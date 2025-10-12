@@ -7,43 +7,43 @@ interface HeaderProps {
 
 export const Header = ({ onCreatePost }: HeaderProps) => {
   return (
-    <header className="sticky top-0 z-50 w-full bg-background border-b">
+    <header className="sticky top-0 z-50 w-full bg-background">
       <div className="flex flex-col">
         {/* Top row with logo and actions */}
-        <div className="flex h-14 items-center justify-between px-4">
-          <h1 className="text-2xl font-bold">Aelixto</h1>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-9 w-9">
-              <Bookmark className="h-5 w-5" />
+        <div className="flex h-16 items-center justify-between px-6">
+          <h1 className="text-3xl font-bold tracking-tight">Aelixto</h1>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="h-10 w-10">
+              <Bookmark className="h-6 w-6 stroke-[1.5]" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-9 w-9">
-              <div className="relative">
-                <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-[10px] font-bold text-white flex items-center justify-center">
-                  3
-                </div>
-                <MessageCircle className="h-5 w-5" />
+            <Button variant="ghost" size="icon" className="h-10 w-10 relative">
+              <MessageCircle className="h-6 w-6 stroke-[1.5]" />
+              <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive text-[11px] font-bold text-white flex items-center justify-center">
+                3
               </div>
             </Button>
           </div>
         </div>
         
-        {/* Action icons row */}
-        <div className="flex items-center justify-around px-4 py-3 border-t border-b">
-          <Button variant="ghost" size="icon" className="h-10 w-10">
-            <Heart className="h-6 w-6" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-10 w-10">
-            <MessageCircle className="h-6 w-6" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-10 w-10">
-            <Repeat2 className="h-6 w-6" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-10 w-10">
-            <Share className="h-6 w-6" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-10 w-10">
-            <Bookmark className="h-6 w-6" />
-          </Button>
+        {/* Action icons row in bordered container */}
+        <div className="mx-4 mb-4 px-6 py-3 border-2 border-foreground rounded-3xl">
+          <div className="flex items-center justify-around">
+            <Button variant="ghost" size="icon" className="h-12 w-12">
+              <Heart className="h-7 w-7 stroke-[1.5]" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-12 w-12">
+              <MessageCircle className="h-7 w-7 stroke-[1.5]" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-12 w-12">
+              <Repeat2 className="h-7 w-7 stroke-[1.5]" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-12 w-12">
+              <Share className="h-7 w-7 stroke-[1.5]" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-12 w-12">
+              <Bookmark className="h-7 w-7 stroke-[1.5]" />
+            </Button>
+          </div>
         </div>
       </div>
     </header>
