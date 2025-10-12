@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Header } from "@/components/Header";
+import { BottomNav } from "@/components/BottomNav";
 import { FeedPost } from "@/components/FeedPost";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { demoPosts } from "@/data/demoData";
@@ -17,7 +18,7 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
       <main className="mx-auto max-w-2xl px-4 py-6">
@@ -27,6 +28,8 @@ const Index = () => {
           ))}
         </div>
       </main>
+
+      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
       <CreatePostDialog 
         open={isCreateDialogOpen} 
