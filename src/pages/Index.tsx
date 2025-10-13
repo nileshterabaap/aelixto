@@ -18,15 +18,13 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-[72px]">
+    <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
-      <main className="mx-auto max-w-2xl px-4 py-4">
+      <main className="mx-auto max-w-2xl px-4 py-6">
         <div className="space-y-4">
-          {demoPosts.map((post, index) => (
-            <div key={post.id} style={{ animationDelay: `${index * 100}ms` }}>
-              <FeedPost post={post} onSave={handleSavePost} />
-            </div>
+          {demoPosts.map((post) => (
+            <FeedPost key={post.id} post={post} onSave={handleSavePost} />
           ))}
         </div>
       </main>

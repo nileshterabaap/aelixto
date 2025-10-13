@@ -38,7 +38,7 @@ All colors MUST be HSL.
 
     --radius: 1.5rem;
     
-    --gradient-sunset: linear-gradient(180deg, hsl(45 100% 65%) 0%, hsl(35 100% 60%) 20%, hsl(25 95% 55%) 40%, hsl(200 70% 50%) 100%);
+    --gradient-sunset: linear-gradient(180deg, hsl(38 100% 70%) 0%, hsl(30 100% 65%) 25%, hsl(25 100% 60%) 50%, hsl(210 60% 45%) 100%);
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -99,9 +99,5 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
-  }
-  
-  html {
-    scroll-behavior: smooth;
   }
 }
