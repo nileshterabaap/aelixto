@@ -25,8 +25,8 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
           </div>
         </div>
         
-        {/* Action icons row in bordered container */}
-        <div className="mx-4 mb-4 px-6 py-3 border-2 border-foreground rounded-3xl">
+        {/* Action icons row */}
+        <div className="mx-4 mb-4">
           <div className="flex items-center justify-around">
             <Button variant="ghost" size="icon" className="h-12 w-12">
               <Heart className="h-7 w-7 stroke-[1.5]" />
