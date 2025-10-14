@@ -24,27 +24,6 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
             </Button>
           </div>
         </div>
-        
-        {/* Action icons row */}
-        <div className="mx-4 mb-4">
-          <div className="flex items-center justify-around">
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <Heart className="h-7 w-7 stroke-[1.5]" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <MessageCircle className="h-7 w-7 stroke-[1.5]" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <Repeat2 className="h-7 w-7 stroke-[1.5]" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <Share className="h-7 w-7 stroke-[1.5]" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <Bookmark className="h-7 w-7 stroke-[1.5]" />
-            </Button>
-          </div>
-        </div>
       </div>
     </header>
   );
