@@ -46,7 +46,7 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
 
         {/* Media */}
         {post.mediaType === 'image' && post.mediaUrl && (
-          <div className="rounded-2xl overflow-hidden mb-4">
+          <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 
               alt="Post content"
@@ -56,7 +56,7 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
         )}
 
         {post.mediaType === 'video' && post.mediaUrl && (
-          <div className="rounded-2xl overflow-hidden mb-4 bg-muted aspect-[4/3] flex items-center justify-center relative">
+          <div className="rounded-2xl overflow-hidden mb-2 bg-muted aspect-[4/3] flex items-center justify-center relative">
             <div className="absolute inset-0">
               <img 
                 src={post.mediaUrl} 
@@ -71,7 +71,7 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
         )}
 
         {/* Actions */}
-        <div className="flex items-center justify-around px-2 py-3">
+        <div className="flex items-center justify-around px-2 py-4 mt-1">
           <button
             onClick={() => setLiked(!liked)}
             className="p-2 hover:opacity-60 transition-opacity"
