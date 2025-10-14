@@ -13,11 +13,11 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
         <div className="flex h-16 items-center justify-between px-6">
           <h1 className="text-3xl font-bold tracking-tight">Aelixto</h1>
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-10 w-10">
-              <Bookmark className="h-6 w-6 stroke-[1.5]" />
+            <Button variant="ghost" size="icon" className="h-20 w-20">
+              <Bookmark className="h-12 w-12 stroke-[1.5]" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-10 w-10 relative">
-              <MessageCircle className="h-6 w-6 stroke-[1.5]" />
+            <Button variant="ghost" size="icon" className="h-20 w-20 relative">
+              <MessageCircle className="h-12 w-12 stroke-[1.5]" />
               <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive text-[11px] font-bold text-white flex items-center justify-center">
                 3
               </div>
@@ -28,20 +28,20 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
         {/* Action icons row in bordered container */}
         <div className="mx-4 mb-4 px-6 py-3 border-2 border-foreground rounded-3xl">
           <div className="flex items-center justify-around">
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <Heart className="h-7 w-7 stroke-[1.5]" />
+            <Button variant="ghost" size="icon" className="h-24 w-24">
+              <Heart className="h-14 w-14 stroke-[1.5]" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <MessageCircle className="h-7 w-7 stroke-[1.5]" />
+            <Button variant="ghost" size="icon" className="h-24 w-24">
+              <MessageCircle className="h-14 w-14 stroke-[1.5]" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <Repeat2 className="h-7 w-7 stroke-[1.5]" />
+            <Button variant="ghost" size="icon" className="h-24 w-24">
+              <Repeat2 className="h-14 w-14 stroke-[2.5]" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <Share className="h-7 w-7 stroke-[1.5]" />
+            <Button variant="ghost" size="icon" className="h-24 w-24">
+              <Share className="h-14 w-14 stroke-[1.5]" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <Bookmark className="h-7 w-7 stroke-[1.5]" />
+            <Button variant="ghost" size="icon" className="h-24 w-24">
+              <Bookmark className="h-14 w-14 stroke-[1.5]" />
             </Button>
           </div>
         </div>

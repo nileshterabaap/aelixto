@@ -77,18 +77,18 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
               variant="ghost"
               size="icon"
               onClick={() => setLiked(!liked)}
-              className="h-12 w-12"
+              className="h-24 w-24"
             >
-              <Heart className={`h-7 w-7 stroke-[1.5] ${liked ? 'fill-destructive text-destructive' : ''}`} />
+              <Heart className={`h-14 w-14 stroke-[1.5] ${liked ? 'fill-destructive text-destructive' : ''}`} />
             </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <MessageCircle className="h-7 w-7 stroke-[1.5]" />
+            <Button variant="ghost" size="icon" className="h-24 w-24">
+              <MessageCircle className="h-14 w-14 stroke-[1.5]" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <Repeat2 className="h-7 w-7 stroke-[1.5]" />
+            <Button variant="ghost" size="icon" className="h-24 w-24">
+              <Repeat2 className="h-14 w-14 stroke-[2.5]" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12">
-              <Share className="h-7 w-7 stroke-[1.5]" />
+            <Button variant="ghost" size="icon" className="h-24 w-24">
+              <Share className="h-14 w-14 stroke-[1.5]" />
             </Button>
           </div>
           <Button
@@ -98,9 +98,9 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
               setSaved(!saved);
               onSave(post.id);
             }}
-            className="h-12 w-12"
+            className="h-24 w-24"
           >
-            <Bookmark className={`h-7 w-7 stroke-[1.5] ${saved ? 'fill-current' : ''}`} />
+            <Bookmark className={`h-14 w-14 stroke-[1.5] ${saved ? 'fill-current' : ''}`} />
           </Button>
         </div>
       </div>

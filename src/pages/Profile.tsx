@@ -22,10 +22,10 @@ const Profile = () => {
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-12 w-12 bg-black/20 hover:bg-black/30 text-white rounded-full"
+            className="h-24 w-24 bg-black/20 hover:bg-black/30 text-white rounded-full"
             onClick={() => navigate("/")}
           >
-            <ArrowLeft className="h-7 w-7" />
+            <ArrowLeft className="h-14 w-14" />
           </Button>
           <div className="text-white text-left flex-1 ml-3">
             <h2 className="text-xl font-bold">Andrew Rollings</h2>
@@ -34,9 +34,9 @@ const Profile = () => {
           <Button 
             variant="ghost" 
             size="icon" 
-            className="h-12 w-12 bg-black/20 hover:bg-black/30 text-white rounded-full"
+            className="h-24 w-24 bg-black/20 hover:bg-black/30 text-white rounded-full"
           >
-            <MoreVertical className="h-7 w-7" />
+            <MoreVertical className="h-14 w-14" />
           </Button>
         </div>
         
@@ -80,7 +80,7 @@ const Profile = () => {
         </p>
 
         {/* Follow Button */}
-        <Button className="mt-5 w-full max-w-xs rounded-full h-12 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90">
+        <Button className="mt-5 w-full max-w-xs rounded-full h-24 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90">
           Follow
         </Button>
 
@@ -95,14 +95,14 @@ const Profile = () => {
 
         {/* Social Links */}
         <div className="flex items-center justify-center gap-10 mt-6">
-          <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl border-2 border-foreground">
-            <Instagram className="h-7 w-7 stroke-[1.5]" />
+          <Button variant="outline" size="icon" className="h-28 w-28 rounded-2xl border-2 border-foreground">
+            <Instagram className="h-14 w-14 stroke-[1.5]" />
           </Button>
-          <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl border-2 border-foreground">
-            <Youtube className="h-7 w-7 stroke-[1.5]" />
+          <Button variant="outline" size="icon" className="h-28 w-28 rounded-2xl border-2 border-foreground">
+            <Youtube className="h-14 w-14 stroke-[1.5]" />
           </Button>
-          <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl border-2 border-foreground">
-            <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <Button variant="outline" size="icon" className="h-28 w-28 rounded-2xl border-2 border-foreground">
+            <svg className="h-14 w-14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
             </svg>
           </Button>
