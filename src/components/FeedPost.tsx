@@ -25,11 +25,11 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
   const [saved, setSaved] = useState(false);
 
   return (
-    <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
-      <div className="p-5">
+    <Card className="overflow-hidden border-[3px] border-foreground rounded-[1.75rem]">
+      <div className="p-4">
         {/* Author Info */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full overflow-hidden bg-muted">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-full overflow-hidden bg-muted">
             <img 
               src={post.mediaUrl} 
               alt={post.author.username}
@@ -37,16 +37,16 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
             />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-base">{post.author.username}</p>
+            <p className="font-bold text-[15px]">{post.author.username}</p>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-            <MoreHorizontal className="h-6 w-6" />
+          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0">
+            <MoreHorizontal className="h-5 w-5" />
           </Button>
         </div>
 
         {/* Media */}
         {post.mediaType === 'image' && post.mediaUrl && (
-          <div className="rounded-2xl overflow-hidden mb-4">
+          <div className="rounded-xl overflow-hidden mb-3">
             <img 
               src={post.mediaUrl} 
               alt="Post content"
@@ -56,7 +56,7 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
         )}
 
         {post.mediaType === 'video' && post.mediaUrl && (
-          <div className="rounded-2xl overflow-hidden mb-4 bg-muted aspect-[4/3] flex items-center justify-center relative">
+          <div className="rounded-xl overflow-hidden mb-3 bg-muted aspect-[4/3] flex items-center justify-center relative">
             <div className="absolute inset-0">
               <img 
                 src={post.mediaUrl} 
@@ -64,44 +64,46 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
                 className="w-full h-full object-cover"
               />
             </div>
-            <div className="relative z-10 h-16 w-16 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+            <div className="relative z-10 h-16 w-16 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center">
               <div className="w-0 h-0 border-l-[16px] border-l-white border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
             </div>
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-0">
+        <div className="border-[3px] border-foreground rounded-[1.5rem] px-2 py-1">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setLiked(!liked)}
+                className="h-11 w-11"
+              >
+                <Heart className={`h-6 w-6 stroke-[2] ${liked ? 'fill-destructive text-destructive' : ''}`} />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-11 w-11">
+                <MessageCircle className="h-6 w-6 stroke-[2]" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-11 w-11">
+                <Repeat2 className="h-6 w-6 stroke-[2]" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-11 w-11">
+                <Share className="h-6 w-6 stroke-[2]" />
+              </Button>
+            </div>
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => setLiked(!liked)}
-              className="h-24 w-24"
+              onClick={() => {
+                setSaved(!saved);
+                onSave(post.id);
+              }}
+              className="h-11 w-11"
             >
-              <Heart className={`h-14 w-14 stroke-[1.5] ${liked ? 'fill-destructive text-destructive' : ''}`} />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-24 w-24">
-              <MessageCircle className="h-14 w-14 stroke-[1.5]" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-24 w-24">
-              <Repeat2 className="h-14 w-14 stroke-[2.5]" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-24 w-24">
-              <Share className="h-14 w-14 stroke-[1.5]" />
+              <Bookmark className={`h-6 w-6 stroke-[2] ${saved ? 'fill-current' : ''}`} />
             </Button>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              setSaved(!saved);
-              onSave(post.id);
-            }}
-            className="h-24 w-24"
-          >
-            <Bookmark className={`h-14 w-14 stroke-[1.5] ${saved ? 'fill-current' : ''}`} />
-          </Button>
         </div>
       </div>
     </Card>
