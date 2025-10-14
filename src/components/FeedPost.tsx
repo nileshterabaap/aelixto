@@ -71,35 +71,31 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
         )}
 
         {/* Actions */}
-        <div className="flex items-center justify-around">
-          <Button
-            variant="ghost"
-            size="icon"
+        <div className="flex items-center justify-around px-2 py-3">
+          <button
             onClick={() => setLiked(!liked)}
-            className="h-12 w-12"
+            className="p-2 hover:opacity-60 transition-opacity"
           >
-            <Heart className={`h-7 w-7 stroke-[1.5] ${liked ? 'fill-destructive text-destructive' : ''}`} />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-12 w-12">
-            <MessageCircle className="h-7 w-7 stroke-[1.5]" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-12 w-12">
-            <Repeat2 className="h-7 w-7 stroke-[1.5]" />
-          </Button>
-          <Button variant="ghost" size="icon" className="h-12 w-12">
-            <Share className="h-7 w-7 stroke-[1.5]" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
+            <Heart className={`h-7 w-7 stroke-[2] ${liked ? 'fill-red-500 text-red-500' : 'fill-none'}`} />
+          </button>
+          <button className="p-2 hover:opacity-60 transition-opacity">
+            <MessageCircle className="h-7 w-7 stroke-[2] fill-none" />
+          </button>
+          <button className="p-2 hover:opacity-60 transition-opacity">
+            <Repeat2 className="h-7 w-7 stroke-[2]" />
+          </button>
+          <button className="p-2 hover:opacity-60 transition-opacity">
+            <Share className="h-7 w-7 stroke-[2]" />
+          </button>
+          <button
             onClick={() => {
               setSaved(!saved);
               onSave(post.id);
             }}
-            className="h-12 w-12"
+            className="p-2 hover:opacity-60 transition-opacity"
           >
-            <Bookmark className={`h-7 w-7 stroke-[1.5] ${saved ? 'fill-current' : ''}`} />
-          </Button>
+            <Bookmark className={`h-7 w-7 stroke-[2] ${saved ? 'fill-current' : 'fill-none'}`} />
+          </button>
         </div>
       </div>
     </Card>
