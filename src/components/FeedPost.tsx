@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreHorizontal } from "lucide-react";
+import { Heart, MessageCircle, ArrowLeftRight, Share, Bookmark, MoreHorizontal } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { Post } from "@/data/demoData";
@@ -82,7 +82,7 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
             <MessageCircle className="h-7 w-7 stroke-[2] fill-none" />
           </button>
           <button className="p-2 hover:opacity-60 transition-opacity">
-            <Repeat2 className="h-7 w-7 stroke-[2]" />
+            <ArrowLeftRight className="h-7 w-7 stroke-[2]" />
           </button>
           <button className="p-2 hover:opacity-60 transition-opacity">
             <Share className="h-7 w-7 stroke-[2]" />
