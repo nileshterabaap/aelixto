@@ -14,10 +14,10 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
           <h1 className="text-3xl font-bold tracking-tight">Aelixto</h1>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" className="h-10 w-10">
-              <Bookmark className="h-6 w-6 stroke-[2]" />
+              <Bookmark className="h-7 w-7 stroke-[2.5]" />
             </Button>
             <Button variant="ghost" size="icon" className="h-10 w-10 relative">
-              <MessageCircle className="h-6 w-6 stroke-[2]" />
+              <MessageCircle className="h-7 w-7 stroke-[2.5]" />
               <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive text-[11px] font-bold text-white flex items-center justify-center">
                 3
               </div>
