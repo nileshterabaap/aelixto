@@ -76,16 +76,16 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
             onClick={() => setLiked(!liked)}
             className="p-2 hover:opacity-60 transition-opacity"
           >
-            <Heart className={`h-7 w-7 stroke-[2] ${liked ? 'fill-red-500 text-red-500' : 'fill-none'}`} />
+            <Heart className={`h-7 w-7 stroke-[1.5] ${liked ? 'fill-red-500 text-red-500' : 'fill-none'}`} />
           </button>
           <button className="p-2 hover:opacity-60 transition-opacity">
-            <MessageCircle className="h-7 w-7 stroke-[2] fill-none" />
+            <MessageCircle className="h-7 w-7 stroke-[1.5] fill-none" />
           </button>
           <button className="p-2 hover:opacity-60 transition-opacity">
-            <Repeat2 className="h-7 w-7 stroke-[2]" />
+            <Repeat2 className="h-8 w-8 stroke-[2.5]" />
           </button>
           <button className="p-2 hover:opacity-60 transition-opacity">
-            <Share className="h-7 w-7 stroke-[2]" />
+            <Share className="h-7 w-7 stroke-[1.5]" />
           </button>
           <button
             onClick={() => {
@@ -94,7 +94,7 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
             }}
             className="p-2 hover:opacity-60 transition-opacity"
           >
-            <Bookmark className={`h-7 w-7 stroke-[2] ${saved ? 'fill-current' : 'fill-none'}`} />
+            <Bookmark className={`h-7 w-7 stroke-[1.5] ${saved ? 'fill-current' : 'fill-none'}`} />
           </button>
         </div>
       </div>
