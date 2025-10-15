@@ -18,24 +18,24 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
         <Button 
           variant="ghost" 
           size="icon" 
-          className="h-14 w-14"
+          className="h-16 w-16"
           onClick={() => navigate("/")}
         >
-          <Home className={`h-10 w-10 stroke-[2.5] ${isActive("/") ? "fill-current" : ""}`} />
+          <Home className={`h-12 w-12 stroke-[2.5] ${isActive("/") ? "fill-current" : ""}`} />
         </Button>
         
         <Button 
           variant="ghost" 
           size="icon" 
-          className="h-14 w-14"
+          className="h-16 w-16"
           onClick={() => navigate("/discover")}
         >
-          <Compass className={`h-10 w-10 stroke-[2.5] ${isActive("/discover") ? "fill-current" : ""}`} />
+          <Compass className={`h-12 w-12 stroke-[2.5] ${isActive("/discover") ? "fill-current" : ""}`} />
         </Button>
         
         <Button 
           size="icon" 
-          className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90"
+          className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90 shadow-lg"
           onClick={onCreatePost}
         >
           <Plus className="h-9 w-9 text-primary-foreground stroke-[2.5]" />
@@ -44,10 +44,10 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
         <Button 
           variant="ghost" 
           size="icon" 
-          className="h-14 w-14 relative"
+          className="h-16 w-16 relative"
           onClick={() => navigate("/notifications")}
         >
-          <Bell className={`h-10 w-10 stroke-[2.5] ${isActive("/notifications") ? "fill-current" : ""}`} />
+          <Bell className={`h-12 w-12 stroke-[2.5] ${isActive("/notifications") ? "fill-current" : ""}`} />
           <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-destructive text-[11px] font-bold text-white flex items-center justify-center">
             7
           </div>
@@ -56,10 +56,10 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
         <Button 
           variant="ghost" 
           size="icon" 
-          className="h-14 w-14"
+          className="h-16 w-16"
           onClick={() => navigate("/profile")}
         >
-          <User className={`h-10 w-10 stroke-[2.5] ${isActive("/profile") ? "fill-current" : ""}`} />
+          <User className={`h-12 w-12 stroke-[2.5] ${isActive("/profile") ? "fill-current" : ""}`} />
         </Button>
       </div>
     </nav>
