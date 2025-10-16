@@ -96,7 +96,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
           aria-label="Create post"
           onClick={onCreatePost}
           className="absolute left-1/2 -top-5 -translate-x-1/2 h-14 w-14 rounded-2xl bg-black text-white 
-                     shadow-[0_12px_24px_rgba(0,0,0,0.8),0_6px_12px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-transform"
+                     hover:scale-105 active:scale-95 transition-transform"
         >
           <Plus className="mx-auto h-6 w-6 stroke-[3] text-white" />
         </button>
