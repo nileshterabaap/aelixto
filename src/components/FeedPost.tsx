@@ -24,29 +24,27 @@ const formatTimestamp = (date: Date) => {
   return `${Math.floor(hours / 24)}d ago`;
 };
 
-const detectPlatform = (url?: string) => {
-  if (!url) return null;
+const getPlatformIcon = (platform?: string) => {
+  if (!platform) return null;
   
-  const urlLower = url.toLowerCase();
-  if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) {
-    return { name: 'YouTube', icon: youtubeIcon };
+  switch (platform) {
+    case 'youtube':
+      return { name: 'YouTube', icon: youtubeIcon };
+    case 'tiktok':
+      return { name: 'TikTok', icon: tiktokIcon };
+    case 'instagram':
+      return { name: 'Instagram', icon: instagramIcon };
+    case 'reddit':
+      return { name: 'Reddit', icon: redditIcon };
+    default:
+      return null;
   }
-  if (urlLower.includes('tiktok.com')) {
-    return { name: 'TikTok', icon: tiktokIcon };
-  }
-  if (urlLower.includes('instagram.com')) {
-    return { name: 'Instagram', icon: instagramIcon };
-  }
-  if (urlLower.includes('reddit.com')) {
-    return { name: 'Reddit', icon: redditIcon };
-  }
-  return null;
 };
 
 export const FeedPost = ({ post, onSave }: FeedPostProps) => {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
-  const platform = detectPlatform(post.mediaUrl);
+  const platform = getPlatformIcon(post.platform);
 
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
