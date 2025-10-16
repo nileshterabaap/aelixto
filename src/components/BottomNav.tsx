@@ -11,7 +11,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
 
-  const baseIcon = "h-12 w-12 text-black";
+  const baseIcon = "h-8 w-8 text-black";
   const activeIcon = "opacity-100";
   const inactiveIcon = "opacity-60 hover:opacity-100 transition-opacity";
 
@@ -20,13 +20,13 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
       {/* max width like your feed */}
       <div className="relative mx-auto max-w-md">
         {/* 5 columns: 1=home, 2=discover, 3=empty (for FAB), 4=notifications, 5=profile */}
-        <div className="grid grid-cols-5 place-items-center h-20 px-4">
+        <div className="grid grid-cols-5 place-items-center h-14 px-4">
           {/* Home */}
           <Button
             aria-label="Home"
             variant="ghost"
             size="icon"
-            className="h-20 w-20"
+            className="h-14 w-14"
             onClick={() => navigate("/")}
           >
             <Home
@@ -40,7 +40,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Explore"
             variant="ghost"
             size="icon"
-            className="h-20 w-20"
+            className="h-14 w-14"
             onClick={() => navigate("/discover")}
           >
             <Compass
@@ -50,14 +50,14 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
           </Button>
 
           {/* spacer for center FAB */}
-          <div aria-hidden className="h-12 w-12" />
+          <div aria-hidden className="h-8 w-8" />
 
           {/* Notifications */}
           <Button
             aria-label="Notifications"
             variant="ghost"
             size="icon"
-            className="relative h-20 w-20"
+            className="relative h-14 w-14"
             onClick={() => navigate("/notifications")}
           >
             <Bell
@@ -65,7 +65,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               className={`${baseIcon} ${isActive("/notifications") ? activeIcon : inactiveIcon}`}
             />
             {/* red badge */}
-            <span className="absolute top-3 right-3 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white ring-2 ring-white">
+            <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white ring-2 ring-white">
               7
             </span>
           </Button>
@@ -75,7 +75,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Profile"
             variant="ghost"
             size="icon"
-            className="h-20 w-20"
+            className="h-14 w-14"
             onClick={() => navigate("/profile")}
           >
             <User
@@ -87,18 +87,18 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
 
         {/* Floating center + button (rounded square) */}
         {/* Soft oval shadow underneath to match your screenshot */}
-        <div className="pointer-events-none absolute left-1/2 -top-5 -translate-x-1/2 w-24 h-10">
-          <div className="absolute left-1/2 top-[52px] -translate-x-1/2 h-3 w-16 rounded-full bg-black/30 blur-md" />
-          <div className="absolute left-1/2 top-[40px] -translate-x-1/2 h-4 w-20 rounded-full bg-black/10 blur-lg" />
+        <div className="pointer-events-none absolute left-1/2 -top-4 -translate-x-1/2 w-20 h-8">
+          <div className="absolute left-1/2 top-[40px] -translate-x-1/2 h-2 w-14 rounded-full bg-black/30 blur-md" />
+          <div className="absolute left-1/2 top-[32px] -translate-x-1/2 h-3 w-16 rounded-full bg-black/10 blur-lg" />
         </div>
 
         <button
           aria-label="Create post"
           onClick={onCreatePost}
-          className="absolute left-1/2 -top-5 -translate-x-1/2 h-14 w-14 rounded-2xl bg-black text-white 
+          className="absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-2xl bg-black text-white 
                      hover:scale-105 active:scale-95 transition-transform"
         >
-          <Plus className="mx-auto h-6 w-6 stroke-[3] text-white" />
+          <Plus className="mx-auto h-5 w-5 stroke-[3] text-white" />
         </button>
       </div>
     </nav>
