@@ -65,7 +65,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               className={`${baseIcon} ${isActive("/notifications") ? activeIcon : inactiveIcon}`}
             />
             {/* red badge */}
-            <span className="absolute -top-0.5 -right-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white ring-2 ring-white">
+            <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white ring-2 ring-white">
               7
             </span>
           </Button>
@@ -96,7 +96,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
           aria-label="Create post"
           onClick={onCreatePost}
           className="absolute left-1/2 -top-7 -translate-x-1/2 h-14 w-14 rounded-2xl bg-black text-white 
-                     shadow-[0_10px_16px_rgba(0,0,0,0.35)] hover:scale-105 active:scale-95 transition-transform"
+                     shadow-[0_10px_16px_rgba(0,0,0,0.6)] hover:scale-105 active:scale-95 transition-transform"
         >
           <Plus className="mx-auto h-6 w-6 stroke-[3] text-white" />
         </button>
