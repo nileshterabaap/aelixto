@@ -21,8 +21,8 @@ const Index = () => {
     <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
-      <main className="mx-auto max-w-2xl px-0 py-0">
-        <div className="space-y-0">
+      <main className="mx-auto max-w-2xl px-4 py-6">
+        <div className="space-y-4">
           {demoPosts.map((post) => (
             <FeedPost key={post.id} post={post} onSave={handleSavePost} />
           ))}
