@@ -12,7 +12,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const isActive = (path: string) => location.pathname === path;
 
   const baseIcon =
-    "h-9 w-9 stroke-[2.5] text-black"; // outlined, black
+    "h-9 w-9 text-black"; // filled, black
   const activeIcon =
     "opacity-100";
   const inactiveIcon =
@@ -33,6 +33,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               onClick={() => navigate("/")}
             >
               <Home
+                fill="currentColor"
                 className={`${baseIcon} ${
                   isActive("/") ? activeIcon : inactiveIcon
                 }`}
@@ -47,6 +48,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               onClick={() => navigate("/discover")}
             >
               <Compass
+                strokeWidth={2.5}
                 className={`${baseIcon} ${
                   isActive("/discover") ? activeIcon : inactiveIcon
                 }`}
@@ -63,6 +65,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               onClick={() => navigate("/notifications")}
             >
               <Bell
+                fill="currentColor"
                 className={`${baseIcon} ${
                   isActive("/notifications") ? activeIcon : inactiveIcon
                 }`}
@@ -81,6 +84,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               onClick={() => navigate("/profile")}
             >
               <User
+                strokeWidth={2.5}
                 className={`${baseIcon} ${
                   isActive("/profile") ? activeIcon : inactiveIcon
                 }`}
