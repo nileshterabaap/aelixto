@@ -20,7 +20,7 @@ export const demoPosts: Post[] = [
     title: 'Portfolio Launch',
     content: 'Just launched my new portfolio! What do you think?',
     mediaType: 'image',
-    mediaUrl: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800',
+    mediaUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1',
     timestamp: new Date(Date.now() - 1000 * 60 * 15),
     saves: 42
   },
@@ -39,7 +39,7 @@ export const demoPosts: Post[] = [
     title: 'Behind the Scenes',
     content: 'Behind the scenes of today\'s shoot. The lighting was perfect!',
     mediaType: 'video',
-    mediaUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    mediaUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ&v=2',
     timestamp: new Date(Date.now() - 1000 * 60 * 45),
     saves: 89
   },
@@ -49,7 +49,7 @@ export const demoPosts: Post[] = [
     title: 'Book Recommendation',
     content: 'Currently reading "Atomic Habits" and it\'s mind-blowing. Highly recommend!',
     mediaType: 'image',
-    mediaUrl: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=800',
+    mediaUrl: 'https://www.instagram.com/p/example123',
     timestamp: new Date(Date.now() - 1000 * 60 * 60),
     saves: 234
   },
@@ -59,7 +59,7 @@ export const demoPosts: Post[] = [
     title: 'New Setup',
     content: 'New coding setup complete! Clean desk = clean code 🖥️',
     mediaType: 'image',
-    mediaUrl: 'https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800',
+    mediaUrl: 'https://www.tiktok.com/@user/video/1234567890',
     timestamp: new Date(Date.now() - 1000 * 60 * 90),
     saves: 67
   },
@@ -69,7 +69,7 @@ export const demoPosts: Post[] = [
     title: 'Homemade Ramen',
     content: 'Homemade ramen recipe that\'s easier than you think!',
     mediaType: 'video',
-    mediaUrl: 'https://www.youtube.com/watch?v=example2',
+    mediaUrl: 'https://www.reddit.com/r/cooking/comments/example',
     timestamp: new Date(Date.now() - 1000 * 60 * 120),
     saves: 156
   },
