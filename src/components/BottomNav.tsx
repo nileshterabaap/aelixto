@@ -1,9 +1,10 @@
-import { Home, Search, PlusCircle, Heart, User } from "lucide-react";
+import { Home, Compass, Plus, Bell, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 
-type BottomNavProps = {
+interface BottomNavProps {
   onCreatePost: () => void;
-};
+}
 
 export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const navigate = useNavigate();
@@ -12,53 +13,54 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
-      <div className="mx-auto max-w-2xl px-4">
-        <div className="flex items-center justify-around py-2">
-          <button
-            onClick={() => navigate("/")}
-            className={`flex flex-col items-center justify-center h-16 w-16 rounded-lg transition-colors ${
-              isActive("/") ? "text-foreground" : "text-muted-foreground"
-            }`}
-            aria-label="Home"
-          >
-            <Home className="h-12 w-12 stroke-[2.5]" />
-          </button>
-
-          <button
-            onClick={() => {}}
-            className="flex flex-col items-center justify-center h-16 w-16 rounded-lg text-muted-foreground transition-colors"
-            aria-label="Search"
-          >
-            <Search className="h-12 w-12 stroke-[2.5]" />
-          </button>
-
-          <button
-            onClick={onCreatePost}
-            className="flex flex-col items-center justify-center h-16 w-16 rounded-lg text-foreground transition-colors shadow-lg"
-            aria-label="Create Post"
-          >
-            <PlusCircle className="h-12 w-12 stroke-[2.5]" />
-          </button>
-
-          <button
-            onClick={() => {}}
-            className="flex flex-col items-center justify-center h-16 w-16 rounded-lg text-muted-foreground transition-colors"
-            aria-label="Notifications"
-          >
-            <Heart className="h-12 w-12 stroke-[2.5]" />
-          </button>
-
-          <button
-            onClick={() => navigate("/profile")}
-            className={`flex flex-col items-center justify-center h-16 w-16 rounded-lg transition-colors ${
-              isActive("/profile") ? "text-foreground" : "text-muted-foreground"
-            }`}
-            aria-label="Profile"
-          >
-            <User className="h-12 w-12 stroke-[2.5]" />
-          </button>
-        </div>
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t-2 border-foreground">
+      <div className="flex items-center justify-around h-20 max-w-2xl mx-auto px-6">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-16 w-16"
+          onClick={() => navigate("/")}
+        >
+          <Home className={`h-12 w-12 stroke-[2.5] ${isActive("/") ? "fill-current" : ""}`} />
+        </Button>
+        
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-16 w-16"
+          onClick={() => navigate("/discover")}
+        >
+          <Compass className={`h-12 w-12 stroke-[2.5] ${isActive("/discover") ? "fill-current" : ""}`} />
+        </Button>
+        
+        <Button 
+          size="icon" 
+          className="h-16 w-16 rounded-full bg-primary hover:bg-primary/90 shadow-lg"
+          onClick={onCreatePost}
+        >
+          <Plus className="h-9 w-9 text-primary-foreground stroke-[2.5]" />
+        </Button>
+        
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-16 w-16 relative"
+          onClick={() => navigate("/notifications")}
+        >
+          <Bell className={`h-12 w-12 stroke-[2.5] ${isActive("/notifications") ? "fill-current" : ""}`} />
+          <div className="absolute top-2 right-2 h-5 w-5 rounded-full bg-destructive text-[11px] font-bold text-white flex items-center justify-center">
+            7
+          </div>
+        </Button>
+        
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-16 w-16"
+          onClick={() => navigate("/profile")}
+        >
+          <User className={`h-12 w-12 stroke-[2.5] ${isActive("/profile") ? "fill-current" : ""}`} />
+        </Button>
       </div>
     </nav>
   );
