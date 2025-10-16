@@ -12,14 +12,14 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const isActive = (path: string) => location.pathname === path;
 
   const baseIcon =
-    "h-7 w-7 stroke-[2.5] text-black"; // outlined, black
+    "h-9 w-9 stroke-[2.5] text-black"; // outlined, black
   const activeIcon =
     "opacity-100";
   const inactiveIcon =
     "opacity-60 hover:opacity-100 transition-opacity";
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-black/90">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-white">
       {/* container to center content and allow the floating + to overlap */}
       <div className="relative max-w-md mx-auto">
         {/* row of 4 side icons (2 left, 2 right)  */}
@@ -29,7 +29,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               aria-label="Home"
               variant="ghost"
               size="icon"
-              className="h-10 w-10"
+              className="h-14 w-14"
               onClick={() => navigate("/")}
             >
               <Home
@@ -43,7 +43,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               aria-label="Explore"
               variant="ghost"
               size="icon"
-              className="h-10 w-10"
+              className="h-14 w-14"
               onClick={() => navigate("/discover")}
             >
               <Compass
@@ -59,7 +59,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               aria-label="Notifications"
               variant="ghost"
               size="icon"
-              className="relative h-10 w-10"
+              className="relative h-14 w-14"
               onClick={() => navigate("/notifications")}
             >
               <Bell
@@ -77,7 +77,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               aria-label="Profile"
               variant="ghost"
               size="icon"
-              className="h-10 w-10"
+              className="h-14 w-14"
               onClick={() => navigate("/profile")}
             >
               <User
@@ -93,7 +93,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
         <button
           aria-label="Create post"
           onClick={onCreatePost}
-          className="absolute left-1/2 -top-6 -translate-x-1/2 h-14 w-14 rounded-full bg-black text-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] ring-2 ring-black hover:scale-105 active:scale-95 transition-transform"
+          className="absolute left-1/2 -top-6 -translate-x-1/2 h-14 w-14 rounded-2xl bg-black text-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] ring-2 ring-black hover:scale-105 active:scale-95 transition-transform"
         >
           <Plus className="mx-auto h-7 w-7 stroke-[3] text-white" />
         </button>
