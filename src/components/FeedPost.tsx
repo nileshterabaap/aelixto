@@ -85,11 +85,11 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
               }`}
             />
             {platform && (
-              <div className="absolute top-3 right-3 bg-white/90 rounded-lg p-1.5">
+              <div className="absolute top-3 right-3 bg-white/90 rounded-full p-2">
                 <img 
                   src={platform.icon} 
                   alt={platform.name}
-                  className="w-8 h-8"
+                  className="w-6 h-6"
                 />
               </div>
             )}
@@ -110,11 +110,11 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
               />
             </div>
             {platform && (
-              <div className="absolute top-3 right-3 z-20 bg-white/90 rounded-lg p-1.5">
+              <div className="absolute top-3 right-3 z-20 bg-white/90 rounded-full p-2">
                 <img 
                   src={platform.icon} 
                   alt={platform.name}
-                  className="w-8 h-8"
+                  className="w-6 h-6"
                 />
               </div>
             )}

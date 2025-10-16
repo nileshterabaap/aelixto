@@ -17,7 +17,7 @@ export interface Post {
 export const demoPosts: Post[] = [
   {
     id: '1',
-    author: { name: 'MrBeast', username: 'mrbeast', avatar: '🎬' },
+    author: { name: 'Jake Thompson', username: 'jakethompson', avatar: '🎬' },
     title: 'I Built 100 Wells In Africa',
     content: 'This changed everything. Watch till the end 🌍',
     mediaType: 'video',
@@ -28,7 +28,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '2',
-    author: { name: 'Bella Poarch', username: 'bellapoarch', avatar: '🎵' },
+    author: { name: 'Emily Rose', username: 'emilyrose', avatar: '🎵' },
     title: '',
     content: '#fyp #viral #dance 💃✨',
     mediaType: 'video',
@@ -39,7 +39,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '3',
-    author: { name: 'Selena Gomez', username: 'selenagomez', avatar: '⭐' },
+    author: { name: 'Sarah Miller', username: 'sarahmiller', avatar: '⭐' },
     title: '',
     content: 'Golden hour ✨',
     mediaType: 'image',
@@ -50,7 +50,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '4',
-    author: { name: 'Tech Tips', username: 'u/techproductivity', avatar: '💻' },
+    author: { name: 'Alex Chen', username: 'u/techproductivity', avatar: '💻' },
     title: 'My productivity setup after 5 years of refinement',
     content: 'Finally achieved my dream desk setup. Monitor: LG 38" ultrawide, Keyboard: Custom mechanical...',
     mediaType: 'image',
@@ -61,7 +61,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '5',
-    author: { name: 'Khaby Lame', username: 'khaby.lame', avatar: '😂' },
+    author: { name: 'Marcus Johnson', username: 'marcusj', avatar: '😂' },
     title: '',
     content: 'why make it complicated? 🤷‍♂️ #comedy #lifehacks',
     mediaType: 'video',
@@ -72,7 +72,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '6',
-    author: { name: 'MKBHD', username: 'mkbhd', avatar: '📱' },
+    author: { name: 'David Park', username: 'davidpark', avatar: '📱' },
     title: 'iPhone 15 Pro Review: The Titanium Difference!',
     content: 'Is the new titanium design worth it? Full review is here!',
     mediaType: 'video',
@@ -83,9 +83,9 @@ export const demoPosts: Post[] = [
   },
   {
     id: '7',
-    author: { name: 'Kylie Jenner', username: 'kyliejenner', avatar: '💄' },
+    author: { name: 'Jessica Lee', username: 'jessicalee', avatar: '💄' },
     title: '',
-    content: 'new Kylie Cosmetics drop tomorrow 💋',
+    content: 'new makeup collection drop tomorrow 💋',
     mediaType: 'image',
     mediaUrl: 'https://images.unsplash.com/photo-1586297135537-94bc9ba060aa?w=800&h=800',
     platform: 'instagram',
@@ -94,7 +94,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '8',
-    author: { name: 'Gaming Pro', username: 'u/pcmasterrace', avatar: '🎮' },
+    author: { name: 'Ryan Martinez', username: 'u/pcmasterrace', avatar: '🎮' },
     title: 'Just finished my first custom water-cooled build',
     content: 'After 6 months of planning and saving, my dream PC is finally complete. Specs in comments!',
     mediaType: 'image',
@@ -105,7 +105,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '9',
-    author: { name: 'Charli D\'Amelio', username: 'charlidamelio', avatar: '💃' },
+    author: { name: 'Olivia Brown', username: 'oliviabrown', avatar: '💃' },
     title: '',
     content: 'learned this in 10 mins lol #dancechallenge #foryou',
     mediaType: 'video',
@@ -116,7 +116,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '10',
-    author: { name: 'Dude Perfect', username: 'dudeperfect', avatar: '🏀' },
+    author: { name: 'Tyler Wilson', username: 'tylerwilson', avatar: '🏀' },
     title: 'Impossible Trick Shots 2024',
     content: 'Our craziest shots yet! Which one was your favorite? 🎯',
     mediaType: 'video',
@@ -127,7 +127,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '11',
-    author: { name: 'Ariana Grande', username: 'arianagrande', avatar: '🎤' },
+    author: { name: 'Mia Anderson', username: 'miaanderson', avatar: '🎤' },
     title: '',
     content: 'thank u, next 🤍',
     mediaType: 'image',
@@ -138,7 +138,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '12',
-    author: { name: 'Food Lover', username: 'u/foodporn', avatar: '🍜' },
+    author: { name: 'Chris Taylor', username: 'u/foodporn', avatar: '🍜' },
     title: '[Homemade] Tonkotsu Ramen with chashu pork',
     content: 'Spent 18 hours on the broth. Totally worth it!',
     mediaType: 'image',
@@ -149,7 +149,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '13',
-    author: { name: 'Addison Rae', username: 'addisonrae', avatar: '✨' },
+    author: { name: 'Sophie Davis', username: 'sophiedavis', avatar: '✨' },
     title: '',
     content: 'obsessed with this sound 🎶 #trending',
     mediaType: 'video',
@@ -160,9 +160,9 @@ export const demoPosts: Post[] = [
   },
   {
     id: '14',
-    author: { name: 'Cristiano Ronaldo', username: 'cristiano', avatar: '⚽' },
+    author: { name: 'Michael Garcia', username: 'michaelgarcia', avatar: '⚽' },
     title: '',
-    content: 'Training hard 💪🔥 #CR7',
+    content: 'Training hard 💪🔥 #fitness',
     mediaType: 'image',
     mediaUrl: 'https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=800&h=800',
     platform: 'instagram',
@@ -171,7 +171,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '15',
-    author: { name: 'Veritasium', username: 'veritasium', avatar: '🔬' },
+    author: { name: 'Nathan Brooks', username: 'nathanbrooks', avatar: '🔬' },
     title: 'The Real Reason SpaceX Landed Starship',
     content: 'This engineering feat is more impressive than you think. Here\'s why:',
     mediaType: 'video',
@@ -182,7 +182,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '16',
-    author: { name: 'Travel Guru', username: 'u/travel', avatar: '✈️' },
+    author: { name: 'Emma White', username: 'u/travel', avatar: '✈️' },
     title: 'Santorini sunset - no filter needed',
     content: 'This view never gets old. Best time to visit is September!',
     mediaType: 'image',
@@ -193,7 +193,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '17',
-    author: { name: 'Zach King', username: 'zachking', avatar: '🎩' },
+    author: { name: 'Ethan Clark', username: 'ethanclark', avatar: '🎩' },
     title: '',
     content: 'wait for it... 🪄✨ #magic #satisfying',
     mediaType: 'video',
@@ -204,7 +204,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '18',
-    author: { name: 'Dwayne Johnson', username: 'therock', avatar: '💪' },
+    author: { name: 'Daniel Rodriguez', username: 'danielrodriguez', avatar: '💪' },
     title: '',
     content: 'It\'s about drive, it\'s about power 🔥',
     mediaType: 'image',
@@ -215,7 +215,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '19',
-    author: { name: 'Linus Tech Tips', username: 'linustechtips', avatar: '🖥️' },
+    author: { name: 'Kevin Zhang', username: 'kevinzhang', avatar: '🖥️' },
     title: 'I Bought a $20,000 Gaming PC',
     content: 'Is it actually 10x better? Let\'s find out with some benchmarks!',
     mediaType: 'video',
@@ -226,7 +226,7 @@ export const demoPosts: Post[] = [
   },
   {
     id: '20',
-    author: { name: 'NASA', username: 'nasa', avatar: '🚀' },
+    author: { name: 'Rachel Kim', username: 'rachelkim', avatar: '🚀' },
     title: '',
     content: 'The James Webb Space Telescope captured this 🌌',
     mediaType: 'image',
