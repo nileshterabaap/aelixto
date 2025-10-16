@@ -3,6 +3,10 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { Post } from "@/data/demoData";
 import { useState } from "react";
+import youtubeIcon from "@/assets/youtube-icon.png";
+import instagramIcon from "@/assets/instagram-icon.png";
+import tiktokIcon from "@/assets/tiktok-icon.png";
+import redditIcon from "@/assets/reddit-icon.png";
 
 interface FeedPostProps {
   post: Post;
@@ -20,9 +24,29 @@ const formatTimestamp = (date: Date) => {
   return `${Math.floor(hours / 24)}d ago`;
 };
 
+const detectPlatform = (url?: string) => {
+  if (!url) return null;
+  
+  const urlLower = url.toLowerCase();
+  if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) {
+    return { name: 'YouTube', icon: youtubeIcon };
+  }
+  if (urlLower.includes('tiktok.com')) {
+    return { name: 'TikTok', icon: tiktokIcon };
+  }
+  if (urlLower.includes('instagram.com')) {
+    return { name: 'Instagram', icon: instagramIcon };
+  }
+  if (urlLower.includes('reddit.com')) {
+    return { name: 'Reddit', icon: redditIcon };
+  }
+  return null;
+};
+
 export const FeedPost = ({ post, onSave }: FeedPostProps) => {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
+  const platform = detectPlatform(post.mediaUrl);
 
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
@@ -52,12 +76,21 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
 
         {/* Media */}
         {post.mediaType === 'image' && post.mediaUrl && (
-          <div className="rounded-2xl overflow-hidden mb-2">
+          <div className="rounded-2xl overflow-hidden mb-2 relative">
             <img 
               src={post.mediaUrl} 
               alt="Post content"
               className="w-full h-auto aspect-[4/3] object-cover"
             />
+            {platform && (
+              <div className="absolute top-3 right-3">
+                <img 
+                  src={platform.icon} 
+                  alt={platform.name}
+                  className="w-6 h-6 opacity-70"
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -70,6 +103,15 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
                 className="w-full h-full object-cover"
               />
             </div>
+            {platform && (
+              <div className="absolute top-3 right-3 z-20">
+                <img 
+                  src={platform.icon} 
+                  alt={platform.name}
+                  className="w-6 h-6 opacity-70"
+                />
+              </div>
+            )}
             <div className="relative z-10 h-16 w-16 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
               <div className="w-0 h-0 border-l-[16px] border-l-white border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
             </div>
