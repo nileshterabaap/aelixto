@@ -60,16 +60,14 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             className="relative h-20 w-20"
             onClick={() => navigate("/notifications")}
           >
-            <div className="relative">
-              <Bell
-                fill="currentColor"
-                className={`${baseIcon} ${isActive("/notifications") ? activeIcon : inactiveIcon}`}
-              />
-              {/* red badge */}
-              <span className="absolute -top-1 -right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white ring-2 ring-white">
-                7
-              </span>
-            </div>
+            <Bell
+              fill="currentColor"
+              className={`${baseIcon} ${isActive("/notifications") ? activeIcon : inactiveIcon}`}
+            />
+            {/* red badge */}
+            <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white ring-2 ring-white">
+              7
+            </span>
           </Button>
 
           {/* Profile */}
