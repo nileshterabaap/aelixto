@@ -11,44 +11,22 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
 
-  // Bigger icons
-  const baseIcon = "h-9 w-9 text-black";
+  const baseIcon = "h-7 w-7 text-black";
   const activeIcon = "opacity-100";
   const inactiveIcon = "opacity-60 hover:opacity-100 transition-opacity";
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-t border-transparent pb-[env(safe-area-inset-bottom)]">
+      {/* max width like your feed */}
       <div className="relative mx-auto max-w-md">
-        {/* --- Curved notch background under the FAB --- */}
-        <div className="pointer-events-none absolute left-0 right-0 -top-8 h-[104px]">
-          <svg
-            viewBox="0 0 1000 104"
-            preserveAspectRatio="none"
-            className="w-full h-full"
-          >
-            {/* white bar */}
-            <path d="M0,0 H1000 V104 H0 Z" fill="white" />
-            {/* notch dip (centered) */}
-            <path
-              d="
-                M 450 0
-                C 470 0, 485 16, 500 16
-                C 515 16, 530 0, 550 0
-                L 550 0 L 450 0 Z
-              "
-              fill="white"
-            />
-          </svg>
-        </div>
-
-        {/* 5 columns: 1=home, 2=discover, 3=spacer, 4=notifications, 5=profile */}
-        <div className="grid grid-cols-5 place-items-center h-20 px-6 border-t border-transparent">
+        {/* 5 columns: 1=home, 2=discover, 3=empty (for FAB), 4=notifications, 5=profile */}
+        <div className="grid grid-cols-5 place-items-center h-16 px-6">
           {/* Home */}
           <Button
             aria-label="Home"
             variant="ghost"
             size="icon"
-            className="h-16 w-16"
+            className="h-12 w-12"
             onClick={() => navigate("/")}
           >
             <Home
@@ -62,35 +40,32 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Explore"
             variant="ghost"
             size="icon"
-            className="h-16 w-16"
+            className="h-12 w-12"
             onClick={() => navigate("/discover")}
           >
             <Compass
-              strokeWidth={2.6}
-              className={`${baseIcon} ${
-                isActive("/discover") ? activeIcon : inactiveIcon
-              }`}
+              strokeWidth={2.5}
+              className={`${baseIcon} ${isActive("/discover") ? activeIcon : inactiveIcon}`}
             />
           </Button>
 
-          {/* Spacer for FAB */}
-          <div aria-hidden className="h-16 w-16" />
+          {/* spacer for center FAB */}
+          <div aria-hidden className="h-12 w-12" />
 
           {/* Notifications */}
           <Button
             aria-label="Notifications"
             variant="ghost"
             size="icon"
-            className="relative h-16 w-16"
+            className="relative h-12 w-12"
             onClick={() => navigate("/notifications")}
           >
             <Bell
               fill="currentColor"
-              className={`${baseIcon} ${
-                isActive("/notifications") ? activeIcon : inactiveIcon
-              }`}
+              className={`${baseIcon} ${isActive("/notifications") ? activeIcon : inactiveIcon}`}
             />
-            <span className="absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-[6px] text-[11px] font-bold leading-none text-white ring-2 ring-white">
+            {/* red badge */}
+            <span className="absolute -top-0.5 -right-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white ring-2 ring-white">
               7
             </span>
           </Button>
@@ -100,34 +75,30 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Profile"
             variant="ghost"
             size="icon"
-            className="h-16 w-16"
+            className="h-12 w-12"
             onClick={() => navigate("/profile")}
           >
             <User
-              strokeWidth={2.6}
-              className={`${baseIcon} ${
-                isActive("/profile") ? activeIcon : inactiveIcon
-              }`}
+              strokeWidth={2.5}
+              className={`${baseIcon} ${isActive("/profile") ? activeIcon : inactiveIcon}`}
             />
           </Button>
         </div>
 
-        {/* --- Floating + button with stronger, layered shadow --- */}
-        {/* shadow “pillow” layers */}
-        <div className="pointer-events-none absolute left-1/2 -top-9 -translate-x-1/2 w-28 h-14">
-          {/* crisper core shadow */}
-          <div className="absolute left-1/2 top-[76px] -translate-x-1/2 h-4 w-24 rounded-full bg-black/35 blur-md" />
-          {/* wide soft glow */}
-          <div className="absolute left-1/2 top-[64px] -translate-x-1/2 h-6 w-28 rounded-full bg-black/15 blur-xl" />
+        {/* Floating center + button (rounded square) */}
+        {/* Soft oval shadow underneath to match your screenshot */}
+        <div className="pointer-events-none absolute left-1/2 -top-7 -translate-x-1/2 w-24 h-10">
+          <div className="absolute left-1/2 top-[52px] -translate-x-1/2 h-3 w-16 rounded-full bg-black/30 blur-md" />
+          <div className="absolute left-1/2 top-[40px] -translate-x-1/2 h-4 w-20 rounded-full bg-black/10 blur-lg" />
         </div>
 
         <button
           aria-label="Create post"
           onClick={onCreatePost}
-          className="absolute left-1/2 -top-10 -translate-x-1/2 h-16 w-16 rounded-2xl bg-black text-white
-                     shadow-[0_14px_22px_rgba(0,0,0,0.38)] hover:scale-105 active:scale-95 transition-transform"
+          className="absolute left-1/2 -top-8 -translate-x-1/2 h-16 w-16 rounded-2xl bg-black text-white 
+                     shadow-[0_10px_16px_rgba(0,0,0,0.35)] hover:scale-105 active:scale-95 transition-transform"
         >
-          <Plus className="mx-auto h-8 w-8 stroke-[3] text-white" />
+          <Plus className="mx-auto h-7 w-7 stroke-[3] text-white" />
         </button>
       </div>
     </nav>
