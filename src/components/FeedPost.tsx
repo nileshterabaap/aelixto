@@ -80,14 +80,18 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
             <img 
               src={post.mediaUrl} 
               alt="Post content"
-              className="w-full h-auto aspect-[4/3] object-cover"
+              className={`w-full h-auto object-cover ${
+                platform?.name === 'Instagram' ? 'aspect-square' : 
+                platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
+                'aspect-[16/9]'
+              }`}
             />
             {platform && (
-              <div className="absolute top-3 right-3">
+              <div className="absolute top-3 right-3 bg-white/90 rounded-lg p-1.5">
                 <img 
                   src={platform.icon} 
                   alt={platform.name}
-                  className="w-6 h-6 opacity-70"
+                  className="w-8 h-8"
                 />
               </div>
             )}
@@ -95,7 +99,11 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
         )}
 
         {post.mediaType === 'video' && post.mediaUrl && (
-          <div className="rounded-2xl overflow-hidden mb-2 bg-muted aspect-[4/3] flex items-center justify-center relative">
+          <div className={`rounded-2xl overflow-hidden mb-2 bg-muted flex items-center justify-center relative ${
+            platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
+            platform?.name === 'YouTube' ? 'aspect-[16/9]' : 
+            'aspect-[4/3]'
+          }`}>
             <div className="absolute inset-0">
               <img 
                 src={post.mediaUrl} 
@@ -104,11 +112,11 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
               />
             </div>
             {platform && (
-              <div className="absolute top-3 right-3 z-20">
+              <div className="absolute top-3 right-3 z-20 bg-white/90 rounded-lg p-1.5">
                 <img 
                   src={platform.icon} 
                   alt={platform.name}
-                  className="w-6 h-6 opacity-70"
+                  className="w-8 h-8"
                 />
               </div>
             )}
