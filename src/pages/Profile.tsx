@@ -54,24 +54,27 @@ const Profile = () => {
         </div>
       </div>
 
+      {/* Stats overlapping profile picture */}
+      <div className="relative px-6">
+        {/* Left stat - Followers */}
+        <div className="absolute left-6 top-12 bg-background rounded-3xl px-6 py-3 shadow-lg border border-border">
+          <div className="text-2xl font-bold">7058</div>
+          <div className="text-xs font-semibold">Followers</div>
+        </div>
+        
+        {/* Right stat - Following */}
+        <div className="absolute right-6 top-12 bg-background rounded-3xl px-6 py-3 shadow-lg border border-border">
+          <div className="text-2xl font-bold">85</div>
+          <div className="text-xs font-semibold">Following</div>
+        </div>
+      </div>
+
       {/* Profile Info */}
       <div className="mt-24 px-6 text-center">
-        {/* Stats side by side */}
-        <div className="flex items-center justify-center gap-12 mb-4">
-          <div>
-            <div className="text-3xl font-bold">7058</div>
-            <div className="text-sm font-medium">Followers</div>
-          </div>
-          <div>
-            <div className="text-3xl font-bold">85</div>
-            <div className="text-sm font-medium">Following</div>
-          </div>
-        </div>
-
         {/* Aelix Score */}
-        <div className="mt-4 mx-auto inline-block px-12 py-3 border-2 border-foreground rounded-full">
+        <div className="mt-4 mx-auto inline-block px-10 py-2 border-2 border-foreground rounded-3xl">
           <div className="text-3xl font-bold">45,700</div>
-          <div className="text-xs font-bold tracking-widest mt-1">AELIX SCORE</div>
+          <div className="text-xs font-bold tracking-wider">AELIX SCORE</div>
         </div>
 
         {/* Bio */}
@@ -80,40 +83,40 @@ const Profile = () => {
         </p>
 
         {/* Follow Button */}
-        <Button className="mt-5 w-full max-w-xs rounded-full h-12 text-base font-semibold bg-primary text-primary-foreground hover:bg-primary/90">
+        <Button className="mt-5 w-full max-w-xs rounded-full h-14 text-lg font-bold bg-foreground text-background hover:bg-foreground/90">
           Follow
         </Button>
 
         {/* Menu Icon */}
-        <div className="mt-6 flex justify-center">
-          <div className="flex gap-1.5">
-            <div className="h-1 w-10 bg-foreground rounded-full"></div>
-            <div className="h-1 w-10 bg-foreground rounded-full"></div>
-            <div className="h-1 w-10 bg-foreground rounded-full"></div>
+        <div className="mt-8 flex justify-start px-2">
+          <div className="flex flex-col gap-1.5">
+            <div className="h-1 w-8 bg-foreground rounded-full"></div>
+            <div className="h-1 w-8 bg-foreground rounded-full"></div>
+            <div className="h-1 w-8 bg-foreground rounded-full"></div>
           </div>
         </div>
 
         {/* Social Links */}
-        <div className="flex items-center justify-center gap-10 mt-6">
-          <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl border-2 border-foreground">
-            <Instagram className="h-7 w-7 stroke-[1.5]" />
+        <div className="flex items-center justify-center gap-8 mt-6">
+          <Button variant="outline" size="icon" className="h-16 w-16 rounded-xl border-2 border-muted-foreground/30">
+            <Instagram className="h-8 w-8 stroke-[1.5]" />
           </Button>
-          <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl border-2 border-foreground">
-            <Youtube className="h-7 w-7 stroke-[1.5]" />
+          <Button variant="outline" size="icon" className="h-16 w-16 rounded-xl border-2 border-muted-foreground/30">
+            <Youtube className="h-8 w-8 stroke-[1.5]" />
           </Button>
-          <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl border-2 border-foreground">
-            <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+          <Button variant="outline" size="icon" className="h-16 w-16 rounded-xl border-2 border-muted-foreground/30">
+            <svg className="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
               <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
             </svg>
           </Button>
         </div>
 
         {/* Video Grid */}
-        <div className="grid grid-cols-2 gap-3 mt-8 max-w-md mx-auto">
+        <div className="grid grid-cols-2 gap-2.5 mt-8 max-w-md mx-auto">
           {mockVideos.map((video) => (
             <div 
               key={video.id} 
-              className="relative aspect-[3/4] rounded-3xl overflow-hidden bg-muted"
+              className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted"
             >
               <img 
                 src={video.thumbnail} 
@@ -121,8 +124,8 @@ const Profile = () => {
                 className="w-full h-full object-cover"
               />
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="h-14 w-14 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center">
-                  <div className="w-0 h-0 border-l-[14px] border-l-white border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent ml-1"></div>
+                <div className="h-16 w-16 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+                  <div className="w-0 h-0 border-l-[16px] border-l-white border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
                 </div>
               </div>
             </div>
