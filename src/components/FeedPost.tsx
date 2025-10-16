@@ -44,6 +44,12 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
           </Button>
         </div>
 
+        {/* Title and Caption */}
+        <div className="mb-3">
+          <h2 className="text-lg font-bold mb-1">{post.title}</h2>
+          <p className="text-sm text-muted-foreground">{post.content}</p>
+        </div>
+
         {/* Media */}
         {post.mediaType === 'image' && post.mediaUrl && (
           <div className="rounded-2xl overflow-hidden mb-2">
