@@ -143,7 +143,7 @@ const Profile = () => {
         </div>
         
         {/* Profile picture overlapping gradient */}
-        <div className="absolute -bottom-20 left-1/2 transform -translate-x-1/2 z-10">
+        <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 z-10">
           <div className="h-40 w-40 rounded-full bg-background p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
             <div className="h-full w-full rounded-full overflow-hidden">
               <img 
@@ -159,14 +159,14 @@ const Profile = () => {
       {/* Stats overlapping profile picture */}
       <div className="relative px-4">
         {/* Left stat - Followers */}
-        <div className="absolute left-8 top-12 px-3 py-2 text-center">
-          <div className="text-xl font-bold">7058</div>
+        <div className="absolute left-6 top-8 text-center">
+          <div className="text-2xl font-bold">7058</div>
           <div className="text-xs font-bold">Followers</div>
         </div>
         
         {/* Right stat - Following */}
-        <div className="absolute right-8 top-12 px-3 py-2 text-center">
-          <div className="text-xl font-bold">85</div>
+        <div className="absolute right-6 top-8 text-center">
+          <div className="text-2xl font-bold">85</div>
           <div className="text-xs font-bold">Following</div>
         </div>
       </div>
@@ -176,9 +176,9 @@ const Profile = () => {
         {/* Profile Info */}
         <div className="px-6 text-center">
         {/* Aelix Score */}
-        <div className="mt-4 mx-auto inline-block px-12 py-3 border-2 border-foreground rounded-lg shadow-[0_6px_16px_rgba(0,0,0,0.2)] bg-background">
-          <div className="text-3xl font-bold">45,700</div>
-          <div className="text-xs font-bold tracking-widest">AELIX SCORE</div>
+        <div className="mt-4 mx-auto inline-block px-8 py-2 border-2 border-foreground rounded-lg shadow-[0_6px_16px_rgba(0,0,0,0.2)] bg-background">
+          <div className="text-2xl font-bold">45,700</div>
+          <div className="text-[10px] font-bold tracking-widest">AELIX SCORE</div>
         </div>
 
         {/* Bio */}
