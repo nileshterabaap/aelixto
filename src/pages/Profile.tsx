@@ -33,15 +33,15 @@ const Profile = () => {
   ];
 
   const xPosts = [
-    { id: 1, thumbnail: "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=400&h=400&fit=crop", platform: "x" },
-    { id: 2, thumbnail: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=400&fit=crop", platform: "x" },
-    { id: 3, thumbnail: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=400&h=400&fit=crop", platform: "x" },
-    { id: 4, thumbnail: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=400&h=400&fit=crop", platform: "x" },
-    { id: 5, thumbnail: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&h=400&fit=crop", platform: "x" },
-    { id: 6, thumbnail: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&h=400&fit=crop", platform: "x" },
-    { id: 7, thumbnail: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=400&fit=crop", platform: "x" },
-    { id: 8, thumbnail: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop", platform: "x" },
-    { id: 9, thumbnail: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop", platform: "x" },
+    { id: 1, text: "Just finished an incredible hike through the mountains! The views were absolutely breathtaking 🏔️", likes: 234, retweets: 45 },
+    { id: 2, text: "Working on something exciting today. Can't wait to share it with you all soon! Stay tuned 🚀", likes: 189, retweets: 32 },
+    { id: 3, text: "Coffee and creativity - the perfect combination for a productive morning ☕✨", likes: 412, retweets: 78 },
+    { id: 4, text: "Sometimes you need to step back to see the bigger picture. Perspective is everything 🎯", likes: 567, retweets: 123 },
+    { id: 5, text: "Grateful for the amazing people in my life. Surrounding yourself with positivity makes all the difference 💫", likes: 345, retweets: 89 },
+    { id: 6, text: "New week, new goals, new opportunities. Let's make it count! 💪", likes: 298, retweets: 56 },
+    { id: 7, text: "The best investment you can make is in yourself. Never stop learning and growing 📚", likes: 523, retweets: 134 },
+    { id: 8, text: "Taking a moment to appreciate the simple things. Life is beautiful when you pause to notice ✨", likes: 445, retweets: 92 },
+    { id: 9, text: "Dream big, work hard, stay focused, and surround yourself with good people 🌟", likes: 678, retweets: 156 },
   ];
 
   return (
@@ -126,26 +126,8 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* Social Links */}
-        <div className="flex items-center justify-center gap-6 mt-6">
-          <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl border-2 border-muted-foreground/40 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-            <Instagram className="h-7 w-7 stroke-[1.5]" />
-          </Button>
-          <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl border-2 border-muted-foreground/40 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-            <Youtube className="h-7 w-7 stroke-[1.5]" />
-          </Button>
-          <Button variant="outline" size="icon" className="h-14 w-14 rounded-2xl border-2 border-muted-foreground/40 shadow-[0_2px_8px_rgba(0,0,0,0.1)]">
-            <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
-          </Button>
-        </div>
-
-        {/* Divider */}
-        <div className="h-px bg-border/30 mt-8 mb-6"></div>
-
         {/* Platform Tabs */}
-        <Tabs defaultValue="youtube" className="w-full" onValueChange={setActiveTab}>
+        <Tabs defaultValue="youtube" className="w-full mt-6" onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3 mb-6 bg-transparent gap-3 h-auto p-0">
             <TabsTrigger 
               value="youtube" 
@@ -215,21 +197,49 @@ const Profile = () => {
           </TabsContent>
 
           <TabsContent value="x">
-            <div className="grid grid-cols-3 gap-2 mt-6 max-w-lg mx-auto">
+            <div className="grid grid-cols-1 gap-3 mt-6 max-w-lg mx-auto">
               {xPosts.map((post) => (
                 <div 
                   key={post.id} 
-                  className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted shadow-[0_4px_12px_rgba(0,0,0,0.12)]"
+                  className="relative rounded-2xl overflow-hidden bg-card border border-border shadow-[0_2px_8px_rgba(0,0,0,0.08)] p-4"
                 >
-                  <img 
-                    src={post.thumbnail} 
-                    alt="X post"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-2 right-2 h-6 w-6 bg-black rounded-md flex items-center justify-center shadow-sm">
-                    <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="h-10 w-10 rounded-full bg-muted flex-shrink-0 overflow-hidden">
+                      <img 
+                        src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop" 
+                        alt="Profile"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm">Andrew Rollings</span>
+                        <span className="text-muted-foreground text-sm">@andrewwr10</span>
+                      </div>
+                    </div>
+                    <svg className="h-4 w-4 text-foreground flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
                     </svg>
+                  </div>
+                  <p className="text-sm text-foreground leading-relaxed mb-3">
+                    {post.text}
+                  </p>
+                  <div className="flex items-center gap-6 text-muted-foreground text-xs">
+                    <div className="flex items-center gap-1">
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                      </svg>
+                      <span>{post.likes}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M17 1l4 4-4 4"/>
+                        <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                        <path d="M7 23l-4-4 4-4"/>
+                        <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                      </svg>
+                      <span>{post.retweets}</span>
+                    </div>
                   </div>
                 </div>
               ))}
