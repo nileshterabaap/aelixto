@@ -187,9 +187,9 @@ const Profile = () => {
           "Chasing multiple dreams,<br />within a single life"
         </p>
 
-        {/* Follow Button */}
+        {/* Edit Profile Button */}
         <Button className="mt-6 w-full max-w-sm rounded-full h-14 text-lg font-bold bg-foreground text-background hover:bg-foreground/90 shadow-[0_6px_16px_rgba(0,0,0,0.2)]">
-          Follow
+          Edit Profile
         </Button>
 
           {/* Menu Icon */}
