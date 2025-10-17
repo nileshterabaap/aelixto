@@ -90,27 +90,27 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* Stats overlapping profile picture */}
-      <div className="relative px-4">
-      {/* Left stat - Followers */}
-        <div className="absolute left-4 top-16 px-5 py-3">
-          <div className="text-2xl font-bold">7058</div>
-          <div className="text-xs font-bold">Followers</div>
-        </div>
-        
-        {/* Right stat - Following */}
-        <div className="absolute right-4 top-16 px-5 py-3">
-          <div className="text-2xl font-bold">85</div>
-          <div className="text-xs font-bold">Following</div>
-        </div>
-      </div>
-
-      {/* Profile Info with curved top */}
+      {/* Stats and Profile Info */}
       <div className="mt-20 px-6 text-center relative">
         <div className="absolute -top-6 left-0 right-0 h-6 bg-background rounded-t-[32px]"></div>
-        <div className="relative pt-2">
-        {/* Aelix Score */}
-        <div className="mt-4 mx-auto inline-block px-12 py-3 border-2 border-foreground rounded-lg shadow-[0_6px_16px_rgba(0,0,0,0.2)] bg-background">
+        <div className="relative pt-8">
+          {/* Stats Row */}
+          <div className="flex justify-between items-start mb-8 px-4">
+            {/* Left stat - Followers */}
+            <div className="text-left">
+              <div className="text-2xl font-bold">7058</div>
+              <div className="text-xs font-bold">Followers</div>
+            </div>
+            
+            {/* Right stat - Following */}
+            <div className="text-right">
+              <div className="text-2xl font-bold">85</div>
+              <div className="text-xs font-bold">Following</div>
+            </div>
+          </div>
+
+          {/* Aelix Score */}
+          <div className="mx-auto inline-block px-12 py-3 border-2 border-foreground rounded-lg shadow-[0_6px_16px_rgba(0,0,0,0.2)] bg-background">
           <div className="text-3xl font-bold">45,700</div>
           <div className="text-xs font-bold tracking-widest">AELIX SCORE</div>
         </div>
