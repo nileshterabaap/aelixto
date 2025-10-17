@@ -33,15 +33,87 @@ const Profile = () => {
   ];
 
   const xPosts = [
-    { id: 1, text: "Just finished an incredible hike through the mountains! The views were absolutely breathtaking 🏔️", likes: 234, retweets: 45 },
-    { id: 2, text: "Working on something exciting today. Can't wait to share it with you all soon! Stay tuned 🚀", likes: 189, retweets: 32 },
-    { id: 3, text: "Coffee and creativity - the perfect combination for a productive morning ☕✨", likes: 412, retweets: 78 },
-    { id: 4, text: "Sometimes you need to step back to see the bigger picture. Perspective is everything 🎯", likes: 567, retweets: 123 },
-    { id: 5, text: "Grateful for the amazing people in my life. Surrounding yourself with positivity makes all the difference 💫", likes: 345, retweets: 89 },
-    { id: 6, text: "New week, new goals, new opportunities. Let's make it count! 💪", likes: 298, retweets: 56 },
-    { id: 7, text: "The best investment you can make is in yourself. Never stop learning and growing 📚", likes: 523, retweets: 134 },
-    { id: 8, text: "Taking a moment to appreciate the simple things. Life is beautiful when you pause to notice ✨", likes: 445, retweets: 92 },
-    { id: 9, text: "Dream big, work hard, stay focused, and surround yourself with good people 🌟", likes: 678, retweets: 156 },
+    { 
+      id: 1, 
+      name: "Dr. Sarah Chen", 
+      username: "@sarahchen", 
+      avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop",
+      text: "Breaking: New quantum computing breakthrough at MIT could revolutionize encryption technology. The implications for cybersecurity are massive. 🔬💻", 
+      likes: 2834, 
+      retweets: 845 
+    },
+    { 
+      id: 2, 
+      name: "Marcus Williams", 
+      username: "@mwilliams_pol", 
+      avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
+      text: "The Senate vote today marks a historic shift in climate policy. Bipartisan support shows that environmental action transcends party lines. Real progress. 🌍", 
+      likes: 5234, 
+      retweets: 1456 
+    },
+    { 
+      id: 3, 
+      name: "Elena Rodriguez", 
+      username: "@e_rodriguez", 
+      avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop",
+      text: "Fed signals potential rate cut in Q2. Markets responding positively. This could be the catalyst for small business expansion we've been waiting for. 📈💼", 
+      likes: 3892, 
+      retweets: 967 
+    },
+    { 
+      id: 4, 
+      name: "Prof. James Liu", 
+      username: "@profliugeo", 
+      avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop",
+      text: "Tensions in the South China Sea reaching critical point. Regional stability depends on diplomatic channels remaining open. History shows us the cost of miscalculation. 🌏", 
+      likes: 6721, 
+      retweets: 2103 
+    },
+    { 
+      id: 5, 
+      name: "Dr. Amara Okafor", 
+      username: "@amara_phys", 
+      avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop",
+      text: "Our team just published findings on dark matter detection. The universe is far stranger than we imagined. Full paper in Nature Physics. 🌌✨", 
+      likes: 4156, 
+      retweets: 1289 
+    },
+    { 
+      id: 6, 
+      name: "David Kumar", 
+      username: "@dkumar_econ", 
+      avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop",
+      text: "Global debt levels at unprecedented highs. Central banks walking a tightrope between inflation control and economic growth. The next decade will be defining. 💰", 
+      likes: 2967, 
+      retweets: 734 
+    },
+    { 
+      id: 7, 
+      name: "Ambassador Lisa Park", 
+      username: "@amb_park", 
+      avatar: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=200&h=200&fit=crop",
+      text: "Successful conclusion to the trade negotiations. Multilateralism still works when leaders prioritize cooperation over confrontation. A win for all parties. 🤝", 
+      likes: 8234, 
+      retweets: 2891 
+    },
+    { 
+      id: 8, 
+      name: "Dr. Robert Singh", 
+      username: "@rsingh_climate", 
+      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
+      text: "Arctic ice melt accelerating beyond model predictions. We're witnessing planetary changes in real-time. The science is clear - action needed now. 🧊❄️", 
+      likes: 7445, 
+      retweets: 3102 
+    },
+    { 
+      id: 9, 
+      name: "Maya Thompson", 
+      username: "@maya_fintech", 
+      avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop",
+      text: "Digital currencies reshaping the global financial system. Traditional banking must adapt or face obsolescence. The transformation is already underway. 💳🚀", 
+      likes: 5678, 
+      retweets: 1876 
+    },
   ];
 
   return (
@@ -84,23 +156,25 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* Stats overlapping profile picture */}
-      <div className="relative px-4">
-      {/* Left stat - Followers */}
-        <div className="absolute left-4 top-16 px-5 py-3">
-          <div className="text-2xl font-bold">7058</div>
-          <div className="text-xs font-bold">Followers</div>
+      {/* Curved white section */}
+      <div className="relative -mt-12 bg-background rounded-t-[3rem] pt-20 px-6">
+        {/* Stats overlapping profile picture */}
+        <div className="absolute top-16 left-0 right-0 flex justify-between px-8">
+          {/* Left stat - Followers */}
+          <div className="px-5 py-3">
+            <div className="text-2xl font-bold">7058</div>
+            <div className="text-xs font-bold">Followers</div>
+          </div>
+          
+          {/* Right stat - Following */}
+          <div className="px-5 py-3">
+            <div className="text-2xl font-bold">85</div>
+            <div className="text-xs font-bold">Following</div>
+          </div>
         </div>
-        
-        {/* Right stat - Following */}
-        <div className="absolute right-4 top-16 px-5 py-3">
-          <div className="text-2xl font-bold">85</div>
-          <div className="text-xs font-bold">Following</div>
-        </div>
-      </div>
 
-      {/* Profile Info */}
-      <div className="mt-28 px-6 text-center">
+        {/* Profile Info */}
+        <div className="text-center">
         {/* Aelix Score */}
         <div className="mt-4 mx-auto inline-block px-12 py-3 border-2 border-foreground rounded-lg shadow-[0_6px_16px_rgba(0,0,0,0.2)] bg-background">
           <div className="text-3xl font-bold">45,700</div>
@@ -117,17 +191,17 @@ const Profile = () => {
           Follow
         </Button>
 
-        {/* Menu Icon */}
-        <div className="mt-8 flex justify-start px-2">
-          <div className="flex flex-col gap-1.5">
-            <div className="h-1 w-8 bg-foreground rounded-full"></div>
-            <div className="h-1 w-8 bg-foreground rounded-full"></div>
-            <div className="h-1 w-8 bg-foreground rounded-full"></div>
+          {/* Menu Icon */}
+          <div className="mt-8 flex justify-start px-2">
+            <div className="flex flex-col gap-1.5">
+              <div className="h-1 w-8 bg-foreground rounded-full"></div>
+              <div className="h-1 w-8 bg-foreground rounded-full"></div>
+              <div className="h-1 w-8 bg-foreground rounded-full"></div>
+            </div>
           </div>
-        </div>
 
-        {/* Platform Tabs */}
-        <Tabs defaultValue="youtube" className="w-full mt-6" onValueChange={setActiveTab}>
+          {/* Platform Tabs */}
+          <Tabs defaultValue="youtube" className="w-full mt-6" onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3 mb-6 bg-transparent gap-3 h-auto p-0">
             <TabsTrigger 
               value="youtube" 
@@ -206,15 +280,15 @@ const Profile = () => {
                   <div className="flex items-start gap-3 mb-3">
                     <div className="h-10 w-10 rounded-full bg-muted flex-shrink-0 overflow-hidden">
                       <img 
-                        src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop" 
-                        alt="Profile"
+                        src={post.avatar} 
+                        alt={post.name}
                         className="w-full h-full object-cover"
                       />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm">Andrew Rollings</span>
-                        <span className="text-muted-foreground text-sm">@andrewwr10</span>
+                        <span className="font-bold text-sm">{post.name}</span>
+                        <span className="text-muted-foreground text-sm">{post.username}</span>
                       </div>
                     </div>
                     <svg className="h-4 w-4 text-foreground flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
@@ -245,7 +319,8 @@ const Profile = () => {
               ))}
             </div>
           </TabsContent>
-        </Tabs>
+          </Tabs>
+        </div>
       </div>
     </div>
   );
