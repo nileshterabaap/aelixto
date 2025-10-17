@@ -143,8 +143,8 @@ const Profile = () => {
         </div>
         
         {/* Profile picture overlapping gradient */}
-        <div className="absolute -bottom-24 left-1/2 transform -translate-x-1/2 z-10">
-          <div className="h-48 w-48 rounded-full bg-background p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
+        <div className="absolute -bottom-20 left-1/2 transform -translate-x-1/2 z-10">
+          <div className="h-40 w-40 rounded-full bg-background p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
             <div className="h-full w-full rounded-full overflow-hidden">
               <img 
                 src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop" 
@@ -159,14 +159,14 @@ const Profile = () => {
       {/* Stats overlapping profile picture */}
       <div className="relative px-4">
         {/* Left stat - Followers */}
-        <div className="absolute left-4 top-16 px-5 py-3">
-          <div className="text-2xl font-bold">7058</div>
+        <div className="absolute left-8 top-12 px-3 py-2 text-center">
+          <div className="text-xl font-bold">7058</div>
           <div className="text-xs font-bold">Followers</div>
         </div>
         
         {/* Right stat - Following */}
-        <div className="absolute right-4 top-16 px-5 py-3">
-          <div className="text-2xl font-bold">85</div>
+        <div className="absolute right-8 top-12 px-3 py-2 text-center">
+          <div className="text-xl font-bold">85</div>
           <div className="text-xs font-bold">Following</div>
         </div>
       </div>
