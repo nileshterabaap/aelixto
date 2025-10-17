@@ -38,7 +38,12 @@ All colors MUST be HSL.
 
     --radius: 1.5rem;
     
-    --gradient-sunset: linear-gradient(180deg, hsl(38 100% 70%) 0%, hsl(30 100% 65%) 25%, hsl(25 100% 60%) 50%, hsl(210 60% 45%) 100%);
+    --gradient-sunset: linear-gradient(180deg, hsl(25 100% 55%) 0%, hsl(30 100% 60%) 20%, hsl(220 80% 45%) 70%, hsl(220 90% 40%) 100%);
+    --gradient-aelixto: linear-gradient(180deg, hsl(25 100% 62%) 0%, hsl(20 100% 58%) 35%, hsl(220 85% 50%) 100%);
+    
+    --brand-orange: 22 100% 51%;
+    --brand-blue: 213 100% 50%;
+    --shadow-soft: 0 0% 0% / 0.15;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -80,6 +85,11 @@ All colors MUST be HSL.
     --ring: 0 0% 100%;
     
     --gradient-sunset: linear-gradient(180deg, hsl(35 100% 65%) 0%, hsl(28 100% 60%) 30%, hsl(210 70% 50%) 100%);
+    --gradient-aelixto: linear-gradient(180deg, hsl(25 100% 60%) 0%, hsl(20 100% 56%) 35%, hsl(220 85% 48%) 100%);
+    
+    --brand-orange: 22 100% 51%;
+    --brand-blue: 213 100% 50%;
+    --shadow-soft: 0 0% 0% / 0.15;
     
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
