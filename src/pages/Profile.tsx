@@ -38,7 +38,7 @@ const Profile = () => {
       name: "Dr. Sarah Chen", 
       username: "@sarahchen", 
       avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop",
-      text: "Breaking: New quantum computing breakthrough at MIT could revolutionize encryption technology. The implications for cybersecurity are massive. 🔬💻", 
+      text: "New quantum breakthrough at MIT revolutionizes encryption technology 🔬💻", 
       likes: 2834, 
       retweets: 845 
     },
@@ -47,7 +47,7 @@ const Profile = () => {
       name: "Marcus Williams", 
       username: "@mwilliams_pol", 
       avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
-      text: "The Senate vote today marks a historic shift in climate policy. Bipartisan support shows that environmental action transcends party lines. Real progress. 🌍", 
+      text: "Senate vote marks historic shift with bipartisan climate policy support 🌍", 
       likes: 5234, 
       retweets: 1456 
     },
@@ -56,7 +56,7 @@ const Profile = () => {
       name: "Elena Rodriguez", 
       username: "@e_rodriguez", 
       avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop",
-      text: "Fed signals potential rate cut in Q2. Markets responding positively. This could be the catalyst for small business expansion we've been waiting for. 📈💼", 
+      text: "Fed signals Q2 rate cut, markets rally on business expansion hopes 📈", 
       likes: 3892, 
       retweets: 967 
     },
@@ -65,7 +65,7 @@ const Profile = () => {
       name: "Prof. James Liu", 
       username: "@profliugeo", 
       avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop",
-      text: "Tensions in the South China Sea reaching critical point. Regional stability depends on diplomatic channels remaining open. History shows us the cost of miscalculation. 🌏", 
+      text: "South China Sea tensions escalate, diplomatic channels critical for stability 🌏", 
       likes: 6721, 
       retweets: 2103 
     },
@@ -74,7 +74,7 @@ const Profile = () => {
       name: "Dr. Amara Okafor", 
       username: "@amara_phys", 
       avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=200&h=200&fit=crop",
-      text: "Our team just published findings on dark matter detection. The universe is far stranger than we imagined. Full paper in Nature Physics. 🌌✨", 
+      text: "Dark matter detection findings published, universe stranger than imagined 🌌✨", 
       likes: 4156, 
       retweets: 1289 
     },
@@ -83,7 +83,7 @@ const Profile = () => {
       name: "David Kumar", 
       username: "@dkumar_econ", 
       avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop",
-      text: "Global debt levels at unprecedented highs. Central banks walking a tightrope between inflation control and economic growth. The next decade will be defining. 💰", 
+      text: "Global debt at record highs, central banks balance inflation and growth 💰", 
       likes: 2967, 
       retweets: 734 
     },
@@ -92,7 +92,7 @@ const Profile = () => {
       name: "Ambassador Lisa Park", 
       username: "@amb_park", 
       avatar: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=200&h=200&fit=crop",
-      text: "Successful conclusion to the trade negotiations. Multilateralism still works when leaders prioritize cooperation over confrontation. A win for all parties. 🤝", 
+      text: "Trade negotiations succeed, multilateralism wins through cooperation over confrontation 🤝", 
       likes: 8234, 
       retweets: 2891 
     },
@@ -101,7 +101,7 @@ const Profile = () => {
       name: "Dr. Robert Singh", 
       username: "@rsingh_climate", 
       avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
-      text: "Arctic ice melt accelerating beyond model predictions. We're witnessing planetary changes in real-time. The science is clear - action needed now. 🧊❄️", 
+      text: "Arctic ice melt accelerates beyond predictions, urgent action needed now 🧊", 
       likes: 7445, 
       retweets: 3102 
     },
@@ -110,7 +110,7 @@ const Profile = () => {
       name: "Maya Thompson", 
       username: "@maya_fintech", 
       avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop",
-      text: "Digital currencies reshaping the global financial system. Traditional banking must adapt or face obsolescence. The transformation is already underway. 💳🚀", 
+      text: "Digital currencies reshape finance, traditional banking must adapt or fade 💳", 
       likes: 5678, 
       retweets: 1876 
     },
@@ -156,25 +156,25 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* Curved white section */}
-      <div className="relative -mt-12 bg-background rounded-t-[3rem] pt-20 px-6">
-        {/* Stats overlapping profile picture */}
-        <div className="absolute top-16 left-0 right-0 flex justify-between px-8">
-          {/* Left stat - Followers */}
-          <div className="px-5 py-3">
-            <div className="text-2xl font-bold">7058</div>
-            <div className="text-xs font-bold">Followers</div>
-          </div>
-          
-          {/* Right stat - Following */}
-          <div className="px-5 py-3">
-            <div className="text-2xl font-bold">85</div>
-            <div className="text-xs font-bold">Following</div>
-          </div>
+      {/* Stats overlapping profile picture */}
+      <div className="relative px-4">
+        {/* Left stat - Followers */}
+        <div className="absolute left-4 top-16 px-5 py-3">
+          <div className="text-2xl font-bold">7058</div>
+          <div className="text-xs font-bold">Followers</div>
         </div>
+        
+        {/* Right stat - Following */}
+        <div className="absolute right-4 top-16 px-5 py-3">
+          <div className="text-2xl font-bold">85</div>
+          <div className="text-xs font-bold">Following</div>
+        </div>
+      </div>
 
+      {/* Curved white section */}
+      <div className="relative -mt-12 bg-background rounded-t-[3rem] pt-32 pb-8">
         {/* Profile Info */}
-        <div className="text-center">
+        <div className="px-6 text-center">
         {/* Aelix Score */}
         <div className="mt-4 mx-auto inline-block px-12 py-3 border-2 border-foreground rounded-lg shadow-[0_6px_16px_rgba(0,0,0,0.2)] bg-background">
           <div className="text-3xl font-bold">45,700</div>
@@ -319,7 +319,7 @@ const Profile = () => {
               ))}
             </div>
           </TabsContent>
-          </Tabs>
+        </Tabs>
         </div>
       </div>
     </div>
