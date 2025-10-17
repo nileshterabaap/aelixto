@@ -188,7 +188,7 @@ const Profile = () => {
         </p>
 
         {/* Edit Profile Button */}
-        <Button className="mt-6 w-full max-w-sm rounded-full h-12 text-base font-bold bg-white text-foreground hover:bg-white/90 shadow-[0_4px_12px_rgba(0,0,0,0.15)] border border-border">
+        <Button className="mt-6 w-full max-w-xs rounded-full h-10 text-sm font-bold bg-white text-foreground hover:bg-white/90 shadow-[0_4px_12px_rgba(0,0,0,0.15)] border border-border">
           Edit Profile
         </Button>
 
