@@ -57,13 +57,13 @@ const Profile = () => {
       {/* Stats overlapping profile picture */}
       <div className="relative px-4">
         {/* Left stat - Followers */}
-        <div className="absolute left-4 top-16 bg-background rounded-2xl px-5 py-3 shadow-[0_4px_12px_rgba(0,0,0,0.15)] border-2 border-foreground">
+        <div className="absolute left-4 top-16 bg-background rounded-lg px-5 py-3 shadow-[0_6px_16px_rgba(0,0,0,0.2)] border-2 border-foreground">
           <div className="text-2xl font-bold">7058</div>
           <div className="text-xs font-bold">Followers</div>
         </div>
         
         {/* Right stat - Following */}
-        <div className="absolute right-4 top-16 bg-background rounded-2xl px-5 py-3 shadow-[0_4px_12px_rgba(0,0,0,0.15)] border-2 border-foreground">
+        <div className="absolute right-4 top-16 bg-background rounded-lg px-5 py-3 shadow-[0_6px_16px_rgba(0,0,0,0.2)] border-2 border-foreground">
           <div className="text-2xl font-bold">85</div>
           <div className="text-xs font-bold">Following</div>
         </div>
@@ -72,7 +72,7 @@ const Profile = () => {
       {/* Profile Info */}
       <div className="mt-28 px-6 text-center">
         {/* Aelix Score */}
-        <div className="mt-4 mx-auto inline-block px-12 py-3 border-3 border-foreground rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.15)]">
+        <div className="mt-4 mx-auto inline-block px-12 py-3 border-2 border-foreground rounded-lg shadow-[0_6px_16px_rgba(0,0,0,0.2)] bg-background">
           <div className="text-3xl font-bold">45,700</div>
           <div className="text-xs font-bold tracking-widest">AELIX SCORE</div>
         </div>
