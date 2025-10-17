@@ -1,17 +1,47 @@
 import { ArrowLeft, MoreVertical, Instagram, Youtube } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 
 const Profile = () => {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("youtube");
 
-  const mockVideos = [
-    { id: 1, thumbnail: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=400&fit=crop" },
-    { id: 2, thumbnail: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=400&fit=crop" },
-    { id: 3, thumbnail: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=400&fit=crop" },
-    { id: 4, thumbnail: "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=400&h=400&fit=crop" },
-    { id: 5, thumbnail: "https://images.unsplash.com/photo-1484589065579-248aad0d8b13?w=400&h=400&fit=crop" },
-    { id: 6, thumbnail: "https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?w=400&h=400&fit=crop" },
+  const youtubeVideos = [
+    { id: 1, thumbnail: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=400&fit=crop", platform: "youtube" },
+    { id: 2, thumbnail: "https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=400&fit=crop", platform: "youtube" },
+    { id: 3, thumbnail: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&h=400&fit=crop", platform: "youtube" },
+    { id: 4, thumbnail: "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=400&h=400&fit=crop", platform: "youtube" },
+    { id: 5, thumbnail: "https://images.unsplash.com/photo-1484589065579-248aad0d8b13?w=400&h=400&fit=crop", platform: "youtube" },
+    { id: 6, thumbnail: "https://images.unsplash.com/photo-1446776653964-20c1d3a81b06?w=400&h=400&fit=crop", platform: "youtube" },
+    { id: 7, thumbnail: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&h=400&fit=crop", platform: "youtube" },
+    { id: 8, thumbnail: "https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=400&h=400&fit=crop", platform: "youtube" },
+    { id: 9, thumbnail: "https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=400&h=400&fit=crop", platform: "youtube" },
+  ];
+
+  const instagramPosts = [
+    { id: 1, thumbnail: "https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=400&h=400&fit=crop", platform: "instagram" },
+    { id: 2, thumbnail: "https://images.unsplash.com/photo-1682687221038-404cb8830901?w=400&h=400&fit=crop", platform: "instagram" },
+    { id: 3, thumbnail: "https://images.unsplash.com/photo-1682695796954-bad0d0f59ff1?w=400&h=400&fit=crop", platform: "instagram" },
+    { id: 4, thumbnail: "https://images.unsplash.com/photo-1682687220063-4742bd7fd538?w=400&h=400&fit=crop", platform: "instagram" },
+    { id: 5, thumbnail: "https://images.unsplash.com/photo-1682695798256-28a674122872?w=400&h=400&fit=crop", platform: "instagram" },
+    { id: 6, thumbnail: "https://images.unsplash.com/photo-1682695797221-8164ff1fafc9?w=400&h=400&fit=crop", platform: "instagram" },
+    { id: 7, thumbnail: "https://images.unsplash.com/photo-1682695796497-31a44224d6d6?w=400&h=400&fit=crop", platform: "instagram" },
+    { id: 8, thumbnail: "https://images.unsplash.com/photo-1682695797873-aa4cb6edd613?w=400&h=400&fit=crop", platform: "instagram" },
+    { id: 9, thumbnail: "https://images.unsplash.com/photo-1682687982501-1e58ab814714?w=400&h=400&fit=crop", platform: "instagram" },
+  ];
+
+  const xPosts = [
+    { id: 1, thumbnail: "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=400&h=400&fit=crop", platform: "x" },
+    { id: 2, thumbnail: "https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=400&fit=crop", platform: "x" },
+    { id: 3, thumbnail: "https://images.unsplash.com/photo-1556761175-5973dc0f32e7?w=400&h=400&fit=crop", platform: "x" },
+    { id: 4, thumbnail: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=400&h=400&fit=crop", platform: "x" },
+    { id: 5, thumbnail: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&h=400&fit=crop", platform: "x" },
+    { id: 6, thumbnail: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&h=400&fit=crop", platform: "x" },
+    { id: 7, thumbnail: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=400&fit=crop", platform: "x" },
+    { id: 8, thumbnail: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=400&fit=crop", platform: "x" },
+    { id: 9, thumbnail: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop", platform: "x" },
   ];
 
   return (
@@ -57,13 +87,13 @@ const Profile = () => {
       {/* Stats overlapping profile picture */}
       <div className="relative px-4">
         {/* Left stat - Followers */}
-        <div className="absolute left-4 top-16 bg-background rounded-lg px-5 py-3 shadow-[0_6px_16px_rgba(0,0,0,0.2)] border-2 border-foreground">
+        <div className="absolute left-4 top-16 px-5 py-3 shadow-[0_6px_16px_rgba(0,0,0,0.2)]">
           <div className="text-2xl font-bold">7058</div>
           <div className="text-xs font-bold">Followers</div>
         </div>
         
         {/* Right stat - Following */}
-        <div className="absolute right-4 top-16 bg-background rounded-lg px-5 py-3 shadow-[0_6px_16px_rgba(0,0,0,0.2)] border-2 border-foreground">
+        <div className="absolute right-4 top-16 px-5 py-3 shadow-[0_6px_16px_rgba(0,0,0,0.2)]">
           <div className="text-2xl font-bold">85</div>
           <div className="text-xs font-bold">Following</div>
         </div>
@@ -114,31 +144,98 @@ const Profile = () => {
         {/* Divider */}
         <div className="h-px bg-border/30 mt-8 mb-6"></div>
 
-        {/* Video Grid */}
-        <div className="grid grid-cols-2 gap-2 mt-6 max-w-md mx-auto">
-          {mockVideos.map((video) => (
-            <div 
-              key={video.id} 
-              className="relative aspect-[3/4] rounded-3xl overflow-hidden bg-muted shadow-[0_4px_12px_rgba(0,0,0,0.12)]"
+        {/* Platform Tabs */}
+        <Tabs defaultValue="youtube" className="w-full" onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-3 mb-6 bg-transparent gap-2">
+            <TabsTrigger 
+              value="youtube" 
+              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg"
             >
-              <img 
-                src={video.thumbnail} 
-                alt="Video thumbnail"
-                className="w-full h-full object-cover"
-              />
-              {/* Platform logo overlay */}
-              <div className="absolute top-2 right-2 h-6 w-6 bg-white/90 rounded-md flex items-center justify-center shadow-sm">
-                <Youtube className="h-4 w-4 text-black opacity-70" />
-              </div>
-              {/* Play button */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="h-14 w-14 rounded-full bg-white/20 backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.3)] flex items-center justify-center">
-                  <div className="w-0 h-0 border-l-[14px] border-l-white border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent ml-1"></div>
+              <Youtube className="h-5 w-5" />
+            </TabsTrigger>
+            <TabsTrigger 
+              value="instagram"
+              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg"
+            >
+              <Instagram className="h-5 w-5" />
+            </TabsTrigger>
+            <TabsTrigger 
+              value="x"
+              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+              </svg>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="youtube">
+            <div className="grid grid-cols-3 gap-2 mt-6 max-w-lg mx-auto">
+              {youtubeVideos.map((video) => (
+                <div 
+                  key={video.id} 
+                  className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted shadow-[0_4px_12px_rgba(0,0,0,0.12)]"
+                >
+                  <img 
+                    src={video.thumbnail} 
+                    alt="Video thumbnail"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-2 right-2 h-6 w-6 bg-black rounded-md flex items-center justify-center shadow-sm">
+                    <Youtube className="h-3.5 w-3.5 text-white" />
+                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="h-12 w-12 rounded-full bg-white/20 backdrop-blur-md shadow-[0_0_20px_rgba(255,255,255,0.3)] flex items-center justify-center">
+                      <div className="w-0 h-0 border-l-[12px] border-l-white border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent ml-1"></div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </TabsContent>
+
+          <TabsContent value="instagram">
+            <div className="grid grid-cols-3 gap-2 mt-6 max-w-lg mx-auto">
+              {instagramPosts.map((post) => (
+                <div 
+                  key={post.id} 
+                  className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted shadow-[0_4px_12px_rgba(0,0,0,0.12)]"
+                >
+                  <img 
+                    src={post.thumbnail} 
+                    alt="Instagram post"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-2 right-2 h-6 w-6 bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500 rounded-md flex items-center justify-center shadow-sm">
+                    <Instagram className="h-3.5 w-3.5 text-white" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="x">
+            <div className="grid grid-cols-3 gap-2 mt-6 max-w-lg mx-auto">
+              {xPosts.map((post) => (
+                <div 
+                  key={post.id} 
+                  className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-muted shadow-[0_4px_12px_rgba(0,0,0,0.12)]"
+                >
+                  <img 
+                    src={post.thumbnail} 
+                    alt="X post"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-2 right-2 h-6 w-6 bg-black rounded-md flex items-center justify-center shadow-sm">
+                    <svg className="h-3.5 w-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
