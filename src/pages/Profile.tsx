@@ -156,23 +156,24 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* Stats overlapping profile picture */}
-      <div className="relative px-4">
-        {/* Left stat - Followers */}
-        <div className="absolute left-6 top-8 text-center">
-          <div className="text-2xl font-bold">7058</div>
-          <div className="text-xs font-bold">Followers</div>
-        </div>
-        
-        {/* Right stat - Following */}
-        <div className="absolute right-6 top-8 text-center">
-          <div className="text-2xl font-bold">85</div>
-          <div className="text-xs font-bold">Following</div>
-        </div>
-      </div>
 
       {/* Curved white section */}
-      <div className="relative -mt-12 bg-background rounded-t-[3rem] pt-32 pb-8">
+      <div className="relative -mt-12 bg-background rounded-t-[3rem] pt-20 pb-8">
+        {/* Stats on both sides of profile picture */}
+        <div className="absolute top-8 left-0 right-0 flex justify-between items-center px-8">
+          {/* Left stat - Followers */}
+          <div className="text-center">
+            <div className="text-2xl font-bold">7058</div>
+            <div className="text-xs font-bold">Followers</div>
+          </div>
+          
+          {/* Right stat - Following */}
+          <div className="text-center">
+            <div className="text-2xl font-bold">85</div>
+            <div className="text-xs font-bold">Following</div>
+          </div>
+        </div>
+
         {/* Profile Info */}
         <div className="px-6 text-center">
         {/* Aelix Score */}
