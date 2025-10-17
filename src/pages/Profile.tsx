@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import profileHeaderAerial from "@/assets/profile-header-aerial.jpg";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -46,8 +47,13 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Header with cinematic gradient */}
-      <div className="relative h-64" style={{ background: 'var(--gradient-aelixto)' }}>
+      {/* Header with aerial nature scene */}
+      <div className="relative h-64 overflow-hidden">
+        <img 
+          src={profileHeaderAerial} 
+          alt="Aerial morning nature scene"
+          className="w-full h-full object-cover"
+        />
         <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-3">
           <Button 
             variant="ghost" 
