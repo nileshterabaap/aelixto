@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import profileHeaderNature from "@/assets/profile-header-nature.jpg";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -34,26 +33,21 @@ const Profile = () => {
   ];
 
   const xPosts = [
-    { id: 1, username: "Sarah Chen", handle: "@sarahchen", avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop", text: "The upcoming election will reshape global trade policies. Markets are already pricing in potential tariff changes. History shows economic policy shifts have long-term ripple effects 📊🌍", likes: 892, retweets: 234 },
-    { id: 2, username: "Dr. Marcus Kim", handle: "@drmarcusk", avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop", text: "Breakthrough in quantum computing: researchers achieved 1000+ qubit stability at room temperature. This could revolutionize cryptography and drug discovery within the decade 🔬⚛️", likes: 1243, retweets: 456 },
-    { id: 3, username: "Elena Rodriguez", handle: "@elenarodz", avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop", text: "Federal Reserve's decision to maintain rates signals confidence in soft landing. Inflation trending down while employment remains strong. Textbook monetary policy execution 📈💼", likes: 678, retweets: 189 },
-    { id: 4, username: "James Wilson", handle: "@jwilson_pol", avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop", text: "The geopolitical shift in the Indo-Pacific is accelerating. New alliances forming as nations reassess their strategic partnerships. This will define the next decade of international relations 🌏🤝", likes: 1567, retweets: 423 },
-    { id: 5, username: "Dr. Aisha Patel", handle: "@aishapatel_sci", avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop", text: "CRISPR gene therapy shows 95% success rate in latest trials for sickle cell disease. We're witnessing the beginning of personalized medicine becoming mainstream healthcare 🧬💉", likes: 2134, retweets: 678 },
-    { id: 6, username: "Michael Torres", handle: "@mtorres_econ", avatar: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=crop", text: "China's economic pivot toward domestic consumption is reshaping global supply chains. Western manufacturers need to adapt or risk losing competitive advantage. The decoupling is real 📦🌐", likes: 956, retweets: 312 },
-    { id: 7, username: "Prof. Lisa Zhang", handle: "@profzhang", avatar: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=200&h=200&fit=crop", text: "AI models now surpassing human performance in protein folding predictions. The implications for drug development and disease treatment are staggering. Science fiction becoming reality 🤖🔬", likes: 1789, retweets: 534 },
-    { id: 8, username: "David Kumar", handle: "@dkumar_geo", avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=200&h=200&fit=crop", text: "Arctic shipping routes opening earlier each year. This isn't just climate change - it's a complete reconfiguration of global trade geography and territorial claims. Watch this space 🚢❄️", likes: 1423, retweets: 389 },
-    { id: 9, username: "Emma Foster", handle: "@emmaf_policy", avatar: "https://images.unsplash.com/photo-1489424731084-a5d8b219a5bb?w=200&h=200&fit=crop", text: "Universal basic income pilot programs showing unexpected results: increased entrepreneurship and education enrollment, minimal impact on workforce participation. Data challenging assumptions 💰📊", likes: 2891, retweets: 756 },
+    { id: 1, text: "Just finished an incredible hike through the mountains! The views were absolutely breathtaking 🏔️", likes: 234, retweets: 45 },
+    { id: 2, text: "Working on something exciting today. Can't wait to share it with you all soon! Stay tuned 🚀", likes: 189, retweets: 32 },
+    { id: 3, text: "Coffee and creativity - the perfect combination for a productive morning ☕✨", likes: 412, retweets: 78 },
+    { id: 4, text: "Sometimes you need to step back to see the bigger picture. Perspective is everything 🎯", likes: 567, retweets: 123 },
+    { id: 5, text: "Grateful for the amazing people in my life. Surrounding yourself with positivity makes all the difference 💫", likes: 345, retweets: 89 },
+    { id: 6, text: "New week, new goals, new opportunities. Let's make it count! 💪", likes: 298, retweets: 56 },
+    { id: 7, text: "The best investment you can make is in yourself. Never stop learning and growing 📚", likes: 523, retweets: 134 },
+    { id: 8, text: "Taking a moment to appreciate the simple things. Life is beautiful when you pause to notice ✨", likes: 445, retweets: 92 },
+    { id: 9, text: "Dream big, work hard, stay focused, and surround yourself with good people 🌟", likes: 678, retweets: 156 },
   ];
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Header with aerial nature scene */}
-      <div className="relative h-64 overflow-hidden">
-        <img 
-          src={profileHeaderNature} 
-          alt="Morning nature landscape"
-          className="w-full h-full object-cover"
-        />
+      {/* Header with cinematic gradient */}
+      <div className="relative h-64" style={{ background: 'var(--gradient-aelixto)' }}>
         <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-3">
           <Button 
             variant="ghost" 
@@ -90,27 +84,25 @@ const Profile = () => {
         </div>
       </div>
 
-      {/* Stats and Profile Info */}
-      <div className="mt-20 px-6 text-center relative">
-        <div className="absolute -top-6 left-0 right-0 h-6 bg-background rounded-t-[32px]"></div>
-        <div className="relative pt-8">
-          {/* Stats Row */}
-          <div className="flex justify-between items-start mb-8 px-4">
-            {/* Left stat - Followers */}
-            <div className="text-left">
-              <div className="text-2xl font-bold">7058</div>
-              <div className="text-xs font-bold">Followers</div>
-            </div>
-            
-            {/* Right stat - Following */}
-            <div className="text-right">
-              <div className="text-2xl font-bold">85</div>
-              <div className="text-xs font-bold">Following</div>
-            </div>
-          </div>
+      {/* Stats overlapping profile picture */}
+      <div className="relative px-4">
+      {/* Left stat - Followers */}
+        <div className="absolute left-4 top-16 px-5 py-3">
+          <div className="text-2xl font-bold">7058</div>
+          <div className="text-xs font-bold">Followers</div>
+        </div>
+        
+        {/* Right stat - Following */}
+        <div className="absolute right-4 top-16 px-5 py-3">
+          <div className="text-2xl font-bold">85</div>
+          <div className="text-xs font-bold">Following</div>
+        </div>
+      </div>
 
-          {/* Aelix Score */}
-          <div className="mx-auto inline-block px-12 py-3 border-2 border-foreground rounded-lg shadow-[0_6px_16px_rgba(0,0,0,0.2)] bg-background">
+      {/* Profile Info */}
+      <div className="mt-28 px-6 text-center">
+        {/* Aelix Score */}
+        <div className="mt-4 mx-auto inline-block px-12 py-3 border-2 border-foreground rounded-lg shadow-[0_6px_16px_rgba(0,0,0,0.2)] bg-background">
           <div className="text-3xl font-bold">45,700</div>
           <div className="text-xs font-bold tracking-widest">AELIX SCORE</div>
         </div>
@@ -214,15 +206,15 @@ const Profile = () => {
                   <div className="flex items-start gap-3 mb-3">
                     <div className="h-10 w-10 rounded-full bg-muted flex-shrink-0 overflow-hidden">
                       <img 
-                        src={post.avatar} 
-                        alt={post.username}
+                        src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop" 
+                        alt="Profile"
                         className="w-full h-full object-cover"
                       />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-sm">{post.username}</span>
-                        <span className="text-muted-foreground text-sm">{post.handle}</span>
+                        <span className="font-bold text-sm">Andrew Rollings</span>
+                        <span className="text-muted-foreground text-sm">@andrewwr10</span>
                       </div>
                     </div>
                     <svg className="h-4 w-4 text-foreground flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
@@ -254,7 +246,6 @@ const Profile = () => {
             </div>
           </TabsContent>
         </Tabs>
-        </div>
       </div>
     </div>
   );
