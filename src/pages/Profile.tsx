@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import profileHeaderBg from "@/assets/profile-header-bg.jpg";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -118,8 +119,8 @@ const Profile = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Header with cinematic gradient */}
-      <div className="relative h-64" style={{ background: 'var(--gradient-aelixto)' }}>
+      {/* Header with nature background */}
+      <div className="relative h-64 bg-cover bg-center" style={{ backgroundImage: `url(${profileHeaderBg})` }}>
         <div className="absolute top-0 left-0 right-0 flex items-center justify-between p-3">
           <Button 
             variant="ghost" 
