@@ -143,7 +143,7 @@ const Profile = () => {
         </div>
         
         {/* Profile picture overlapping gradient */}
-        <div className="absolute -bottom-12 left-1/2 transform -translate-x-1/2 z-10">
+        <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 z-10">
           <div className="h-40 w-40 rounded-full bg-background p-1.5 shadow-[0_8px_24px_rgba(0,0,0,0.15)]">
             <div className="h-full w-full rounded-full overflow-hidden">
               <img 
@@ -184,7 +184,7 @@ const Profile = () => {
 
         {/* Bio */}
         <p className="mt-6 text-base italic font-medium">
-          "Chasing multiple dreams, within a single life"
+          "Chasing multiple dreams,<br />within a single life"
         </p>
 
         {/* Follow Button */}
