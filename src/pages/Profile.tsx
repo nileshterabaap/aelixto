@@ -86,14 +86,14 @@ const Profile = () => {
 
       {/* Stats overlapping profile picture */}
       <div className="relative px-4">
-        {/* Left stat - Followers */}
-        <div className="absolute left-4 top-16 px-5 py-3 shadow-[0_6px_16px_rgba(0,0,0,0.2)]">
+      {/* Left stat - Followers */}
+        <div className="absolute left-4 top-16 px-5 py-3">
           <div className="text-2xl font-bold">7058</div>
           <div className="text-xs font-bold">Followers</div>
         </div>
         
         {/* Right stat - Following */}
-        <div className="absolute right-4 top-16 px-5 py-3 shadow-[0_6px_16px_rgba(0,0,0,0.2)]">
+        <div className="absolute right-4 top-16 px-5 py-3">
           <div className="text-2xl font-bold">85</div>
           <div className="text-xs font-bold">Following</div>
         </div>
@@ -146,22 +146,22 @@ const Profile = () => {
 
         {/* Platform Tabs */}
         <Tabs defaultValue="youtube" className="w-full" onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 mb-6 bg-transparent gap-2">
+          <TabsList className="grid w-full grid-cols-3 mb-6 bg-transparent gap-3 h-auto p-0">
             <TabsTrigger 
               value="youtube" 
-              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg"
+              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-full h-12 border-2 border-muted-foreground/40"
             >
               <Youtube className="h-5 w-5" />
             </TabsTrigger>
             <TabsTrigger 
               value="instagram"
-              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg"
+              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-full h-12 border-2 border-muted-foreground/40"
             >
               <Instagram className="h-5 w-5" />
             </TabsTrigger>
             <TabsTrigger 
               value="x"
-              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg"
+              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-full h-12 border-2 border-muted-foreground/40"
             >
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
