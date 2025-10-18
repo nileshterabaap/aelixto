@@ -53,7 +53,7 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
         <div className="flex items-center gap-3 mb-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-full overflow-hidden bg-muted">
             <img 
-              src={post.mediaUrl} 
+              src={post.author.avatar} 
               alt={post.author.username}
               className="w-full h-full object-cover"
             />
