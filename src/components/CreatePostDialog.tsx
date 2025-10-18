@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Image, Video } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useCreatePost } from "@/hooks/usePosts";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -16,21 +16,17 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [content, setContent] = useState("");
   const [mediaUrl, setMediaUrl] = useState("");
   const [mediaType, setMediaType] = useState<'none' | 'image' | 'video'>('none');
-  const { toast } = useToast();
+  const createPost = useCreatePost();
 
   const handleSubmit = () => {
     if (!content.trim()) {
-      toast({
-        title: "Content required",
-        description: "Please write something before posting",
-        variant: "destructive"
-      });
       return;
     }
 
-    toast({
-      title: "Post created!",
-      description: "Your post has been published to your feed"
+    createPost.mutate({
+      content: content.trim(),
+      media_type: mediaType === 'none' ? undefined : mediaType,
+      media_url: mediaUrl || undefined,
     });
 
     setContent("");

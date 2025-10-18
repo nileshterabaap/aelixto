@@ -74,12 +74,13 @@ const Index = () => {
                     username: `@${post.profiles?.username || "anonymous"}`,
                     avatar: post.profiles?.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
                   },
+                  title: "",
                   content: post.content,
-                  mediaType: post.media_type as "image" | "video" | null,
+                  mediaType: post.media_type as "image" | "video" | "none",
                   mediaUrl: post.media_url || undefined,
-                  platform: post.platform as "youtube" | "instagram" | "tiktok" | "reddit" | null,
-                  timestamp: new Date(post.created_at).toLocaleString(),
-                  savesCount: post.saves_count,
+                  platform: post.platform as "youtube" | "instagram" | "tiktok" | "reddit",
+                  timestamp: new Date(post.created_at),
+                  saves: post.saves_count,
                 }} 
                 onSave={handleSavePost} 
               />

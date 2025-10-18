@@ -25,7 +25,7 @@ export const usePosts = () => {
         .from("posts")
         .select(`
           *,
-          profiles (
+          profiles!posts_user_id_fkey (
             username,
             avatar_url
           )
@@ -33,7 +33,7 @@ export const usePosts = () => {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as Post[];
+      return data as unknown as Post[];
     },
   });
 };
