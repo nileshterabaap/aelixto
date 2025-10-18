@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Image, Video } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 
 interface CreatePostDialogProps {
@@ -13,90 +13,154 @@ interface CreatePostDialogProps {
 }
 
 export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) => {
-  const [content, setContent] = useState("");
-  const [mediaUrl, setMediaUrl] = useState("");
-  const [mediaType, setMediaType] = useState<'none' | 'image' | 'video'>('none');
+  const [step, setStep] = useState<1 | 2>(1);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [caption, setCaption] = useState("");
+  const [showThumbnailInput, setShowThumbnailInput] = useState(false);
   const createPost = useCreatePost();
 
-  const handleSubmit = () => {
-    if (!content.trim()) {
-      return;
+  const handleLinkSubmit = () => {
+    if (!linkUrl.trim()) return;
+    
+    // Auto-generate thumbnail URL based on platform
+    let thumbnail = "";
+    if (linkUrl.includes("youtube.com") || linkUrl.includes("youtu.be")) {
+      const videoId = linkUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
+      if (videoId) thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    } else if (linkUrl.includes("instagram.com")) {
+      thumbnail = linkUrl + "media/?size=l";
     }
+    
+    setThumbnailUrl(thumbnail);
+    setStep(2);
+  };
+
+  const handlePost = () => {
+    if (!linkUrl.trim()) return;
 
     createPost.mutate({
-      content: content.trim(),
-      media_type: mediaType === 'none' ? undefined : mediaType,
-      media_url: mediaUrl || undefined,
+      content: caption.trim() || linkUrl,
+      media_type: "image",
+      media_url: thumbnailUrl || linkUrl,
     });
 
-    setContent("");
-    setMediaUrl("");
-    setMediaType('none');
+    // Reset form
+    setStep(1);
+    setLinkUrl("");
+    setThumbnailUrl("");
+    setCaption("");
+    setShowThumbnailInput(false);
+    onOpenChange(false);
+  };
+
+  const handleBack = () => {
+    setStep(1);
+    setShowThumbnailInput(false);
+  };
+
+  const handleClose = () => {
+    setStep(1);
+    setLinkUrl("");
+    setThumbnailUrl("");
+    setCaption("");
+    setShowThumbnailInput(false);
     onOpenChange(false);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Create Post</DialogTitle>
+          <div className="flex items-center gap-2">
+            {step === 2 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleBack}
+                className="h-8 w-8"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+            )}
+            <DialogTitle>
+              {step === 1 ? "Insert Link" : "Add Details"}
+            </DialogTitle>
+          </div>
         </DialogHeader>
         
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="content">What's on your mind?</Label>
-            <Textarea
-              id="content"
-              placeholder="Share something interesting..."
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="mt-1.5 min-h-[120px] resize-none"
-            />
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant={mediaType === 'image' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setMediaType(mediaType === 'image' ? 'none' : 'image')}
-              className="flex-1"
-            >
-              <Image className="h-4 w-4 mr-1.5" />
-              Image
-            </Button>
-            <Button
-              type="button"
-              variant={mediaType === 'video' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setMediaType(mediaType === 'video' ? 'none' : 'video')}
-              className="flex-1"
-            >
-              <Video className="h-4 w-4 mr-1.5" />
-              Video
-            </Button>
-          </div>
-
-          {mediaType !== 'none' && (
+        {step === 1 ? (
+          <div className="space-y-4">
             <div>
-              <Label htmlFor="mediaUrl">
-                {mediaType === 'image' ? 'Image URL' : 'Video URL'}
-              </Label>
+              <Label htmlFor="link">Paste your link</Label>
               <Input
-                id="mediaUrl"
+                id="link"
                 type="url"
-                placeholder={mediaType === 'image' ? 'https://...' : 'YouTube, TikTok, etc.'}
-                value={mediaUrl}
-                onChange={(e) => setMediaUrl(e.target.value)}
+                placeholder="https://youtube.com/... or https://instagram.com/..."
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
                 className="mt-1.5"
               />
             </div>
-          )}
 
-          <Button onClick={handleSubmit} className="w-full">
-            Post
-          </Button>
-        </div>
+            <Button onClick={handleLinkSubmit} className="w-full" disabled={!linkUrl.trim()}>
+              Next
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {thumbnailUrl && (
+              <div className="rounded-lg overflow-hidden border">
+                <img 
+                  src={thumbnailUrl} 
+                  alt="Preview" 
+                  className="w-full h-48 object-cover"
+                  onError={() => setThumbnailUrl("")}
+                />
+              </div>
+            )}
+
+            <div>
+              <Label htmlFor="caption">Caption (optional)</Label>
+              <Textarea
+                id="caption"
+                placeholder="Write a caption..."
+                value={caption}
+                onChange={(e) => setCaption(e.target.value)}
+                className="mt-1.5 min-h-[80px] resize-none"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowThumbnailInput(!showThumbnailInput)}
+                className="w-full"
+              >
+                {showThumbnailInput ? "Hide" : "Change"} Thumbnail
+              </Button>
+
+              {showThumbnailInput && (
+                <div>
+                  <Label htmlFor="thumbnail">Thumbnail URL</Label>
+                  <Input
+                    id="thumbnail"
+                    type="url"
+                    placeholder="https://..."
+                    value={thumbnailUrl}
+                    onChange={(e) => setThumbnailUrl(e.target.value)}
+                    className="mt-1.5"
+                  />
+                </div>
+              )}
+            </div>
+
+            <Button onClick={handlePost} className="w-full">
+              Post
+            </Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
