@@ -7,15 +7,35 @@ import { BottomNav } from "@/components/BottomNav";
 import { FeedPost } from "@/components/FeedPost";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { usePosts } from "@/hooks/usePosts";
-import { useToast } from "@/hooks/use-toast";
+import { demoPosts } from "@/data/demoData";
 
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-  const { data: posts, isLoading: postsLoading } = usePosts();
+  const { data: userPosts, isLoading: postsLoading } = usePosts();
+
+  // Combine demo posts with user posts
+  const allPosts = [
+    ...(userPosts || []).map(post => ({
+      id: post.id,
+      author: {
+        name: post.profiles?.username || "Anonymous",
+        username: `@${post.profiles?.username || "anonymous"}`,
+        avatar: post.profiles?.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
+      },
+      title: "",
+      content: post.content,
+      mediaType: post.media_type as "image" | "video" | "none",
+      mediaUrl: post.media_url || undefined,
+      platform: post.platform as "youtube" | "instagram" | "tiktok" | "reddit",
+      timestamp: new Date(post.created_at),
+      saves: post.saves_count,
+      isRealPost: true,
+    })),
+    ...demoPosts.map(post => ({ ...post, isRealPost: false })),
+  ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
   useEffect(() => {
     // Check authentication
@@ -42,13 +62,6 @@ const Index = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  const handleSavePost = (postId: string) => {
-    toast({
-      title: "Post saved!",
-      description: "Added to your saved collection"
-    });
-  };
-
   if (loading || postsLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -62,35 +75,15 @@ const Index = () => {
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
       <main className="mx-auto max-w-2xl px-4 py-6">
-        {posts && posts.length > 0 ? (
-          <div className="space-y-4">
-            {posts.map((post) => (
-              <FeedPost 
-                key={post.id} 
-                post={{
-                  id: post.id,
-                  author: {
-                    name: post.profiles?.username || "Anonymous",
-                    username: `@${post.profiles?.username || "anonymous"}`,
-                    avatar: post.profiles?.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
-                  },
-                  title: "",
-                  content: post.content,
-                  mediaType: post.media_type as "image" | "video" | "none",
-                  mediaUrl: post.media_url || undefined,
-                  platform: post.platform as "youtube" | "instagram" | "tiktok" | "reddit",
-                  timestamp: new Date(post.created_at),
-                  saves: post.saves_count,
-                }} 
-                onSave={handleSavePost} 
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground mb-4">No posts yet. Be the first to create one!</p>
-          </div>
-        )}
+        <div className="space-y-4">
+          {allPosts.map((post) => (
+            <FeedPost 
+              key={post.id} 
+              post={post}
+              userId={user?.id}
+            />
+          ))}
+        </div>
       </main>
 
       <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />

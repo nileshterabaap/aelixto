@@ -3,14 +3,16 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { Post } from "@/data/demoData";
 import { useState } from "react";
+import { usePostActions } from "@/hooks/usePostActions";
+import { CommentsDialog } from "@/components/CommentsDialog";
 import youtubeIcon from "@/assets/youtube-icon.png";
 import instagramIcon from "@/assets/instagram-icon.png";
 import tiktokIcon from "@/assets/tiktok-icon.png";
 import redditIcon from "@/assets/reddit-icon.png";
 
 interface FeedPostProps {
-  post: Post;
-  onSave: (postId: string) => void;
+  post: Post & { isRealPost?: boolean };
+  userId?: string;
 }
 
 const formatTimestamp = (date: Date) => {
@@ -41,10 +43,16 @@ const getPlatformIcon = (platform?: string) => {
   }
 };
 
-export const FeedPost = ({ post, onSave }: FeedPostProps) => {
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
+export const FeedPost = ({ post, userId }: FeedPostProps) => {
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const platform = getPlatformIcon(post.platform);
+  
+  // Only use post actions for real posts
+  const postActions = post.isRealPost && userId 
+    ? usePostActions(post.id, userId)
+    : { isLiked: false, isSaved: false, toggleLike: () => {}, toggleSave: () => {}, handleShare: () => {} };
+
+  const { isLiked, isSaved, toggleLike, toggleSave, handleShare } = postActions;
 
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
@@ -127,31 +135,42 @@ export const FeedPost = ({ post, onSave }: FeedPostProps) => {
         {/* Actions */}
         <div className="flex items-center justify-around px-2 py-4 mt-1">
           <button
-            onClick={() => setLiked(!liked)}
+            onClick={() => toggleLike()}
             className="p-2 hover:opacity-60 transition-opacity"
           >
-            <Heart className={`h-7 w-7 stroke-[1.5] ${liked ? 'fill-red-500 text-red-500' : 'fill-none'}`} />
+            <Heart className={`h-7 w-7 stroke-[1.5] ${isLiked ? 'fill-red-500 text-red-500' : 'fill-none'}`} />
           </button>
-          <button className="p-2 hover:opacity-60 transition-opacity">
+          <button 
+            onClick={() => setCommentsOpen(true)}
+            className="p-2 hover:opacity-60 transition-opacity"
+          >
             <MessageCircle className="h-7 w-7 stroke-[1.5] fill-none" />
           </button>
           <button className="p-2 hover:opacity-60 transition-opacity">
             <Repeat2 className="h-8 w-8 stroke-[2.5]" />
           </button>
-          <button className="p-2 hover:opacity-60 transition-opacity">
+          <button 
+            onClick={handleShare}
+            className="p-2 hover:opacity-60 transition-opacity"
+          >
             <Share className="h-7 w-7 stroke-[1.5]" />
           </button>
           <button
-            onClick={() => {
-              setSaved(!saved);
-              onSave(post.id);
-            }}
+            onClick={() => toggleSave()}
             className="p-2 hover:opacity-60 transition-opacity"
           >
-            <Bookmark className={`h-7 w-7 stroke-[1.5] ${saved ? 'fill-current' : 'fill-none'}`} />
+            <Bookmark className={`h-7 w-7 stroke-[1.5] ${isSaved ? 'fill-current' : 'fill-none'}`} />
           </button>
         </div>
       </div>
+      
+      {post.isRealPost && (
+        <CommentsDialog 
+          open={commentsOpen} 
+          onOpenChange={setCommentsOpen}
+          postId={post.id}
+        />
+      )}
     </Card>
   );
 };
