@@ -1,13 +1,53 @@
-import { ArrowLeft, MoreVertical, Instagram, Youtube } from "lucide-react";
+import { ArrowLeft, MoreVertical, Instagram, Youtube, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { User } from "@supabase/supabase-js";
+import { useToast } from "@/hooks/use-toast";
 import profileHeaderBg from "@/assets/profile-header-bg.jpg";
 
 const Profile = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("youtube");
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check authentication
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/auth");
+      } else {
+        setUser(session.user);
+      }
+      setLoading(false);
+    };
+    checkAuth();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        navigate("/auth");
+      } else {
+        setUser(session.user);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast({
+      title: "Logged out",
+      description: "You've been successfully logged out.",
+    });
+    navigate("/auth");
+  };
 
   const youtubeVideos = [
     { id: 1, thumbnail: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&h=400&fit=crop", platform: "youtube" },
@@ -117,6 +157,14 @@ const Profile = () => {
     },
   ];
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header with nature background */}
@@ -138,8 +186,9 @@ const Profile = () => {
             variant="ghost" 
             size="icon" 
             className="h-10 w-10 bg-transparent hover:bg-black/10 text-black rounded-full"
+            onClick={handleLogout}
           >
-            <MoreVertical className="h-6 w-6" />
+            <LogOut className="h-6 w-6" />
           </Button>
         </div>
         
