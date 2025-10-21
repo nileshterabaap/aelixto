@@ -1,6 +1,5 @@
 export interface Post {
   id: string;
-  user_id?: string;
   author: {
     name: string;
     username: string;
