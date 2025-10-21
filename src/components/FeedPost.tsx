@@ -1,16 +1,10 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2 } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreHorizontal } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { Post } from "@/data/demoData";
 import { useState } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
 import { CommentsDialog } from "@/components/CommentsDialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import youtubeIcon from "@/assets/youtube-icon.png";
 import instagramIcon from "@/assets/instagram-icon.png";
 import tiktokIcon from "@/assets/tiktok-icon.png";
@@ -69,11 +63,9 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   // Only use post actions for real posts
   const postActions = post.isRealPost && userId 
     ? usePostActions(post.id, userId)
-    : { isLiked: false, isSaved: false, toggleLike: () => {}, toggleSave: () => {}, handleShare: () => {}, deletePost: () => {} };
+    : { isLiked: false, isSaved: false, toggleLike: () => {}, toggleSave: () => {}, handleShare: () => {} };
 
-  const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost } = postActions;
-  
-  const isOwnPost = userId && post.user_id === userId;
+  const { isLiked, isSaved, toggleLike, toggleSave, handleShare } = postActions;
 
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
@@ -90,38 +82,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <div className="flex-1 min-w-0">
             <p className="font-bold text-base">{post.author.username}</p>
           </div>
-          {isOwnPost && post.isRealPost && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                  <MoreVertical className="h-6 w-6" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => deletePost()} className="text-destructive">
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+            <MoreHorizontal className="h-6 w-6" />
+          </Button>
         </div>
 
         {/* Title and Caption */}
         <div className="mb-3">
           <h2 className="text-lg font-bold mb-1">{post.title}</h2>
-          <div className="flex items-center gap-2">
-            <p className="text-sm text-muted-foreground">{post.content}</p>
-            {platform && (
-              <div className="bg-white rounded-full p-1.5 shadow-sm flex-shrink-0">
-                <img 
-                  src={platform.icon} 
-                  alt={platform.name}
-                  className="w-4 h-4 brightness-0"
-                />
-              </div>
-            )}
-          </div>
+          <p className="text-sm text-muted-foreground">{post.content}</p>
         </div>
 
         {/* Media */}
@@ -136,6 +105,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 'aspect-[16/9]'
               }`}
             />
+            {platform && (
+              <div className="absolute top-3 right-3 bg-white rounded-full p-2 shadow-md">
+                <img 
+                  src={platform.icon} 
+                  alt={platform.name}
+                  className="w-5 h-5 brightness-0"
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -145,10 +123,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             platform?.name === 'YouTube' ? 'aspect-[16/9]' : 
             'aspect-[4/3]'
           }`}>
-            {isPlayingVideo && platform?.name === 'YouTube' && post.mediaUrl ? (
+            {isPlayingVideo && platform?.name === 'YouTube' && post.content ? (
               <iframe
                 className="w-full h-full"
-                src={`https://www.youtube.com/embed/${getYouTubeVideoId(post.mediaUrl)}?autoplay=1`}
+                src={`https://www.youtube.com/embed/${getYouTubeVideoId(post.content)}?autoplay=1`}
                 title="YouTube video player"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -162,6 +140,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                     className="w-full h-full object-cover"
                   />
                 </div>
+                {platform && (
+                  <div className="absolute top-3 right-3 z-20 bg-white rounded-full p-2 shadow-md">
+                    <img 
+                      src={platform.icon} 
+                      alt={platform.name}
+                      className="w-5 h-5 brightness-0"
+                    />
+                  </div>
+                )}
                 <button
                   onClick={handleVideoClick}
                   className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group"
