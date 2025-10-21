@@ -45,7 +45,20 @@ const getPlatformIcon = (platform?: string) => {
 
 export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const platform = getPlatformIcon(post.platform);
+  
+  const getYouTubeVideoId = (url: string) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
+
+  const handleVideoClick = () => {
+    if (post.mediaType === 'video' && post.platform === 'youtube' && post.mediaUrl) {
+      setIsPlayingVideo(true);
+    }
+  };
   
   // Only use post actions for real posts
   const postActions = post.isRealPost && userId 
@@ -93,11 +106,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               }`}
             />
             {platform && (
-              <div className="absolute top-3 right-3 bg-white/90 rounded-full p-2">
+              <div className="absolute top-3 right-3 bg-white rounded-full p-2 shadow-md">
                 <img 
                   src={platform.icon} 
                   alt={platform.name}
-                  className="w-6 h-6"
+                  className="w-5 h-5 brightness-0"
                 />
               </div>
             )}
@@ -105,30 +118,47 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         )}
 
         {post.mediaType === 'video' && post.mediaUrl && (
-          <div className={`rounded-2xl overflow-hidden mb-2 bg-muted flex items-center justify-center relative ${
+          <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
             platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
             platform?.name === 'YouTube' ? 'aspect-[16/9]' : 
             'aspect-[4/3]'
           }`}>
-            <div className="absolute inset-0">
-              <img 
-                src={post.mediaUrl} 
-                alt="Video thumbnail"
-                className="w-full h-full object-cover"
+            {isPlayingVideo && platform?.name === 'YouTube' && post.content ? (
+              <iframe
+                className="w-full h-full"
+                src={`https://www.youtube.com/embed/${getYouTubeVideoId(post.content)}?autoplay=1`}
+                title="YouTube video player"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
               />
-            </div>
-            {platform && (
-              <div className="absolute top-3 right-3 z-20 bg-white/90 rounded-full p-2">
-                <img 
-                  src={platform.icon} 
-                  alt={platform.name}
-                  className="w-6 h-6"
-                />
-              </div>
+            ) : (
+              <>
+                <div className="absolute inset-0">
+                  <img 
+                    src={post.mediaUrl} 
+                    alt="Video thumbnail"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                {platform && (
+                  <div className="absolute top-3 right-3 z-20 bg-white rounded-full p-2 shadow-md">
+                    <img 
+                      src={platform.icon} 
+                      alt={platform.name}
+                      className="w-5 h-5 brightness-0"
+                    />
+                  </div>
+                )}
+                <button
+                  onClick={handleVideoClick}
+                  className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group"
+                >
+                  <div className="h-20 w-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center group-hover:bg-black/70 transition-all">
+                    <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent ml-1"></div>
+                  </div>
+                </button>
+              </>
             )}
-            <div className="relative z-10 h-16 w-16 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
-              <div className="w-0 h-0 border-l-[16px] border-l-white border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
-            </div>
           </div>
         )}
 
