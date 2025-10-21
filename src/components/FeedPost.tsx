@@ -110,7 +110,18 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {/* Title and Caption */}
         <div className="mb-3">
           <h2 className="text-lg font-bold mb-1">{post.title}</h2>
-          <p className="text-sm text-muted-foreground">{post.content}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-muted-foreground">{post.content}</p>
+            {platform && (
+              <div className="bg-white rounded-full p-1.5 shadow-sm flex-shrink-0">
+                <img 
+                  src={platform.icon} 
+                  alt={platform.name}
+                  className="w-4 h-4 brightness-0"
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Media */}
@@ -125,15 +136,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 'aspect-[16/9]'
               }`}
             />
-            {platform && (
-              <div className="absolute top-3 right-3 bg-white rounded-full p-2 shadow-md">
-                <img 
-                  src={platform.icon} 
-                  alt={platform.name}
-                  className="w-5 h-5 brightness-0"
-                />
-              </div>
-            )}
           </div>
         )}
 
@@ -143,10 +145,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             platform?.name === 'YouTube' ? 'aspect-[16/9]' : 
             'aspect-[4/3]'
           }`}>
-            {isPlayingVideo && platform?.name === 'YouTube' && post.content ? (
+            {isPlayingVideo && platform?.name === 'YouTube' && post.mediaUrl ? (
               <iframe
                 className="w-full h-full"
-                src={`https://www.youtube.com/embed/${getYouTubeVideoId(post.content)}?autoplay=1`}
+                src={`https://www.youtube.com/embed/${getYouTubeVideoId(post.mediaUrl)}?autoplay=1`}
                 title="YouTube video player"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -160,15 +162,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                {platform && (
-                  <div className="absolute top-3 right-3 z-20 bg-white rounded-full p-2 shadow-md">
-                    <img 
-                      src={platform.icon} 
-                      alt={platform.name}
-                      className="w-5 h-5 brightness-0"
-                    />
-                  </div>
-                )}
                 <button
                   onClick={handleVideoClick}
                   className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group"
