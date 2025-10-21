@@ -39,10 +39,30 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const handlePost = () => {
     if (!linkUrl.trim()) return;
 
+    // Detect platform and media type
+    let platform = "";
+    let mediaType = "image";
+    
+    if (linkUrl.includes("youtube.com") || linkUrl.includes("youtu.be")) {
+      platform = "youtube";
+      mediaType = "video";
+    } else if (linkUrl.includes("tiktok.com")) {
+      platform = "tiktok";
+      mediaType = "video";
+    } else if (linkUrl.includes("instagram.com")) {
+      platform = "instagram";
+      if (linkUrl.includes("/reel/") || linkUrl.includes("/reels/")) {
+        mediaType = "video";
+      }
+    } else if (linkUrl.includes("reddit.com")) {
+      platform = "reddit";
+    }
+
     createPost.mutate({
-      content: caption.trim() || linkUrl,
-      media_type: "image",
+      content: linkUrl,
+      media_type: mediaType,
       media_url: thumbnailUrl || linkUrl,
+      platform: platform || undefined,
     });
 
     // Reset form
