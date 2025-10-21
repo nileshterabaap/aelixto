@@ -93,11 +93,29 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
     }
   };
 
+  // Delete post
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!userId) throw new Error("Not authenticated");
+      
+      await supabase
+        .from("posts")
+        .delete()
+        .eq("id", postId)
+        .eq("user_id", userId);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      toast({ title: "Post deleted", description: "Your post has been removed" });
+    },
+  });
+
   return {
     isLiked: isLiked || false,
     isSaved: isSaved || false,
     toggleLike: likeMutation.mutate,
     toggleSave: saveMutation.mutate,
     handleShare,
+    deletePost: deleteMutation.mutate,
   };
 };
