@@ -1,10 +1,16 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreHorizontal } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { Post } from "@/data/demoData";
 import { useState } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
 import { CommentsDialog } from "@/components/CommentsDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import youtubeIcon from "@/assets/youtube-icon.png";
 import instagramIcon from "@/assets/instagram-icon.png";
 import tiktokIcon from "@/assets/tiktok-icon.png";
@@ -63,9 +69,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   // Only use post actions for real posts
   const postActions = post.isRealPost && userId 
     ? usePostActions(post.id, userId)
-    : { isLiked: false, isSaved: false, toggleLike: () => {}, toggleSave: () => {}, handleShare: () => {} };
+    : { isLiked: false, isSaved: false, toggleLike: () => {}, toggleSave: () => {}, handleShare: () => {}, deletePost: () => {} };
 
-  const { isLiked, isSaved, toggleLike, toggleSave, handleShare } = postActions;
+  const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost } = postActions;
+  
+  const isOwnPost = userId && post.user_id === userId;
 
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
@@ -82,9 +90,21 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <div className="flex-1 min-w-0">
             <p className="font-bold text-base">{post.author.username}</p>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-            <MoreHorizontal className="h-6 w-6" />
-          </Button>
+          {isOwnPost && post.isRealPost && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                  <MoreVertical className="h-6 w-6" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => deletePost()} className="text-destructive">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
 
         {/* Title and Caption */}

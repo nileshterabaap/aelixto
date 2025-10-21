@@ -59,7 +59,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     }
 
     createPost.mutate({
-      content: linkUrl,
+      content: caption.trim() || linkUrl,
       media_type: mediaType,
       media_url: thumbnailUrl || linkUrl,
       platform: platform || undefined,
