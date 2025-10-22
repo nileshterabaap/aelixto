@@ -9,7 +9,7 @@ export interface Post {
   content: string;
   mediaType?: 'image' | 'video' | 'none';
   mediaUrl?: string;
-  platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit';
+  platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest' | 'vimeo' | 'soundcloud' | 'spotify';
   timestamp: Date;
   saves: number;
 }

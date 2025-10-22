@@ -5,6 +5,13 @@ import type { Post } from "@/data/demoData";
 import { useState } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
 import { CommentsDialog } from "@/components/CommentsDialog";
+import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
+import { TikTokEmbed } from "@/components/embeds/TikTokEmbed";
+import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
+import { RedditEmbed } from "@/components/embeds/RedditEmbed";
+import { VimeoEmbed } from "@/components/embeds/VimeoEmbed";
+import { SoundCloudEmbed } from "@/components/embeds/SoundCloudEmbed";
+import { SpotifyEmbed } from "@/components/embeds/SpotifyEmbed";
 import youtubeIcon from "@/assets/youtube-icon.png";
 import instagramIcon from "@/assets/instagram-icon.png";
 import tiktokIcon from "@/assets/tiktok-icon.png";
@@ -38,6 +45,16 @@ const getPlatformIcon = (platform?: string) => {
       return { name: 'Instagram', icon: instagramIcon };
     case 'reddit':
       return { name: 'Reddit', icon: redditIcon };
+    case 'twitter':
+      return { name: 'Twitter', icon: null };
+    case 'pinterest':
+      return { name: 'Pinterest', icon: null };
+    case 'vimeo':
+      return { name: 'Vimeo', icon: null };
+    case 'soundcloud':
+      return { name: 'SoundCloud', icon: null };
+    case 'spotify':
+      return { name: 'Spotify', icon: null };
     default:
       return null;
   }
@@ -99,7 +116,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           )}
           <div className="flex items-center gap-2">
             <p className="text-sm flex-1">{post.content}</p>
-            {platform && (
+            {platform?.icon && (
               <img 
                 src={platform.icon} 
                 alt={platform.name}
@@ -110,27 +127,64 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         </div>
 
         {/* Media */}
-        {post.mediaType === 'image' && post.mediaUrl && (
+        {platform?.name === 'Twitter' && post.mediaUrl && (
+          <div className="mb-2">
+            <TwitterEmbed url={post.mediaUrl} />
+          </div>
+        )}
+
+        {platform?.name === 'TikTok' && post.mediaUrl && (
+          <div className="mb-2">
+            <TikTokEmbed url={post.mediaUrl} />
+          </div>
+        )}
+
+        {platform?.name === 'Pinterest' && post.mediaUrl && (
+          <div className="mb-2">
+            <PinterestEmbed url={post.mediaUrl} />
+          </div>
+        )}
+
+        {platform?.name === 'Reddit' && post.mediaUrl && (
+          <div className="mb-2">
+            <RedditEmbed url={post.mediaUrl} />
+          </div>
+        )}
+
+        {platform?.name === 'Vimeo' && post.mediaUrl && (
+          <div className="mb-2">
+            <VimeoEmbed url={post.mediaUrl} />
+          </div>
+        )}
+
+        {platform?.name === 'SoundCloud' && post.mediaUrl && (
+          <div className="mb-2">
+            <SoundCloudEmbed url={post.mediaUrl} />
+          </div>
+        )}
+
+        {platform?.name === 'Spotify' && post.mediaUrl && (
+          <div className="mb-2">
+            <SpotifyEmbed url={post.mediaUrl} />
+          </div>
+        )}
+
+        {post.mediaType === 'image' && post.mediaUrl && !['Twitter', 'Pinterest', 'Reddit'].includes(platform?.name || '') && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 
               alt="Post content"
               className={`w-full h-auto object-cover ${
                 platform?.name === 'Instagram' ? 'aspect-square' : 
-                platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
                 'aspect-[16/9]'
               }`}
             />
           </div>
         )}
 
-        {post.mediaType === 'video' && post.mediaUrl && (
+        {post.mediaType === 'video' && post.mediaUrl && platform?.name === 'YouTube' && (
           <>
-            <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
-              platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
-              platform?.name === 'YouTube' ? 'aspect-[16/9]' : 
-              'aspect-[4/3]'
-            }`}>
+            <div className="rounded-2xl overflow-hidden mb-2 bg-muted relative aspect-[16/9]">
               {isPlayingVideo && platform?.name === 'YouTube' && post.mediaUrl ? (
                 <iframe
                   className="w-full h-full"
