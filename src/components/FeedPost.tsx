@@ -54,6 +54,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
+  const getYouTubeThumbnail = (url: string) => {
+    const videoId = getYouTubeVideoId(url);
+    return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : url;
+  };
+
   const handleVideoClick = () => {
     if (post.mediaType === 'video' && post.platform === 'youtube' && post.mediaUrl) {
       setIsPlayingVideo(true);
@@ -135,7 +140,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <>
                 <div className="absolute inset-0">
                   <img 
-                    src={post.mediaUrl} 
+                    src={platform?.name === 'YouTube' && post.mediaUrl ? getYouTubeThumbnail(post.mediaUrl) : post.mediaUrl} 
                     alt="Video thumbnail"
                     className="w-full h-full object-cover"
                   />
