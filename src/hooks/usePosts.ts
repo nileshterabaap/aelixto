@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 export interface Post {
   id: string;
   user_id: string;
+  title?: string | null;
   content: string;
   media_type: string | null;
   media_url: string | null;
@@ -44,6 +45,7 @@ export const useCreatePost = () => {
 
   return useMutation({
     mutationFn: async (newPost: {
+      title?: string;
       content: string;
       media_type?: string;
       media_url?: string;
@@ -56,6 +58,7 @@ export const useCreatePost = () => {
         .from("posts")
         .insert({
           user_id: user.id,
+          title: newPost.title || null,
           content: newPost.content,
           media_type: newPost.media_type || null,
           media_url: newPost.media_url || null,

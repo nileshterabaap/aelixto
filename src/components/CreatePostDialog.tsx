@@ -16,6 +16,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [step, setStep] = useState<1 | 2>(1);
   const [linkUrl, setLinkUrl] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
+  const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
   const [showThumbnailInput, setShowThumbnailInput] = useState(false);
   const createPost = useCreatePost();
@@ -59,6 +60,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     }
 
     createPost.mutate({
+      title: title.trim() || undefined,
       content: caption.trim() || linkUrl,
       media_type: mediaType,
       media_url: linkUrl,
@@ -69,6 +71,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setStep(1);
     setLinkUrl("");
     setThumbnailUrl("");
+    setTitle("");
     setCaption("");
     setShowThumbnailInput(false);
     onOpenChange(false);
@@ -83,6 +86,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setStep(1);
     setLinkUrl("");
     setThumbnailUrl("");
+    setTitle("");
     setCaption("");
     setShowThumbnailInput(false);
     onOpenChange(false);
@@ -139,6 +143,17 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
                 />
               </div>
             )}
+
+            <div>
+              <Label htmlFor="title">Title (optional)</Label>
+              <Input
+                id="title"
+                placeholder="Enter video title..."
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
 
             <div>
               <Label htmlFor="caption">Caption (optional)</Label>

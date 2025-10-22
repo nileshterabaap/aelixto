@@ -53,6 +53,7 @@ export type Database = {
           media_url: string | null
           platform: string | null
           saves_count: number | null
+          title: string | null
           user_id: string
         }
         Insert: {
@@ -64,6 +65,7 @@ export type Database = {
           media_url?: string | null
           platform?: string | null
           saves_count?: number | null
+          title?: string | null
           user_id: string
         }
         Update: {
@@ -75,6 +77,7 @@ export type Database = {
           media_url?: string | null
           platform?: string | null
           saves_count?: number | null
+          title?: string | null
           user_id?: string
         }
         Relationships: [
