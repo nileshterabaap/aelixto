@@ -5,6 +5,7 @@ import type { Post } from "@/data/demoData";
 import { useState } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
 import { CommentsDialog } from "@/components/CommentsDialog";
+import { InstagramEmbed } from "@/components/InstagramEmbed";
 import youtubeIcon from "@/assets/youtube-icon.png";
 import instagramIcon from "@/assets/instagram-icon.png";
 import tiktokIcon from "@/assets/tiktok-icon.png";
@@ -110,13 +111,16 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         </div>
 
         {/* Media */}
-        {post.mediaType === 'image' && post.mediaUrl && (
+        {platform?.name === 'Instagram' && post.mediaUrl ? (
+          <div className="mb-2">
+            <InstagramEmbed url={post.mediaUrl} />
+          </div>
+        ) : post.mediaType === 'image' && post.mediaUrl && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 
               alt="Post content"
               className={`w-full h-auto object-cover ${
-                platform?.name === 'Instagram' ? 'aspect-square' : 
                 platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
                 'aspect-[16/9]'
               }`}

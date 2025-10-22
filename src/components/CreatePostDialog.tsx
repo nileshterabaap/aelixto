@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
+import { extractInstagramUrlFromEmbed, isInstagramEmbedCode } from "@/lib/instagramEmbed";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -22,14 +23,24 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const createPost = useCreatePost();
 
   const handleLinkSubmit = async () => {
-    if (!linkUrl.trim()) return;
+    let inputValue = linkUrl.trim();
+    if (!inputValue) return;
+    
+    // Check if input is Instagram embed code
+    if (isInstagramEmbedCode(inputValue)) {
+      const extractedUrl = extractInstagramUrlFromEmbed(inputValue);
+      if (extractedUrl) {
+        inputValue = extractedUrl;
+        setLinkUrl(extractedUrl);
+      }
+    }
     
     // Auto-generate thumbnail URL and fetch title based on platform
     let thumbnail = "";
     let videoTitle = "";
     
-    if (linkUrl.includes("youtube.com") || linkUrl.includes("youtu.be")) {
-      const videoId = linkUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
+    if (inputValue.includes("youtube.com") || inputValue.includes("youtu.be")) {
+      const videoId = inputValue.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
       if (videoId) {
         thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
         
@@ -44,8 +55,9 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
           console.error("Failed to fetch video title:", error);
         }
       }
-    } else if (linkUrl.includes("instagram.com")) {
-      thumbnail = linkUrl + "media/?size=l";
+    } else if (inputValue.includes("instagram.com")) {
+      // For Instagram, we'll use the embed component, no thumbnail needed
+      videoTitle = "Instagram Post";
     }
     
     setThumbnailUrl(thumbnail);
@@ -132,14 +144,13 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
         {step === 1 ? (
           <div className="space-y-4">
             <div>
-              <Label htmlFor="link">Paste your link</Label>
-              <Input
+              <Label htmlFor="link">Paste your link or embed code</Label>
+              <Textarea
                 id="link"
-                type="url"
-                placeholder="https://youtube.com/... or https://instagram.com/..."
+                placeholder="https://youtube.com/... or https://instagram.com/... or paste Instagram embed code"
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
-                className="mt-1.5"
+                className="mt-1.5 min-h-[100px] resize-none"
               />
             </div>
 
