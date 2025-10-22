@@ -94,7 +94,9 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
 
         {/* Title and Caption */}
         <div className="mb-3">
-          <h2 className="text-lg font-bold mb-1">{post.title}</h2>
+          {post.mediaType !== 'video' && (
+            <h2 className="text-lg font-bold mb-1">{post.title}</h2>
+          )}
           <div className="flex items-center gap-2">
             <p className="text-sm flex-1">{post.content}</p>
             {platform && (
@@ -158,7 +160,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               )}
             </div>
             {post.title && (
-              <h3 className="font-bold text-base mb-2">{post.title}</h3>
+              <h3 className="font-bold text-base mb-3">{post.title}</h3>
             )}
           </>
         )}
