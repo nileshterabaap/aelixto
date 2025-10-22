@@ -95,12 +95,23 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {/* Title and Caption */}
         <div className="mb-3">
           <h2 className="text-lg font-bold mb-1">{post.title}</h2>
-          <p className="text-sm text-muted-foreground">{post.content}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-muted-foreground flex-1">{post.content}</p>
+            {platform && (
+              <div className="bg-white rounded-full p-1.5 shadow-sm shrink-0">
+                <img 
+                  src={platform.icon} 
+                  alt={platform.name}
+                  className="w-4 h-4 brightness-0"
+                />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Media */}
         {post.mediaType === 'image' && post.mediaUrl && (
-          <div className="rounded-2xl overflow-hidden mb-2 relative">
+          <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 
               alt="Post content"
@@ -110,15 +121,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 'aspect-[16/9]'
               }`}
             />
-            {platform && (
-              <div className="absolute top-3 right-3 bg-white rounded-full p-2 shadow-md">
-                <img 
-                  src={platform.icon} 
-                  alt={platform.name}
-                  className="w-5 h-5 brightness-0"
-                />
-              </div>
-            )}
           </div>
         )}
 
@@ -145,15 +147,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                     className="w-full h-full object-cover"
                   />
                 </div>
-                {platform && (
-                  <div className="absolute top-3 right-3 z-20 bg-white rounded-full p-2 shadow-md">
-                    <img 
-                      src={platform.icon} 
-                      alt={platform.name}
-                      className="w-5 h-5 brightness-0"
-                    />
-                  </div>
-                )}
                 <button
                   onClick={handleVideoClick}
                   className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group"
