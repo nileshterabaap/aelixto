@@ -145,6 +145,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                     className="w-full h-full object-cover"
                   />
                 </div>
+                {post.title && (
+                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
+                    <h3 className="text-white font-bold text-lg leading-tight">{post.title}</h3>
+                  </div>
+                )}
                 <button
                   onClick={handleVideoClick}
                   className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group"
