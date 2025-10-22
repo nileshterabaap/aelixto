@@ -98,13 +98,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <div className="flex items-center gap-2">
             <p className="text-sm text-muted-foreground flex-1">{post.content}</p>
             {platform && (
-              <div className="bg-white rounded-full p-1.5 shadow-sm shrink-0">
-                <img 
-                  src={platform.icon} 
-                  alt={platform.name}
-                  className="w-4 h-4 brightness-0"
-                />
-              </div>
+              <img 
+                src={platform.icon} 
+                alt={platform.name}
+                className="w-5 h-5 shrink-0"
+              />
             )}
           </div>
         </div>
