@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
-import { supabase } from "@/integrations/supabase/client";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -46,19 +45,8 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
         }
       }
     } else if (linkUrl.includes("instagram.com")) {
-      // Fetch Instagram post data using server-side edge function
-      try {
-        const { data, error } = await supabase.functions.invoke('instagram-oembed', {
-          body: { url: linkUrl }
-        });
-        
-        if (!error && data) {
-          videoTitle = data.title || "";
-          thumbnail = data.thumbnail_url || "";
-        }
-      } catch (error) {
-        console.error("Failed to fetch Instagram data:", error);
-      }
+      // Simple clickable embed for Instagram - no oEmbed needed for now
+      videoTitle = "Instagram Post";
     }
     
     setThumbnailUrl(thumbnail);

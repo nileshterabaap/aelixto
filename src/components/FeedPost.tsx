@@ -111,17 +111,32 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
 
         {/* Media */}
         {post.mediaType === 'image' && post.mediaUrl && (
-          <div className="rounded-2xl overflow-hidden mb-2">
-            <img 
-              src={post.mediaUrl} 
-              alt="Post content"
-              className={`w-full h-auto object-cover ${
-                platform?.name === 'Instagram' ? 'aspect-square' : 
-                platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
-                'aspect-[16/9]'
-              }`}
-            />
-          </div>
+          <>
+            {platform?.name === 'Instagram' ? (
+              <a 
+                href={post.mediaUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="block rounded-2xl overflow-hidden mb-2 border-2 border-muted hover:border-primary transition-colors"
+              >
+                <div className="p-4 bg-muted/30">
+                  <p className="text-sm font-medium">View on Instagram</p>
+                  <p className="text-xs text-muted-foreground mt-1">{post.mediaUrl}</p>
+                </div>
+              </a>
+            ) : (
+              <div className="rounded-2xl overflow-hidden mb-2">
+                <img 
+                  src={post.mediaUrl} 
+                  alt="Post content"
+                  className={`w-full h-auto object-cover ${
+                    platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
+                    'aspect-[16/9]'
+                  }`}
+                />
+              </div>
+            )}
+          </>
         )}
 
         {post.mediaType === 'video' && post.mediaUrl && (
