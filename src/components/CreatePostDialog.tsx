@@ -45,7 +45,17 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
         }
       }
     } else if (linkUrl.includes("instagram.com")) {
-      thumbnail = linkUrl + "media/?size=l";
+      // Fetch Instagram post data using oEmbed API
+      try {
+        const response = await fetch(`https://api.instagram.com/oembed/?url=${encodeURIComponent(linkUrl)}`);
+        if (response.ok) {
+          const data = await response.json();
+          videoTitle = data.title || "";
+          thumbnail = data.thumbnail_url || "";
+        }
+      } catch (error) {
+        console.error("Failed to fetch Instagram data:", error);
+      }
     }
     
     setThumbnailUrl(thumbnail);
@@ -79,7 +89,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       title: title.trim() || undefined,
       content: caption.trim() || linkUrl,
       media_type: mediaType,
-      media_url: linkUrl,
+      media_url: thumbnailUrl || linkUrl,
       platform: platform || undefined,
     });
 
