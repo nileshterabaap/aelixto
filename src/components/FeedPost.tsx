@@ -123,44 +123,44 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         )}
 
         {post.mediaType === 'video' && post.mediaUrl && (
-          <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
-            platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
-            platform?.name === 'YouTube' ? 'aspect-[16/9]' : 
-            'aspect-[4/3]'
-          }`}>
-            {isPlayingVideo && platform?.name === 'YouTube' && post.mediaUrl ? (
-              <iframe
-                className="w-full h-full"
-                src={`https://www.youtube.com/embed/${getYouTubeVideoId(post.mediaUrl)}?autoplay=1`}
-                title="YouTube video player"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            ) : (
-              <>
-                <div className="absolute inset-0">
-                  <img 
-                    src={platform?.name === 'YouTube' && post.mediaUrl ? getYouTubeThumbnail(post.mediaUrl) : post.mediaUrl} 
-                    alt="Video thumbnail"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                {post.title && (
-                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
-                    <h3 className="text-white font-bold text-lg leading-tight">{post.title}</h3>
+          <>
+            <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
+              platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
+              platform?.name === 'YouTube' ? 'aspect-[16/9]' : 
+              'aspect-[4/3]'
+            }`}>
+              {isPlayingVideo && platform?.name === 'YouTube' && post.mediaUrl ? (
+                <iframe
+                  className="w-full h-full"
+                  src={`https://www.youtube.com/embed/${getYouTubeVideoId(post.mediaUrl)}?autoplay=1`}
+                  title="YouTube video player"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <>
+                  <div className="absolute inset-0">
+                    <img 
+                      src={platform?.name === 'YouTube' && post.mediaUrl ? getYouTubeThumbnail(post.mediaUrl) : post.mediaUrl} 
+                      alt="Video thumbnail"
+                      className="w-full h-full object-cover"
+                    />
                   </div>
-                )}
-                <button
-                  onClick={handleVideoClick}
-                  className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group"
-                >
-                  <div className="h-20 w-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center group-hover:bg-black/70 transition-all">
-                    <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent ml-1"></div>
-                  </div>
-                </button>
-              </>
+                  <button
+                    onClick={handleVideoClick}
+                    className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group"
+                  >
+                    <div className="h-20 w-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center group-hover:bg-black/70 transition-all">
+                      <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent ml-1"></div>
+                    </div>
+                  </button>
+                </>
+              )}
+            </div>
+            {post.title && (
+              <h3 className="font-bold text-base mb-2">{post.title}</h3>
             )}
-          </div>
+          </>
         )}
 
         {/* Actions */}
