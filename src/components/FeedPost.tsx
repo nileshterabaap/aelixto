@@ -123,10 +123,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             platform?.name === 'YouTube' ? 'aspect-[16/9]' : 
             'aspect-[4/3]'
           }`}>
-            {isPlayingVideo && platform?.name === 'YouTube' && post.content ? (
+            {isPlayingVideo && platform?.name === 'YouTube' && post.mediaUrl ? (
               <iframe
                 className="w-full h-full"
-                src={`https://www.youtube.com/embed/${getYouTubeVideoId(post.content)}?autoplay=1`}
+                src={`https://www.youtube.com/embed/${getYouTubeVideoId(post.mediaUrl)}?autoplay=1`}
                 title="YouTube video player"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
