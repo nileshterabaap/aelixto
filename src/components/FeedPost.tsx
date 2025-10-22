@@ -1,7 +1,6 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreHorizontal, ExternalLink, Share2 } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreHorizontal } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import type { Post } from "@/data/demoData";
 import { useState } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
@@ -112,67 +111,17 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
 
         {/* Media */}
         {post.mediaType === 'image' && post.mediaUrl && (
-          <>
-            {platform?.name === 'Instagram' ? (
-              <div className="rounded-2xl overflow-hidden mb-2 border border-muted bg-card">
-                {/* Instagram Header */}
-                <div className="flex items-center justify-between p-3 border-b border-muted">
-                  <div className="flex items-center gap-2">
-                    <Avatar className="w-8 h-8">
-                      <AvatarImage src={post.author.avatar} alt={post.author.name} />
-                      <AvatarFallback>{post.author.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm font-semibold">{post.author.name}</span>
-                  </div>
-                  <a 
-                    href={post.mediaUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline"
-                  >
-                    View profile
-                  </a>
-                </div>
-                
-                {/* Instagram Image - placeholder/thumbnail */}
-                <div className="aspect-square bg-muted flex items-center justify-center">
-                  <ExternalLink className="w-12 h-12 text-muted-foreground" />
-                </div>
-                
-                {/* Instagram Footer */}
-                <div className="p-3 space-y-2">
-                  <a 
-                    href={post.mediaUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary hover:underline inline-block"
-                  >
-                    View more on Instagram
-                  </a>
-                  <div className="flex items-center gap-4 text-muted-foreground">
-                    <Heart className="w-5 h-5" />
-                    <MessageCircle className="w-5 h-5" />
-                    <Share2 className="w-5 h-5" />
-                  </div>
-                  <p className="text-sm">
-                    <span className="font-semibold">{post.author.name}</span>
-                    {post.content && <span className="ml-2">{post.content}</span>}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl overflow-hidden mb-2">
-                <img 
-                  src={post.mediaUrl} 
-                  alt="Post content"
-                  className={`w-full h-auto object-cover ${
-                    platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
-                    'aspect-[16/9]'
-                  }`}
-                />
-              </div>
-            )}
-          </>
+          <div className="rounded-2xl overflow-hidden mb-2">
+            <img 
+              src={post.mediaUrl} 
+              alt="Post content"
+              className={`w-full h-auto object-cover ${
+                platform?.name === 'Instagram' ? 'aspect-square' : 
+                platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
+                'aspect-[16/9]'
+              }`}
+            />
+          </div>
         )}
 
         {post.mediaType === 'video' && post.mediaUrl && (

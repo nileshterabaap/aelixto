@@ -45,8 +45,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
         }
       }
     } else if (linkUrl.includes("instagram.com")) {
-      // Simple clickable embed for Instagram - no oEmbed needed for now
-      videoTitle = "Instagram Post";
+      thumbnail = linkUrl + "media/?size=l";
     }
     
     setThumbnailUrl(thumbnail);
@@ -80,7 +79,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       title: title.trim() || undefined,
       content: caption.trim() || linkUrl,
       media_type: mediaType,
-      media_url: thumbnailUrl || linkUrl,
+      media_url: linkUrl,
       platform: platform || undefined,
     });
 
