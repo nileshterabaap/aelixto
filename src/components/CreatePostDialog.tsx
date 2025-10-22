@@ -21,19 +21,35 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [showThumbnailInput, setShowThumbnailInput] = useState(false);
   const createPost = useCreatePost();
 
-  const handleLinkSubmit = () => {
+  const handleLinkSubmit = async () => {
     if (!linkUrl.trim()) return;
     
-    // Auto-generate thumbnail URL based on platform
+    // Auto-generate thumbnail URL and fetch title based on platform
     let thumbnail = "";
+    let videoTitle = "";
+    
     if (linkUrl.includes("youtube.com") || linkUrl.includes("youtu.be")) {
       const videoId = linkUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
-      if (videoId) thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+      if (videoId) {
+        thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+        
+        // Fetch video title from YouTube oEmbed API
+        try {
+          const response = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+          if (response.ok) {
+            const data = await response.json();
+            videoTitle = data.title || "";
+          }
+        } catch (error) {
+          console.error("Failed to fetch video title:", error);
+        }
+      }
     } else if (linkUrl.includes("instagram.com")) {
       thumbnail = linkUrl + "media/?size=l";
     }
     
     setThumbnailUrl(thumbnail);
+    setTitle(videoTitle);
     setStep(2);
   };
 
@@ -143,17 +159,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
                 />
               </div>
             )}
-
-            <div>
-              <Label htmlFor="title">Title (optional)</Label>
-              <Input
-                id="title"
-                placeholder="Enter video title..."
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="mt-1.5"
-              />
-            </div>
 
             <div>
               <Label htmlFor="caption">Caption (optional)</Label>
