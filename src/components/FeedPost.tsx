@@ -58,6 +58,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
+  const isYouTubeShort = (url: string) => {
+    return url.includes('/shorts/');
+  };
+
   const getYouTubeThumbnail = (url: string) => {
     const videoId = getYouTubeVideoId(url);
     return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : url;
@@ -137,7 +141,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {post.mediaType === 'video' && post.mediaUrl && platform?.name !== 'X' && (
           <>
             <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
-              platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
+              platform?.name === 'TikTok' || (platform?.name === 'YouTube' && isYouTubeShort(post.mediaUrl)) 
+                ? 'aspect-[9/16]' : 
               platform?.name === 'YouTube' ? 'aspect-[16/9]' : 
               'aspect-[4/3]'
             }`}>
