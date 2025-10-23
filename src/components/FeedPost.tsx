@@ -1,6 +1,12 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreHorizontal } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreHorizontal, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
 import { useState } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
@@ -10,7 +16,9 @@ import instagramIcon from "@/assets/instagram-icon.png";
 import tiktokIcon from "@/assets/tiktok-icon.png";
 import redditIcon from "@/assets/reddit-icon.png";
 import twitterIcon from "@/assets/twitter-icon.png";
+import pinterestIcon from "@/assets/pinterest-icon.png";
 import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
+import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -42,6 +50,8 @@ const getPlatformIcon = (platform?: string) => {
       return { name: 'Reddit', icon: redditIcon };
     case 'twitter':
       return { name: 'X', icon: twitterIcon };
+    case 'pinterest':
+      return { name: 'Pinterest', icon: pinterestIcon };
     default:
       return null;
   }
@@ -76,9 +86,17 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   // Only use post actions for real posts
   const postActions = post.isRealPost && userId 
     ? usePostActions(post.id, userId)
-    : { isLiked: false, isSaved: false, toggleLike: () => {}, toggleSave: () => {}, handleShare: () => {} };
+    : { 
+        isLiked: false, 
+        isSaved: false, 
+        toggleLike: () => {}, 
+        toggleSave: () => {}, 
+        handleShare: () => {}, 
+        deletePost: () => {},
+        isDeleting: false 
+      };
 
-  const { isLiked, isSaved, toggleLike, toggleSave, handleShare } = postActions;
+  const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost, isDeleting } = postActions;
 
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
@@ -103,9 +121,25 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 className="w-6 h-6"
               />
             )}
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-6 w-6" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreHorizontal className="h-6 w-6" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {post.isRealPost && (post as any).user_id === userId && (
+                  <DropdownMenuItem 
+                    onClick={() => deletePost()}
+                    disabled={isDeleting}
+                    className="text-destructive focus:text-destructive cursor-pointer"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -119,7 +153,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <div className="mb-2">
             <TwitterEmbed url={post.mediaUrl} />
           </div>
-        ) : post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && (
+        ) : post.isRealPost && platform?.name === 'Pinterest' && post.mediaUrl ? (
+          <div className="mb-2">
+            <PinterestEmbed url={post.mediaUrl} />
+          </div>
+        ) : post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 

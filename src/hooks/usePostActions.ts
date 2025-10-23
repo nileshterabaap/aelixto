@@ -93,11 +93,39 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
     }
   };
 
+  // Delete post
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!userId) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("posts")
+        .delete()
+        .eq("id", postId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      toast({ title: "Post deleted", description: "Your post has been removed" });
+    },
+    onError: () => {
+      toast({ 
+        title: "Error", 
+        description: "Failed to delete post", 
+        variant: "destructive" 
+      });
+    },
+  });
+
   return {
     isLiked: isLiked || false,
     isSaved: isSaved || false,
     toggleLike: likeMutation.mutate,
     toggleSave: saveMutation.mutate,
     handleShare,
+    deletePost: deleteMutation.mutate,
+    isDeleting: deleteMutation.isPending,
   };
 };
