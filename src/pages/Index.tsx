@@ -20,6 +20,7 @@ const Index = () => {
   const allPosts = [
     ...(userPosts || []).map(post => ({
       id: post.id,
+      user_id: post.user_id, // Add user_id for delete button
       author: {
         name: post.profiles?.username || "Anonymous",
         username: `@${post.profiles?.username || "anonymous"}`,
@@ -29,7 +30,7 @@ const Index = () => {
       content: post.content,
       mediaType: post.media_type as "image" | "video" | "none",
       mediaUrl: post.media_url || undefined,
-      platform: post.platform as "youtube" | "instagram" | "tiktok" | "reddit" | "twitter",
+      platform: post.platform as "youtube" | "instagram" | "tiktok" | "reddit" | "twitter" | "pinterest",
       timestamp: new Date(post.created_at),
       saves: post.saves_count,
       isRealPost: true,
