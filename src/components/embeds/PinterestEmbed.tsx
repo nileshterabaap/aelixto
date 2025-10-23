@@ -14,8 +14,8 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   useEffect(() => {
     console.log("[PinterestEmbed] Loading Pinterest embed for URL:", url);
     
-    // Validate Pinterest URL
-    const isPinterestPin = url.includes('pinterest.com/pin/');
+    // Validate Pinterest URL - support both full URLs and pin.it shortlinks
+    const isPinterestPin = url.includes('pinterest.com/pin/') || url.includes('pin.it/');
     if (!isPinterestPin) {
       console.warn("[PinterestEmbed] Invalid Pinterest URL:", url);
       setEmbedFailed(true);
@@ -30,14 +30,16 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
         const script = document.createElement("script");
         script.src = "https://assets.pinterest.com/js/pinit.js";
         script.async = true;
-        script.defer = true;
         document.body.appendChild(script);
 
         script.onload = () => {
           console.log("[PinterestEmbed] Pinterest script loaded successfully");
-          if (window.PinUtils) {
-            window.PinUtils.build();
-          }
+          setTimeout(() => {
+            if (window.PinUtils) {
+              window.PinUtils.build();
+              console.log("[PinterestEmbed] Pinterest embeds processed");
+            }
+          }, 500);
         };
 
         script.onerror = () => {
@@ -45,20 +47,17 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
           setEmbedFailed(true);
         };
       }
+    } else {
+      // Script already loaded, just build
+      setTimeout(() => {
+        if (window.PinUtils) {
+          window.PinUtils.build();
+          console.log("[PinterestEmbed] Pinterest embeds processed");
+        }
+      }, 500);
     }
 
-    // Build Pinterest embeds after a short delay
-    const timer = setTimeout(() => {
-      if (window.PinUtils) {
-        window.PinUtils.build();
-        console.log("[PinterestEmbed] Pinterest embeds processed");
-      } else {
-        console.warn("[PinterestEmbed] PinUtils not available, showing fallback");
-        setEmbedFailed(true);
-      }
-    }, 300);
-
-    return () => clearTimeout(timer);
+    return () => {};
   }, [url]);
 
   // Fallback card if Pinterest embed fails
