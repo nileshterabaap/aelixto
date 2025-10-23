@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface PinterestEmbedProps {
   url: string;
@@ -7,9 +7,28 @@ interface PinterestEmbedProps {
 export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const scriptRef = useRef<HTMLScriptElement | null>(null);
+  const [fullUrl, setFullUrl] = useState(url);
+
+  // Expand pin.it URLs to full Pinterest URLs
+  useEffect(() => {
+    const expandUrl = async () => {
+      if (url.includes('pin.it')) {
+        try {
+          const response = await fetch(url, { redirect: 'follow' });
+          const expandedUrl = response.url;
+          console.log("[PinterestEmbed] Expanded URL:", expandedUrl);
+          setFullUrl(expandedUrl);
+        } catch (error) {
+          console.error("[PinterestEmbed] Failed to expand URL:", error);
+          setFullUrl(url);
+        }
+      }
+    };
+    expandUrl();
+  }, [url]);
 
   useEffect(() => {
-    console.log("[PinterestEmbed] Loading Pinterest embed for URL:", url);
+    console.log("[PinterestEmbed] Loading Pinterest embed for URL:", fullUrl);
     
     // Check if Pinterest script already exists
     const existingScript = document.querySelector('script[src="https://assets.pinterest.com/js/pinit.js"]');
@@ -51,18 +70,15 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
         }
       }
     };
-  }, []);
+  }, [fullUrl]);
 
   return (
-    <div ref={containerRef} className="pinterest-embed-container w-full">
+    <div ref={containerRef} className="pinterest-embed-container w-full flex justify-center">
       <a 
         data-pin-do="embedPin" 
         data-pin-width="large"
-        href={url}
-        className="block"
-      >
-        View Pin
-      </a>
+        href={fullUrl}
+      />
     </div>
   );
 };
