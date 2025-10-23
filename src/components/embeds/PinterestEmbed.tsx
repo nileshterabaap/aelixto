@@ -12,6 +12,7 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   const [embedFailed, setEmbedFailed] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState(url);
   const [isExpanding, setIsExpanding] = useState(false);
+  const [pinTitle, setPinTitle] = useState<string>("");
 
   useEffect(() => {
     const loadEmbed = async () => {
@@ -47,6 +48,21 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
         }
         
         setIsExpanding(false);
+      }
+
+      // Fetch pin metadata using Pinterest oEmbed API
+      try {
+        const oembedUrl = `https://www.pinterest.com/oembed/?url=${encodeURIComponent(finalUrl)}`;
+        const response = await fetch(oembedUrl);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.title) {
+            setPinTitle(data.title);
+            console.log("[PinterestEmbed] Fetched pin title:", data.title);
+          }
+        }
+      } catch (error) {
+        console.warn("[PinterestEmbed] Failed to fetch pin metadata:", error);
       }
 
       // Validate Pinterest URL - must be a pin URL with digits or alphanumeric ID
@@ -130,10 +146,12 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
 
   return (
     <div className="w-full max-w-[500px] mx-auto">
-      <div className="flex items-center gap-2 mb-3 px-2">
-        <img src={pinterestIcon} alt="Pinterest" className="w-5 h-5" />
-        <span className="text-sm font-medium text-muted-foreground">Pinterest Pin</span>
-      </div>
+      {pinTitle && (
+        <div className="flex items-center gap-2 mb-3 px-2">
+          <img src={pinterestIcon} alt="Pinterest" className="w-5 h-5" />
+          <span className="text-sm font-medium text-foreground">{pinTitle}</span>
+        </div>
+      )}
       <div ref={containerRef} className="pinterest-embed-container w-full flex justify-center [&_span[data-pin-log='button_pinit_bookmarklet']]:hidden">
         <a 
           data-pin-do="embedPin" 
