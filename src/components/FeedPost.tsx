@@ -153,7 +153,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <div className="mb-2">
             <TwitterEmbed url={post.mediaUrl} />
           </div>
-        ) : post.isRealPost && platform?.name === 'Pinterest' && post.mediaUrl ? (
+        ) : platform?.name === 'Pinterest' && post.mediaUrl ? (
           <div className="mb-2">
             <PinterestEmbed url={post.mediaUrl} />
           </div>
