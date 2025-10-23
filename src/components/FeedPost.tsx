@@ -102,7 +102,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             <h2 className="text-lg font-bold mb-1">{post.title}</h2>
           )}
           <div className="flex items-center gap-2">
-            <p className="text-sm flex-1">{post.content}</p>
+            {post.content && <p className="text-sm flex-1">{post.content}</p>}
             {platform && (
               <img 
                 src={platform.icon} 
@@ -114,11 +114,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         </div>
 
         {/* Media */}
-        {post.isRealPost && platform?.name === 'Twitter' && post.mediaUrl ? (
+        {post.isRealPost && platform?.name === 'X' && post.mediaUrl ? (
           <div className="mb-2">
             <TwitterEmbed url={post.mediaUrl} />
           </div>
-        ) : post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'Twitter' && (
+        ) : post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 
@@ -132,7 +132,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {post.mediaType === 'video' && post.mediaUrl && platform?.name !== 'Twitter' && (
+        {post.mediaType === 'video' && post.mediaUrl && platform?.name !== 'X' && (
           <>
             <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
               platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
