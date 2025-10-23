@@ -9,6 +9,8 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   const scriptRef = useRef<HTMLScriptElement | null>(null);
 
   useEffect(() => {
+    console.log("[PinterestEmbed] Loading Pinterest embed for URL:", url);
+    
     // Check if Pinterest script already exists
     const existingScript = document.querySelector('script[src="https://assets.pinterest.com/js/pinit.js"]');
     
@@ -23,14 +25,18 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
 
       // Process Pinterest embeds after script loads
       script.onload = () => {
+        console.log("[PinterestEmbed] Pinterest script loaded successfully");
         if (window.PinUtils) {
           window.PinUtils.build();
+          console.log("[PinterestEmbed] Pinterest embeds processed");
         }
       };
     } else {
       // Script already loaded, just build the pins
+      console.log("[PinterestEmbed] Pinterest script already loaded, processing embeds");
       if (window.PinUtils) {
         window.PinUtils.build();
+        console.log("[PinterestEmbed] Pinterest embeds processed");
       }
     }
 
@@ -48,12 +54,15 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   }, []);
 
   return (
-    <div ref={containerRef} className="pinterest-embed-container">
+    <div ref={containerRef} className="pinterest-embed-container w-full">
       <a 
         data-pin-do="embedPin" 
-        data-pin-width="medium"
+        data-pin-width="large"
         href={url}
-      />
+        className="block"
+      >
+        View Pin
+      </a>
     </div>
   );
 };
