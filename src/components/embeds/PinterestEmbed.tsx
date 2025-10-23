@@ -10,55 +10,105 @@ interface PinterestEmbedProps {
 export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [embedFailed, setEmbedFailed] = useState(false);
+  const [resolvedUrl, setResolvedUrl] = useState(url);
+  const [isExpanding, setIsExpanding] = useState(false);
 
   useEffect(() => {
-    console.log("[PinterestEmbed] Loading Pinterest embed for URL:", url);
-    
-    // Validate Pinterest URL - support both full URLs and pin.it shortlinks
-    const isPinterestPin = url.includes('pinterest.com/pin/') || url.includes('pin.it/');
-    if (!isPinterestPin) {
-      console.warn("[PinterestEmbed] Invalid Pinterest URL:", url);
-      setEmbedFailed(true);
-      return;
-    }
-
-    // Load Pinterest script only once
-    if (!window.PinUtils) {
-      const existingScript = document.querySelector('script[src="https://assets.pinterest.com/js/pinit.js"]');
+    const loadEmbed = async () => {
+      console.log("[PinterestEmbed] Loading Pinterest embed for URL:", url);
       
-      if (!existingScript) {
-        const script = document.createElement("script");
-        script.src = "https://assets.pinterest.com/js/pinit.js";
-        script.async = true;
-        document.body.appendChild(script);
+      let finalUrl = url;
 
-        script.onload = () => {
-          console.log("[PinterestEmbed] Pinterest script loaded successfully");
-          setTimeout(() => {
-            if (window.PinUtils) {
-              window.PinUtils.build();
-              console.log("[PinterestEmbed] Pinterest embeds processed");
-            }
-          }, 500);
-        };
+      // If it's a pin.it short link, expand it first
+      if (url.includes('pin.it/')) {
+        console.log("[PinterestEmbed] Detected pin.it short link, expanding...");
+        setIsExpanding(true);
+        
+        try {
+          const { supabase } = await import("@/integrations/supabase/client");
+          const { data, error } = await supabase.functions.invoke('expand-pin', {
+            body: { url }
+          });
 
-        script.onerror = () => {
-          console.error("[PinterestEmbed] Failed to load Pinterest script");
+          if (error) throw error;
+          
+          if (data?.finalUrl) {
+            finalUrl = data.finalUrl;
+            console.log("[PinterestEmbed] Expanded to:", finalUrl);
+            setResolvedUrl(finalUrl);
+          } else {
+            throw new Error("No final URL returned");
+          }
+        } catch (error) {
+          console.error("[PinterestEmbed] Failed to expand short link:", error);
           setEmbedFailed(true);
-        };
-      }
-    } else {
-      // Script already loaded, just build
-      setTimeout(() => {
-        if (window.PinUtils) {
-          window.PinUtils.build();
-          console.log("[PinterestEmbed] Pinterest embeds processed");
+          setIsExpanding(false);
+          return;
         }
-      }, 500);
-    }
+        
+        setIsExpanding(false);
+      }
+
+      // Validate Pinterest URL - must be a pin URL with digits or alphanumeric ID
+      const isPinterestPin = /pinterest\.com\/pin\/[a-zA-Z0-9]+\/?/.test(finalUrl);
+      if (!isPinterestPin) {
+        console.warn("[PinterestEmbed] Invalid Pinterest pin URL:", finalUrl);
+        setEmbedFailed(true);
+        return;
+      }
+
+      // Load Pinterest script only once
+      if (!window.PinUtils) {
+        const existingScript = document.querySelector('script[src="https://assets.pinterest.com/js/pinit.js"]');
+        
+        if (!existingScript) {
+          const script = document.createElement("script");
+          script.src = "https://assets.pinterest.com/js/pinit.js";
+          script.async = true;
+          document.body.appendChild(script);
+
+          script.onload = () => {
+            console.log("[PinterestEmbed] Pinterest script loaded successfully");
+            setTimeout(() => {
+              if (window.PinUtils) {
+                window.PinUtils.build();
+                console.log("[PinterestEmbed] Pinterest embeds processed");
+              }
+            }, 500);
+          };
+
+          script.onerror = () => {
+            console.error("[PinterestEmbed] Failed to load Pinterest script");
+            setEmbedFailed(true);
+          };
+        }
+      } else {
+        // Script already loaded, just build
+        setTimeout(() => {
+          if (window.PinUtils) {
+            window.PinUtils.build();
+            console.log("[PinterestEmbed] Pinterest embeds processed");
+          }
+        }, 500);
+      }
+    };
+
+    loadEmbed();
 
     return () => {};
   }, [url]);
+
+  // Show loading state while expanding
+  if (isExpanding) {
+    return (
+      <Card className="p-6 flex flex-col items-center gap-4">
+        <img src={pinterestIcon} alt="Pinterest" className="w-12 h-12" />
+        <p className="text-sm text-muted-foreground text-center">
+          Loading Pinterest embed...
+        </p>
+      </Card>
+    );
+  }
 
   // Fallback card if Pinterest embed fails
   if (embedFailed) {
@@ -83,7 +133,7 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
       <a 
         data-pin-do="embedPin" 
         data-pin-width="large"
-        href={url}
+        href={resolvedUrl}
       />
     </div>
   );
