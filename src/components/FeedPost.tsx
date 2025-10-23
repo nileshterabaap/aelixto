@@ -95,28 +95,24 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <div className="flex-1 min-w-0">
             <p className="font-bold text-base">{post.author.username}</p>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-            <MoreHorizontal className="h-6 w-6" />
-          </Button>
-        </div>
-
-        {/* Title and Caption */}
-        <div className="mb-3">
-          <h2 className="text-lg font-bold mb-1">{post.title}</h2>
-          {post.content && (
-            <p className="text-sm">{post.content}</p>
-          )}
-          {platform && (
-            <div className="flex items-center gap-1 mt-1">
+          <div className="flex items-center gap-2 shrink-0">
+            {platform && post.platform !== 'twitter' && (
               <img 
                 src={platform.icon} 
                 alt={platform.name}
-                className="w-5 h-5"
+                className="w-6 h-6"
               />
-              <span className="text-sm text-muted-foreground">{platform.name}</span>
-            </div>
-          )}
+            )}
+            <Button variant="ghost" size="icon" className="h-8 w-8">
+              <MoreHorizontal className="h-6 w-6" />
+            </Button>
+          </div>
         </div>
+
+        {/* Caption */}
+        {post.content && (
+          <p className="text-sm mb-3">{post.content}</p>
+        )}
 
         {/* Media */}
         {post.isRealPost && platform?.name === 'X' && post.mediaUrl ? (
@@ -175,6 +171,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             </div>
           </>
         )}
+
+        {/* Title */}
+        <div className="mt-3">
+          <h2 className="text-lg font-bold">{post.title}</h2>
+        </div>
 
         {/* Actions */}
         <div className="flex items-center justify-around px-2 py-4 mt-1">
