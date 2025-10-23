@@ -63,9 +63,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     if (linkUrl.includes("youtube.com") || linkUrl.includes("youtu.be")) {
       platform = "youtube";
       mediaType = "video";
-    } else if (linkUrl.includes("twitter.com") || linkUrl.includes("x.com")) {
-      platform = "twitter";
-      mediaType = "image";
     } else if (linkUrl.includes("tiktok.com")) {
       platform = "tiktok";
       mediaType = "video";
@@ -74,21 +71,8 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       if (linkUrl.includes("/reel/") || linkUrl.includes("/reels/")) {
         mediaType = "video";
       }
-    } else if (linkUrl.includes("pinterest.com")) {
-      platform = "pinterest";
-      mediaType = "image";
     } else if (linkUrl.includes("reddit.com")) {
       platform = "reddit";
-      mediaType = "image";
-    } else if (linkUrl.includes("vimeo.com")) {
-      platform = "vimeo";
-      mediaType = "video";
-    } else if (linkUrl.includes("soundcloud.com")) {
-      platform = "soundcloud";
-      mediaType = "video";
-    } else if (linkUrl.includes("spotify.com")) {
-      platform = "spotify";
-      mediaType = "video";
     }
 
     createPost.mutate({
@@ -152,7 +136,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
               <Input
                 id="link"
                 type="url"
-                placeholder="YouTube, Twitter, TikTok, Instagram, Pinterest, Reddit, Vimeo, SoundCloud, Spotify..."
+                placeholder="https://youtube.com/... or https://instagram.com/..."
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
                 className="mt-1.5"
