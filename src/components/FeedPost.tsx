@@ -149,7 +149,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         )}
 
         {/* Media */}
-        {post.isRealPost && platform?.name === 'X' && post.mediaUrl ? (
+        {platform?.name === 'X' && post.mediaUrl ? (
           <div className="mb-2">
             <TwitterEmbed url={post.mediaUrl} />
           </div>
