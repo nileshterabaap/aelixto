@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 interface PinterestEmbedProps {
   url: string;
@@ -7,28 +7,9 @@ interface PinterestEmbedProps {
 export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const scriptRef = useRef<HTMLScriptElement | null>(null);
-  const [fullUrl, setFullUrl] = useState(url);
-
-  // Expand pin.it URLs to full Pinterest URLs
-  useEffect(() => {
-    const expandUrl = async () => {
-      if (url.includes('pin.it')) {
-        try {
-          const response = await fetch(url, { redirect: 'follow' });
-          const expandedUrl = response.url;
-          console.log("[PinterestEmbed] Expanded URL:", expandedUrl);
-          setFullUrl(expandedUrl);
-        } catch (error) {
-          console.error("[PinterestEmbed] Failed to expand URL:", error);
-          setFullUrl(url);
-        }
-      }
-    };
-    expandUrl();
-  }, [url]);
 
   useEffect(() => {
-    console.log("[PinterestEmbed] Loading Pinterest embed for URL:", fullUrl);
+    console.log("[PinterestEmbed] Loading Pinterest embed for URL:", url);
     
     // Check if Pinterest script already exists
     const existingScript = document.querySelector('script[src="https://assets.pinterest.com/js/pinit.js"]');
@@ -45,18 +26,22 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
       // Process Pinterest embeds after script loads
       script.onload = () => {
         console.log("[PinterestEmbed] Pinterest script loaded successfully");
-        if (window.PinUtils) {
-          window.PinUtils.build();
-          console.log("[PinterestEmbed] Pinterest embeds processed");
-        }
+        setTimeout(() => {
+          if (window.PinUtils) {
+            window.PinUtils.build();
+            console.log("[PinterestEmbed] Pinterest embeds processed");
+          }
+        }, 100);
       };
     } else {
       // Script already loaded, just build the pins
       console.log("[PinterestEmbed] Pinterest script already loaded, processing embeds");
-      if (window.PinUtils) {
-        window.PinUtils.build();
-        console.log("[PinterestEmbed] Pinterest embeds processed");
-      }
+      setTimeout(() => {
+        if (window.PinUtils) {
+          window.PinUtils.build();
+          console.log("[PinterestEmbed] Pinterest embeds processed");
+        }
+      }, 100);
     }
 
     return () => {
@@ -70,14 +55,14 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
         }
       }
     };
-  }, [fullUrl]);
+  }, [url]);
 
   return (
     <div ref={containerRef} className="pinterest-embed-container w-full flex justify-center">
       <a 
         data-pin-do="embedPin" 
-        data-pin-width="large"
-        href={fullUrl}
+        data-pin-width="medium"
+        href={url}
       />
     </div>
   );
