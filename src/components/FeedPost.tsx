@@ -9,6 +9,8 @@ import youtubeIcon from "@/assets/youtube-icon.png";
 import instagramIcon from "@/assets/instagram-icon.png";
 import tiktokIcon from "@/assets/tiktok-icon.png";
 import redditIcon from "@/assets/reddit-icon.png";
+import twitterIcon from "@/assets/twitter-icon.png";
+import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -38,6 +40,8 @@ const getPlatformIcon = (platform?: string) => {
       return { name: 'Instagram', icon: instagramIcon };
     case 'reddit':
       return { name: 'Reddit', icon: redditIcon };
+    case 'twitter':
+      return { name: 'Twitter', icon: twitterIcon };
     default:
       return null;
   }
@@ -110,7 +114,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         </div>
 
         {/* Media */}
-        {post.mediaType === 'image' && post.mediaUrl && (
+        {post.isRealPost && platform?.name === 'Twitter' && post.mediaUrl ? (
+          <div className="mb-3">
+            <TwitterEmbed url={post.mediaUrl} />
+          </div>
+        ) : post.mediaType === 'image' && post.mediaUrl && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 

@@ -73,6 +73,8 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       }
     } else if (linkUrl.includes("reddit.com")) {
       platform = "reddit";
+    } else if (linkUrl.includes("twitter.com") || linkUrl.includes("x.com")) {
+      platform = "twitter";
     }
 
     createPost.mutate({
