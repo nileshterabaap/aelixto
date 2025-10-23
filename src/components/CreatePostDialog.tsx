@@ -29,7 +29,8 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     let videoTitle = "";
     
     if (linkUrl.includes("youtube.com") || linkUrl.includes("youtu.be")) {
-      const videoId = linkUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
+      // Updated regex to also match /shorts/ URLs
+      const videoId = linkUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
       if (videoId) {
         thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
         
