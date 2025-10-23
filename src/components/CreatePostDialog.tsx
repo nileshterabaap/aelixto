@@ -29,8 +29,8 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     let videoTitle = "";
     
     if (linkUrl.includes("youtube.com") || linkUrl.includes("youtu.be")) {
-      // Updated regex to also match /shorts/ URLs
-      const videoId = linkUrl.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?|shorts)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
+      // Extract video ID from various YouTube URL formats including shorts
+      const videoId = linkUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1];
       if (videoId) {
         thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
         
@@ -163,6 +163,18 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
                 />
               </div>
             )}
+
+            <div>
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                type="text"
+                placeholder="Post title..."
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="mt-1.5"
+              />
+            </div>
 
             <div>
               <Label htmlFor="caption">Caption (optional)</Label>
