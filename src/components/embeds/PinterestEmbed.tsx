@@ -1,4 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import pinterestIcon from "@/assets/pinterest-icon.png";
 
 interface PinterestEmbedProps {
   url: string;
@@ -6,62 +9,81 @@ interface PinterestEmbedProps {
 
 export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scriptRef = useRef<HTMLScriptElement | null>(null);
+  const [embedFailed, setEmbedFailed] = useState(false);
 
   useEffect(() => {
     console.log("[PinterestEmbed] Loading Pinterest embed for URL:", url);
     
-    // Check if Pinterest script already exists
-    const existingScript = document.querySelector('script[src="https://assets.pinterest.com/js/pinit.js"]');
-    
-    if (!existingScript) {
-      // Load Pinterest embed script only if it doesn't exist
-      const script = document.createElement("script");
-      script.src = "https://assets.pinterest.com/js/pinit.js";
-      script.async = true;
-      script.defer = true;
-      scriptRef.current = script;
-      document.body.appendChild(script);
-
-      // Process Pinterest embeds after script loads
-      script.onload = () => {
-        console.log("[PinterestEmbed] Pinterest script loaded successfully");
-        setTimeout(() => {
-          if (window.PinUtils) {
-            window.PinUtils.build();
-            console.log("[PinterestEmbed] Pinterest embeds processed");
-          }
-        }, 100);
-      };
-    } else {
-      // Script already loaded, just build the pins
-      console.log("[PinterestEmbed] Pinterest script already loaded, processing embeds");
-      setTimeout(() => {
-        if (window.PinUtils) {
-          window.PinUtils.build();
-          console.log("[PinterestEmbed] Pinterest embeds processed");
-        }
-      }, 100);
+    // Validate Pinterest URL
+    const isPinterestPin = url.includes('pinterest.com/pin/');
+    if (!isPinterestPin) {
+      console.warn("[PinterestEmbed] Invalid Pinterest URL:", url);
+      setEmbedFailed(true);
+      return;
     }
 
-    return () => {
-      // Only remove the script if this component added it and it's still in the DOM
-      if (scriptRef.current && document.body.contains(scriptRef.current)) {
-        try {
-          document.body.removeChild(scriptRef.current);
-        } catch (e) {
-          // Silently fail if already removed
-          console.debug("Pinterest script already removed");
-        }
+    // Load Pinterest script only once
+    if (!window.PinUtils) {
+      const existingScript = document.querySelector('script[src="https://assets.pinterest.com/js/pinit.js"]');
+      
+      if (!existingScript) {
+        const script = document.createElement("script");
+        script.src = "https://assets.pinterest.com/js/pinit.js";
+        script.async = true;
+        script.defer = true;
+        document.body.appendChild(script);
+
+        script.onload = () => {
+          console.log("[PinterestEmbed] Pinterest script loaded successfully");
+          if (window.PinUtils) {
+            window.PinUtils.build();
+          }
+        };
+
+        script.onerror = () => {
+          console.error("[PinterestEmbed] Failed to load Pinterest script");
+          setEmbedFailed(true);
+        };
       }
-    };
+    }
+
+    // Build Pinterest embeds after a short delay
+    const timer = setTimeout(() => {
+      if (window.PinUtils) {
+        window.PinUtils.build();
+        console.log("[PinterestEmbed] Pinterest embeds processed");
+      } else {
+        console.warn("[PinterestEmbed] PinUtils not available, showing fallback");
+        setEmbedFailed(true);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [url]);
+
+  // Fallback card if Pinterest embed fails
+  if (embedFailed) {
+    return (
+      <Card className="p-6 flex flex-col items-center gap-4">
+        <img src={pinterestIcon} alt="Pinterest" className="w-12 h-12" />
+        <p className="text-sm text-muted-foreground text-center">
+          Unable to load Pinterest embed
+        </p>
+        <Button
+          variant="outline"
+          onClick={() => window.open(url, '_blank')}
+        >
+          View on Pinterest
+        </Button>
+      </Card>
+    );
+  }
 
   return (
     <div ref={containerRef} className="pinterest-embed-container w-full flex justify-center">
       <a 
         data-pin-do="embedPin" 
-        data-pin-width="medium"
+        data-pin-width="large"
         href={url}
       />
     </div>
