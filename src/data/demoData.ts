@@ -234,5 +234,27 @@ export const demoPosts: Post[] = [
     platform: 'instagram',
     timestamp: new Date(Date.now() - 1000 * 60 * 540),
     saves: 8901
+  },
+  {
+    id: '21',
+    author: { name: 'Lisa Chen', username: 'lisachen', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop' },
+    title: 'Modern Minimalist Living Room',
+    content: 'Clean lines and natural light ✨ #interiordesign #minimalist',
+    mediaType: 'none',
+    mediaUrl: 'https://pin.it/2r57xj7Vi',
+    platform: 'pinterest',
+    timestamp: new Date(Date.now() - 1000 * 60 * 570),
+    saves: 1234
+  },
+  {
+    id: '22',
+    author: { name: 'Anna Martinez', username: 'annamartinez', avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200&h=200&fit=crop' },
+    title: 'Delicious Chocolate Cake Recipe',
+    content: 'Perfect for any occasion! 🍰',
+    mediaType: 'none',
+    mediaUrl: 'https://pin.it/6isLuHgMI',
+    platform: 'pinterest',
+    timestamp: new Date(Date.now() - 1000 * 60 * 600),
+    saves: 892
   }
 ];
