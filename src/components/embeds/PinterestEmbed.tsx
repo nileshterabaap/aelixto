@@ -129,10 +129,10 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   }
 
   return (
-    <div ref={containerRef} className="pinterest-embed-container w-full flex justify-center">
+    <div ref={containerRef} className="pinterest-embed-container w-full flex justify-center max-w-[500px] mx-auto">
       <a 
         data-pin-do="embedPin" 
-        data-pin-width="large"
+        data-pin-width="medium"
         href={resolvedUrl}
       />
     </div>
