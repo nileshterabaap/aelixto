@@ -86,6 +86,9 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
                 ? "dark"
                 : "light",
               align: "center",
+              conversation: "none",
+              cards: "hidden",
+              dnt: true,
             }
           );
 
