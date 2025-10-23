@@ -75,6 +75,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       platform = "reddit";
     } else if (linkUrl.includes("twitter.com") || linkUrl.includes("x.com")) {
       platform = "twitter";
+      mediaType = "video"; // Twitter embeds handle both images and videos
     }
 
     createPost.mutate({
