@@ -41,7 +41,7 @@ const getPlatformIcon = (platform?: string) => {
     case 'reddit':
       return { name: 'Reddit', icon: redditIcon };
     case 'twitter':
-      return { name: 'Twitter', icon: twitterIcon };
+      return { name: 'X', icon: twitterIcon };
     default:
       return null;
   }

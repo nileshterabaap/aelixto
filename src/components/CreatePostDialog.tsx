@@ -80,7 +80,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
 
     createPost.mutate({
       title: title.trim() || undefined,
-      content: caption.trim() || linkUrl,
+      content: caption.trim() || "",
       media_type: mediaType,
       media_url: linkUrl,
       platform: platform || undefined,
