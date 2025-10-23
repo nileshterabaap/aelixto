@@ -12,8 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const targetUrl = url.searchParams.get('url');
+    const { url: targetUrl } = await req.json();
 
     if (!targetUrl) {
       return new Response(
