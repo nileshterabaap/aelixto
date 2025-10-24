@@ -69,12 +69,16 @@ export const PinterestEmbed = ({ url, mode = 'preview', onOpen }: PinterestEmbed
       }
 
       if (mode === 'preview') {
-        // Fetch pin metadata using Pinterest oEmbed API
+        // Fetch pin metadata using server-side edge function
         try {
-          const oembedUrl = `https://www.pinterest.com/oembed/?url=${encodeURIComponent(finalUrl)}`;
-          const response = await fetch(oembedUrl);
-          if (response.ok) {
-            const data = await response.json();
+          const { supabase } = await import("@/integrations/supabase/client");
+          const { data, error } = await supabase.functions.invoke('pinterest-oembed', {
+            body: { url: finalUrl }
+          });
+
+          if (error) throw error;
+          
+          if (data) {
             setPinData({
               title: data.title || 'Pinterest Pin',
               author_name: data.author_name,
@@ -82,7 +86,7 @@ export const PinterestEmbed = ({ url, mode = 'preview', onOpen }: PinterestEmbed
             });
             console.log("[PinterestEmbed] Fetched pin data:", data);
           } else {
-            throw new Error('oEmbed fetch failed');
+            throw new Error('No data returned from pinterest-oembed');
           }
         } catch (error) {
           console.warn("[PinterestEmbed] Failed to fetch pin metadata:", error);

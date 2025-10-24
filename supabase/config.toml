@@ -1,1 +1,7 @@
 project_id = "hhotresssetunubidrth"
+
+[functions.expand-pin]
+verify_jwt = false
+
+[functions.pinterest-oembed]
+verify_jwt = false
