@@ -77,16 +77,21 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
       if (!window.PinUtils) {
         const existingScript = document.querySelector('script[src="https://assets.pinterest.com/js/pinit.js"]');
         
-        // If script exists but doesn't have data-pin-hover="false", remove and re-add
-        if (existingScript && existingScript.getAttribute('data-pin-hover') !== 'false') {
+        // If script exists but doesn't have both attributes, remove and re-add
+        if (existingScript && 
+            (existingScript.getAttribute('data-pin-hover') !== 'false' || 
+             existingScript.getAttribute('data-pin-save') !== 'false')) {
           existingScript.remove();
         }
         
-        if (!existingScript || existingScript.getAttribute('data-pin-hover') !== 'false') {
+        if (!existingScript || 
+            existingScript.getAttribute('data-pin-hover') !== 'false' || 
+            existingScript.getAttribute('data-pin-save') !== 'false') {
           const script = document.createElement("script");
           script.src = "https://assets.pinterest.com/js/pinit.js";
           script.async = true;
           script.setAttribute('data-pin-hover', 'false');
+          script.setAttribute('data-pin-save', 'false');
           document.body.appendChild(script);
 
           script.onload = () => {
