@@ -111,7 +111,30 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
 
     loadEmbed();
 
-    return () => {};
+    // MutationObserver to remove Pinterest save buttons after they load
+    const observer = new MutationObserver(() => {
+      if (containerRef.current) {
+        // Find and remove all Pinterest save buttons
+        const saveButtons = containerRef.current.querySelectorAll(
+          'span[data-pin-log], a[data-pin-log], button[data-pin-save="true"], .pin-save-button, span[data-pin-href]'
+        );
+        saveButtons.forEach(button => {
+          button.remove();
+          console.log("[PinterestEmbed] Removed save button");
+        });
+      }
+    });
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current, {
+        childList: true,
+        subtree: true
+      });
+    }
+
+    return () => {
+      observer.disconnect();
+    };
   }, [url]);
 
   // Show loading state while expanding
