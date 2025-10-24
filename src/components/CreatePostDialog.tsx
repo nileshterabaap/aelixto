@@ -18,6 +18,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
+  const [embedHtml, setEmbedHtml] = useState("");
   const [showThumbnailInput, setShowThumbnailInput] = useState(false);
   const createPost = useCreatePost();
 
@@ -55,7 +56,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   };
 
   const handlePost = () => {
-    if (!linkUrl.trim()) return;
+    if (!linkUrl.trim() && !embedHtml.trim()) return;
 
     // Detect platform and media type
     let platform = "";
@@ -86,8 +87,9 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       title: title.trim() || undefined,
       content: caption.trim() || "",
       media_type: mediaType,
-      media_url: linkUrl,
+      media_url: linkUrl || undefined,
       platform: platform || undefined,
+      embed_html: embedHtml.trim() || undefined,
     });
 
     // Reset form
@@ -96,6 +98,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setThumbnailUrl("");
     setTitle("");
     setCaption("");
+    setEmbedHtml("");
     setShowThumbnailInput(false);
     onOpenChange(false);
   };
@@ -111,6 +114,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setThumbnailUrl("");
     setTitle("");
     setCaption("");
+    setEmbedHtml("");
     setShowThumbnailInput(false);
     onOpenChange(false);
   };
@@ -150,7 +154,18 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
               />
             </div>
 
-            <Button onClick={handleLinkSubmit} className="w-full" disabled={!linkUrl.trim()}>
+            <div>
+              <Label htmlFor="embedHtml">Or paste embed HTML (Instagram/Facebook)</Label>
+              <Textarea
+                id="embedHtml"
+                placeholder='<blockquote class="instagram-media"...'
+                value={embedHtml}
+                onChange={(e) => setEmbedHtml(e.target.value)}
+                className="mt-1.5 min-h-[100px] resize-none font-mono text-xs"
+              />
+            </div>
+
+            <Button onClick={handleLinkSubmit} className="w-full" disabled={!linkUrl.trim() && !embedHtml.trim()}>
               Next
             </Button>
           </div>
