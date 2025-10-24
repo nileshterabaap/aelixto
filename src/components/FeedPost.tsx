@@ -18,7 +18,7 @@ import redditIcon from "@/assets/reddit-icon.png";
 import twitterIcon from "@/assets/twitter-icon.png";
 import pinterestIcon from "@/assets/pinterest-icon.png";
 import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
-import { CleanPinterestPreview } from "@/components/embeds/CleanPinterestPreview";
+import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -155,7 +155,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         ) : platform?.name === 'Pinterest' && post.mediaUrl ? (
           <div className="mb-2">
-            <CleanPinterestPreview url={post.mediaUrl} />
+            <PinterestEmbed url={post.mediaUrl} />
           </div>
         ) : post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && (
           <div className="rounded-2xl overflow-hidden mb-2">
