@@ -77,10 +77,16 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
       if (!window.PinUtils) {
         const existingScript = document.querySelector('script[src="https://assets.pinterest.com/js/pinit.js"]');
         
-        if (!existingScript) {
+        // If script exists but doesn't have data-pin-hover="false", remove and re-add
+        if (existingScript && existingScript.getAttribute('data-pin-hover') !== 'false') {
+          existingScript.remove();
+        }
+        
+        if (!existingScript || existingScript.getAttribute('data-pin-hover') !== 'false') {
           const script = document.createElement("script");
           script.src = "https://assets.pinterest.com/js/pinit.js";
           script.async = true;
+          script.setAttribute('data-pin-hover', 'false');
           document.body.appendChild(script);
 
           script.onload = () => {
@@ -110,31 +116,6 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
     };
 
     loadEmbed();
-
-    // MutationObserver to remove Pinterest save buttons after they load
-    const observer = new MutationObserver(() => {
-      if (containerRef.current) {
-        // Find and remove all Pinterest save buttons
-        const saveButtons = containerRef.current.querySelectorAll(
-          'span[data-pin-log], a[data-pin-log], button[data-pin-save="true"], .pin-save-button, span[data-pin-href]'
-        );
-        saveButtons.forEach(button => {
-          button.remove();
-          console.log("[PinterestEmbed] Removed save button");
-        });
-      }
-    });
-
-    if (containerRef.current) {
-      observer.observe(containerRef.current, {
-        childList: true,
-        subtree: true
-      });
-    }
-
-    return () => {
-      observer.disconnect();
-    };
   }, [url]);
 
   // Show loading state while expanding
