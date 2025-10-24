@@ -111,17 +111,3 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
-
-/* Hide Pinterest Save button */
-.pinterest-embed-container span[data-pin-log="button_pinit_bookmarklet"],
-.pinterest-embed-container span[data-pin-log="embed_pin_button"],
-.pinterest-embed-container .pin-save-button,
-.pinterest-embed-container a[data-pin-log="button_pinit"],
-.pinterest-embed-container button[data-pin-save="true"],
-span[data-pin-href] > a[data-pin-log],
-span[data-pin-href] button {
-  display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}

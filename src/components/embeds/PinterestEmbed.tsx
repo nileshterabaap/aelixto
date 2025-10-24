@@ -146,7 +146,7 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
 
   return (
     <div className="w-full max-w-[500px] mx-auto">
-      <div ref={containerRef} className="pinterest-embed-container w-full flex flex-col justify-center">
+      <div ref={containerRef} className="pinterest-embed-container w-full flex flex-col justify-center [&_span[data-pin-log='button_pinit_bookmarklet']]:hidden [&_span[data-pin-log='embed_pin_button']]:hidden [&_.pin-save-button]:hidden [&_a[data-pin-log='button_pinit']]:!hidden [&_.PIN_1745533230427_button_pin]:!hidden [&_span]:has([data-pin-log]):!hidden">
         {pinTitle && (
           <div className="flex items-center gap-2 px-3 py-2 bg-card rounded-t-lg border border-b-0">
             <img src={pinterestIcon} alt="Pinterest" className="w-5 h-5" />
