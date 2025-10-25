@@ -98,21 +98,14 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           if ((window as any).instgrm?.Embeds) {
             setTimeout(() => (window as any).instgrm.Embeds.process(), 100);
           }
-        } else if (detectedPlatform === 'facebook') {
-          html = buildFacebookEmbed(finalUrl);
-          // Load Facebook SDK
-          await loadScript('https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v18.0');
-          if ((window as any).FB) {
-            setTimeout(() => (window as any).FB.XFBML.parse(), 100);
-          }
-        }
-        
-        if (html) {
           setEmbedHtml(html);
           setIsLoading(false);
           
           // Try to fetch OG data in background for potential fallback
           fetchOgDataInBackground(finalUrl);
+        } else if (detectedPlatform === 'facebook') {
+          // Facebook embeds require app registration - use OG card instead
+          await fetchOgData(finalUrl);
         } else {
           // Unknown platform, fetch OG data immediately
           await fetchOgData(finalUrl);
