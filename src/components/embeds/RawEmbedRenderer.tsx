@@ -87,16 +87,27 @@ export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
   }
 
   return (
-    <div className="relative rounded-2xl overflow-hidden bg-background">
-      <iframe
-        src={embedUrl}
-        className="w-full min-h-[500px] border-0"
-        style={{ maxWidth: '540px', margin: '0 auto', display: 'block' }}
-        scrolling="no"
-        frameBorder="0"
-        allowTransparency={true}
-        allow="encrypted-media"
-      />
+    <div className="relative rounded-2xl overflow-hidden bg-background" style={{ maxWidth: '540px', margin: '0 auto' }}>
+      <div style={{ 
+        height: '600px', 
+        overflow: 'hidden',
+        position: 'relative'
+      }}>
+        <iframe
+          src={embedUrl}
+          className="w-full border-0"
+          style={{ 
+            height: '800px',
+            marginTop: '-60px',
+            marginBottom: '-140px',
+            display: 'block'
+          }}
+          scrolling="no"
+          frameBorder="0"
+          allowTransparency={true}
+          allow="encrypted-media"
+        />
+      </div>
     </div>
   );
 };
