@@ -25,7 +25,7 @@ export const useVisibility = (
     return () => {
       observer.disconnect();
     };
-  }, [ref, options?.threshold, options?.root, options?.rootMargin]);
+  }, [ref]); // Removed options from dependencies to prevent infinite re-renders
 
   return isVisible;
 };
