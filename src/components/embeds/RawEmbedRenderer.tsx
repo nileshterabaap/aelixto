@@ -89,7 +89,7 @@ export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
   return (
     <div className="relative rounded-2xl overflow-hidden bg-background" style={{ maxWidth: '540px', margin: '0 auto' }}>
       <div style={{ 
-        height: '520px', 
+        height: '620px', 
         overflow: 'hidden',
         position: 'relative'
       }}>
@@ -98,7 +98,7 @@ export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
           className="w-full border-0"
           style={{ 
             height: '1200px',
-            marginTop: '-60px',
+            marginTop: '0px',
             display: 'block'
           }}
           scrolling="no"
