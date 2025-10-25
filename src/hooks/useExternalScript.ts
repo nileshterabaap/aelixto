@@ -94,7 +94,7 @@ export const useExternalScript = (
         cbs.splice(index, 1);
       }
     };
-  }, [src, JSON.stringify(attrs)]);
+  }, [src]); // Removed JSON.stringify(attrs) to prevent infinite re-renders
 
   return { status };
 };
