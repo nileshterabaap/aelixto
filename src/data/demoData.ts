@@ -11,7 +11,6 @@ export interface Post {
   mediaUrl?: string;
   platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest';
   embedHtml?: string;
-  url?: string; // Universal URL for auto-embed
   timestamp: Date;
   saves: number;
 }
@@ -22,7 +21,7 @@ export const demoPosts: Post[] = [
     author: { name: 'Demo User', username: 'demouser', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop' },
     title: 'Check out this amazing post!',
     content: 'Example of auto-embed from Instagram URL 📸',
-    url: 'https://www.instagram.com/p/C3KxYz1vXYz/',
+    mediaUrl: 'https://www.instagram.com/p/C3KxYz1vXYz/',
     platform: 'instagram',
     timestamp: new Date(Date.now() - 1000 * 60 * 5),
     saves: 523

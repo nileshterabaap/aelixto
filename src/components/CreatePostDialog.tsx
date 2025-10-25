@@ -18,12 +18,11 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
-  const [embedHtml, setEmbedHtml] = useState("");
   const [showThumbnailInput, setShowThumbnailInput] = useState(false);
   const createPost = useCreatePost();
 
   const handleLinkSubmit = async () => {
-    if (!linkUrl.trim() && !embedHtml.trim()) return;
+    if (!linkUrl.trim()) return;
     
     // Auto-generate thumbnail URL and fetch title based on platform
     let thumbnail = "";
@@ -56,7 +55,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   };
 
   const handlePost = () => {
-    if (!linkUrl.trim() && !embedHtml.trim()) return;
+    if (!linkUrl.trim()) return;
 
     // Detect platform and media type
     let platform = "";
@@ -89,7 +88,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       media_type: mediaType,
       media_url: linkUrl || undefined,
       platform: platform || undefined,
-      embed_html: embedHtml.trim() || undefined,
     });
 
     // Reset form
@@ -98,7 +96,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setThumbnailUrl("");
     setTitle("");
     setCaption("");
-    setEmbedHtml("");
     setShowThumbnailInput(false);
     onOpenChange(false);
   };
@@ -114,7 +111,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setThumbnailUrl("");
     setTitle("");
     setCaption("");
-    setEmbedHtml("");
     setShowThumbnailInput(false);
     onOpenChange(false);
   };
@@ -147,25 +143,17 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
               <Input
                 id="link"
                 type="url"
-                placeholder="https://youtube.com/... or https://instagram.com/..."
+                placeholder="https://youtube.com/... or https://instagram.com/... or https://facebook.com/..."
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
                 className="mt-1.5"
               />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Supports YouTube, Instagram, Facebook, TikTok, Twitter, Reddit, Pinterest
+              </p>
             </div>
 
-            <div>
-              <Label htmlFor="embedHtml">Or paste embed HTML (Instagram/Facebook)</Label>
-              <Textarea
-                id="embedHtml"
-                placeholder='<blockquote class="instagram-media"...'
-                value={embedHtml}
-                onChange={(e) => setEmbedHtml(e.target.value)}
-                className="mt-1.5 min-h-[100px] resize-none font-mono text-xs"
-              />
-            </div>
-
-            <Button onClick={handleLinkSubmit} className="w-full" disabled={!linkUrl.trim() && !embedHtml.trim()}>
+            <Button onClick={handleLinkSubmit} className="w-full" disabled={!linkUrl.trim()}>
               Next
             </Button>
           </div>

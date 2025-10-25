@@ -162,29 +162,29 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         )}
 
         {/* Universal Meta Embed (Instagram/Facebook URLs) */}
-        {post.url && (detectPlatform(post.url) === 'instagram' || detectPlatform(post.url) === 'facebook') ? (
+        {post.mediaUrl && (detectPlatform(post.mediaUrl) === 'instagram' || detectPlatform(post.mediaUrl) === 'facebook') ? (
           <div className="mb-2">
-            <UniversalMetaEmbed url={post.url} />
+            <UniversalMetaEmbed url={post.mediaUrl} />
           </div>
         ) : null}
 
         {/* Legacy Embed HTML (Instagram/Facebook) */}
-        {!post.url && post.embedHtml ? (
+        {post.embedHtml && !post.mediaUrl ? (
           <div className="mb-2">
             <RawEmbedRenderer embedHtml={post.embedHtml} />
           </div>
         ) : null}
 
         {/* Media */}
-        {!post.url && !post.embedHtml && platform?.name === 'X' && post.mediaUrl ? (
+        {!post.embedHtml && platform?.name === 'X' && post.mediaUrl && detectPlatform(post.mediaUrl) === 'unknown' ? (
           <div className="mb-2">
             <TwitterEmbed url={post.mediaUrl} />
           </div>
-        ) : !post.url && !post.embedHtml && platform?.name === 'Pinterest' && post.mediaUrl ? (
+        ) : !post.embedHtml && platform?.name === 'Pinterest' && post.mediaUrl && detectPlatform(post.mediaUrl) === 'unknown' ? (
           <div className="mb-2">
             <PinterestEmbed url={post.mediaUrl} />
           </div>
-        ) : !post.url && !post.embedHtml && post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && (
+        ) : !post.embedHtml && post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && detectPlatform(post.mediaUrl) === 'unknown' && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 
@@ -198,7 +198,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {!post.url && !post.embedHtml && post.mediaType === 'video' && post.mediaUrl && platform?.name !== 'X' && (
+        {!post.embedHtml && post.mediaType === 'video' && post.mediaUrl && platform?.name !== 'X' && detectPlatform(post.mediaUrl) === 'unknown' && (
           <>
             <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
               platform?.name === 'TikTok' || (platform?.name === 'YouTube' && isYouTubeShort(post.mediaUrl)) 
