@@ -23,7 +23,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const createPost = useCreatePost();
 
   const handleLinkSubmit = async () => {
-    if (!linkUrl.trim()) return;
+    if (!linkUrl.trim() && !embedHtml.trim()) return;
     
     // Auto-generate thumbnail URL and fetch title based on platform
     let thumbnail = "";
