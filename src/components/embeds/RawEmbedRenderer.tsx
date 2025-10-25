@@ -12,12 +12,18 @@ const stripScriptTags = (html: string): string => {
   return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
 };
 
-const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
+const detectPlatform = (html: string): 'instagram' | 'facebook' | 'twitter' | 'pinterest' | 'unknown' => {
   if (html.includes('instagram.com') || html.includes('instagr.am')) {
     return 'instagram';
   }
   if (html.includes('facebook.com') || html.includes('fb.com')) {
     return 'facebook';
+  }
+  if (html.includes('twitter.com') || html.includes('x.com') || html.includes('platform.twitter.com')) {
+    return 'twitter';
+  }
+  if (html.includes('pinterest.com') || html.includes('pinimg.com') || html.includes('assets.pinterest.com')) {
+    return 'pinterest';
   }
   return 'unknown';
 };
@@ -56,6 +62,30 @@ export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
           // Parse Facebook embeds
           if (window.FB?.XFBML && containerRef.current) {
             window.FB.XFBML.parse(containerRef.current);
+          }
+        } else if (platform === 'twitter') {
+          // Load Twitter widgets script
+          const script = document.createElement('script');
+          script.src = 'https://platform.twitter.com/widgets.js';
+          script.async = true;
+          if (!document.querySelector('script[src="https://platform.twitter.com/widgets.js"]')) {
+            document.body.appendChild(script);
+          }
+        } else if (platform === 'pinterest') {
+          // Load Pinterest script
+          const script = document.createElement('script');
+          script.src = 'https://assets.pinterest.com/js/pinit.js';
+          script.async = true;
+          script.setAttribute('data-pin-build', 'doBuild');
+          if (!document.querySelector('script[src="https://assets.pinterest.com/js/pinit.js"]')) {
+            document.body.appendChild(script);
+            script.onload = () => {
+              if (window.PinUtils) {
+                window.PinUtils.build();
+              }
+            };
+          } else if (window.PinUtils) {
+            window.PinUtils.build();
           }
         }
 

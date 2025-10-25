@@ -90,5 +90,8 @@ declare global {
         parse: (element?: HTMLElement) => void;
       };
     };
+    PinUtils?: {
+      build: () => void;
+    };
   }
 }
