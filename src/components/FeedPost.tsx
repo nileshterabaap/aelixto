@@ -20,6 +20,7 @@ import pinterestIcon from "@/assets/pinterest-icon.png";
 import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
 import { FacebookPreview } from "@/components/embeds/FacebookPreview";
+import { InstagramPreview } from "@/components/embeds/InstagramPreview";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -201,8 +202,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 </div>
               );
             case 'instagram':
-              // Instagram embeds would go here if we had a working embed component
-              return null;
+              return (
+                <div className="mb-2" key={urlKey}>
+                  <InstagramPreview url={post.mediaUrl} />
+                </div>
+              );
             default:
               // Fall through to regular media rendering below
               return null;
