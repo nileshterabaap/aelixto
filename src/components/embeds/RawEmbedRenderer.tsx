@@ -52,10 +52,14 @@ export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
         // Load appropriate script based on platform
         if (platform === 'instagram') {
           await loadScript('https://www.instagram.com/embed.js');
+          // Wait for DOM to be ready and Instagram SDK to be available
+          await new Promise(resolve => setTimeout(resolve, 100));
           // Process Instagram embeds
           if (window.instgrm?.Embeds) {
             window.instgrm.Embeds.process();
           }
+          // Give Instagram time to process
+          await new Promise(resolve => setTimeout(resolve, 500));
         } else if (platform === 'facebook') {
           await loadScript('https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v19.0');
           // Wait a bit for FB SDK to initialize
