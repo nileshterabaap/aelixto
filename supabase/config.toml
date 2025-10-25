@@ -1,1 +1,4 @@
 project_id = "hhotresssetunubidrth"
+
+[functions.unfurl-url]
+verify_jwt = false

@@ -19,8 +19,7 @@ import twitterIcon from "@/assets/twitter-icon.png";
 import pinterestIcon from "@/assets/pinterest-icon.png";
 import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
-import { RawEmbedRenderer } from "@/components/embeds/RawEmbedRenderer";
-import { UniversalMetaEmbed } from "@/components/embeds/UniversalMetaEmbed";
+import { FacebookPreview } from "@/components/embeds/FacebookPreview";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -59,15 +58,31 @@ const getPlatformIcon = (platform?: string) => {
   }
 };
 
-const detectPlatform = (url: string): 'instagram' | 'facebook' | 'unknown' => {
+const detectPlatform = (url: string): 'instagram' | 'facebook' | 'twitter' | 'pinterest' | 'unknown' => {
   const lowerUrl = url.toLowerCase();
   if (lowerUrl.includes('instagram.com') || lowerUrl.includes('instagr.am')) {
     return 'instagram';
   }
-  if (lowerUrl.includes('facebook.com') || lowerUrl.includes('fb.watch') || lowerUrl.includes('fb.me')) {
+  if (lowerUrl.includes('facebook.com') || lowerUrl.includes('fb.watch') || lowerUrl.includes('fb.me') || lowerUrl.includes('m.facebook.com')) {
     return 'facebook';
   }
+  if (lowerUrl.includes('twitter.com') || lowerUrl.includes('x.com')) {
+    return 'twitter';
+  }
+  if (lowerUrl.includes('pinterest.com') || lowerUrl.includes('pin.it')) {
+    return 'pinterest';
+  }
   return 'unknown';
+};
+
+const hashUrl = (url: string): string => {
+  let hash = 0;
+  for (let i = 0; i < url.length; i++) {
+    const char = url.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(36);
 };
 
 export const FeedPost = ({ post, userId }: FeedPostProps) => {
@@ -161,34 +176,46 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <p className="text-sm mb-3">{post.content}</p>
         )}
 
-        {/* Universal Meta Embed (Instagram/Facebook URLs) */}
-        {post.mediaUrl && (detectPlatform(post.mediaUrl) === 'instagram' || detectPlatform(post.mediaUrl) === 'facebook') ? (
-          <div className="mb-2">
-            <UniversalMetaEmbed url={post.mediaUrl} />
-          </div>
-        ) : null}
+        {/* Social Media Embeds */}
+        {post.mediaUrl && (() => {
+          const detectedPlatform = detectPlatform(post.mediaUrl);
+          const urlKey = hashUrl(post.mediaUrl);
 
-        {/* Legacy Embed HTML (Instagram/Facebook) */}
-        {post.embedHtml && !post.mediaUrl ? (
-          <div className="mb-2">
-            <RawEmbedRenderer embedHtml={post.embedHtml} />
-          </div>
-        ) : null}
+          switch (detectedPlatform) {
+            case 'facebook':
+              return (
+                <div className="mb-2" key={urlKey}>
+                  <FacebookPreview url={post.mediaUrl} />
+                </div>
+              );
+            case 'twitter':
+              return (
+                <div className="mb-2" key={urlKey}>
+                  <TwitterEmbed url={post.mediaUrl} />
+                </div>
+              );
+            case 'pinterest':
+              return (
+                <div className="mb-2" key={urlKey}>
+                  <PinterestEmbed url={post.mediaUrl} />
+                </div>
+              );
+            case 'instagram':
+              // Keep existing Instagram handling
+              return null;
+            default:
+              return null;
+          }
+        })()}
 
-        {/* Media */}
-        {!post.embedHtml && platform?.name === 'X' && post.mediaUrl && detectPlatform(post.mediaUrl) === 'unknown' ? (
-          <div className="mb-2">
-            <TwitterEmbed url={post.mediaUrl} />
-          </div>
-        ) : !post.embedHtml && platform?.name === 'Pinterest' && post.mediaUrl && detectPlatform(post.mediaUrl) === 'unknown' ? (
-          <div className="mb-2">
-            <PinterestEmbed url={post.mediaUrl} />
-          </div>
-        ) : !post.embedHtml && post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && detectPlatform(post.mediaUrl) === 'unknown' && (
+        {/* Regular Media (non-social platforms) */}
+        {post.mediaUrl && detectPlatform(post.mediaUrl) === 'unknown' && post.mediaType === 'image' && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 
               alt="Post content"
+              loading="lazy"
+              decoding="async"
               className={`w-full h-auto object-cover ${
                 platform?.name === 'Instagram' ? 'aspect-square' : 
                 platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
@@ -198,7 +225,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {!post.embedHtml && post.mediaType === 'video' && post.mediaUrl && platform?.name !== 'X' && detectPlatform(post.mediaUrl) === 'unknown' && (
+        {post.mediaUrl && detectPlatform(post.mediaUrl) === 'unknown' && post.mediaType === 'video' && (
           <>
             <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
               platform?.name === 'TikTok' || (platform?.name === 'YouTube' && isYouTubeShort(post.mediaUrl)) 

@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ExternalLink } from "lucide-react";
+import { useEffect, useRef, useState } from 'react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { ExternalLink } from 'lucide-react';
+import { useExternalScript } from '@/hooks/useExternalScript';
+import { useVisibility } from '@/hooks/useVisibility';
 
 interface TwitterEmbedProps {
   url: string;
@@ -12,104 +14,58 @@ declare global {
     twttr?: {
       widgets: {
         load: (element?: HTMLElement) => void;
-        createTweet: (
-          tweetId: string,
-          container: HTMLElement,
-          options?: any
-        ) => Promise<HTMLElement | undefined>;
       };
     };
   }
 }
 
-const loadTwitterScript = () => {
-  return new Promise<void>((resolve, reject) => {
-    if (window.twttr) {
-      resolve();
+export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [showFallback, setShowFallback] = useState(false);
+  const { status } = useExternalScript('https://platform.twitter.com/widgets.js');
+  const isVisible = useVisibility(containerRef);
+  const loadedRef = useRef(false);
+
+  useEffect(() => {
+    if (status === 'error') {
+      setShowFallback(true);
+    }
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== 'ready' || !isVisible || !containerRef.current || loadedRef.current) {
       return;
     }
 
-    const script = document.createElement("script");
-    script.src = "https://platform.twitter.com/widgets.js";
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Twitter script"));
-    document.body.appendChild(script);
-  });
-};
-
-const extractTweetId = (url: string): string | null => {
-  const patterns = [
-    /twitter\.com\/\w+\/status\/(\d+)/,
-    /x\.com\/\w+\/status\/(\d+)/,
-  ];
-
-  for (const pattern of patterns) {
-    const match = url.match(pattern);
-    if (match) return match[1];
-  }
-  return null;
-};
-
-export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    const loadEmbed = async () => {
-      console.log('[TwitterEmbed] Loading tweet from URL:', url);
+    const loadTweet = async () => {
       try {
-        const tweetId = extractTweetId(url);
-        console.log('[TwitterEmbed] Extracted tweet ID:', tweetId);
+        console.log('[TwitterEmbed] Loading tweet for:', url);
         
-        if (!tweetId) {
-          console.error('[TwitterEmbed] Failed to extract tweet ID from URL');
-          setError(true);
-          setLoading(false);
-          return;
-        }
+        if (window.twttr?.widgets) {
+          window.twttr.widgets.load(containerRef.current!);
+          loadedRef.current = true;
 
-        console.log('[TwitterEmbed] Loading Twitter script...');
-        await loadTwitterScript();
-        console.log('[TwitterEmbed] Twitter script loaded successfully');
-
-        if (containerRef.current && window.twttr) {
-          containerRef.current.innerHTML = "";
-          console.log('[TwitterEmbed] Creating tweet widget...');
-          
-          const tweet = await window.twttr.widgets.createTweet(
-            tweetId,
-            containerRef.current,
-            {
-              theme: document.documentElement.classList.contains("dark")
-                ? "dark"
-                : "light",
-              align: "center",
+          // Check if embed loaded after 2s
+          setTimeout(() => {
+            const hasIframe = containerRef.current?.querySelector('iframe');
+            if (!hasIframe) {
+              console.log('[TwitterEmbed] No iframe found after 2s, showing fallback');
+              setShowFallback(true);
             }
-          );
-
-          if (!tweet) {
-            console.error('[TwitterEmbed] Failed to create tweet widget');
-            setError(true);
-          } else {
-            console.log('[TwitterEmbed] Tweet widget created successfully');
-          }
+          }, 2000);
         }
       } catch (err) {
-        console.error("[TwitterEmbed] Failed to load Twitter embed:", err);
-        setError(true);
-      } finally {
-        setLoading(false);
+        console.error('[TwitterEmbed] Error loading tweet:', err);
+        setShowFallback(true);
       }
     };
 
-    loadEmbed();
-  }, [url]);
+    loadTweet();
+  }, [status, isVisible, url]);
 
-  if (error) {
+  if (showFallback) {
     return (
-      <Card className="p-6 text-center space-y-3">
+      <Card className="p-6 text-center space-y-3 rounded-2xl">
         <div className="flex justify-center">
           <svg
             className="w-12 h-12 text-muted-foreground"
@@ -133,20 +89,18 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
   }
 
   return (
-    <div className="relative">
-      {loading && (
+    <div ref={containerRef} className="twitter-embed-container" key={url}>
+      {status === 'loading' && (
         <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       )}
-      <div ref={containerRef} className="twitter-embed-container" />
-      <style>{`
-        .twitter-embed-container iframe {
-          margin-bottom: -85px !important;
-        }
-        .twitter-embed-container {
-          overflow: hidden;
-          max-height: calc(100% - 85px);
-        }
-      `}</style>
+      <a
+        className="twitter-tweet"
+        href={url}
+        data-dnt="true"
+        data-theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+      >
+        Loading...
+      </a>
     </div>
   );
 };
