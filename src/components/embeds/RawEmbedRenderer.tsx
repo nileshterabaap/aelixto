@@ -43,33 +43,44 @@ export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
   const [error, setError] = useState(false);
   const platform = detectPlatform(embedHtml);
 
+  console.log('RawEmbedRenderer: platform=', platform, 'embedHtml length=', embedHtml.length);
+
   useEffect(() => {
     const initializeEmbed = async () => {
       try {
+        console.log('Starting embed initialization for', platform);
         setIsLoading(true);
         setError(false);
 
         // Load appropriate script based on platform
         if (platform === 'instagram') {
+          console.log('Loading Instagram script...');
           await loadScript('https://www.instagram.com/embed.js');
+          console.log('Instagram script loaded, window.instgrm=', !!window.instgrm);
           // Wait for DOM to be ready and Instagram SDK to be available
           await new Promise(resolve => setTimeout(resolve, 100));
           // Process Instagram embeds
           if (window.instgrm?.Embeds) {
+            console.log('Processing Instagram embeds...');
             window.instgrm.Embeds.process();
+          } else {
+            console.error('Instagram Embeds object not available');
           }
           // Give Instagram time to process
           await new Promise(resolve => setTimeout(resolve, 500));
         } else if (platform === 'facebook') {
+          console.log('Loading Facebook script...');
           await loadScript('https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v19.0');
           // Wait a bit for FB SDK to initialize
           await new Promise(resolve => setTimeout(resolve, 500));
           // Process Facebook embeds
           if (window.FB?.XFBML && containerRef.current) {
+            console.log('Processing Facebook embeds...');
             window.FB.XFBML.parse(containerRef.current);
           }
         }
 
+        console.log('Embed initialization complete');
         setIsLoading(false);
       } catch (err) {
         console.error('Failed to load embed:', err);
@@ -79,7 +90,10 @@ export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
     };
 
     if (embedHtml && containerRef.current) {
+      console.log('Container ready, initializing embed');
       initializeEmbed();
+    } else {
+      console.log('Container not ready:', { embedHtml: !!embedHtml, container: !!containerRef.current });
     }
   }, [embedHtml, platform]);
 
