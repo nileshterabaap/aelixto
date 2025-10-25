@@ -1,14 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
-import { loadScript } from '@/lib/ScriptLoader';
+import { useEffect, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface RawEmbedRendererProps {
   embedHtml: string;
 }
 
-// Strip script tags for security (we load official scripts separately)
-const stripScripts = (html: string): string => {
-  return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+// Extract Instagram post URL from embed HTML
+const extractInstagramUrl = (html: string): string | null => {
+  const match = html.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+)\/?/);
+  return match ? match[0] : null;
+};
+
+// Extract Facebook post URL from embed HTML  
+const extractFacebookUrl = (html: string): string | null => {
+  const match = html.match(/https?:\/\/(?:www\.)?facebook\.com\/[^"'\s]+/);
+  return match ? match[0] : null;
 };
 
 // Detect platform from embed HTML
@@ -22,82 +28,51 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
   return 'unknown';
 };
 
-declare global {
-  interface Window {
-    instgrm?: {
-      Embeds?: {
-        process: () => void;
-      };
-    };
-    FB?: {
-      XFBML?: {
-        parse: (container?: HTMLElement) => void;
-      };
-    };
-  }
-}
-
 export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [embedUrl, setEmbedUrl] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
   const platform = detectPlatform(embedHtml);
 
-  console.log('RawEmbedRenderer: platform=', platform, 'embedHtml length=', embedHtml.length);
-
   useEffect(() => {
-    const initializeEmbed = async () => {
+    const fetchEmbed = async () => {
       try {
-        console.log('Starting embed initialization for', platform);
         setIsLoading(true);
         setError(false);
 
-        // Load appropriate script based on platform
         if (platform === 'instagram') {
-          console.log('Loading Instagram script...');
-          await loadScript('https://www.instagram.com/embed.js');
-          console.log('Instagram script loaded, window.instgrm=', !!window.instgrm);
-          // Wait for DOM to be ready and Instagram SDK to be available
-          await new Promise(resolve => setTimeout(resolve, 100));
-          // Process Instagram embeds
-          if (window.instgrm?.Embeds) {
-            console.log('Processing Instagram embeds...');
-            window.instgrm.Embeds.process();
-          } else {
-            console.error('Instagram Embeds object not available');
+          const postUrl = extractInstagramUrl(embedHtml);
+          if (postUrl) {
+            // Use Instagram oEmbed API to get iframe embed
+            const response = await fetch(
+              `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(postUrl)}&access_token=1234567890`,
+              { mode: 'no-cors' }
+            );
+            
+            // Since we can't read the response in no-cors mode, use direct iframe approach
+            const embedId = postUrl.split('/')[4];
+            setEmbedUrl(`https://www.instagram.com/p/${embedId}/embed/`);
           }
-          // Give Instagram time to process
-          await new Promise(resolve => setTimeout(resolve, 500));
         } else if (platform === 'facebook') {
-          console.log('Loading Facebook script...');
-          await loadScript('https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v19.0');
-          // Wait a bit for FB SDK to initialize
-          await new Promise(resolve => setTimeout(resolve, 500));
-          // Process Facebook embeds
-          if (window.FB?.XFBML && containerRef.current) {
-            console.log('Processing Facebook embeds...');
-            window.FB.XFBML.parse(containerRef.current);
+          const postUrl = extractFacebookUrl(embedHtml);
+          if (postUrl) {
+            // Use Facebook's iframe embed
+            setEmbedUrl(`https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(postUrl)}&width=500`);
           }
         }
 
-        console.log('Embed initialization complete');
         setIsLoading(false);
       } catch (err) {
-        console.error('Failed to load embed:', err);
+        console.error('Failed to process embed:', err);
         setError(true);
         setIsLoading(false);
       }
     };
 
-    if (embedHtml && containerRef.current) {
-      console.log('Container ready, initializing embed');
-      initializeEmbed();
-    } else {
-      console.log('Container not ready:', { embedHtml: !!embedHtml, container: !!containerRef.current });
+    if (embedHtml) {
+      fetchEmbed();
     }
   }, [embedHtml, platform]);
-
-  const sanitizedHtml = stripScripts(embedHtml);
 
   if (error) {
     return (
@@ -107,15 +82,20 @@ export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
     );
   }
 
+  if (isLoading || !embedUrl) {
+    return <Skeleton className="w-full h-[500px] rounded-2xl" />;
+  }
+
   return (
-    <div className="relative rounded-2xl overflow-hidden">
-      {isLoading && (
-        <Skeleton className="absolute inset-0 z-10 rounded-2xl" />
-      )}
-      <div
-        ref={containerRef}
-        className="embed-container"
-        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+    <div className="relative rounded-2xl overflow-hidden bg-background">
+      <iframe
+        src={embedUrl}
+        className="w-full min-h-[500px] border-0"
+        style={{ maxWidth: '540px', margin: '0 auto', display: 'block' }}
+        scrolling="no"
+        frameBorder="0"
+        allowTransparency={true}
+        allow="encrypted-media"
       />
     </div>
   );
