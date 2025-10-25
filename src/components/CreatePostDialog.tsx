@@ -15,12 +15,10 @@ interface CreatePostDialogProps {
 export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [linkUrl, setLinkUrl] = useState("");
-  const [embedHtml, setEmbedHtml] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
   const [showThumbnailInput, setShowThumbnailInput] = useState(false);
-  const [useEmbedHtml, setUseEmbedHtml] = useState(false);
   const createPost = useCreatePost();
 
   const handleLinkSubmit = async () => {
@@ -57,7 +55,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   };
 
   const handlePost = () => {
-    if (!linkUrl.trim() && !embedHtml.trim()) return;
+    if (!linkUrl.trim()) return;
 
     // Detect platform and media type
     let platform = "";
@@ -69,7 +67,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     } else if (linkUrl.includes("tiktok.com")) {
       platform = "tiktok";
       mediaType = "video";
-    } else if (linkUrl.includes("instagram.com") || embedHtml.includes("instagram.com")) {
+    } else if (linkUrl.includes("instagram.com")) {
       platform = "instagram";
       if (linkUrl.includes("/reel/") || linkUrl.includes("/reels/")) {
         mediaType = "video";
@@ -78,13 +76,10 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       platform = "reddit";
     } else if (linkUrl.includes("twitter.com") || linkUrl.includes("x.com")) {
       platform = "twitter";
-      mediaType = "video";
+      mediaType = "video"; // Twitter embeds handle both images and videos
     } else if (linkUrl.includes("pinterest.com") || linkUrl.includes("pin.it")) {
       platform = "pinterest";
       mediaType = "image";
-    } else if (embedHtml.includes("facebook.com") || embedHtml.includes("fb.com")) {
-      platform = "instagram"; // Use instagram for Facebook embeds
-      mediaType = "video";
     }
 
     createPost.mutate({
@@ -93,18 +88,15 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       media_type: mediaType,
       media_url: linkUrl || undefined,
       platform: platform || undefined,
-      embed_html: embedHtml.trim() || undefined,
     });
 
     // Reset form
     setStep(1);
     setLinkUrl("");
-    setEmbedHtml("");
     setThumbnailUrl("");
     setTitle("");
     setCaption("");
     setShowThumbnailInput(false);
-    setUseEmbedHtml(false);
     onOpenChange(false);
   };
 
@@ -116,12 +108,10 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const handleClose = () => {
     setStep(1);
     setLinkUrl("");
-    setEmbedHtml("");
     setThumbnailUrl("");
     setTitle("");
     setCaption("");
     setShowThumbnailInput(false);
-    setUseEmbedHtml(false);
     onOpenChange(false);
   };
 
@@ -148,57 +138,22 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
         
         {step === 1 ? (
           <div className="space-y-4">
-            <div className="flex gap-2 mb-2">
-              <Button
-                type="button"
-                variant={!useEmbedHtml ? "default" : "outline"}
-                onClick={() => setUseEmbedHtml(false)}
-                size="sm"
-                className="flex-1"
-              >
-                Link URL
-              </Button>
-              <Button
-                type="button"
-                variant={useEmbedHtml ? "default" : "outline"}
-                onClick={() => setUseEmbedHtml(true)}
-                size="sm"
-                className="flex-1"
-              >
-                Embed HTML
-              </Button>
+            <div>
+              <Label htmlFor="link">Paste your link</Label>
+              <Input
+                id="link"
+                type="url"
+                placeholder="https://youtube.com/... or https://instagram.com/... or https://facebook.com/..."
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                className="mt-1.5"
+              />
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Supports YouTube, Instagram, Facebook, TikTok, Twitter, Reddit, Pinterest
+              </p>
             </div>
 
-            {!useEmbedHtml ? (
-              <div>
-                <Label htmlFor="link">Paste your link</Label>
-                <Input
-                  id="link"
-                  type="url"
-                  placeholder="https://youtube.com/... or https://instagram.com/..."
-                  value={linkUrl}
-                  onChange={(e) => setLinkUrl(e.target.value)}
-                  className="mt-1.5"
-                />
-              </div>
-            ) : (
-              <div>
-                <Label htmlFor="embed">Paste embed HTML code</Label>
-                <Textarea
-                  id="embed"
-                  placeholder="<blockquote>...</blockquote> or <div>...</div>"
-                  value={embedHtml}
-                  onChange={(e) => setEmbedHtml(e.target.value)}
-                  className="mt-1.5 min-h-[120px] font-mono text-xs"
-                />
-              </div>
-            )}
-
-            <Button 
-              onClick={handleLinkSubmit} 
-              className="w-full" 
-              disabled={!useEmbedHtml ? !linkUrl.trim() : !embedHtml.trim()}
-            >
+            <Button onClick={handleLinkSubmit} className="w-full" disabled={!linkUrl.trim()}>
               Next
             </Button>
           </div>

@@ -31,6 +31,7 @@ const Index = () => {
       mediaType: post.media_type as "image" | "video" | "none",
       mediaUrl: post.media_url || undefined,
       platform: post.platform as "youtube" | "instagram" | "tiktok" | "reddit" | "twitter" | "pinterest",
+      embedHtml: post.embed_html || undefined,
       timestamp: new Date(post.created_at),
       saves: post.saves_count,
       isRealPost: true,
