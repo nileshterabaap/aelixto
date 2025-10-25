@@ -19,7 +19,6 @@ import twitterIcon from "@/assets/twitter-icon.png";
 import pinterestIcon from "@/assets/pinterest-icon.png";
 import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
-import { RawEmbedRenderer } from "@/components/embeds/RawEmbedRenderer";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -149,23 +148,16 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <p className="text-sm mb-3">{post.content}</p>
         )}
 
-        {/* Embed HTML (Instagram/Facebook) */}
-        {post.embedHtml ? (
-          <div className="mb-2">
-            <RawEmbedRenderer embedHtml={post.embedHtml} />
-          </div>
-        ) : null}
-
         {/* Media */}
-        {!post.embedHtml && platform?.name === 'X' && post.mediaUrl ? (
+        {platform?.name === 'X' && post.mediaUrl ? (
           <div className="mb-2">
             <TwitterEmbed url={post.mediaUrl} />
           </div>
-        ) : !post.embedHtml && platform?.name === 'Pinterest' && post.mediaUrl ? (
+        ) : platform?.name === 'Pinterest' && post.mediaUrl ? (
           <div className="mb-2">
             <PinterestEmbed url={post.mediaUrl} />
           </div>
-        ) : !post.embedHtml && post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && (
+        ) : post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 
@@ -179,7 +171,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {!post.embedHtml && post.mediaType === 'video' && post.mediaUrl && platform?.name !== 'X' && (
+        {post.mediaType === 'video' && post.mediaUrl && platform?.name !== 'X' && (
           <>
             <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
               platform?.name === 'TikTok' || (platform?.name === 'YouTube' && isYouTubeShort(post.mediaUrl)) 
