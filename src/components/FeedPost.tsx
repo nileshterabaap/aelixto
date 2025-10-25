@@ -176,7 +176,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <p className="text-sm mb-3">{post.content}</p>
         )}
 
-        {/* Social Media Embeds */}
+        {/* Social Media Embeds - only for actual social media URLs */}
         {post.mediaUrl && (() => {
           const detectedPlatform = detectPlatform(post.mediaUrl);
           const urlKey = hashUrl(post.mediaUrl);
@@ -201,14 +201,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 </div>
               );
             case 'instagram':
-              // Keep existing Instagram handling
+              // Instagram embeds would go here if we had a working embed component
               return null;
             default:
+              // Fall through to regular media rendering below
               return null;
           }
         })()}
 
-        {/* Regular Media (non-social platforms) */}
+        {/* Regular Media (non-social platforms) - show if not a social media URL */}
         {post.mediaUrl && detectPlatform(post.mediaUrl) === 'unknown' && post.mediaType === 'image' && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
