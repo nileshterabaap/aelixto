@@ -150,17 +150,17 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         )}
 
         {/* Media */}
-        {(post as any).embed_html ? (
-          <div className="mb-2">
-            <RawEmbedRenderer embedHtml={(post as any).embed_html} />
-          </div>
-        ) : platform?.name === 'X' && post.mediaUrl ? (
+        {platform?.name === 'X' && post.mediaUrl ? (
           <div className="mb-2">
             <TwitterEmbed url={post.mediaUrl} />
           </div>
         ) : platform?.name === 'Pinterest' && post.mediaUrl ? (
           <div className="mb-2">
             <PinterestEmbed url={post.mediaUrl} />
+          </div>
+        ) : (post as any).embed_html ? (
+          <div className="mb-2">
+            <RawEmbedRenderer embedHtml={(post as any).embed_html} />
           </div>
         ) : post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && (
           <div className="rounded-2xl overflow-hidden mb-2">
