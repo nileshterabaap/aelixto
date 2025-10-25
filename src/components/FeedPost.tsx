@@ -19,6 +19,7 @@ import twitterIcon from "@/assets/twitter-icon.png";
 import pinterestIcon from "@/assets/pinterest-icon.png";
 import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
+import { RawEmbedRenderer } from "@/components/embeds/RawEmbedRenderer";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -149,7 +150,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         )}
 
         {/* Media */}
-        {platform?.name === 'X' && post.mediaUrl ? (
+        {(post as any).embed_html ? (
+          <div className="mb-2">
+            <RawEmbedRenderer embedHtml={(post as any).embed_html} />
+          </div>
+        ) : platform?.name === 'X' && post.mediaUrl ? (
           <div className="mb-2">
             <TwitterEmbed url={post.mediaUrl} />
           </div>
