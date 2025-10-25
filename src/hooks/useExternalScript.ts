@@ -7,7 +7,7 @@ const scriptCallbacks = new Map<string, Array<(status: ScriptStatus) => void>>()
 
 export const useExternalScript = (
   src: string,
-  attrs?: Record<string, string>
+  dataAttributes?: Record<string, string>
 ): { status: ScriptStatus } => {
   const [status, setStatus] = useState<ScriptStatus>(() => {
     return loadedScripts.get(src) || 'idle';
@@ -38,15 +38,21 @@ export const useExternalScript = (
     }
 
     // Subscribe to status changes
-    const callbacks = scriptCallbacks.get(src) || [];
     const callback = (newStatus: ScriptStatus) => setStatus(newStatus);
+    const callbacks = scriptCallbacks.get(src) || [];
     callbacks.push(callback);
     scriptCallbacks.set(src, callbacks);
 
     // If already loading, wait for it
     if (currentStatus === 'loading') {
       setStatus('loading');
-      return;
+      return () => {
+        const cbs = scriptCallbacks.get(src) || [];
+        const index = cbs.indexOf(callback);
+        if (index > -1) {
+          cbs.splice(index, 1);
+        }
+      };
     }
 
     // Start loading
@@ -57,9 +63,9 @@ export const useExternalScript = (
     script.src = src;
     script.async = true;
 
-    // Add custom attributes
-    if (attrs) {
-      Object.entries(attrs).forEach(([key, value]) => {
+    // Add data attributes
+    if (dataAttributes) {
+      Object.entries(dataAttributes).forEach(([key, value]) => {
         script.setAttribute(key, value);
       });
     }
@@ -87,14 +93,13 @@ export const useExternalScript = (
       script.removeEventListener('load', onLoad);
       script.removeEventListener('error', onError);
       
-      // Remove this callback from the list
       const cbs = scriptCallbacks.get(src) || [];
       const index = cbs.indexOf(callback);
       if (index > -1) {
         cbs.splice(index, 1);
       }
     };
-  }, [src]); // Removed JSON.stringify(attrs) to prevent infinite re-renders
+  }, [src]); // Only depend on src
 
   return { status };
 };

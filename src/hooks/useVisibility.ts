@@ -2,7 +2,7 @@ import { useEffect, useState, RefObject } from 'react';
 
 export const useVisibility = (
   ref: RefObject<HTMLElement>,
-  options?: IntersectionObserverInit
+  threshold: number = 0.1
 ): boolean => {
   const [isVisible, setIsVisible] = useState(false);
 
@@ -14,10 +14,7 @@ export const useVisibility = (
       ([entry]) => {
         setIsVisible(entry.isIntersecting);
       },
-      {
-        threshold: 0.1,
-        ...options,
-      }
+      { threshold }
     );
 
     observer.observe(element);
@@ -25,7 +22,7 @@ export const useVisibility = (
     return () => {
       observer.disconnect();
     };
-  }, [ref]); // Removed options from dependencies to prevent infinite re-renders
+  }, []); // Empty dependencies - observer is set up once
 
   return isVisible;
 };

@@ -39,9 +39,10 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showFallback, setShowFallback] = useState(false);
   const [finalUrl, setFinalUrl] = useState(url);
-  const { status } = useExternalScript('https://assets.pinterest.com/js/pinit.js', {
-    'data-pin-hover': 'false',
-  });
+  const { status } = useExternalScript(
+    'https://assets.pinterest.com/js/pinit.js',
+    { 'data-pin-hover': 'false' }
+  );
   const isVisible = useVisibility(containerRef);
   const loadedRef = useRef(false);
 
