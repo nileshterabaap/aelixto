@@ -52,10 +52,15 @@ export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
 
         // Load appropriate script and process embed
         if (platform === 'instagram') {
+          console.log('Loading Instagram embed...');
           await loadInstagramEmbed();
+          console.log('Instagram script loaded, processing embeds...');
           // Process Instagram embeds
           if (window.instgrm?.Embeds) {
             window.instgrm.Embeds.process();
+            console.log('Instagram embeds processed');
+          } else {
+            console.error('Instagram Embeds not available');
           }
         } else if (platform === 'facebook') {
           await loadFacebookSDK();
