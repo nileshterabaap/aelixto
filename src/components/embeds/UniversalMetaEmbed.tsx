@@ -2,10 +2,8 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { RawEmbedRenderer } from './RawEmbedRenderer';
 import { OgCardFallback } from './OgCardFallback';
-import { CleanInstagramCard } from './CleanInstagramCard';
 import { Skeleton } from '@/components/ui/skeleton';
 import { loadScript } from '@/lib/ScriptLoader';
-import { useInstagramRender } from '@/contexts/InstagramRenderContext';
 
 interface UniversalMetaEmbedProps {
   url: string;
@@ -53,7 +51,6 @@ const buildFacebookEmbed = (url: string): string => {
 };
 
 export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
-  const { renderMode } = useInstagramRender();
   const [embedHtml, setEmbedHtml] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -64,7 +61,6 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     finalUrl: string;
   } | null>(null);
   const [platform, setPlatform] = useState<Platform>('unknown');
-  const [finalExpandedUrl, setFinalExpandedUrl] = useState<string>(url);
 
   useEffect(() => {
     const processUrl = async () => {
@@ -90,7 +86,6 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         // Step 2: Detect platform
         const detectedPlatform = detectPlatform(finalUrl);
         setPlatform(detectedPlatform);
-        setFinalExpandedUrl(finalUrl);
         console.log('[UniversalMetaEmbed] Detected platform:', detectedPlatform);
         
         // Step 3: Build embed HTML based on platform
@@ -184,11 +179,6 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     return <Skeleton className="w-full h-[500px] rounded-2xl" />;
   }
 
-  // If Instagram and clean mode is enabled, use CleanInstagramCard
-  if (platform === 'instagram' && renderMode === 'clean') {
-    return <CleanInstagramCard postUrl={finalExpandedUrl} />;
-  }
-
   // Show fallback if embed failed or for unknown platforms
   if (error || !embedHtml) {
     return (
@@ -202,6 +192,6 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     );
   }
 
-  // Render the official embed
+  // Render the embed
   return <RawEmbedRenderer embedHtml={embedHtml} />;
 };
