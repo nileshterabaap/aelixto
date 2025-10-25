@@ -23,8 +23,8 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showFallback, setShowFallback] = useState(false);
   const { status } = useExternalScript('https://platform.twitter.com/widgets.js');
-  const isVisible = useVisibility(containerRef);
-  const loadedRef = useRef(false);
+  const isVisible = useVisibility(containerRef, 0.1);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     if (status === 'error') {
@@ -33,22 +33,22 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
   }, [status]);
 
   useEffect(() => {
-    if (status !== 'ready' || !isVisible || !containerRef.current || loadedRef.current) {
+    if (status !== 'ready' || !isVisible || !containerRef.current || hasLoadedRef.current) {
       return;
     }
 
-    const loadTweet = async () => {
+    const loadTweet = () => {
       try {
         console.log('[TwitterEmbed] Loading tweet for:', url);
         
-        if (window.twttr?.widgets) {
-          window.twttr.widgets.load(containerRef.current!);
-          loadedRef.current = true;
+        if (window.twttr?.widgets && containerRef.current) {
+          window.twttr.widgets.load(containerRef.current);
+          hasLoadedRef.current = true;
 
           // Check if embed loaded after 2s
           setTimeout(() => {
             const hasIframe = containerRef.current?.querySelector('iframe');
-            if (!hasIframe) {
+            if (!hasIframe && !hasLoadedRef.current) {
               console.log('[TwitterEmbed] No iframe found after 2s, showing fallback');
               setShowFallback(true);
             }

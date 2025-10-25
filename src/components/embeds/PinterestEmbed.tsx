@@ -43,8 +43,8 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
     'https://assets.pinterest.com/js/pinit.js',
     { 'data-pin-hover': 'false' }
   );
-  const isVisible = useVisibility(containerRef);
-  const loadedRef = useRef(false);
+  const isVisible = useVisibility(containerRef, 0.1);
+  const hasLoadedRef = useRef(false);
 
   // Expand URL on mount
   useEffect(() => {
@@ -58,18 +58,18 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   }, [status]);
 
   useEffect(() => {
-    if (status !== 'ready' || !isVisible || !containerRef.current || loadedRef.current) {
+    if (status !== 'ready' || !isVisible || !containerRef.current || hasLoadedRef.current) {
       return;
     }
 
-    const loadPin = async () => {
+    const loadPin = () => {
       try {
         console.log('[PinterestEmbed] Loading pin for:', finalUrl);
 
-        if (window.PinUtils?.build) {
+        if (window.PinUtils?.build && containerRef.current) {
           // Build the embed
-          window.PinUtils.build(containerRef.current!);
-          loadedRef.current = true;
+          window.PinUtils.build(containerRef.current);
+          hasLoadedRef.current = true;
 
           // Remove Save buttons immediately
           setTimeout(() => removeSaveButtons(), 100);

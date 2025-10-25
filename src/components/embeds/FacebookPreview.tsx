@@ -60,7 +60,13 @@ export const FacebookPreview = ({ url }: FacebookPreviewProps) => {
   }
 
   const displayUrl = ogData?.canonicalUrl || url;
-  const domain = new URL(displayUrl).hostname.replace('www.', '');
+  let domain = 'facebook.com';
+  
+  try {
+    domain = new URL(displayUrl).hostname.replace('www.', '');
+  } catch (err) {
+    console.error('[FacebookPreview] Invalid URL:', displayUrl);
+  }
 
   return (
     <Card className="overflow-hidden rounded-2xl border-2 border-foreground">

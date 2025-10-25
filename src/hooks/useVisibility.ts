@@ -1,28 +1,37 @@
-import { useEffect, useState, RefObject } from 'react';
+import { useEffect, useState, RefObject, useRef } from 'react';
 
 export const useVisibility = (
-  ref: RefObject<HTMLElement>,
+  elementRef: RefObject<HTMLElement>,
   threshold: number = 0.1
 ): boolean => {
   const [isVisible, setIsVisible] = useState(false);
+  const observerRef = useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
-    const element = ref.current;
+    const element = elementRef.current;
     if (!element) return;
 
-    const observer = new IntersectionObserver(
+    // Clean up existing observer
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+    }
+
+    // Create new observer
+    observerRef.current = new IntersectionObserver(
       ([entry]) => {
         setIsVisible(entry.isIntersecting);
       },
       { threshold }
     );
 
-    observer.observe(element);
+    observerRef.current.observe(element);
 
     return () => {
-      observer.disconnect();
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+      }
     };
-  }, []); // Empty dependencies - observer is set up once
+  }, [threshold]); // Only depend on threshold, not ref
 
   return isVisible;
 };
