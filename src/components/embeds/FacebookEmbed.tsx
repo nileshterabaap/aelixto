@@ -80,8 +80,8 @@ export const FacebookEmbed = ({ url }: FacebookEmbedProps) => {
   }
 
   return (
-    <div ref={containerRef} className="overflow-hidden rounded-2xl">
-      {status === 'loading' && (
+    <div ref={containerRef} className="overflow-hidden rounded-2xl relative">
+      {(status === 'loading' || (status === 'ready' && !hasLoadedRef.current)) && (
         <Card className="overflow-hidden rounded-2xl border-2 border-foreground">
           <div className="aspect-video w-full bg-muted animate-pulse" />
         </Card>
@@ -91,6 +91,7 @@ export const FacebookEmbed = ({ url }: FacebookEmbedProps) => {
         data-href={url}
         data-width="500"
         data-show-text="true"
+        style={{ display: 'none' }}
       />
     </div>
   );

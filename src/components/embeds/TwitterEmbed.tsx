@@ -89,8 +89,11 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
   }
 
   return (
-    <div ref={containerRef} className="twitter-embed-container" key={url}>
+    <div ref={containerRef} className="twitter-embed-container relative" key={url}>
       {status === 'loading' && (
+        <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
+      )}
+      {status === 'ready' && !hasLoadedRef.current && (
         <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       )}
       <a
@@ -98,8 +101,8 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
         href={url}
         data-dnt="true"
         data-theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
+        style={{ display: 'none' }}
       >
-        Loading...
       </a>
     </div>
   );

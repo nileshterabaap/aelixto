@@ -153,16 +153,19 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   }
 
   return (
-    <div ref={containerRef} className="pinterest-embed-container" key={finalUrl}>
+    <div ref={containerRef} className="pinterest-embed-container relative" key={finalUrl}>
       {status === 'loading' && (
+        <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
+      )}
+      {status === 'ready' && !hasLoadedRef.current && (
         <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       )}
       <a
         data-pin-do="embedPin"
         data-pin-width="medium"
         href={finalUrl}
+        style={{ display: 'none' }}
       >
-        Loading...
       </a>
       <style>{`
         .pinterest-embed-container a[data-pin-log],
