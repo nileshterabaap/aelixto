@@ -36,21 +36,33 @@ export const InstagramEmbed = ({ url }: InstagramEmbedProps) => {
     if (status === 'ready' && isVisible && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
 
-      // Process Instagram embeds
+      console.log('[InstagramEmbed] Processing embed for:', url);
+
+      // Process Instagram embeds with delay to ensure script is ready
       setTimeout(() => {
         if (window.instgrm?.Embeds) {
-          window.instgrm.Embeds.process();
-        }
-      }, 100);
-
-      // Fallback detection - if no iframe after 8 seconds, show fallback
-      setTimeout(() => {
-        if (containerRef.current && !containerRef.current.querySelector('iframe')) {
+          try {
+            window.instgrm.Embeds.process();
+            console.log('[InstagramEmbed] Processed successfully');
+          } catch (err) {
+            console.error('[InstagramEmbed] Error processing:', err);
+            setShowFallback(true);
+          }
+        } else {
+          console.error('[InstagramEmbed] Instagram SDK not available');
           setShowFallback(true);
         }
-      }, 8000);
+      }, 200);
+
+      // Fallback detection
+      setTimeout(() => {
+        if (containerRef.current && !containerRef.current.querySelector('iframe')) {
+          console.log('[InstagramEmbed] No iframe found, showing fallback');
+          setShowFallback(true);
+        }
+      }, 10000);
     }
-  }, [status, isVisible]);
+  }, [status, isVisible, url]);
 
   if (showFallback) {
     return (
@@ -80,25 +92,26 @@ export const InstagramEmbed = ({ url }: InstagramEmbedProps) => {
   }
 
   return (
-    <div ref={containerRef} className="max-w-[540px] mx-auto relative">
+    <div ref={containerRef} className="instagram-wrapper w-full flex justify-center">
       <blockquote
         className="instagram-media"
+        data-instgrm-captioned
         data-instgrm-permalink={url}
         data-instgrm-version="14"
-        style={{ 
-          minWidth: '326px',
-          width: 'calc(100% - 2px)',
-          background: '#FFF',
-          border: '0',
-          borderRadius: '3px',
-          boxShadow: '0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15)',
-          margin: '1px',
-          maxWidth: '540px',
-          padding: '0'
-        }}
       >
-        <div className="w-full bg-muted animate-pulse rounded-2xl" style={{ minHeight: '400px' }} />
+        <div className="w-full bg-muted animate-pulse rounded-2xl" style={{ minHeight: '500px', minWidth: '326px', maxWidth: '540px' }} />
       </blockquote>
+      <style>{`
+        .instagram-wrapper .instagram-media {
+          max-width: 540px !important;
+          min-width: 326px !important;
+          width: 100% !important;
+        }
+        .instagram-wrapper iframe {
+          max-width: 540px !important;
+          width: 100% !important;
+        }
+      `}</style>
     </div>
   );
 };
