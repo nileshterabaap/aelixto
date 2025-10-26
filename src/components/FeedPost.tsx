@@ -19,7 +19,8 @@ import twitterIcon from "@/assets/twitter-icon.png";
 import pinterestIcon from "@/assets/pinterest-icon.png";
 import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
-import { RawEmbedRenderer } from "@/components/embeds/RawEmbedRenderer";
+import { FacebookEmbed } from "@/components/embeds/FacebookEmbed";
+import { InstagramEmbed } from "@/components/embeds/InstagramEmbed";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -56,6 +57,33 @@ const getPlatformIcon = (platform?: string) => {
     default:
       return null;
   }
+};
+
+const detectPlatform = (url: string): 'instagram' | 'facebook' | 'twitter' | 'pinterest' | 'unknown' => {
+  const lowerUrl = url.toLowerCase();
+  if (lowerUrl.includes('instagram.com') || lowerUrl.includes('instagr.am')) {
+    return 'instagram';
+  }
+  if (lowerUrl.includes('facebook.com') || lowerUrl.includes('fb.watch') || lowerUrl.includes('fb.me') || lowerUrl.includes('m.facebook.com')) {
+    return 'facebook';
+  }
+  if (lowerUrl.includes('twitter.com') || lowerUrl.includes('x.com')) {
+    return 'twitter';
+  }
+  if (lowerUrl.includes('pinterest.com') || lowerUrl.includes('pin.it')) {
+    return 'pinterest';
+  }
+  return 'unknown';
+};
+
+const hashUrl = (url: string): string => {
+  let hash = 0;
+  for (let i = 0; i < url.length; i++) {
+    const char = url.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(36);
 };
 
 export const FeedPost = ({ post, userId }: FeedPostProps) => {
@@ -149,24 +177,39 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <p className="text-sm mb-3">{post.content}</p>
         )}
 
-        {/* Media */}
-        {(post as any).embed_html ? (
+        {/* Social Media Embeds - only for actual social media URLs */}
+        {post.mediaUrl && detectPlatform(post.mediaUrl) === 'facebook' && (
           <div className="mb-2">
-            <RawEmbedRenderer embedHtml={(post as any).embed_html} />
+            <FacebookEmbed url={post.mediaUrl} />
           </div>
-        ) : platform?.name === 'X' && post.mediaUrl ? (
+        )}
+        
+        {post.mediaUrl && detectPlatform(post.mediaUrl) === 'twitter' && (
           <div className="mb-2">
             <TwitterEmbed url={post.mediaUrl} />
           </div>
-        ) : platform?.name === 'Pinterest' && post.mediaUrl ? (
+        )}
+        
+        {post.mediaUrl && detectPlatform(post.mediaUrl) === 'pinterest' && (
           <div className="mb-2">
             <PinterestEmbed url={post.mediaUrl} />
           </div>
-        ) : post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && (
+        )}
+        
+        {post.mediaUrl && detectPlatform(post.mediaUrl) === 'instagram' && (
+          <div className="mb-2">
+            <InstagramEmbed url={post.mediaUrl} />
+          </div>
+        )}
+
+        {/* Regular Media (non-social platforms) - show if not a social media URL */}
+        {post.mediaUrl && detectPlatform(post.mediaUrl) === 'unknown' && post.mediaType === 'image' && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 
               alt="Post content"
+              loading="lazy"
+              decoding="async"
               className={`w-full h-auto object-cover ${
                 platform?.name === 'Instagram' ? 'aspect-square' : 
                 platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
@@ -176,7 +219,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {post.mediaType === 'video' && post.mediaUrl && platform?.name !== 'X' && (
+        {post.mediaUrl && detectPlatform(post.mediaUrl) === 'unknown' && post.mediaType === 'video' && (
           <>
             <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
               platform?.name === 'TikTok' || (platform?.name === 'YouTube' && isYouTubeShort(post.mediaUrl)) 

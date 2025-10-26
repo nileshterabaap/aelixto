@@ -1,19 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
-import { loadInstagramEmbed, loadFacebookSDK } from '@/lib/ScriptLoader';
-import { Card } from '@/components/ui/card';
-import { AlertCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface RawEmbedRendererProps {
   embedHtml: string;
 }
 
-const stripScriptTags = (html: string): string => {
-  // Remove all <script> tags for security
-  return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+// Extract Instagram post URL from embed HTML
+const extractInstagramUrl = (html: string): string | null => {
+  const match = html.match(/https?:\/\/(?:www\.)?instagram\.com\/(?:p|reel|tv)\/([a-zA-Z0-9_-]+)\/?/);
+  return match ? match[0] : null;
 };
 
+// Extract Facebook post URL from embed HTML  
+const extractFacebookUrl = (html: string): string | null => {
+  const match = html.match(/https?:\/\/(?:www\.)?facebook\.com\/[^"'\s]+/);
+  return match ? match[0] : null;
+};
+
+// Detect platform from embed HTML
 const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
-  if (html.includes('instagram.com') || html.includes('instagr.am')) {
+  if (html.includes('instagram.com') || html.includes('cdninstagram.com')) {
     return 'instagram';
   }
   if (html.includes('facebook.com') || html.includes('fb.com')) {
@@ -23,75 +29,73 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
 };
 
 export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [embedUrl, setEmbedUrl] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const platform = detectPlatform(embedHtml);
 
   useEffect(() => {
-    const loadEmbed = async () => {
-      if (!embedHtml || !containerRef.current) {
-        setIsLoading(false);
-        return;
-      }
-
-      setError(null);
-      setIsLoading(true);
-
+    const fetchEmbed = async () => {
       try {
-        const platform = detectPlatform(embedHtml);
-        const sanitizedHtml = stripScriptTags(embedHtml);
+        setIsLoading(true);
+        setError(false);
 
-        // Set the HTML content
-        containerRef.current.innerHTML = sanitizedHtml;
-
-        // Load appropriate script and process embed
         if (platform === 'instagram') {
-          await loadInstagramEmbed();
-          // Process Instagram embeds
-          if (window.instgrm?.Embeds) {
-            window.instgrm.Embeds.process();
+          const postUrl = extractInstagramUrl(embedHtml);
+          if (postUrl) {
+            // Use Instagram oEmbed API to get iframe embed
+            const response = await fetch(
+              `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(postUrl)}&access_token=1234567890`,
+              { mode: 'no-cors' }
+            );
+            
+            // Since we can't read the response in no-cors mode, use direct iframe approach
+            const embedId = postUrl.split('/')[4];
+            setEmbedUrl(`https://www.instagram.com/p/${embedId}/embed/`);
           }
         } else if (platform === 'facebook') {
-          await loadFacebookSDK();
-          // Parse Facebook embeds
-          if (window.FB?.XFBML && containerRef.current) {
-            window.FB.XFBML.parse(containerRef.current);
+          const postUrl = extractFacebookUrl(embedHtml);
+          if (postUrl) {
+            // Use Facebook's iframe embed
+            setEmbedUrl(`https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(postUrl)}&width=500`);
           }
         }
 
         setIsLoading(false);
       } catch (err) {
-        console.error('Failed to load embed:', err);
-        setError('Failed to load embed. Please try again.');
+        console.error('Failed to process embed:', err);
+        setError(true);
         setIsLoading(false);
       }
     };
 
-    loadEmbed();
-  }, [embedHtml]);
+    if (embedHtml) {
+      fetchEmbed();
+    }
+  }, [embedHtml, platform]);
 
   if (error) {
     return (
-      <Card className="p-6 border-destructive">
-        <div className="flex items-center gap-3 text-destructive">
-          <AlertCircle className="h-5 w-5" />
-          <p className="text-sm">{error}</p>
-        </div>
-      </Card>
+      <div className="rounded-2xl overflow-hidden bg-muted p-4 text-center text-sm text-muted-foreground">
+        Unable to load embed. The content may be unavailable.
+      </div>
     );
   }
 
+  if (isLoading || !embedUrl) {
+    return <Skeleton className="w-full h-[500px] rounded-2xl" />;
+  }
+
   return (
-    <div className="relative">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/50 rounded-2xl">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      )}
-      <div 
-        ref={containerRef}
-        className="embed-container rounded-2xl overflow-hidden"
-        style={{ minHeight: isLoading ? '200px' : 'auto' }}
+    <div className="relative rounded-2xl overflow-hidden bg-background">
+      <iframe
+        src={embedUrl}
+        className="w-full min-h-[500px] border-0"
+        style={{ maxWidth: '540px', margin: '0 auto', display: 'block' }}
+        scrolling="no"
+        frameBorder="0"
+        allowTransparency={true}
+        allow="encrypted-media"
       />
     </div>
   );
