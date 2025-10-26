@@ -35,3 +35,6 @@ export const loadInstagramEmbed = () => loadScript('https://www.instagram.com/em
 
 // Facebook embed script loader
 export const loadFacebookSDK = () => loadScript('https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v19.0');
+
+// Pinterest embed script loader
+export const loadPinterestEmbed = () => loadScript('https://assets.pinterest.com/js/pinit.js');
