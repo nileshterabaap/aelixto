@@ -27,29 +27,41 @@ export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
   const platform = detectPlatform(embedHtml);
   const sanitizedHtml = sanitizeEmbedHtml(embedHtml);
 
+  console.log('[RawEmbedRenderer] Platform detected:', platform);
+  console.log('[RawEmbedRenderer] Embed HTML:', embedHtml);
+
   useEffect(() => {
     const processEmbed = async () => {
       if (!containerRef.current) return;
 
+      console.log('[RawEmbedRenderer] Processing embed for platform:', platform);
+
       try {
         // Load appropriate script based on platform
         if (platform === 'instagram') {
+          console.log('[RawEmbedRenderer] Loading Instagram script...');
           await loadInstagramEmbed();
           
           // Process Instagram embeds after script loads
           if (window.instgrm?.Embeds?.process) {
+            console.log('[RawEmbedRenderer] Processing Instagram embed');
             window.instgrm.Embeds.process();
           }
         } else if (platform === 'facebook') {
+          console.log('[RawEmbedRenderer] Loading Facebook SDK...');
           await loadFacebookSDK();
           
+          console.log('[RawEmbedRenderer] Facebook SDK loaded, parsing embed...');
           // Parse Facebook embeds after SDK loads
           if (window.FB?.XFBML?.parse) {
+            console.log('[RawEmbedRenderer] Parsing Facebook embed');
             window.FB.XFBML.parse(containerRef.current);
+          } else {
+            console.log('[RawEmbedRenderer] FB.XFBML.parse not available');
           }
         }
       } catch (error) {
-        console.error('Failed to load embed script:', error);
+        console.error('[RawEmbedRenderer] Failed to load embed script:', error);
       }
     };
 
