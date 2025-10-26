@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { FeedPost } from "@/components/FeedPost";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { usePosts } from "@/hooks/usePosts";
+import { demoPosts } from "@/data/demoData";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -15,24 +16,27 @@ const Index = () => {
   const [loading, setLoading] = useState(true);
   const { data: userPosts, isLoading: postsLoading } = usePosts();
 
-  // Map user posts to feed format
-  const allPosts = (userPosts || []).map(post => ({
-    id: post.id,
-    user_id: post.user_id,
-    author: {
-      name: post.profiles?.username || "Anonymous",
-      username: `@${post.profiles?.username || "anonymous"}`,
-      avatar: post.profiles?.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
-    },
-    title: post.title || "",
-    content: post.content,
-    mediaType: post.media_type as "image" | "video" | "none",
-    mediaUrl: post.media_url || undefined,
-    platform: post.platform as "youtube" | "instagram" | "tiktok" | "reddit" | "twitter" | "pinterest",
-    timestamp: new Date(post.created_at),
-    saves: post.saves_count,
-    isRealPost: true,
-  })).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  // Combine demo posts with user posts
+  const allPosts = [
+    ...(userPosts || []).map(post => ({
+      id: post.id,
+      user_id: post.user_id, // Add user_id for delete button
+      author: {
+        name: post.profiles?.username || "Anonymous",
+        username: `@${post.profiles?.username || "anonymous"}`,
+        avatar: post.profiles?.avatar_url || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
+      },
+      title: post.title || "",
+      content: post.content,
+      mediaType: post.media_type as "image" | "video" | "none",
+      mediaUrl: post.media_url || undefined,
+      platform: post.platform as "youtube" | "instagram" | "tiktok" | "reddit" | "twitter" | "pinterest",
+      timestamp: new Date(post.created_at),
+      saves: post.saves_count,
+      isRealPost: true,
+    })),
+    ...demoPosts.map(post => ({ ...post, isRealPost: false })),
+  ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
   useEffect(() => {
     // Check authentication
