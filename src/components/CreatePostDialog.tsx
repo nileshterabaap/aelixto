@@ -86,7 +86,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       title: title.trim() || undefined,
       content: caption.trim() || "",
       media_type: mediaType,
-      media_url: linkUrl || undefined,
+      media_url: linkUrl,
       platform: platform || undefined,
     });
 
@@ -143,14 +143,11 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
               <Input
                 id="link"
                 type="url"
-                placeholder="https://youtube.com/... or https://instagram.com/... or https://facebook.com/..."
+                placeholder="https://youtube.com/... or https://instagram.com/..."
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
                 className="mt-1.5"
               />
-              <p className="text-xs text-muted-foreground mt-1.5">
-                Supports YouTube, Instagram, Facebook, TikTok, Twitter, Reddit, Pinterest
-              </p>
             </div>
 
             <Button onClick={handleLinkSubmit} className="w-full" disabled={!linkUrl.trim()}>
