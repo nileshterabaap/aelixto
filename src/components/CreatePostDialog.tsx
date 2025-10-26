@@ -15,10 +15,12 @@ interface CreatePostDialogProps {
 export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [linkUrl, setLinkUrl] = useState("");
+  const [embedHtml, setEmbedHtml] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
   const [showThumbnailInput, setShowThumbnailInput] = useState(false);
+  const [useEmbedMode, setUseEmbedMode] = useState(false);
   const createPost = useCreatePost();
 
   const handleLinkSubmit = async () => {
@@ -55,6 +57,41 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   };
 
   const handlePost = () => {
+    // Handle embed mode
+    if (useEmbedMode) {
+      if (!embedHtml.trim()) return;
+      
+      // Detect platform from embed HTML
+      let platform = "";
+      if (embedHtml.includes("instagram.com")) {
+        platform = "instagram";
+      } else if (embedHtml.includes("facebook.com")) {
+        platform = "facebook";
+      }
+
+      createPost.mutate({
+        title: title.trim() || undefined,
+        content: caption.trim() || "",
+        media_type: "none",
+        media_url: null,
+        platform: platform || undefined,
+        embed_html: embedHtml.trim(),
+      });
+
+      // Reset form
+      setStep(1);
+      setLinkUrl("");
+      setEmbedHtml("");
+      setThumbnailUrl("");
+      setTitle("");
+      setCaption("");
+      setShowThumbnailInput(false);
+      setUseEmbedMode(false);
+      onOpenChange(false);
+      return;
+    }
+
+    // Handle regular link mode
     if (!linkUrl.trim()) return;
 
     // Detect platform and media type
@@ -93,10 +130,12 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     // Reset form
     setStep(1);
     setLinkUrl("");
+    setEmbedHtml("");
     setThumbnailUrl("");
     setTitle("");
     setCaption("");
     setShowThumbnailInput(false);
+    setUseEmbedMode(false);
     onOpenChange(false);
   };
 
@@ -108,10 +147,12 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const handleClose = () => {
     setStep(1);
     setLinkUrl("");
+    setEmbedHtml("");
     setThumbnailUrl("");
     setTitle("");
     setCaption("");
     setShowThumbnailInput(false);
+    setUseEmbedMode(false);
     onOpenChange(false);
   };
 
@@ -138,19 +179,58 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
         
         {step === 1 ? (
           <div className="space-y-4">
-            <div>
-              <Label htmlFor="link">Paste your link</Label>
-              <Input
-                id="link"
-                type="url"
-                placeholder="https://youtube.com/... or https://instagram.com/..."
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                className="mt-1.5"
-              />
+            <div className="flex gap-2 mb-4">
+              <Button
+                type="button"
+                variant={!useEmbedMode ? "default" : "outline"}
+                onClick={() => setUseEmbedMode(false)}
+                className="flex-1"
+              >
+                Link Mode
+              </Button>
+              <Button
+                type="button"
+                variant={useEmbedMode ? "default" : "outline"}
+                onClick={() => setUseEmbedMode(true)}
+                className="flex-1"
+              >
+                Embed Mode
+              </Button>
             </div>
 
-            <Button onClick={handleLinkSubmit} className="w-full" disabled={!linkUrl.trim()}>
+            {!useEmbedMode ? (
+              <div>
+                <Label htmlFor="link">Paste your link</Label>
+                <Input
+                  id="link"
+                  type="url"
+                  placeholder="https://youtube.com/... or https://instagram.com/..."
+                  value={linkUrl}
+                  onChange={(e) => setLinkUrl(e.target.value)}
+                  className="mt-1.5"
+                />
+              </div>
+            ) : (
+              <div>
+                <Label htmlFor="embed">Paste embed HTML</Label>
+                <Textarea
+                  id="embed"
+                  placeholder='<blockquote class="instagram-media"...>'
+                  value={embedHtml}
+                  onChange={(e) => setEmbedHtml(e.target.value)}
+                  className="mt-1.5 min-h-[120px] font-mono text-xs"
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Paste the full Instagram or Facebook embed code (blockquote or div)
+                </p>
+              </div>
+            )}
+
+            <Button 
+              onClick={useEmbedMode ? () => setStep(2) : handleLinkSubmit} 
+              className="w-full" 
+              disabled={useEmbedMode ? !embedHtml.trim() : !linkUrl.trim()}
+            >
               Next
             </Button>
           </div>

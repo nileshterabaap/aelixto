@@ -10,6 +10,7 @@ export interface Post {
   mediaType?: 'image' | 'video' | 'none';
   mediaUrl?: string;
   platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest';
+  embed_html?: string | null;
   timestamp: Date;
   saves: number;
 }

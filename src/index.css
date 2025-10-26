@@ -125,3 +125,28 @@ span[data-pin-href] button {
   visibility: hidden !important;
   pointer-events: none !important;
 }
+
+/* Embed container styles */
+.embed-container {
+  @apply rounded-2xl overflow-hidden;
+  max-width: 100%;
+}
+
+/* Instagram embed styles */
+.embed-container .instagram-media,
+.embed-container iframe[src*="instagram.com"] {
+  min-width: 100% !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+  border-radius: 1rem !important;
+}
+
+/* Facebook embed styles */
+.embed-container .fb-post,
+.embed-container .fb-video,
+.embed-container iframe[src*="facebook.com"] {
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+}
