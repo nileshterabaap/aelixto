@@ -20,6 +20,7 @@ import pinterestIcon from "@/assets/pinterest-icon.png";
 import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
 import { RawEmbedRenderer } from "@/components/RawEmbedRenderer";
+import { isEmbedEnabled, type EmbedPlatform } from "@/config/embedFeatureFlags";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -63,7 +64,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const platform = getPlatformIcon(post.platform);
   
-  console.log("[FeedPost] Rendering post:", post.id, "Platform:", post.platform, "MediaURL:", post.mediaUrl, "MediaType:", post.mediaType, "EmbedHTML:", (post as any).embed_html);
+  // Check if this embed type is enabled via feature flags
+  const embedEnabled = post.platform ? isEmbedEnabled(post.platform.toLowerCase() as EmbedPlatform) : true;
+  
+  console.log("[FeedPost] Rendering post:", post.id, "Platform:", post.platform, "Enabled:", embedEnabled, "MediaURL:", post.mediaUrl, "MediaType:", post.mediaType, "EmbedHTML:", (post as any).embed_html);
   
   const getYouTubeVideoId = (url: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -151,26 +155,38 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <p className="text-sm mb-3">{post.content}</p>
         )}
 
+        {/* Feature flag check - show disabled message if embed is disabled */}
+        {!embedEnabled && (
+          <div className="rounded-2xl border-2 border-border bg-muted/30 p-8 text-center mb-3">
+            <p className="text-sm font-semibold mb-2">
+              🔒 {platform?.name || post.platform} embeds are currently disabled
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Enable in <code className="bg-muted px-1 py-0.5 rounded">src/config/embedFeatureFlags.ts</code>
+            </p>
+          </div>
+        )}
+
         {/* Raw Embed HTML (Instagram/Facebook) */}
-        {(post as any).embed_html ? (
+        {embedEnabled && (post as any).embed_html ? (
           <div className="mb-2">
             <RawEmbedRenderer embedHtml={(post as any).embed_html} />
           </div>
         ) : null}
 
         {/* Media */}
-        {!((post as any).embed_html) && platform?.name === 'X' && post.mediaUrl ? (
+        {embedEnabled && !((post as any).embed_html) && platform?.name === 'X' && post.mediaUrl ? (
           <div className="mb-2">
             <TwitterEmbed url={post.mediaUrl} />
           </div>
-        ) : !((post as any).embed_html) && platform?.name === 'Pinterest' && post.mediaUrl ? (
+        ) : embedEnabled && !((post as any).embed_html) && platform?.name === 'Pinterest' && post.mediaUrl ? (
           <>
             {console.log("[FeedPost] Rendering PinterestEmbed for URL:", post.mediaUrl)}
             <div className="mb-2">
               <PinterestEmbed url={post.mediaUrl} />
             </div>
           </>
-        ) : !((post as any).embed_html) && post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && (
+        ) : embedEnabled && !((post as any).embed_html) && post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 
@@ -184,7 +200,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {!((post as any).embed_html) && post.mediaType === 'video' && post.mediaUrl && platform?.name !== 'X' && (
+        {embedEnabled && !((post as any).embed_html) && post.mediaType === 'video' && post.mediaUrl && platform?.name !== 'X' && (
           <>
             <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
               platform?.name === 'TikTok' || (platform?.name === 'YouTube' && isYouTubeShort(post.mediaUrl)) 
