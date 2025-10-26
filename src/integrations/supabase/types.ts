@@ -47,7 +47,6 @@ export type Database = {
         Row: {
           content: string
           created_at: string
-          embed_html: string | null
           id: string
           likes_count: number | null
           media_type: string | null
@@ -60,7 +59,6 @@ export type Database = {
         Insert: {
           content: string
           created_at?: string
-          embed_html?: string | null
           id?: string
           likes_count?: number | null
           media_type?: string | null
@@ -73,7 +71,6 @@ export type Database = {
         Update: {
           content?: string
           created_at?: string
-          embed_html?: string | null
           id?: string
           likes_count?: number | null
           media_type?: string | null
