@@ -54,6 +54,8 @@ const getPlatformIcon = (platform?: string) => {
       return { name: 'X', icon: twitterIcon };
     case 'pinterest':
       return { name: 'Pinterest', icon: pinterestIcon };
+    case 'facebook':
+      return { name: 'Facebook', icon: 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg' };
     default:
       return null;
   }

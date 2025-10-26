@@ -9,7 +9,7 @@ export interface Post {
   content: string;
   mediaType?: 'image' | 'video' | 'none';
   mediaUrl?: string;
-  platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest';
+  platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest' | 'facebook';
   embed_html?: string | null;
   timestamp: Date;
   saves: number;
@@ -257,5 +257,16 @@ export const demoPosts: Post[] = [
     platform: 'pinterest',
     timestamp: new Date(Date.now() - 1000 * 60 * 600),
     saves: 892
+  },
+  {
+    id: '23',
+    author: { name: 'James Wilson', username: 'jameswilson', avatar: 'https://images.unsplash.com/photo-1463453091185-61582044d556?w=200&h=200&fit=crop' },
+    title: 'Amazing sunset at the beach',
+    content: 'Beautiful evening! 🌅',
+    mediaType: 'none',
+    platform: 'facebook',
+    embed_html: '<div class="fb-post" data-href="https://www.facebook.com/FacebookDevelopers/posts/10151471074398553" data-width="500" data-show-text="true"></div>',
+    timestamp: new Date(Date.now() - 1000 * 60 * 630),
+    saves: 567
   }
 ];
