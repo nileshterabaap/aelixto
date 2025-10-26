@@ -81,17 +81,13 @@ export const InstagramEmbed = ({ url }: InstagramEmbedProps) => {
 
   return (
     <div ref={containerRef} className="overflow-hidden rounded-2xl max-w-[540px] mx-auto relative">
-      {(status === 'loading' || (status === 'ready' && !hasLoadedRef.current)) && (
-        <Card className="overflow-hidden rounded-2xl border-2 border-foreground">
-          <div className="aspect-square w-full bg-muted animate-pulse" />
-        </Card>
-      )}
       <blockquote
         className="instagram-media"
         data-instgrm-permalink={url}
         data-instgrm-version="14"
-        style={{ display: 'none' }}
-      />
+      >
+        <div className="aspect-square w-full bg-muted animate-pulse rounded-2xl" />
+      </blockquote>
     </div>
   );
 };

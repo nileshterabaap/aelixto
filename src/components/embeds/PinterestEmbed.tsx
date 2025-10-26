@@ -67,9 +67,8 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
         console.log('[PinterestEmbed] Loading pin for:', finalUrl);
 
         if (window.PinUtils?.build && containerRef.current) {
-          // Build the embed
-          window.PinUtils.build(containerRef.current);
           hasLoadedRef.current = true;
+          window.PinUtils.build(containerRef.current);
 
           // Remove Save buttons immediately
           setTimeout(() => removeSaveButtons(), 100);
@@ -86,14 +85,14 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
             });
           }
 
-          // Check if embed loaded after 2s
+          // Check if embed loaded after 3s
           setTimeout(() => {
             const hasEmbed = containerRef.current?.querySelector('span[data-pin-id]');
             if (!hasEmbed) {
-              console.log('[PinterestEmbed] No embed found after 2s, showing fallback');
+              console.log('[PinterestEmbed] No embed found after 3s, showing fallback');
               setShowFallback(true);
             }
-          }, 2000);
+          }, 3000);
 
           return () => observer.disconnect();
         }
@@ -154,18 +153,12 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
 
   return (
     <div ref={containerRef} className="pinterest-embed-container relative" key={finalUrl}>
-      {status === 'loading' && (
-        <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
-      )}
-      {status === 'ready' && !hasLoadedRef.current && (
-        <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
-      )}
       <a
         data-pin-do="embedPin"
         data-pin-width="medium"
         href={finalUrl}
-        style={{ display: 'none' }}
       >
+        <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       </a>
       <style>{`
         .pinterest-embed-container a[data-pin-log],

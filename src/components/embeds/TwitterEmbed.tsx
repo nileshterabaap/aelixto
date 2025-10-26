@@ -42,17 +42,17 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
         console.log('[TwitterEmbed] Loading tweet for:', url);
         
         if (window.twttr?.widgets && containerRef.current) {
-          window.twttr.widgets.load(containerRef.current);
           hasLoadedRef.current = true;
+          window.twttr.widgets.load(containerRef.current);
 
-          // Check if embed loaded after 2s
+          // Check if embed loaded after 3s
           setTimeout(() => {
             const hasIframe = containerRef.current?.querySelector('iframe');
-            if (!hasIframe && !hasLoadedRef.current) {
-              console.log('[TwitterEmbed] No iframe found after 2s, showing fallback');
+            if (!hasIframe) {
+              console.log('[TwitterEmbed] No iframe found after 3s, showing fallback');
               setShowFallback(true);
             }
-          }, 2000);
+          }, 3000);
         }
       } catch (err) {
         console.error('[TwitterEmbed] Error loading tweet:', err);
@@ -90,19 +90,13 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
 
   return (
     <div ref={containerRef} className="twitter-embed-container relative" key={url}>
-      {status === 'loading' && (
-        <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
-      )}
-      {status === 'ready' && !hasLoadedRef.current && (
-        <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
-      )}
       <a
         className="twitter-tweet"
         href={url}
         data-dnt="true"
         data-theme={document.documentElement.classList.contains('dark') ? 'dark' : 'light'}
-        style={{ display: 'none' }}
       >
+        <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       </a>
     </div>
   );
