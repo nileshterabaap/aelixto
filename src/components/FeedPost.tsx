@@ -63,6 +63,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const platform = getPlatformIcon(post.platform);
   
+  console.log("[FeedPost] Rendering post:", post.id, "Platform:", post.platform, "MediaURL:", post.mediaUrl, "MediaType:", post.mediaType, "EmbedHTML:", (post as any).embed_html);
+  
   const getYouTubeVideoId = (url: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
@@ -162,9 +164,12 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             <TwitterEmbed url={post.mediaUrl} />
           </div>
         ) : !((post as any).embed_html) && platform?.name === 'Pinterest' && post.mediaUrl ? (
-          <div className="mb-2">
-            <PinterestEmbed url={post.mediaUrl} />
-          </div>
+          <>
+            {console.log("[FeedPost] Rendering PinterestEmbed for URL:", post.mediaUrl)}
+            <div className="mb-2">
+              <PinterestEmbed url={post.mediaUrl} />
+            </div>
+          </>
         ) : !((post as any).embed_html) && post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 

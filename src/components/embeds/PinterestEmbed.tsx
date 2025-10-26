@@ -15,9 +15,11 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   const [isExpanding, setIsExpanding] = useState(false);
   const [pinTitle, setPinTitle] = useState<string>("");
 
+  console.log("[PinterestEmbed] Component mounted with URL:", url);
+
   useEffect(() => {
     const loadEmbed = async () => {
-      console.log("[PinterestEmbed] Loading Pinterest embed for URL:", url);
+      console.log("[PinterestEmbed] useEffect triggered - Loading Pinterest embed for URL:", url);
       
       let finalUrl = url;
 
@@ -92,6 +94,7 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
       }
     };
 
+    console.log("[PinterestEmbed] Calling loadEmbed function...");
     loadEmbed();
 
     // MutationObserver to remove Pinterest save buttons after they load
@@ -150,6 +153,8 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
     );
   }
 
+  console.log("[PinterestEmbed] Rendering Pinterest embed. Failed:", embedFailed, "Expanding:", isExpanding, "URL:", resolvedUrl);
+
   return (
     <div className="w-full max-w-[500px] mx-auto">
       <div ref={containerRef} className="pinterest-embed-container w-full flex flex-col justify-center">
@@ -164,7 +169,10 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
           data-pin-width="medium"
           href={resolvedUrl}
           className={pinTitle ? "rounded-t-none" : ""}
-        />
+        >
+          {/* Fallback content */}
+          View Pin
+        </a>
       </div>
     </div>
   );
