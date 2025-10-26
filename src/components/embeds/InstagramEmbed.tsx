@@ -43,12 +43,12 @@ export const InstagramEmbed = ({ url }: InstagramEmbedProps) => {
         }
       }, 100);
 
-      // Fallback detection - if no iframe after 5 seconds, show fallback
+      // Fallback detection - if no iframe after 8 seconds, show fallback
       setTimeout(() => {
         if (containerRef.current && !containerRef.current.querySelector('iframe')) {
           setShowFallback(true);
         }
-      }, 5000);
+      }, 8000);
     }
   }, [status, isVisible]);
 
@@ -80,13 +80,24 @@ export const InstagramEmbed = ({ url }: InstagramEmbedProps) => {
   }
 
   return (
-    <div ref={containerRef} className="overflow-hidden rounded-2xl max-w-[540px] mx-auto relative">
+    <div ref={containerRef} className="max-w-[540px] mx-auto relative">
       <blockquote
         className="instagram-media"
         data-instgrm-permalink={url}
         data-instgrm-version="14"
+        style={{ 
+          minWidth: '326px',
+          width: 'calc(100% - 2px)',
+          background: '#FFF',
+          border: '0',
+          borderRadius: '3px',
+          boxShadow: '0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15)',
+          margin: '1px',
+          maxWidth: '540px',
+          padding: '0'
+        }}
       >
-        <div className="aspect-square w-full bg-muted animate-pulse rounded-2xl" />
+        <div className="w-full bg-muted animate-pulse rounded-2xl" style={{ minHeight: '400px' }} />
       </blockquote>
     </div>
   );
