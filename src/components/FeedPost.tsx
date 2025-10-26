@@ -20,6 +20,7 @@ import pinterestIcon from "@/assets/pinterest-icon.png";
 import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
 import { RawEmbedRenderer } from "@/components/RawEmbedRenderer";
+import { UniversalMetaEmbed } from "@/components/UniversalMetaEmbed";
 import { isEmbedEnabled, type EmbedPlatform } from "@/config/embedFeatureFlags";
 
 interface FeedPostProps {
@@ -168,6 +169,17 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             </p>
           </div>
         )}
+
+        {/* Universal Meta Embed - Auto-converts URLs to embeds */}
+        {embedEnabled && post.mediaUrl && !((post as any).embed_html) && 
+         (post.mediaUrl.includes('instagram.com') || 
+          post.mediaUrl.includes('facebook.com') || 
+          post.mediaUrl.includes('fb.watch') || 
+          post.mediaUrl.includes('fb.me')) ? (
+          <div className="mb-2">
+            <UniversalMetaEmbed url={post.mediaUrl} />
+          </div>
+        ) : null}
 
         {/* Raw Embed HTML (Instagram/Facebook) */}
         {embedEnabled && (post as any).embed_html ? (

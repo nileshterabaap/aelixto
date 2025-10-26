@@ -1,1 +1,10 @@
 project_id = "hhotresssetunubidrth"
+
+[functions.expand-url]
+verify_jwt = false
+
+[functions.fetch-og]
+verify_jwt = false
+
+[functions.expand-pin]
+verify_jwt = false
