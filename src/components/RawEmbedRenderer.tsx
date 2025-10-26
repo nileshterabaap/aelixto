@@ -11,6 +11,27 @@ const sanitizeEmbedHtml = (html: string): string => {
   return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
 };
 
+// Convert Facebook iframe embed to SDK-compatible format
+const transformFacebookEmbed = (html: string): string => {
+  // Extract the Facebook post URL from iframe src
+  const iframeSrcMatch = html.match(/src=["']([^"']*facebook\.com[^"']*)["']/);
+  
+  if (iframeSrcMatch) {
+    const iframeSrc = iframeSrcMatch[1];
+    // Extract the href parameter from the iframe URL
+    const hrefMatch = iframeSrc.match(/href=([^&"']+)/);
+    
+    if (hrefMatch) {
+      const postUrl = decodeURIComponent(hrefMatch[1]);
+      // Return SDK-compatible format
+      return `<div class="fb-post" data-href="${postUrl}" data-width="500" data-show-text="true"></div>`;
+    }
+  }
+  
+  // If already in fb-post format or can't parse, return as is
+  return html;
+};
+
 // Detect platform from embed HTML
 const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
   if (html.includes('instagram.com') || html.includes('instagram-media')) {
@@ -25,7 +46,12 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
 export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const platform = detectPlatform(embedHtml);
-  const sanitizedHtml = sanitizeEmbedHtml(embedHtml);
+  let sanitizedHtml = sanitizeEmbedHtml(embedHtml);
+  
+  // Transform Facebook embeds to SDK-compatible format
+  if (platform === 'facebook') {
+    sanitizedHtml = transformFacebookEmbed(sanitizedHtml);
+  }
 
   console.log('[RawEmbedRenderer] Platform detected:', platform);
   console.log('[RawEmbedRenderer] Embed HTML:', embedHtml);
