@@ -178,40 +178,29 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         )}
 
         {/* Social Media Embeds - only for actual social media URLs */}
-        {post.mediaUrl && (() => {
-          const detectedPlatform = detectPlatform(post.mediaUrl);
-          const urlKey = hashUrl(post.mediaUrl);
-
-          switch (detectedPlatform) {
-            case 'facebook':
-              return (
-                <div className="mb-2" key={urlKey}>
-                  <FacebookPreview url={post.mediaUrl} />
-                </div>
-              );
-            case 'twitter':
-              return (
-                <div className="mb-2" key={urlKey}>
-                  <TwitterEmbed url={post.mediaUrl} />
-                </div>
-              );
-            case 'pinterest':
-              return (
-                <div className="mb-2" key={urlKey}>
-                  <PinterestEmbed url={post.mediaUrl} />
-                </div>
-              );
-            case 'instagram':
-              return (
-                <div className="mb-2" key={urlKey}>
-                  <InstagramPreview url={post.mediaUrl} />
-                </div>
-              );
-            default:
-              // Fall through to regular media rendering below
-              return null;
-          }
-        })()}
+        {post.mediaUrl && detectPlatform(post.mediaUrl) === 'facebook' && (
+          <div className="mb-2">
+            <FacebookPreview url={post.mediaUrl} />
+          </div>
+        )}
+        
+        {post.mediaUrl && detectPlatform(post.mediaUrl) === 'twitter' && (
+          <div className="mb-2">
+            <TwitterEmbed url={post.mediaUrl} />
+          </div>
+        )}
+        
+        {post.mediaUrl && detectPlatform(post.mediaUrl) === 'pinterest' && (
+          <div className="mb-2">
+            <PinterestEmbed url={post.mediaUrl} />
+          </div>
+        )}
+        
+        {post.mediaUrl && detectPlatform(post.mediaUrl) === 'instagram' && (
+          <div className="mb-2">
+            <InstagramPreview url={post.mediaUrl} />
+          </div>
+        )}
 
         {/* Regular Media (non-social platforms) - show if not a social media URL */}
         {post.mediaUrl && detectPlatform(post.mediaUrl) === 'unknown' && post.mediaType === 'image' && (
