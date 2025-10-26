@@ -128,7 +128,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost, isDeleting } = postActions;
 
   return (
-    <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
+    <Card className="border-2 border-foreground rounded-[2rem]">
       <div className="p-5">
         {/* Author Info */}
         <div className="flex items-center gap-3 mb-4">
@@ -197,9 +197,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         )}
         
         {post.mediaUrl && detectPlatform(post.mediaUrl) === 'instagram' && (
-          <div className="mb-2">
-            <InstagramEmbed url={post.mediaUrl} />
-          </div>
+          <InstagramEmbed url={post.mediaUrl} />
         )}
 
         {/* Regular Media (non-social platforms) - show if not a social media URL */}

@@ -92,16 +92,30 @@ export const InstagramEmbed = ({ url }: InstagramEmbedProps) => {
   }
 
   return (
-    <div ref={containerRef} className="instagram-wrapper w-full flex justify-center">
+    <div ref={containerRef} className="instagram-wrapper w-full flex justify-center my-2">
       <blockquote
         className="instagram-media"
         data-instgrm-captioned
         data-instgrm-permalink={url}
         data-instgrm-version="14"
+        style={{
+          background: '#FFF',
+          border: '0',
+          borderRadius: '3px',
+          boxShadow: '0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15)',
+          margin: '1px',
+          maxWidth: '540px',
+          minWidth: '326px',
+          padding: '0',
+          width: 'calc(100% - 2px)'
+        }}
       >
-        <div className="w-full bg-muted animate-pulse rounded-2xl" style={{ minHeight: '500px', minWidth: '326px', maxWidth: '540px' }} />
+        <div className="w-full bg-muted animate-pulse rounded-lg" style={{ minHeight: '500px' }} />
       </blockquote>
       <style>{`
+        .instagram-wrapper {
+          overflow: visible !important;
+        }
         .instagram-wrapper .instagram-media {
           max-width: 540px !important;
           min-width: 326px !important;
@@ -110,6 +124,7 @@ export const InstagramEmbed = ({ url }: InstagramEmbedProps) => {
         .instagram-wrapper iframe {
           max-width: 540px !important;
           width: 100% !important;
+          height: auto !important;
         }
       `}</style>
     </div>
