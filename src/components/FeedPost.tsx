@@ -19,8 +19,8 @@ import twitterIcon from "@/assets/twitter-icon.png";
 import pinterestIcon from "@/assets/pinterest-icon.png";
 import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
-import { FacebookPreview } from "@/components/embeds/FacebookPreview";
-import { InstagramPreview } from "@/components/embeds/InstagramPreview";
+import { FacebookEmbed } from "@/components/embeds/FacebookEmbed";
+import { InstagramEmbed } from "@/components/embeds/InstagramEmbed";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -180,7 +180,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {/* Social Media Embeds - only for actual social media URLs */}
         {post.mediaUrl && detectPlatform(post.mediaUrl) === 'facebook' && (
           <div className="mb-2">
-            <FacebookPreview url={post.mediaUrl} />
+            <FacebookEmbed url={post.mediaUrl} />
           </div>
         )}
         
@@ -198,7 +198,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         
         {post.mediaUrl && detectPlatform(post.mediaUrl) === 'instagram' && (
           <div className="mb-2">
-            <InstagramPreview url={post.mediaUrl} />
+            <InstagramEmbed url={post.mediaUrl} />
           </div>
         )}
 
