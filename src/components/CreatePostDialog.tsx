@@ -111,12 +111,32 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       }
     } else if (linkUrl.includes("reddit.com")) {
       platform = "reddit";
+      mediaType = "none";
     } else if (linkUrl.includes("twitter.com") || linkUrl.includes("x.com")) {
       platform = "twitter";
       mediaType = "video"; // Twitter embeds handle both images and videos
     } else if (linkUrl.includes("pinterest.com") || linkUrl.includes("pin.it")) {
       platform = "pinterest";
       mediaType = "image";
+    } else if (linkUrl.includes("medium.com")) {
+      platform = "medium";
+      mediaType = "none";
+    } else if (linkUrl.includes("quora.com")) {
+      platform = "quora";
+      mediaType = "none";
+    } else if (linkUrl.includes("facebook.com") || linkUrl.includes("fb.watch") || linkUrl.includes("fb.me")) {
+      platform = "facebook";
+      mediaType = "none";
+    } else if (linkUrl.includes("spotify.com") || linkUrl.includes("open.spotify.com")) {
+      platform = "spotify";
+      mediaType = "none";
+    } else {
+      // Check if it's any blog-like URL
+      if (linkUrl.includes("blog") || linkUrl.includes(".wordpress.com") || 
+          linkUrl.includes("blogger.com") || linkUrl.includes("ghost.io") || 
+          linkUrl.includes("substack.com") || linkUrl.includes("dev.to")) {
+        mediaType = "none";
+      }
     }
 
     createPost.mutate({
@@ -204,7 +224,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
                 <Input
                   id="link"
                   type="url"
-                  placeholder="https://youtube.com/... or https://instagram.com/..."
+                  placeholder="https://youtube.com/... or blog URL..."
                   value={linkUrl}
                   onChange={(e) => setLinkUrl(e.target.value)}
                   className="mt-1.5"
