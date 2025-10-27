@@ -210,18 +210,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <PinterestEmbed url={post.mediaUrl} />
             </div>
           </>
-        ) : embedEnabled && !((post as any).embed_html) && (post as any).thumbnailUrl ? (
-          <>
-            {console.log("[FeedPost] Rendering thumbnail:", (post as any).thumbnailUrl)}
-            <div className="rounded-2xl overflow-hidden mb-2">
-              <img 
-                src={(post as any).thumbnailUrl} 
-                alt={post.title || "Post thumbnail"}
-                className="w-full h-auto object-cover aspect-video"
-              />
-            </div>
-          </>
-        ) : embedEnabled && !((post as any).embed_html) && post.mediaType === 'image' && post.mediaUrl && 
+        ) : embedEnabled && !((post as any).embed_html) && (post as any).thumbnail_url ? (
+          <div className="rounded-2xl overflow-hidden mb-2">
+            <img 
+              src={(post as any).thumbnail_url} 
+              alt={post.title || "Post thumbnail"}
+              className="w-full h-auto object-cover aspect-video"
+            />
+          </div>
+        ) : embedEnabled && !((post as any).embed_html) && post.mediaType === 'image' && post.mediaUrl &&
           platform?.name !== 'X' && 
           platform?.name !== 'Pinterest' && 
           !post.mediaUrl.includes('instagram.com') && 
