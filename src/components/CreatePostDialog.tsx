@@ -31,6 +31,8 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     let thumbnail = "";
     let videoTitle = "";
     
+    console.log('[CreatePostDialog] Processing URL:', linkUrl);
+    
     if (linkUrl.includes("youtube.com") || linkUrl.includes("youtu.be")) {
       // Extract video ID from various YouTube URL formats including shorts
       const videoId = linkUrl.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)?.[1];
@@ -76,12 +78,16 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
           console.log('[CreatePostDialog] OG data received:', ogData);
           if (ogData.title) videoTitle = ogData.title;
           if (ogData.image) thumbnail = ogData.image;
+        } else {
+          console.error('[CreatePostDialog] OG fetch error:', error);
         }
       } catch (error) {
         console.error('[CreatePostDialog] Failed to fetch OG data:', error);
       }
     }
     
+    console.log('[CreatePostDialog] Setting thumbnail:', thumbnail);
+    console.log('[CreatePostDialog] Setting title:', videoTitle);
     setThumbnailUrl(thumbnail);
     setTitle(videoTitle);
     setStep(2);
@@ -169,6 +175,15 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
         mediaType = "none";
       }
     }
+
+    console.log('[CreatePostDialog] Creating post with data:', {
+      title: title.trim(),
+      content: caption.trim(),
+      media_type: mediaType,
+      media_url: linkUrl,
+      platform: platform,
+      thumbnail_url: thumbnailUrl,
+    });
 
     createPost.mutate({
       title: title.trim() || undefined,

@@ -211,13 +211,16 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             </div>
           </>
         ) : embedEnabled && !((post as any).embed_html) && (post as any).thumbnailUrl ? (
-          <div className="rounded-2xl overflow-hidden mb-2">
-            <img 
-              src={(post as any).thumbnailUrl} 
-              alt={post.title || "Post thumbnail"}
-              className="w-full h-auto object-cover aspect-video"
-            />
-          </div>
+          <>
+            {console.log("[FeedPost] Rendering thumbnail:", (post as any).thumbnailUrl)}
+            <div className="rounded-2xl overflow-hidden mb-2">
+              <img 
+                src={(post as any).thumbnailUrl} 
+                alt={post.title || "Post thumbnail"}
+                className="w-full h-auto object-cover aspect-video"
+              />
+            </div>
+          </>
         ) : embedEnabled && !((post as any).embed_html) && post.mediaType === 'image' && post.mediaUrl && 
           platform?.name !== 'X' && 
           platform?.name !== 'Pinterest' && 
