@@ -9,7 +9,7 @@ export interface Post {
   content: string;
   mediaType?: 'image' | 'video' | 'none';
   mediaUrl?: string;
-  platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest' | 'facebook';
+  platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest' | 'facebook' | 'spotify' | 'quora' | 'medium';
   embed_html?: string | null;
   timestamp: Date;
   saves: number;
@@ -268,5 +268,38 @@ export const demoPosts: Post[] = [
     embed_html: '<div class="fb-post" data-href="https://www.facebook.com/FacebookDevelopers/posts/10151471074398553" data-width="500" data-show-text="true"></div>',
     timestamp: new Date(Date.now() - 1000 * 60 * 630),
     saves: 567
+  },
+  {
+    id: '24',
+    author: { name: 'Sarah Johnson', username: 'sarahjohnson', avatar: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=200&h=200&fit=crop' },
+    title: 'The Psychology Behind Procrastination',
+    content: 'An insightful look into why we delay important tasks',
+    mediaType: 'none',
+    mediaUrl: 'https://www.reddit.com/r/psychology/comments/example',
+    platform: 'reddit',
+    timestamp: new Date(Date.now() - 1000 * 60 * 660),
+    saves: 432
+  },
+  {
+    id: '25',
+    author: { name: 'Alex Thompson', username: 'alexthompson', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop' },
+    title: 'How to Build a Successful Remote Team',
+    content: 'Essential strategies for managing distributed teams effectively',
+    mediaType: 'none',
+    mediaUrl: 'https://medium.com/@alexthompson/building-remote-teams',
+    platform: 'medium',
+    timestamp: new Date(Date.now() - 1000 * 60 * 690),
+    saves: 678
+  },
+  {
+    id: '26',
+    author: { name: 'Michael Chen', username: 'michaelchen', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop' },
+    title: 'What are the best practices for learning to code?',
+    content: 'A comprehensive guide to starting your programming journey',
+    mediaType: 'none',
+    mediaUrl: 'https://www.quora.com/What-are-the-best-practices-for-learning-to-code',
+    platform: 'quora',
+    timestamp: new Date(Date.now() - 1000 * 60 * 720),
+    saves: 891
   }
 ];
