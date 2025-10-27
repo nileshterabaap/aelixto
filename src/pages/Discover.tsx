@@ -1,12 +1,25 @@
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
+import { FeedPost } from "@/components/FeedPost";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { demoPosts } from "@/data/demoData";
+import { supabase } from "@/integrations/supabase/client";
+import { User } from "@supabase/supabase-js";
 
 const Discover = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user || null);
+    };
+    checkAuth();
+  }, []);
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -63,6 +76,20 @@ const Discover = () => {
                     Follow
                   </button>
                 </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Demo Posts Feed */}
+          <section>
+            <h2 className="text-xl font-semibold mb-4">Featured Posts</h2>
+            <div className="space-y-4">
+              {demoPosts.map((post) => (
+                <FeedPost 
+                  key={post.id} 
+                  post={post}
+                  userId={user?.id}
+                />
               ))}
             </div>
           </section>
