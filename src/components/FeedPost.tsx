@@ -59,6 +59,10 @@ const getPlatformIcon = (platform?: string) => {
       return { name: 'Facebook', icon: 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg' };
     case 'spotify':
       return { name: 'Spotify', icon: 'https://upload.wikimedia.org/wikipedia/commons/8/84/Spotify_icon.svg' };
+    case 'quora':
+      return { name: 'Quora', icon: 'https://upload.wikimedia.org/wikipedia/commons/9/91/Quora_logo_2015.svg' };
+    case 'medium':
+      return { name: 'Medium', icon: 'https://upload.wikimedia.org/wikipedia/commons/e/ec/Medium_logo_Monogram.svg' };
     default:
       return null;
   }

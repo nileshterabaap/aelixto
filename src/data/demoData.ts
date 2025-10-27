@@ -9,7 +9,7 @@ export interface Post {
   content: string;
   mediaType?: 'image' | 'video' | 'none';
   mediaUrl?: string;
-  platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest' | 'facebook';
+  platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest' | 'facebook' | 'spotify' | 'quora' | 'medium';
   embed_html?: string | null;
   timestamp: Date;
   saves: number;
@@ -287,7 +287,7 @@ export const demoPosts: Post[] = [
     content: 'Great article explaining ML concepts for beginners 🤖',
     mediaType: 'none',
     mediaUrl: 'https://medium.com/@example/understanding-machine-learning-basics',
-    platform: 'reddit',
+    platform: 'medium',
     timestamp: new Date(Date.now() - 1000 * 60 * 690),
     saves: 789
   },
@@ -298,7 +298,7 @@ export const demoPosts: Post[] = [
     content: 'Interesting discussion with real startup founders sharing their strategies',
     mediaType: 'none',
     mediaUrl: 'https://www.quora.com/How-do-successful-startups-get-their-first-customers',
-    platform: 'reddit',
+    platform: 'quora',
     timestamp: new Date(Date.now() - 1000 * 60 * 720),
     saves: 654
   }
