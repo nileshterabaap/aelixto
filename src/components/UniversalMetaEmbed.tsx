@@ -26,8 +26,8 @@ const buildInstagramEmbed = (url: string): string => {
 
 // Build Facebook embed HTML (post or video)
 const buildFacebookEmbed = (url: string): string => {
-  // Detect if it's a video based on URL pattern
-  if (url.includes('/videos/') || url.includes('/watch/')) {
+  // Detect if it's a video or reel based on URL pattern
+  if (url.includes('/videos/') || url.includes('/watch/') || url.includes('/reel/')) {
     return `<div class="fb-video" data-href="${url}" data-width="auto" data-show-text="true"></div>`;
   }
   return `<div class="fb-post" data-href="${url}" data-width="auto" data-show-text="true"></div>`;
