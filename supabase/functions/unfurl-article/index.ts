@@ -138,6 +138,32 @@ serve(async (req) => {
 
     if (!response.ok) {
       console.log('[unfurl-article] HTTP error:', response.status);
+      // For 403/401, try to get OG data from error page or return minimal data
+      if (response.status === 403 || response.status === 401) {
+        const result = {
+          kind,
+          resolvedUrl: targetUrl,
+          site: {
+            name: new URL(targetUrl).hostname.replace('www.', ''),
+            domain: new URL(targetUrl).hostname,
+            favicon: new URL('/favicon.ico', targetUrl).href,
+          },
+          meta: {
+            title: targetUrl,
+            description: 'Content not available',
+            image: null,
+            publishedTime: null,
+          },
+          content: {
+            html: '',
+          },
+        };
+        
+        return new Response(
+          JSON.stringify(result),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 

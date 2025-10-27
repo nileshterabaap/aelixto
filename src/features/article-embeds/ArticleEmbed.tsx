@@ -80,12 +80,23 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
     );
   }
 
-  if (error || !data) {
+  if (error) {
     return (
       <LinkPreviewCard
         url={url}
         title="Unable to load content"
-        description={error || "This link couldn't be previewed"}
+        description={error}
+        domain={new URL(url).hostname}
+      />
+    );
+  }
+
+  if (!data) {
+    return (
+      <LinkPreviewCard
+        url={url}
+        title="View Link"
+        description="Click to open this link"
         domain={new URL(url).hostname}
       />
     );

@@ -109,31 +109,37 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
           </p>
         )}
 
-        {/* Article Content */}
-        {data.content.html && (
-          <div className="relative">
-            <div
-              className={`prose prose-sm dark:prose-invert max-w-none ${
-                !isExpanded ? 'line-clamp-[12] max-h-[450px] overflow-hidden' : ''
-              }`}
-              dangerouslySetInnerHTML={{ __html: data.content.html }}
-            />
-            {!isExpanded && data.content.html.length > 1000 && (
-              <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-card to-transparent" />
+        {/* Article Content or Description Fallback */}
+        {data.content.html ? (
+          <>
+            <div className="relative">
+              <div
+                className={`prose prose-sm dark:prose-invert max-w-none ${
+                  !isExpanded ? 'line-clamp-[12] max-h-[450px] overflow-hidden' : ''
+                }`}
+                dangerouslySetInnerHTML={{ __html: data.content.html }}
+              />
+              {!isExpanded && data.content.html.length > 1000 && (
+                <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-card to-transparent" />
+              )}
+            </div>
+            
+            {/* Expand/Collapse Button */}
+            {data.content.html.length > 1000 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="w-full"
+              >
+                {isExpanded ? 'Show less' : 'Read more'}
+              </Button>
             )}
-          </div>
-        )}
-
-        {/* Expand/Collapse Button */}
-        {data.content.html && data.content.html.length > 1000 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="w-full"
-          >
-            {isExpanded ? 'Show less' : 'Read more'}
-          </Button>
+          </>
+        ) : data.meta.description && (
+          <p className="text-sm text-muted-foreground">
+            {data.meta.description}
+          </p>
         )}
       </div>
 
