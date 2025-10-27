@@ -277,6 +277,7 @@ export const demoPosts: Post[] = [
     content: 'An insightful look into why we delay important tasks',
     mediaType: 'none',
     mediaUrl: 'https://www.reddit.com/r/science/comments/1g3sjl5/new_study_finds_that_people_who_procrastinate/',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1516534775068-ba3e7458af70?w=800&h=450&fit=crop',
     platform: 'reddit',
     timestamp: new Date(Date.now() - 1000 * 60 * 660),
     saves: 432
@@ -288,6 +289,7 @@ export const demoPosts: Post[] = [
     content: 'Essential strategies for managing distributed teams effectively',
     mediaType: 'none',
     mediaUrl: 'https://medium.com/swlh/how-to-build-a-successful-remote-team-in-2024-b8e3c9c1f2a4',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&h=450&fit=crop',
     platform: 'medium',
     timestamp: new Date(Date.now() - 1000 * 60 * 690),
     saves: 678
@@ -299,6 +301,7 @@ export const demoPosts: Post[] = [
     content: 'A comprehensive guide to starting your programming journey',
     mediaType: 'none',
     mediaUrl: 'https://www.quora.com/What-are-the-best-programming-languages-to-learn-in-2024',
+    thumbnailUrl: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=800&h=450&fit=crop',
     platform: 'quora',
     timestamp: new Date(Date.now() - 1000 * 60 * 720),
     saves: 891
