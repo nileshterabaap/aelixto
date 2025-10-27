@@ -172,13 +172,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {/* Universal Meta Embed - Auto-converts URLs to embeds */}
+        {/* Universal Meta Embed - Auto-converts URLs to embeds (Instagram, Facebook, Spotify) OR generates rich preview cards (Reddit, Quora, Medium, blogs) */}
         {embedEnabled && post.mediaUrl && !((post as any).embed_html) && 
-         (post.mediaUrl.includes('instagram.com') || 
-          post.mediaUrl.includes('facebook.com') || 
-          post.mediaUrl.includes('fb.watch') || 
-          post.mediaUrl.includes('fb.me') ||
-          post.mediaUrl.includes('spotify.com')) ? (
+         platform?.name !== 'X' && 
+         platform?.name !== 'Pinterest' &&
+         post.mediaType === 'none' ? (
           <div className="mb-2">
             <UniversalMetaEmbed url={post.mediaUrl} />
           </div>

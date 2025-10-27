@@ -8,7 +8,7 @@ interface UniversalMetaEmbedProps {
 }
 
 // Detect platform from URL
-const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 'unknown' => {
+const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 'reddit' | 'quora' | 'medium' | 'blog' | 'unknown' => {
   const urlLower = url.toLowerCase();
   if (urlLower.includes('instagram.com') || urlLower.includes('instagr.am')) {
     return 'instagram';
@@ -19,6 +19,20 @@ const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 'un
   }
   if (urlLower.includes('spotify.com') || urlLower.includes('open.spotify.com')) {
     return 'spotify';
+  }
+  if (urlLower.includes('reddit.com')) {
+    return 'reddit';
+  }
+  if (urlLower.includes('quora.com')) {
+    return 'quora';
+  }
+  if (urlLower.includes('medium.com')) {
+    return 'medium';
+  }
+  // Detect common blog platforms
+  if (urlLower.includes('wordpress.com') || urlLower.includes('blogspot.com') || 
+      urlLower.includes('substack.com') || urlLower.includes('ghost.io')) {
+    return 'blog';
   }
   return 'unknown';
 };
@@ -144,7 +158,11 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   const platform = detectPlatform(expandedUrl);
   const platformName = platform === 'instagram' ? 'Instagram' : 
                        platform === 'facebook' ? 'Facebook' :
-                       platform === 'spotify' ? 'Spotify' : 'Platform';
+                       platform === 'spotify' ? 'Spotify' :
+                       platform === 'reddit' ? 'Reddit' :
+                       platform === 'quora' ? 'Quora' :
+                       platform === 'medium' ? 'Medium' :
+                       platform === 'blog' ? 'Blog' : 'Website';
 
   return (
     <OgCardFallback 

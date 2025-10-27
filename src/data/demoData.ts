@@ -268,5 +268,38 @@ export const demoPosts: Post[] = [
     embed_html: '<div class="fb-post" data-href="https://www.facebook.com/FacebookDevelopers/posts/10151471074398553" data-width="500" data-show-text="true"></div>',
     timestamp: new Date(Date.now() - 1000 * 60 * 630),
     saves: 567
+  },
+  {
+    id: '24',
+    author: { name: 'Tom Harris', username: 'u/programming', avatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=200&h=200&fit=crop' },
+    title: 'What is your favorite programming language and why?',
+    content: 'Curious to hear everyone\'s thoughts on this classic question!',
+    mediaType: 'none',
+    mediaUrl: 'https://www.reddit.com/r/programming/comments/1234/what_is_your_favorite_programming_language/',
+    platform: 'reddit',
+    timestamp: new Date(Date.now() - 1000 * 60 * 660),
+    saves: 432
+  },
+  {
+    id: '25',
+    author: { name: 'Sarah Johnson', username: 'sarahjohnson', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop' },
+    title: 'Understanding Machine Learning Basics',
+    content: 'Great article explaining ML concepts for beginners 🤖',
+    mediaType: 'none',
+    mediaUrl: 'https://medium.com/@example/understanding-machine-learning-basics',
+    platform: 'reddit',
+    timestamp: new Date(Date.now() - 1000 * 60 * 690),
+    saves: 789
+  },
+  {
+    id: '26',
+    author: { name: 'Mike Chen', username: 'mikechen', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop' },
+    title: 'How do successful startups get their first customers?',
+    content: 'Interesting discussion with real startup founders sharing their strategies',
+    mediaType: 'none',
+    mediaUrl: 'https://www.quora.com/How-do-successful-startups-get-their-first-customers',
+    platform: 'reddit',
+    timestamp: new Date(Date.now() - 1000 * 60 * 720),
+    saves: 654
   }
 ];
