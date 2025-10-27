@@ -28,6 +28,7 @@ const Index = () => {
     content: post.content,
     mediaType: post.media_type as "image" | "video" | "none",
     mediaUrl: post.media_url || undefined,
+    thumbnailUrl: post.thumbnail_url || undefined,
     platform: post.platform as "youtube" | "instagram" | "tiktok" | "reddit" | "twitter" | "pinterest",
     embed_html: post.embed_html,
     timestamp: new Date(post.created_at),

@@ -210,6 +210,14 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <PinterestEmbed url={post.mediaUrl} />
             </div>
           </>
+        ) : embedEnabled && !((post as any).embed_html) && (post as any).thumbnailUrl ? (
+          <div className="rounded-2xl overflow-hidden mb-2">
+            <img 
+              src={(post as any).thumbnailUrl} 
+              alt={post.title || "Post thumbnail"}
+              className="w-full h-auto object-cover aspect-video"
+            />
+          </div>
         ) : embedEnabled && !((post as any).embed_html) && post.mediaType === 'image' && post.mediaUrl && 
           platform?.name !== 'X' && 
           platform?.name !== 'Pinterest' && 
@@ -217,7 +225,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           !post.mediaUrl.includes('facebook.com') && 
           !post.mediaUrl.includes('fb.watch') && 
           !post.mediaUrl.includes('fb.me') && 
-          !post.mediaUrl.includes('spotify.com') && (
+          !post.mediaUrl.includes('spotify.com') ? (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 
@@ -229,7 +237,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               }`}
             />
           </div>
-        )}
+        ) : null}
 
         {embedEnabled && !((post as any).embed_html) && post.mediaType === 'video' && post.mediaUrl && 
           platform?.name !== 'X' && 

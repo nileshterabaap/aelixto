@@ -47,36 +47,42 @@ export type Database = {
         Row: {
           content: string
           created_at: string
+          embed_html: string | null
           id: string
           likes_count: number | null
           media_type: string | null
           media_url: string | null
           platform: string | null
           saves_count: number | null
+          thumbnail_url: string | null
           title: string | null
           user_id: string
         }
         Insert: {
           content: string
           created_at?: string
+          embed_html?: string | null
           id?: string
           likes_count?: number | null
           media_type?: string | null
           media_url?: string | null
           platform?: string | null
           saves_count?: number | null
+          thumbnail_url?: string | null
           title?: string | null
           user_id: string
         }
         Update: {
           content?: string
           created_at?: string
+          embed_html?: string | null
           id?: string
           likes_count?: number | null
           media_type?: string | null
           media_url?: string | null
           platform?: string | null
           saves_count?: number | null
+          thumbnail_url?: string | null
           title?: string | null
           user_id?: string
         }

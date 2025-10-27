@@ -11,6 +11,7 @@ export interface Post {
   media_url: string | null;
   platform: string | null;
   embed_html?: string | null;
+  thumbnail_url?: string | null;
   saves_count: number;
   created_at: string;
   profiles: {
@@ -52,6 +53,7 @@ export const useCreatePost = () => {
       media_url?: string | null;
       platform?: string;
       embed_html?: string;
+      thumbnail_url?: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -66,6 +68,7 @@ export const useCreatePost = () => {
           media_url: newPost.media_url || null,
           platform: newPost.platform || null,
           embed_html: newPost.embed_html || null,
+          thumbnail_url: newPost.thumbnail_url || null,
         })
         .select()
         .single();

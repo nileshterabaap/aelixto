@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -49,6 +50,36 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       }
     } else if (linkUrl.includes("instagram.com")) {
       thumbnail = linkUrl + "media/?size=l";
+    } else if (
+      linkUrl.includes("reddit.com") || 
+      linkUrl.includes("medium.com") || 
+      linkUrl.includes("quora.com") ||
+      linkUrl.includes("facebook.com") ||
+      linkUrl.includes("fb.watch") ||
+      linkUrl.includes("fb.me") ||
+      linkUrl.includes("spotify.com") ||
+      linkUrl.includes("blog") || 
+      linkUrl.includes(".wordpress.com") || 
+      linkUrl.includes("blogger.com") || 
+      linkUrl.includes("ghost.io") || 
+      linkUrl.includes("substack.com") ||
+      linkUrl.includes("dev.to")
+    ) {
+      // Fetch OG data for blog/article platforms
+      console.log('[CreatePostDialog] Fetching OG data for:', linkUrl);
+      try {
+        const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
+          body: { url: linkUrl }
+        });
+
+        if (!error && ogData) {
+          console.log('[CreatePostDialog] OG data received:', ogData);
+          if (ogData.title) videoTitle = ogData.title;
+          if (ogData.image) thumbnail = ogData.image;
+        }
+      } catch (error) {
+        console.error('[CreatePostDialog] Failed to fetch OG data:', error);
+      }
     }
     
     setThumbnailUrl(thumbnail);
@@ -145,6 +176,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       media_type: mediaType,
       media_url: linkUrl,
       platform: platform || undefined,
+      thumbnail_url: thumbnailUrl || undefined,
     });
 
     // Reset form
