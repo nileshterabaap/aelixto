@@ -51,7 +51,7 @@ const buildSpotifyEmbed = (url: string): string => {
     embedUrl = url;
   }
   
-  return `<iframe style="border-radius:12px" src="${embedUrl}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
+  return `<iframe style="border-radius:12px;display:block;" src="${embedUrl}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
 };
 
 export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
@@ -131,12 +131,10 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     );
   }
 
-  // Try to render the embed
   if (embedHtml) {
     return (
-      <div className="relative">
+      <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
         <RawEmbedRenderer embedHtml={embedHtml} />
-        {/* If embed fails to load after a timeout, we'll show fallback */}
       </div>
     );
   }

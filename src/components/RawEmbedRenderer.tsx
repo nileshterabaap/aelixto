@@ -106,7 +106,8 @@ export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
   return (
     <div 
       ref={containerRef}
-      className="embed-container"
+      className="embed-container w-full [&>*]:!m-0 [&>iframe]:w-full [&>iframe]:block"
+      style={{ minHeight: 0, lineHeight: 0 }}
       dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );
