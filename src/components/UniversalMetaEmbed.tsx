@@ -8,7 +8,7 @@ interface UniversalMetaEmbedProps {
 }
 
 // Detect platform from URL
-const detectPlatform = (url: string): 'instagram' | 'facebook' | 'unknown' => {
+const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 'unknown' => {
   const urlLower = url.toLowerCase();
   if (urlLower.includes('instagram.com') || urlLower.includes('instagr.am')) {
     return 'instagram';
@@ -16,6 +16,9 @@ const detectPlatform = (url: string): 'instagram' | 'facebook' | 'unknown' => {
   if (urlLower.includes('facebook.com') || urlLower.includes('fb.watch') || urlLower.includes('fb.me')) {
     console.log('[UniversalMetaEmbed] Detected Facebook URL:', url);
     return 'facebook';
+  }
+  if (urlLower.includes('spotify.com') || urlLower.includes('open.spotify.com')) {
+    return 'spotify';
   }
   return 'unknown';
 };
@@ -35,6 +38,20 @@ const buildFacebookEmbed = (url: string): string => {
     return `<div class="fb-video" data-href="${url}" data-width="auto" data-show-text="true"></div>`;
   }
   return `<div class="fb-post" data-href="${url}" data-width="auto" data-show-text="true"></div>`;
+};
+
+// Build Spotify embed HTML
+const buildSpotifyEmbed = (url: string): string => {
+  // Convert regular Spotify URL to embed URL
+  // e.g., https://open.spotify.com/track/xyz -> https://open.spotify.com/embed/track/xyz
+  let embedUrl = url.replace('open.spotify.com/', 'open.spotify.com/embed/');
+  
+  // If it already has /embed/, don't add it again
+  if (url.includes('/embed/')) {
+    embedUrl = url;
+  }
+  
+  return `<iframe style="border-radius:12px" src="${embedUrl}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
 };
 
 export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
@@ -76,6 +93,10 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         const html = buildFacebookEmbed(finalUrl);
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Facebook embed:', html);
+      } else if (platform === 'spotify') {
+        const html = buildSpotifyEmbed(finalUrl);
+        setEmbedHtml(html);
+        console.log('[UniversalMetaEmbed] Built Spotify embed');
       }
 
         // Step 3: Fetch OG data for fallback
@@ -123,7 +144,8 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   // Show fallback if no embed HTML or if embed failed
   const platform = detectPlatform(expandedUrl);
   const platformName = platform === 'instagram' ? 'Instagram' : 
-                       platform === 'facebook' ? 'Facebook' : 'Platform';
+                       platform === 'facebook' ? 'Facebook' :
+                       platform === 'spotify' ? 'Spotify' : 'Platform';
 
   return (
     <OgCardFallback 

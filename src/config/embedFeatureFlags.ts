@@ -7,6 +7,7 @@ export const EMBED_FEATURE_FLAGS = {
   youtube: true,
   tiktok: true,
   reddit: true,
+  spotify: true,
 } as const;
 
 export type EmbedPlatform = keyof typeof EMBED_FEATURE_FLAGS;
