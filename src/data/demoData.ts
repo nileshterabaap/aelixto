@@ -275,7 +275,7 @@ export const demoPosts: Post[] = [
     title: 'The Psychology Behind Procrastination',
     content: 'An insightful look into why we delay important tasks',
     mediaType: 'none',
-    mediaUrl: 'https://www.reddit.com/r/psychology/comments/example',
+    mediaUrl: 'https://www.reddit.com/r/science/comments/1g3sjl5/new_study_finds_that_people_who_procrastinate/',
     platform: 'reddit',
     timestamp: new Date(Date.now() - 1000 * 60 * 660),
     saves: 432
@@ -286,7 +286,7 @@ export const demoPosts: Post[] = [
     title: 'How to Build a Successful Remote Team',
     content: 'Essential strategies for managing distributed teams effectively',
     mediaType: 'none',
-    mediaUrl: 'https://medium.com/@alexthompson/building-remote-teams',
+    mediaUrl: 'https://medium.com/swlh/how-to-build-a-successful-remote-team-in-2024-b8e3c9c1f2a4',
     platform: 'medium',
     timestamp: new Date(Date.now() - 1000 * 60 * 690),
     saves: 678
@@ -297,7 +297,7 @@ export const demoPosts: Post[] = [
     title: 'What are the best practices for learning to code?',
     content: 'A comprehensive guide to starting your programming journey',
     mediaType: 'none',
-    mediaUrl: 'https://www.quora.com/What-are-the-best-practices-for-learning-to-code',
+    mediaUrl: 'https://www.quora.com/What-are-the-best-programming-languages-to-learn-in-2024',
     platform: 'quora',
     timestamp: new Date(Date.now() - 1000 * 60 * 720),
     saves: 891
