@@ -41,6 +41,36 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
+      // If blocked (403/401), return platform-specific placeholders
+      if (response.status === 403 || response.status === 401) {
+        console.log('[fetch-og] Blocked by site, returning platform placeholder');
+        
+        const urlLower = targetUrl.toLowerCase();
+        let platformName = 'Web';
+        let placeholderImage = 'https://images.unsplash.com/photo-1516116216624-53e697fedbea?w=1200&h=630&fit=crop';
+        
+        if (urlLower.includes('quora.com')) {
+          platformName = 'Quora';
+          placeholderImage = 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&h=630&fit=crop';
+        } else if (urlLower.includes('reddit.com')) {
+          platformName = 'Reddit';
+          placeholderImage = 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=1200&h=630&fit=crop';
+        } else if (urlLower.includes('medium.com')) {
+          platformName = 'Medium';
+          placeholderImage = 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=1200&h=630&fit=crop';
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            title: `${platformName} Post`,
+            image: placeholderImage,
+            description: `View this post on ${platformName}`,
+            finalUrl: targetUrl
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
