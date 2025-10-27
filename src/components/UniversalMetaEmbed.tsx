@@ -51,7 +51,15 @@ const buildSpotifyEmbed = (url: string): string => {
     embedUrl = url;
   }
   
-  return `<iframe style="border-radius:12px" src="${embedUrl}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
+  // Add query parameters for better playback experience
+  const separator = embedUrl.includes('?') ? '&' : '?';
+  embedUrl += `${separator}utm_source=generator&theme=0`;
+  
+  // Determine height based on content type
+  const isTrack = embedUrl.includes('/track/');
+  const height = isTrack ? '152' : '352'; // Compact player for single tracks, full player for albums/playlists
+  
+  return `<iframe style="border-radius:12px" src="${embedUrl}" width="100%" height="${height}" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
 };
 
 export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
