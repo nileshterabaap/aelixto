@@ -40,14 +40,19 @@ serve(async (req) => {
     // Extract Open Graph metadata
     const titleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i);
     const imageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+    const descriptionMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i);
+    
+    // Fallback to standard meta tags if OG tags not found
+    const descriptionFallback = descriptionMatch ? null : html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
     
     const title = titleMatch ? titleMatch[1] : null;
     const image = imageMatch ? imageMatch[1] : null;
+    const description = descriptionMatch ? descriptionMatch[1] : (descriptionFallback ? descriptionFallback[1] : null);
 
-    console.log('[fetch-og] Extracted OG data:', { title, image, finalUrl });
+    console.log('[fetch-og] Extracted OG data:', { title, image, description, finalUrl });
 
     return new Response(
-      JSON.stringify({ title, image, finalUrl }),
+      JSON.stringify({ title, image, description, finalUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

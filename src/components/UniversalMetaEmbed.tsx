@@ -56,7 +56,7 @@ const buildSpotifyEmbed = (url: string): string => {
 
 export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   const [embedHtml, setEmbedHtml] = useState<string | null>(null);
-  const [fallbackData, setFallbackData] = useState<{ title?: string; image?: string } | null>(null);
+  const [fallbackData, setFallbackData] = useState<{ title?: string; image?: string; description?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedUrl, setExpandedUrl] = useState(url);
 
@@ -108,7 +108,8 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         if (!ogError && ogData) {
           setFallbackData({
             title: ogData.title,
-            image: ogData.image
+            image: ogData.image,
+            description: ogData.description
           });
           console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
         }
@@ -150,6 +151,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       url={expandedUrl}
       title={fallbackData?.title}
       image={fallbackData?.image}
+      description={fallbackData?.description}
       platform={platformName}
     />
   );

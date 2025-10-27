@@ -5,10 +5,11 @@ interface OgCardFallbackProps {
   url: string;
   title?: string;
   image?: string;
+  description?: string;
   platform: string;
 }
 
-export const OgCardFallback = ({ url, title, image, platform }: OgCardFallbackProps) => {
+export const OgCardFallback = ({ url, title, image, description, platform }: OgCardFallbackProps) => {
   return (
     <Card className="overflow-hidden border-2 border-border hover:border-primary/50 transition-colors">
       <a 
@@ -32,6 +33,11 @@ export const OgCardFallback = ({ url, title, image, platform }: OgCardFallbackPr
               <h3 className="font-semibold text-base line-clamp-2 mb-1">
                 {title || "View on " + platform}
               </h3>
+              {description && (
+                <p className="text-sm text-foreground/80 line-clamp-2 mb-2">
+                  {description}
+                </p>
+              )}
               <p className="text-sm text-muted-foreground truncate">
                 {new URL(url).hostname}
               </p>
