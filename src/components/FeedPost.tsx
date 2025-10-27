@@ -203,7 +203,14 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <PinterestEmbed url={post.mediaUrl} />
             </div>
           </>
-        ) : embedEnabled && !((post as any).embed_html) && post.mediaType === 'image' && post.mediaUrl && platform?.name !== 'X' && platform?.name !== 'Pinterest' && (
+        ) : embedEnabled && !((post as any).embed_html) && post.mediaType === 'image' && post.mediaUrl && 
+          platform?.name !== 'X' && 
+          platform?.name !== 'Pinterest' && 
+          !post.mediaUrl.includes('instagram.com') && 
+          !post.mediaUrl.includes('facebook.com') && 
+          !post.mediaUrl.includes('fb.watch') && 
+          !post.mediaUrl.includes('fb.me') && 
+          !post.mediaUrl.includes('spotify.com') && (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={post.mediaUrl} 
@@ -217,7 +224,12 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {embedEnabled && !((post as any).embed_html) && post.mediaType === 'video' && post.mediaUrl && platform?.name !== 'X' && (
+        {embedEnabled && !((post as any).embed_html) && post.mediaType === 'video' && post.mediaUrl && 
+          platform?.name !== 'X' && 
+          !post.mediaUrl.includes('facebook.com') && 
+          !post.mediaUrl.includes('fb.watch') && 
+          !post.mediaUrl.includes('fb.me') && 
+          !post.mediaUrl.includes('spotify.com') && (
           <>
             <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
               platform?.name === 'TikTok' || (platform?.name === 'YouTube' && isYouTubeShort(post.mediaUrl)) 
