@@ -13,6 +13,11 @@ const sanitizeEmbedHtml = (html: string): string => {
 
 // Convert Facebook iframe embed to SDK-compatible format
 const transformFacebookEmbed = (html: string): string => {
+  // If already in SDK format (fb-post, fb-video), return as is
+  if (html.includes('fb-post') || html.includes('fb-video')) {
+    return html;
+  }
+  
   // Extract the Facebook post URL from iframe src
   const iframeSrcMatch = html.match(/src=["']([^"']*facebook\.com[^"']*)["']/);
   
@@ -23,12 +28,16 @@ const transformFacebookEmbed = (html: string): string => {
     
     if (hrefMatch) {
       const postUrl = decodeURIComponent(hrefMatch[1]);
-      // Return SDK-compatible format
+      // Detect if it's a video/reel based on URL
+      if (postUrl.includes('/videos/') || postUrl.includes('/watch/') || postUrl.includes('/reel/')) {
+        return `<div class="fb-video" data-href="${postUrl}" data-width="500" data-show-text="true"></div>`;
+      }
+      // Return SDK-compatible format for posts
       return `<div class="fb-post" data-href="${postUrl}" data-width="500" data-show-text="true"></div>`;
     }
   }
   
-  // If already in fb-post format or can't parse, return as is
+  // If can't parse, return as is
   return html;
 };
 
