@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.expand-pin]
 verify_jwt = false
+
+[functions.unfurl-article]
+verify_jwt = false

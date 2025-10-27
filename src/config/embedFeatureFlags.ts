@@ -10,6 +10,8 @@ export const EMBED_FEATURE_FLAGS = {
   spotify: true,
   quora: true,
   medium: true,
+  // Article embeds - Universal system for written content
+  articles: true,
 } as const;
 
 export type EmbedPlatform = keyof typeof EMBED_FEATURE_FLAGS;

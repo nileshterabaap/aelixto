@@ -21,7 +21,8 @@ import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
 import { RawEmbedRenderer } from "@/components/RawEmbedRenderer";
 import { UniversalMetaEmbed } from "@/components/UniversalMetaEmbed";
-import { isEmbedEnabled, type EmbedPlatform } from "@/config/embedFeatureFlags";
+import { isEmbedEnabled, type EmbedPlatform, EMBED_FEATURE_FLAGS } from "@/config/embedFeatureFlags";
+import { ArticleEmbed } from "@/features/article-embeds";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -175,6 +176,27 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             </p>
           </div>
         )}
+
+        {/* Article Embeds - Universal system for Reddit/Medium/generic blogs */}
+        {EMBED_FEATURE_FLAGS.articles && embedEnabled && post.mediaUrl && 
+         (post.platform === 'reddit' || post.platform === 'medium' || post.platform === 'quora' ||
+          (post.mediaType === 'none' && 
+           !post.mediaUrl.includes('instagram.com') && 
+           !post.mediaUrl.includes('facebook.com') && 
+           !post.mediaUrl.includes('fb.watch') && 
+           !post.mediaUrl.includes('fb.me') &&
+           !post.mediaUrl.includes('spotify.com') &&
+           !post.mediaUrl.includes('twitter.com') &&
+           !post.mediaUrl.includes('x.com') &&
+           !post.mediaUrl.includes('pinterest.com') &&
+           !post.mediaUrl.includes('youtube.com') &&
+           !post.mediaUrl.includes('youtu.be') &&
+           !post.mediaUrl.includes('tiktok.com') &&
+           !(post as any).embed_html)) ? (
+          <div className="mb-2">
+            <ArticleEmbed url={post.mediaUrl} />
+          </div>
+        ) : null}
 
         {/* Universal Meta Embed - Auto-converts URLs to embeds */}
         {embedEnabled && post.mediaUrl && !((post as any).embed_html) && 

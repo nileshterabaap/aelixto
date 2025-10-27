@@ -43,6 +43,30 @@ export type Database = {
           },
         ]
       }
+      link_previews: {
+        Row: {
+          created_at: string | null
+          data: Json
+          id: string
+          updated_at: string | null
+          url: string
+        }
+        Insert: {
+          created_at?: string | null
+          data: Json
+          id?: string
+          updated_at?: string | null
+          url: string
+        }
+        Update: {
+          created_at?: string | null
+          data?: Json
+          id?: string
+          updated_at?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
       posts: {
         Row: {
           content: string
