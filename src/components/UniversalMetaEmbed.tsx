@@ -14,6 +14,7 @@ const detectPlatform = (url: string): 'instagram' | 'facebook' | 'unknown' => {
     return 'instagram';
   }
   if (urlLower.includes('facebook.com') || urlLower.includes('fb.watch') || urlLower.includes('fb.me')) {
+    console.log('[UniversalMetaEmbed] Detected Facebook URL:', url);
     return 'facebook';
   }
   return 'unknown';
@@ -66,16 +67,16 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
         setExpandedUrl(finalUrl);
 
-        // Step 2: Build embed HTML based on platform
-        if (platform === 'instagram') {
-          const html = buildInstagramEmbed(finalUrl);
-          setEmbedHtml(html);
-          console.log('[UniversalMetaEmbed] Built Instagram embed');
-        } else if (platform === 'facebook') {
-          const html = buildFacebookEmbed(finalUrl);
-          setEmbedHtml(html);
-          console.log('[UniversalMetaEmbed] Built Facebook embed');
-        }
+      // Step 2: Build embed HTML based on platform
+      if (platform === 'instagram') {
+        const html = buildInstagramEmbed(finalUrl);
+        setEmbedHtml(html);
+        console.log('[UniversalMetaEmbed] Built Instagram embed');
+      } else if (platform === 'facebook') {
+        const html = buildFacebookEmbed(finalUrl);
+        setEmbedHtml(html);
+        console.log('[UniversalMetaEmbed] Built Facebook embed:', html);
+      }
 
         // Step 3: Fetch OG data for fallback
         console.log('[UniversalMetaEmbed] Fetching OG data for fallback');
