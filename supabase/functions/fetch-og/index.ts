@@ -23,11 +23,21 @@ serve(async (req) => {
 
     console.log('[fetch-og] Fetching OG data for:', targetUrl);
 
-    // Fetch the HTML
+    // Fetch the HTML with better headers to avoid 403 blocks
     const response = await fetch(targetUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; AelixtoBot/1.0)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0',
       },
+      redirect: 'follow',
     });
 
     if (!response.ok) {
@@ -37,17 +47,22 @@ serve(async (req) => {
     const html = await response.text();
     const finalUrl = response.url;
 
-    // Extract Open Graph metadata
+    // Extract Open Graph metadata with multiple fallbacks
     const titleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i);
+    const titleFallback = titleMatch ? null : html.match(/<meta\s+name=["']twitter:title["']\s+content=["']([^"']+)["']/i);
+    const titleFallback2 = (titleMatch || titleFallback) ? null : html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    
     const imageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
+    const imageFallback = imageMatch ? null : html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i);
+    const imageFallback2 = (imageMatch || imageFallback) ? null : html.match(/<meta\s+property=["']og:image:url["']\s+content=["']([^"']+)["']/i);
+    
     const descriptionMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i);
-    
-    // Fallback to standard meta tags if OG tags not found
     const descriptionFallback = descriptionMatch ? null : html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
+    const descriptionFallback2 = (descriptionMatch || descriptionFallback) ? null : html.match(/<meta\s+name=["']twitter:description["']\s+content=["']([^"']+)["']/i);
     
-    const title = titleMatch ? titleMatch[1] : null;
-    const image = imageMatch ? imageMatch[1] : null;
-    const description = descriptionMatch ? descriptionMatch[1] : (descriptionFallback ? descriptionFallback[1] : null);
+    const title = titleMatch ? titleMatch[1] : (titleFallback ? titleFallback[1] : (titleFallback2 ? titleFallback2[1] : null));
+    const image = imageMatch ? imageMatch[1] : (imageFallback ? imageFallback[1] : (imageFallback2 ? imageFallback2[1] : null));
+    const description = descriptionMatch ? descriptionMatch[1] : (descriptionFallback ? descriptionFallback[1] : (descriptionFallback2 ? descriptionFallback2[1] : null));
 
     console.log('[fetch-og] Extracted OG data:', { title, image, description, finalUrl });
 
