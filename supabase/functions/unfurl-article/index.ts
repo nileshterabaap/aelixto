@@ -28,39 +28,6 @@ const extractTitle = (html: string): string => {
   return titleMatch ? titleMatch[1] : '';
 };
 
-// Extract first image from content
-const extractFirstContentImage = (html: string): string | null => {
-  const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-  return imgMatch ? imgMatch[1] : null;
-};
-
-// Extract first few sentences from content
-const extractTextExcerpt = (html: string, maxChars = 260): string => {
-  // Remove scripts, styles, and tags
-  let text = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-  text = text.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
-  text = text.replace(/<[^>]+>/g, ' ');
-  text = text.replace(/\s+/g, ' ').trim();
-  
-  // Take first 2-3 sentences (approx)
-  const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
-  let excerpt = '';
-  for (const sentence of sentences.slice(0, 3)) {
-    if (excerpt.length + sentence.length <= maxChars) {
-      excerpt += sentence;
-    } else {
-      break;
-    }
-  }
-  
-  if (excerpt.length === 0 && text.length > 0) {
-    excerpt = text.substring(0, maxChars);
-    if (text.length > maxChars) excerpt += '...';
-  }
-  
-  return excerpt.trim();
-};
-
 // Extract article content using simple heuristics
 const extractArticleContent = (html: string): string => {
   // Remove scripts and styles
@@ -171,19 +138,20 @@ serve(async (req) => {
 
     if (!response.ok) {
       console.log('[unfurl-article] HTTP error:', response.status);
-      // For 403/401, try to get OG data from error page or return minimal data
+      // For 403/401, return as link-preview (don't try to embed)
       if (response.status === 403 || response.status === 401) {
+        const siteName = new URL(targetUrl).hostname.replace('www.', '');
         const result = {
-          kind,
+          kind: 'link-preview', // Special kind to force link card display
           resolvedUrl: targetUrl,
           site: {
-            name: new URL(targetUrl).hostname.replace('www.', ''),
+            name: siteName,
             domain: new URL(targetUrl).hostname,
             favicon: new URL('/favicon.ico', targetUrl).href,
           },
           meta: {
-            title: targetUrl,
-            description: 'Content not available',
+            title: `View on ${siteName}`,
+            description: targetUrl,
             image: null,
             publishedTime: null,
           },
@@ -205,38 +173,14 @@ serve(async (req) => {
 
     // Extract metadata
     const title = extractTitle(html);
-    
-    // Description with fallback to content excerpt
-    let description = extractMetaContent(html, 'og:description') || 
-                     extractMetaContent(html, 'description', 'name') || 
-                     extractMetaContent(html, 'twitter:description', 'name') || 
-                     '';
-    
-    // If no description, extract from content
-    if (!description) {
-      const articleContent = extractArticleContent(html);
-      if (articleContent) {
-        description = extractTextExcerpt(articleContent);
-      }
-    }
-    
-    // Image with proper fallback chain
-    let image = extractMetaContent(html, 'og:image') || 
-               extractMetaContent(html, 'twitter:image', 'name') || 
-               extractMetaContent(html, 'og:image:url') || 
-               '';
-    
-    // Fallback to first content image if no OG image
-    if (!image) {
-      const articleContent = extractArticleContent(html);
-      if (articleContent) {
-        const contentImage = extractFirstContentImage(articleContent);
-        if (contentImage) {
-          image = contentImage.startsWith('http') ? contentImage : new URL(contentImage, resolvedUrl).href;
-        }
-      }
-    }
-    
+    const description = extractMetaContent(html, 'og:description') || 
+                       extractMetaContent(html, 'description', 'name') || 
+                       extractMetaContent(html, 'twitter:description', 'name') || 
+                       '';
+    const image = extractMetaContent(html, 'og:image') || 
+                 extractMetaContent(html, 'twitter:image', 'name') || 
+                 extractMetaContent(html, 'og:image:url') || 
+                 '';
     const siteName = extractMetaContent(html, 'og:site_name') || 
                     new URL(resolvedUrl).hostname.replace('www.', '');
     const publishedTime = extractMetaContent(html, 'article:published_time') || 

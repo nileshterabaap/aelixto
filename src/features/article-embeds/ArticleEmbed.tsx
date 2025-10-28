@@ -10,7 +10,7 @@ interface ArticleEmbedProps {
 }
 
 interface UnfurlResult {
-  kind: 'reddit-post' | 'medium-article' | 'generic-article' | 'quora-post';
+  kind: 'reddit-post' | 'medium-article' | 'generic-article' | 'quora-post' | 'link-preview';
   resolvedUrl: string;
   site: {
     name: string;
@@ -28,26 +28,10 @@ interface UnfurlResult {
   };
 }
 
-// Determine renderer type based on URL
-const resolveRenderer = (url: string): 'reddit' | 'quora' | 'article' => {
-  const urlLower = url.toLowerCase();
-  
-  if (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) {
-    return 'reddit';
-  }
-  
-  if (urlLower.includes('quora.com')) {
-    return 'quora';
-  }
-  
-  return 'article';
-};
-
 export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
   const [data, setData] = useState<UnfurlResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const rendererType = resolveRenderer(url);
 
   useEffect(() => {
     const unfurlArticle = async () => {
@@ -85,7 +69,7 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl overflow-hidden border border-border">
+      <div className="rounded-2xl overflow-hidden border-2 border-border">
         <Skeleton className="h-48 w-full" />
         <div className="p-4 space-y-3">
           <Skeleton className="h-6 w-3/4" />
@@ -96,33 +80,34 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
     );
   }
 
-  if (error || !data) {
-    // Graceful fallback - just show title and link, no error message
+  if (error) {
     return (
       <LinkPreviewCard
         url={url}
-        title={data?.meta.title || new URL(url).hostname}
-        description=""
+        title="Unable to load content"
+        description={error}
         domain={new URL(url).hostname}
-        favicon={data?.site.favicon}
-        siteName={data?.site.name}
       />
     );
   }
 
-  // Router: One renderer per URL type
-  
-  // Reddit posts - use official Reddit embed (no fallback card)
-  if (rendererType === 'reddit' && data.kind === 'reddit-post') {
-    return <RedditPostEmbed url={data.resolvedUrl} data={data} />;
+  if (!data) {
+    return (
+      <LinkPreviewCard
+        url={url}
+        title="View Link"
+        description="Click to open this link"
+        domain={new URL(url).hostname}
+      />
+    );
   }
 
-  // Quora posts - link card only (Quora blocks embeds)
-  if (rendererType === 'quora') {
+  // Link preview - for blocked content (403/401 errors)
+  if (data.kind === 'link-preview' || data.kind === 'quora-post') {
     return (
       <LinkPreviewCard
         url={data.resolvedUrl}
-        title={data.meta.title || 'View on Quora'}
+        title={data.meta.title}
         description={data.meta.description}
         image={data.meta.image || undefined}
         domain={data.site.domain}
@@ -132,6 +117,40 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
     );
   }
 
-  // Everything else - rich article card
-  return <ArticleContentEmbed data={data} />;
+  // Reddit posts - use official Reddit embed only if we have content
+  if (data.kind === 'reddit-post') {
+    // If no content, fall back to link card
+    if (!data.content.html && !data.meta.description) {
+      return (
+        <LinkPreviewCard
+          url={data.resolvedUrl}
+          title={data.meta.title}
+          description="View this post on Reddit"
+          image={data.meta.image || undefined}
+          domain={data.site.domain}
+          favicon={data.site.favicon}
+          siteName={data.site.name}
+        />
+      );
+    }
+    return <RedditPostEmbed url={data.resolvedUrl} data={data} />;
+  }
+
+  // Medium and generic articles - rich content card
+  if (data.kind === 'medium-article' || data.kind === 'generic-article') {
+    return <ArticleContentEmbed data={data} />;
+  }
+
+  // Fallback
+  return (
+    <LinkPreviewCard
+      url={data.resolvedUrl}
+      title={data.meta.title}
+      description={data.meta.description}
+      image={data.meta.image || undefined}
+      domain={data.site.domain}
+      favicon={data.site.favicon}
+      siteName={data.site.name}
+    />
+  );
 };
