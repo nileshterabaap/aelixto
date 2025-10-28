@@ -1,6 +1,4 @@
-import { useEffect, useRef } from "react";
-import { ExternalLink } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useEffect } from "react";
 
 interface RedditPostEmbedProps {
   url: string;
@@ -12,54 +10,35 @@ interface RedditPostEmbedProps {
 }
 
 export const RedditPostEmbed = ({ url, data }: RedditPostEmbedProps) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const scriptLoadedRef = useRef(false);
-
   useEffect(() => {
-    // Load Reddit embed script
-    if (!scriptLoadedRef.current) {
+    // Load Reddit embed script if not already loaded
+    const existingScript = document.querySelector('script[src="https://embed.redditmedia.com/widgets/platform.js"]');
+    
+    if (!existingScript) {
       const script = document.createElement('script');
       script.src = 'https://embed.redditmedia.com/widgets/platform.js';
       script.async = true;
       script.charset = 'utf-8';
       document.body.appendChild(script);
-      scriptLoadedRef.current = true;
-
-      return () => {
-        // Cleanup if component unmounts
-        if (script.parentNode) {
-          script.parentNode.removeChild(script);
-        }
-      };
+    } else {
+      // If script already exists, trigger embed rendering
+      if ((window as any).rembeddit) {
+        (window as any).rembeddit.init();
+      }
     }
-  }, []);
+  }, [url]);
 
   return (
     <div className="rounded-2xl overflow-hidden border-2 border-border bg-card">
-      <div ref={containerRef} className="p-4">
-        <blockquote 
-          className="reddit-card" 
-          data-card-created={Date.now()}
-        >
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            {data.meta.title || 'Reddit Post'}
-          </a>
-        </blockquote>
-      </div>
-      
-      <div className="px-4 pb-4 pt-2 border-t border-border bg-muted/30">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-center gap-2 text-muted-foreground hover:text-foreground"
-          asChild
-        >
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="h-4 w-4" />
-            View on Reddit
-          </a>
-        </Button>
-      </div>
+      <blockquote 
+        className="reddit-embed-bq" 
+        data-embed-theme="light"
+        data-embed-height="500"
+      >
+        <a href={url}>
+          {data.meta.title || 'View post on Reddit'}
+        </a>
+      </blockquote>
     </div>
   );
 };
