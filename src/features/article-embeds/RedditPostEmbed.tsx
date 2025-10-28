@@ -35,7 +35,7 @@ export const RedditPostEmbed = ({ url, data }: RedditPostEmbedProps) => {
   }, []);
 
   return (
-    <div className="rounded-2xl overflow-hidden border-2 border-border bg-card">
+    <div className="rounded-2xl overflow-hidden border border-border bg-card">
       <div ref={containerRef} className="p-4">
         <blockquote 
           className="reddit-card" 
@@ -45,20 +45,6 @@ export const RedditPostEmbed = ({ url, data }: RedditPostEmbedProps) => {
             {data.meta.title || 'Reddit Post'}
           </a>
         </blockquote>
-      </div>
-      
-      <div className="px-4 pb-4 pt-2 border-t border-border bg-muted/30">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full justify-center gap-2 text-muted-foreground hover:text-foreground"
-          asChild
-        >
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="h-4 w-4" />
-            View on Reddit
-          </a>
-        </Button>
       </div>
     </div>
   );

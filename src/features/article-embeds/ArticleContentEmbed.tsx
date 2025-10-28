@@ -1,7 +1,5 @@
-import { ExternalLink, Copy, Share2 } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
 
 interface ArticleContentEmbedProps {
   data: {
@@ -24,32 +22,6 @@ interface ArticleContentEmbedProps {
 }
 
 export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
-  const { toast } = useToast();
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(data.resolvedUrl);
-    toast({
-      title: "Link copied",
-      description: "The article link has been copied to your clipboard",
-    });
-  };
-
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: data.meta.title,
-          url: data.resolvedUrl,
-        });
-      } catch (err) {
-        console.error('Share failed:', err);
-      }
-    } else {
-      handleCopyLink();
-    }
-  };
-
   const formatDate = (dateString: string | null) => {
     if (!dateString) return null;
     try {
@@ -63,21 +35,42 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
     }
   };
 
-  return (
-    <article className="rounded-2xl overflow-hidden border-2 border-border bg-card">
-      {/* Hero Image */}
-      {data.meta.image && (
-        <div className="aspect-video w-full overflow-hidden bg-muted">
-          <img
-            src={data.meta.image}
-            alt={data.meta.title}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      )}
+  // Use description if no HTML content
+  const excerpt = data.meta.description || '';
 
-      {/* Article Header */}
-      <div className="p-5 space-y-3">
+  return (
+    <article className="rounded-2xl overflow-hidden border border-border bg-card hover:shadow-lg transition-all">
+      {/* Content */}
+      <div className="p-5 space-y-4">
+        {/* Title */}
+        <h3 className="text-xl font-bold leading-tight text-foreground">
+          {data.meta.title}
+        </h3>
+
+        {/* Thumbnail */}
+        {data.meta.image && (
+          <div className="relative w-full h-48 rounded-xl overflow-hidden bg-muted">
+            <img
+              src={data.meta.image}
+              alt={data.meta.title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              width="400"
+              height="192"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          </div>
+        )}
+
+        {/* Excerpt (2-3 sentences, ~200-260 chars) */}
+        {excerpt && (
+          <p className="text-muted-foreground leading-relaxed line-clamp-3">
+            {excerpt}
+          </p>
+        )}
+
         {/* Site Info */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           {data.site.favicon && (
@@ -85,8 +78,9 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
               src={data.site.favicon}
               alt=""
               className="w-4 h-4 rounded"
+              loading="lazy"
               onError={(e) => {
-                e.currentTarget.style.display = 'none';
+                (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
           )}
@@ -94,84 +88,31 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
           {data.meta.publishedTime && (
             <>
               <span>•</span>
-              <span>{formatDate(data.meta.publishedTime)}</span>
+              <time dateTime={data.meta.publishedTime}>
+                {formatDate(data.meta.publishedTime)}
+              </time>
             </>
           )}
         </div>
 
-        {/* Title */}
-        <h2 className="text-xl font-bold leading-tight">{data.meta.title}</h2>
-
-        {/* Description */}
-        {data.meta.description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">
-            {data.meta.description}
-          </p>
-        )}
-
-        {/* Article Content or Description Fallback */}
-        {data.content.html ? (
-          <>
-            <div className="relative">
-              <div
-                className={`prose prose-sm dark:prose-invert max-w-none ${
-                  !isExpanded ? 'line-clamp-[12] max-h-[450px] overflow-hidden' : ''
-                }`}
-                dangerouslySetInnerHTML={{ __html: data.content.html }}
-              />
-              {!isExpanded && data.content.html.length > 1000 && (
-                <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-card to-transparent" />
-              )}
-            </div>
-            
-            {/* Expand/Collapse Button */}
-            {data.content.html.length > 1000 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full"
-              >
-                {isExpanded ? 'Show less' : 'Read more'}
-              </Button>
-            )}
-          </>
-        ) : data.meta.description && (
-          <p className="text-sm text-muted-foreground">
-            {data.meta.description}
-          </p>
-        )}
-      </div>
-
-      {/* Action Bar */}
-      <div className="px-4 py-3 border-t border-border bg-muted/30 flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="flex-1 gap-2"
-          asChild
-        >
-          <a href={data.resolvedUrl} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="h-4 w-4" />
-            Read full on {data.site.name}
-          </a>
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0"
-          onClick={handleCopyLink}
-        >
-          <Copy className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="shrink-0"
-          onClick={handleShare}
-        >
-          <Share2 className="h-4 w-4" />
-        </Button>
+        {/* Read More Button */}
+        <div className="pt-2">
+          <Button
+            variant="default"
+            size="sm"
+            className="w-full"
+            asChild
+          >
+            <a
+              href={data.resolvedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Read on {data.site.name}
+            </a>
+          </Button>
+        </div>
       </div>
     </article>
   );
