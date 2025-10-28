@@ -10,7 +10,7 @@ interface ArticleEmbedProps {
 }
 
 interface UnfurlResult {
-  kind: 'reddit-post' | 'medium-article' | 'generic-article' | 'quora-post';
+  kind: 'reddit-post' | 'medium-article' | 'generic-article' | 'quora-post' | 'link-preview';
   resolvedUrl: string;
   site: {
     name: string;
@@ -102,8 +102,8 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
     );
   }
 
-  // Quora posts - show link card only (Quora blocks embeds)
-  if (data.kind === 'quora-post') {
+  // Link preview - for blocked content (403/401 errors)
+  if (data.kind === 'link-preview' || data.kind === 'quora-post') {
     return (
       <LinkPreviewCard
         url={data.resolvedUrl}
@@ -117,8 +117,22 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
     );
   }
 
-  // Reddit posts - use official Reddit embed
+  // Reddit posts - use official Reddit embed only if we have content
   if (data.kind === 'reddit-post') {
+    // If no content, fall back to link card
+    if (!data.content.html && !data.meta.description) {
+      return (
+        <LinkPreviewCard
+          url={data.resolvedUrl}
+          title={data.meta.title}
+          description="View this post on Reddit"
+          image={data.meta.image || undefined}
+          domain={data.site.domain}
+          favicon={data.site.favicon}
+          siteName={data.site.name}
+        />
+      );
+    }
     return <RedditPostEmbed url={data.resolvedUrl} data={data} />;
   }
 

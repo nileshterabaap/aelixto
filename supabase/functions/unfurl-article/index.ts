@@ -138,19 +138,20 @@ serve(async (req) => {
 
     if (!response.ok) {
       console.log('[unfurl-article] HTTP error:', response.status);
-      // For 403/401, try to get OG data from error page or return minimal data
+      // For 403/401, return as link-preview (don't try to embed)
       if (response.status === 403 || response.status === 401) {
+        const siteName = new URL(targetUrl).hostname.replace('www.', '');
         const result = {
-          kind,
+          kind: 'link-preview', // Special kind to force link card display
           resolvedUrl: targetUrl,
           site: {
-            name: new URL(targetUrl).hostname.replace('www.', ''),
+            name: siteName,
             domain: new URL(targetUrl).hostname,
             favicon: new URL('/favicon.ico', targetUrl).href,
           },
           meta: {
-            title: targetUrl,
-            description: 'Content not available',
+            title: `View on ${siteName}`,
+            description: targetUrl,
             image: null,
             publishedTime: null,
           },
