@@ -117,22 +117,8 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
     );
   }
 
-  // Reddit posts - use official Reddit embed only if we have content
+  // Reddit posts - always use official Reddit embed
   if (data.kind === 'reddit-post') {
-    // If no content, fall back to link card
-    if (!data.content.html && !data.meta.description) {
-      return (
-        <LinkPreviewCard
-          url={data.resolvedUrl}
-          title={data.meta.title}
-          description="View this post on Reddit"
-          image={data.meta.image || undefined}
-          domain={data.site.domain}
-          favicon={data.site.favicon}
-          siteName={data.site.name}
-        />
-      );
-    }
     return <RedditPostEmbed url={data.resolvedUrl} data={data} />;
   }
 
