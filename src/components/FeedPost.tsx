@@ -24,7 +24,6 @@ import { UniversalMetaEmbed } from "@/components/UniversalMetaEmbed";
 import { isEmbedEnabled, type EmbedPlatform, EMBED_FEATURE_FLAGS } from "@/config/embedFeatureFlags";
 import { ArticleEmbed } from "@/features/article-embeds";
 import RedditEmbed from "@/components/embeds/RedditEmbed";
-import { resolveRenderer } from "@/lib/resolveRenderer";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -117,8 +116,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
 
   const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost, isDeleting } = postActions;
 
-  const r = resolveRenderer(post);
-  console.log('renderer', post.id, post.platform, post.mediaUrl, r.kind);
+  console.log('chosenRenderer', { id: post.id, platform: post.platform, url: post.mediaUrl });
 
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
@@ -182,63 +180,155 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {/* Single renderer based on resolver */}
-        {embedEnabled && (
+        {/* Reddit: render only the official embed */}
+        {embedEnabled && post.mediaUrl && (
+          post.mediaUrl.includes("reddit.com") || post.mediaUrl.includes("redd.it")
+        ) ? (
           <div className="mb-2">
-            {r.kind === 'raw' && <RawEmbedRenderer embedHtml={r.html} />}
-            {r.kind === 'reddit' && <RedditEmbed url={r.url} />}
-            {r.kind === 'twitter' && <TwitterEmbed url={r.url} />}
-            {r.kind === 'pinterest' && <PinterestEmbed url={r.url} />}
-            {r.kind === 'article' && <ArticleEmbed url={r.url} />}
-            {r.kind === 'universal' && <UniversalMetaEmbed url={r.url} />}
-            {r.kind === 'image' && (
-              <div className="rounded-2xl overflow-hidden">
-                <img 
-                  src={r.url} 
-                  alt="Post content" 
-                  className="w-full h-auto object-cover aspect-video" 
-                />
-              </div>
-            )}
-            {r.kind === 'video' && post.platform === 'youtube' && (
-              <div className={`rounded-2xl overflow-hidden bg-muted relative ${
-                isYouTubeShort(r.url) ? 'aspect-[9/16]' : 'aspect-[16/9]'
-              }`}>
-                {isPlayingVideo ? (
-                  <iframe
-                    className="w-full h-full"
-                    src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=1`}
-                    title="YouTube video player"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                ) : (
-                  <>
-                    <div className="absolute inset-0">
-                      <img 
-                        src={getYouTubeThumbnail(r.url)} 
-                        alt="Video thumbnail"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <button
-                      onClick={handleVideoClick}
-                      className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group"
-                    >
-                      <div className="h-20 w-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center group-hover:bg-black/70 transition-all">
-                        <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent ml-1"></div>
-                      </div>
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-            {r.kind === 'video' && post.platform !== 'youtube' && (
-              <div className="rounded-2xl overflow-hidden">
-                <video src={r.url} className="w-full h-auto" controls playsInline />
-              </div>
-            )}
+            <RedditEmbed url={post.mediaUrl} />
           </div>
+        ) : null}
+
+        {/* Article Embeds - Universal system for Medium/Quora/generic blogs */}
+        {EMBED_FEATURE_FLAGS.articles && embedEnabled && post.mediaUrl &&
+         (
+           post.platform === 'medium' ||
+           post.platform === 'quora' ||
+           (
+             post.mediaType === 'none' &&
+             !post.mediaUrl.includes('instagram.com') &&
+             !post.mediaUrl.includes('facebook.com') &&
+             !post.mediaUrl.includes('fb.watch') &&
+             !post.mediaUrl.includes('fb.me') &&
+             !post.mediaUrl.includes('spotify.com') &&
+             !post.mediaUrl.includes('twitter.com') &&
+             !post.mediaUrl.includes('x.com') &&
+             !post.mediaUrl.includes('pinterest.com') &&
+             !post.mediaUrl.includes('youtube.com') &&
+             !post.mediaUrl.includes('youtu.be') &&
+             !post.mediaUrl.includes('tiktok.com') &&
+             !post.mediaUrl.includes('reddit.com') &&
+             !post.mediaUrl.includes('redd.it') &&
+             !(post as any).embed_html
+           )
+         ) ? (
+          <div className="mb-2">
+            <ArticleEmbed url={post.mediaUrl} />
+          </div>
+        ) : null}
+
+        {/* Universal Meta Embed - Auto-converts URLs to embeds */}
+        {embedEnabled && post.mediaUrl && !((post as any).embed_html) &&
+         (
+           post.mediaUrl.includes('instagram.com') ||
+           post.mediaUrl.includes('facebook.com') ||
+           post.mediaUrl.includes('fb.watch') ||
+           post.mediaUrl.includes('fb.me') ||
+           post.mediaUrl.includes('spotify.com') ||
+           (post.mediaType === 'none' && platform?.name !== 'X' && platform?.name !== 'Pinterest')
+         ) ? (
+          <div className="mb-2">
+            <UniversalMetaEmbed url={post.mediaUrl} />
+          </div>
+        ) : null}
+
+        {/* Raw Embed HTML (Instagram/Facebook) */}
+        {embedEnabled && (post as any).embed_html ? (
+          <div className="mb-2">
+            <RawEmbedRenderer embedHtml={(post as any).embed_html} />
+          </div>
+        ) : null}
+
+        {/* Media */}
+        {embedEnabled && !((post as any).embed_html) && platform?.name === 'X' && post.mediaUrl ? (
+          <div className="mb-2">
+            <TwitterEmbed url={post.mediaUrl} />
+          </div>
+        ) : embedEnabled && !((post as any).embed_html) && platform?.name === 'Pinterest' && post.mediaUrl ? (
+          <>
+            {console.log("[FeedPost] Rendering PinterestEmbed for URL:", post.mediaUrl)}
+            <div className="mb-2">
+              <PinterestEmbed url={post.mediaUrl} />
+            </div>
+          </>
+        ) : embedEnabled && !((post as any).embed_html) && post.thumbnailUrl && 
+          post.platform !== 'reddit' && 
+          post.platform !== 'medium' && 
+          post.platform !== 'quora' ? (
+          <div className="rounded-2xl overflow-hidden mb-2">
+            <img 
+              src={post.thumbnailUrl} 
+              alt={post.title || "Post thumbnail"}
+              className="w-full h-auto object-cover aspect-video"
+            />
+          </div>
+        ) : embedEnabled && !((post as any).embed_html) && post.mediaType === 'image' && post.mediaUrl &&
+          platform?.name !== 'X' && 
+          platform?.name !== 'Pinterest' && 
+          post.platform !== 'reddit' && 
+          post.platform !== 'medium' && 
+          post.platform !== 'quora' && 
+          !post.mediaUrl.includes('instagram.com') && 
+          !post.mediaUrl.includes('facebook.com') && 
+          !post.mediaUrl.includes('fb.watch') && 
+          !post.mediaUrl.includes('fb.me') && 
+          !post.mediaUrl.includes('spotify.com') ? (
+          <div className="rounded-2xl overflow-hidden mb-2">
+            <img 
+              src={post.mediaUrl} 
+              alt="Post content"
+              className={`w-full h-auto object-cover ${
+                platform?.name === 'Instagram' ? 'aspect-square' : 
+                platform?.name === 'TikTok' ? 'aspect-[9/16]' : 
+                'aspect-[16/9]'
+              }`}
+            />
+          </div>
+        ) : null}
+
+        {embedEnabled && !((post as any).embed_html) && post.mediaType === 'video' && post.mediaUrl && 
+          platform?.name !== 'X' && 
+          post.platform !== 'reddit' &&
+          !post.mediaUrl.includes('facebook.com') && 
+          !post.mediaUrl.includes('fb.watch') && 
+          !post.mediaUrl.includes('fb.me') && 
+          !post.mediaUrl.includes('spotify.com') && (
+          <>
+            <div className={`rounded-2xl overflow-hidden mb-2 bg-muted relative ${
+              platform?.name === 'TikTok' || (platform?.name === 'YouTube' && isYouTubeShort(post.mediaUrl)) 
+                ? 'aspect-[9/16]' : 
+              platform?.name === 'YouTube' ? 'aspect-[16/9]' : 
+              'aspect-[4/3]'
+            }`}>
+              {isPlayingVideo && platform?.name === 'YouTube' && post.mediaUrl ? (
+                <iframe
+                  className="w-full h-full"
+                  src={`https://www.youtube.com/embed/${getYouTubeVideoId(post.mediaUrl)}?autoplay=1`}
+                  title="YouTube video player"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <>
+                  <div className="absolute inset-0">
+                    <img 
+                      src={platform?.name === 'YouTube' && post.mediaUrl ? getYouTubeThumbnail(post.mediaUrl) : post.mediaUrl} 
+                      alt="Video thumbnail"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <button
+                    onClick={handleVideoClick}
+                    className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group"
+                  >
+                    <div className="h-20 w-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center group-hover:bg-black/70 transition-all">
+                      <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent ml-1"></div>
+                    </div>
+                  </button>
+                </>
+              )}
+            </div>
+          </>
         )}
 
         {/* Title */}

@@ -1,23 +1,31 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
-export default function RedditEmbed({ url }: { url: string }) {
+interface Props { url: string }
+
+export default function RedditEmbed({ url }: Props) {
+  const ref = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
+    // Load reddit widgets.js once
     const src = "https://embed.reddit.com/widgets.js";
-    let s = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
-    if (!s) {
-      s = document.createElement("script");
-      s.src = src; 
-      s.async = true;
-      document.body.appendChild(s);
-      s.onload = () => (window as any).reddit?.init?.();
+    let script = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
+    if (!script) {
+      script = document.createElement("script");
+      script.src = src;
+      script.async = true;
+      document.body.appendChild(script);
+      script.onload = () => (window as any).reddit && (window as any).reddit.init?.();
     } else {
-      (window as any).reddit?.init?.();
+      // Already loaded → re-init in case new blockquote was added
+      (window as any).reddit && (window as any).reddit.init?.();
     }
   }, [url]);
-  
+
   return (
-    <blockquote className="reddit-card">
-      <a href={url}>View on Reddit</a>
-    </blockquote>
+    <div ref={ref}>
+      <blockquote className="reddit-card">
+        <a href={url}>View on Reddit</a>
+      </blockquote>
+    </div>
   );
 }
