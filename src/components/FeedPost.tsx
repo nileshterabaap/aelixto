@@ -115,6 +115,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
 
   const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost, isDeleting } = postActions;
 
+  console.log('[FeedPost] chosenRenderer', { id: post.id, platform: post.platform, url: post.mediaUrl });
+
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
       <div className="p-5">
@@ -177,37 +179,46 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {/* Article Embeds - Universal system for Reddit/Medium/generic blogs */}
-        {EMBED_FEATURE_FLAGS.articles && embedEnabled && post.mediaUrl && 
-         (post.platform === 'reddit' || post.platform === 'medium' || post.platform === 'quora' ||
-          (post.mediaType === 'none' && 
-           !post.mediaUrl.includes('instagram.com') && 
-           !post.mediaUrl.includes('facebook.com') && 
-           !post.mediaUrl.includes('fb.watch') && 
-           !post.mediaUrl.includes('fb.me') &&
-           !post.mediaUrl.includes('spotify.com') &&
-           !post.mediaUrl.includes('twitter.com') &&
-           !post.mediaUrl.includes('x.com') &&
-           !post.mediaUrl.includes('pinterest.com') &&
-           !post.mediaUrl.includes('youtube.com') &&
-           !post.mediaUrl.includes('youtu.be') &&
-           !post.mediaUrl.includes('tiktok.com') &&
-           !(post as any).embed_html)) ? (
+        {/* Article Embeds - Universal system for Medium/Quora/generic blogs */}
+        {EMBED_FEATURE_FLAGS.articles && embedEnabled && post.mediaUrl &&
+         (
+           post.platform === 'medium' ||
+           post.platform === 'quora' ||
+           (
+             post.mediaType === 'none' &&
+             !post.mediaUrl.includes('instagram.com') &&
+             !post.mediaUrl.includes('facebook.com') &&
+             !post.mediaUrl.includes('fb.watch') &&
+             !post.mediaUrl.includes('fb.me') &&
+             !post.mediaUrl.includes('spotify.com') &&
+             !post.mediaUrl.includes('twitter.com') &&
+             !post.mediaUrl.includes('x.com') &&
+             !post.mediaUrl.includes('pinterest.com') &&
+             !post.mediaUrl.includes('youtube.com') &&
+             !post.mediaUrl.includes('youtu.be') &&
+             !post.mediaUrl.includes('tiktok.com') &&
+             !post.mediaUrl.includes('reddit.com') &&
+             !post.mediaUrl.includes('redd.it') &&
+             !(post as any).embed_html
+           )
+         ) ? (
           <div className="mb-2">
             <ArticleEmbed url={post.mediaUrl} />
           </div>
         ) : null}
 
         {/* Universal Meta Embed - Auto-converts URLs to embeds */}
-        {embedEnabled && post.mediaUrl && !((post as any).embed_html) && 
-         (post.mediaUrl.includes('instagram.com') || 
-          post.mediaUrl.includes('facebook.com') || 
-          post.mediaUrl.includes('fb.watch') || 
-          post.mediaUrl.includes('fb.me') ||
-          post.mediaUrl.includes('spotify.com') ||
-          (post.mediaType === 'none' && 
-           platform?.name !== 'X' && 
-           platform?.name !== 'Pinterest')) ? (
+        {embedEnabled && post.mediaUrl && !((post as any).embed_html) &&
+         (
+           post.mediaUrl.includes('reddit.com') ||
+           post.mediaUrl.includes('redd.it') ||
+           post.mediaUrl.includes('instagram.com') ||
+           post.mediaUrl.includes('facebook.com') ||
+           post.mediaUrl.includes('fb.watch') ||
+           post.mediaUrl.includes('fb.me') ||
+           post.mediaUrl.includes('spotify.com') ||
+           (post.mediaType === 'none' && platform?.name !== 'X' && platform?.name !== 'Pinterest')
+         ) ? (
           <div className="mb-2">
             <UniversalMetaEmbed url={post.mediaUrl} />
           </div>
@@ -269,6 +280,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
 
         {embedEnabled && !((post as any).embed_html) && post.mediaType === 'video' && post.mediaUrl && 
           platform?.name !== 'X' && 
+          post.platform !== 'reddit' &&
           !post.mediaUrl.includes('facebook.com') && 
           !post.mediaUrl.includes('fb.watch') && 
           !post.mediaUrl.includes('fb.me') && 
