@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useRef } from "react";
+import { ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface RedditPostEmbedProps {
   url: string;
@@ -11,58 +12,40 @@ interface RedditPostEmbedProps {
 }
 
 export const RedditPostEmbed = ({ url, data }: RedditPostEmbedProps) => {
-  const [embedHtml, setEmbedHtml] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const scriptLoadedRef = useRef(false);
 
   useEffect(() => {
-    const fetchRedditEmbed = async () => {
-      try {
-        setIsLoading(true);
-        // Use Reddit's oEmbed API to get the official embed
-        const oembedUrl = `https://www.reddit.com/oembed?url=${encodeURIComponent(url)}`;
-        const response = await fetch(oembedUrl);
-        const data = await response.json();
-        
-        if (data.html) {
-          setEmbedHtml(data.html);
+    // Load Reddit embed script
+    if (!scriptLoadedRef.current) {
+      const script = document.createElement('script');
+      script.src = 'https://embed.redditmedia.com/widgets/platform.js';
+      script.async = true;
+      script.charset = 'utf-8';
+      document.body.appendChild(script);
+      scriptLoadedRef.current = true;
+
+      return () => {
+        // Cleanup if component unmounts
+        if (script.parentNode) {
+          script.parentNode.removeChild(script);
         }
-      } catch (error) {
-        console.error('Failed to fetch Reddit embed:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchRedditEmbed();
-  }, [url]);
-
-  if (isLoading) {
-    return (
-      <div className="rounded-2xl overflow-hidden border-2 border-border bg-card">
-        <Skeleton className="h-[500px] w-full" />
-      </div>
-    );
-  }
-
-  if (!embedHtml) {
-    return (
-      <div className="rounded-2xl overflow-hidden border-2 border-border bg-card p-4">
-        <a 
-          href={url} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="text-primary hover:underline"
-        >
-          {data.meta.title || 'View post on Reddit'}
-        </a>
-      </div>
-    );
-  }
+      };
+    }
+  }, []);
 
   return (
-    <div 
-      className="rounded-2xl overflow-hidden border-2 border-border bg-card"
-      dangerouslySetInnerHTML={{ __html: embedHtml }}
-    />
+    <div className="rounded-2xl overflow-hidden border border-border bg-card">
+      <div ref={containerRef} className="p-4">
+        <blockquote 
+          className="reddit-card" 
+          data-card-created={Date.now()}
+        >
+          <a href={url} target="_blank" rel="noopener noreferrer">
+            {data.meta.title || 'Reddit Post'}
+          </a>
+        </blockquote>
+      </div>
+    </div>
   );
 };
