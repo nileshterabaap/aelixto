@@ -232,7 +232,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <PinterestEmbed url={post.mediaUrl} />
             </div>
           </>
-        ) : embedEnabled && !((post as any).embed_html) && (post as any).thumbnail_url ? (
+        ) : embedEnabled && !((post as any).embed_html) && (post as any).thumbnail_url && 
+          post.platform !== 'reddit' && 
+          post.platform !== 'medium' && 
+          post.platform !== 'quora' ? (
           <div className="rounded-2xl overflow-hidden mb-2">
             <img 
               src={(post as any).thumbnail_url} 
