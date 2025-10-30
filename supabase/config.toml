@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.unfurl-article]
 verify_jwt = false
+
+[functions.fetch-reddit-post]
+verify_jwt = false
