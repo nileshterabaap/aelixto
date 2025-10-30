@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface RedditPostEmbedProps {
   url: string;
@@ -10,35 +11,58 @@ interface RedditPostEmbedProps {
 }
 
 export const RedditPostEmbed = ({ url, data }: RedditPostEmbedProps) => {
+  const [embedHtml, setEmbedHtml] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
   useEffect(() => {
-    // Load Reddit embed script if not already loaded
-    const existingScript = document.querySelector('script[src="https://embed.redditmedia.com/widgets/platform.js"]');
-    
-    if (!existingScript) {
-      const script = document.createElement('script');
-      script.src = 'https://embed.redditmedia.com/widgets/platform.js';
-      script.async = true;
-      script.charset = 'utf-8';
-      document.body.appendChild(script);
-    } else {
-      // If script already exists, trigger embed rendering
-      if ((window as any).rembeddit) {
-        (window as any).rembeddit.init();
+    const fetchRedditEmbed = async () => {
+      try {
+        setIsLoading(true);
+        // Use Reddit's oEmbed API to get the official embed
+        const oembedUrl = `https://www.reddit.com/oembed?url=${encodeURIComponent(url)}`;
+        const response = await fetch(oembedUrl);
+        const data = await response.json();
+        
+        if (data.html) {
+          setEmbedHtml(data.html);
+        }
+      } catch (error) {
+        console.error('Failed to fetch Reddit embed:', error);
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
+
+    fetchRedditEmbed();
   }, [url]);
 
-  return (
-    <div className="rounded-2xl overflow-hidden border-2 border-border bg-card">
-      <blockquote 
-        className="reddit-embed-bq" 
-        data-embed-theme="light"
-        data-embed-height="500"
-      >
-        <a href={url}>
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl overflow-hidden border-2 border-border bg-card">
+        <Skeleton className="h-[500px] w-full" />
+      </div>
+    );
+  }
+
+  if (!embedHtml) {
+    return (
+      <div className="rounded-2xl overflow-hidden border-2 border-border bg-card p-4">
+        <a 
+          href={url} 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-primary hover:underline"
+        >
           {data.meta.title || 'View post on Reddit'}
         </a>
-      </blockquote>
-    </div>
+      </div>
+    );
+  }
+
+  return (
+    <div 
+      className="rounded-2xl overflow-hidden border-2 border-border bg-card"
+      dangerouslySetInnerHTML={{ __html: embedHtml }}
+    />
   );
 };
