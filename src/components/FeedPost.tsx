@@ -207,7 +207,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           post.mediaUrl.includes('spotify.com') ||
           (post.mediaType === 'none' && 
            platform?.name !== 'X' && 
-           platform?.name !== 'Pinterest')) ? (
+           platform?.name !== 'Pinterest' &&
+           platform?.name !== 'Reddit' &&
+           platform?.name !== 'Medium' &&
+           platform?.name !== 'Quora')) ? (
           <div className="mb-2">
             <UniversalMetaEmbed url={post.mediaUrl} />
           </div>
