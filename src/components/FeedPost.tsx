@@ -246,6 +246,9 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         ) : embedEnabled && !((post as any).embed_html) && post.mediaType === 'image' && post.mediaUrl &&
           platform?.name !== 'X' && 
           platform?.name !== 'Pinterest' && 
+          post.platform !== 'reddit' && 
+          post.platform !== 'medium' && 
+          post.platform !== 'quora' && 
           !post.mediaUrl.includes('instagram.com') && 
           !post.mediaUrl.includes('facebook.com') && 
           !post.mediaUrl.includes('fb.watch') && 
