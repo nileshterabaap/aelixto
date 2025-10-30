@@ -38,6 +38,3 @@ export const loadFacebookSDK = () => loadScript('https://connect.facebook.net/en
 
 // Pinterest embed script loader
 export const loadPinterestEmbed = () => loadScript('https://assets.pinterest.com/js/pinit.js');
-
-// Reddit embed script loader
-export const loadRedditEmbed = () => loadScript('https://embed.reddit.com/widgets.js');
