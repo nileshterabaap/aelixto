@@ -23,6 +23,7 @@ import { RawEmbedRenderer } from "@/components/RawEmbedRenderer";
 import { UniversalMetaEmbed } from "@/components/UniversalMetaEmbed";
 import { isEmbedEnabled, type EmbedPlatform, EMBED_FEATURE_FLAGS } from "@/config/embedFeatureFlags";
 import { ArticleEmbed } from "@/features/article-embeds";
+import RedditEmbed from "@/components/embeds/RedditEmbed";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -115,7 +116,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
 
   const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost, isDeleting } = postActions;
 
-  console.log('[FeedPost] chosenRenderer', { id: post.id, platform: post.platform, url: post.mediaUrl });
+  console.log('chosenRenderer', { id: post.id, platform: post.platform, url: post.mediaUrl });
 
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
@@ -179,6 +180,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
+        {/* Reddit: render only the official embed */}
+        {embedEnabled && post.mediaUrl && (
+          post.mediaUrl.includes("reddit.com") || post.mediaUrl.includes("redd.it")
+        ) ? (
+          <div className="mb-2">
+            <RedditEmbed url={post.mediaUrl} />
+          </div>
+        ) : null}
+
         {/* Article Embeds - Universal system for Medium/Quora/generic blogs */}
         {EMBED_FEATURE_FLAGS.articles && embedEnabled && post.mediaUrl &&
          (
@@ -210,8 +220,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {/* Universal Meta Embed - Auto-converts URLs to embeds */}
         {embedEnabled && post.mediaUrl && !((post as any).embed_html) &&
          (
-           post.mediaUrl.includes('reddit.com') ||
-           post.mediaUrl.includes('redd.it') ||
            post.mediaUrl.includes('instagram.com') ||
            post.mediaUrl.includes('facebook.com') ||
            post.mediaUrl.includes('fb.watch') ||
