@@ -23,6 +23,7 @@ import { RawEmbedRenderer } from "@/components/RawEmbedRenderer";
 import { UniversalMetaEmbed } from "@/components/UniversalMetaEmbed";
 import { isEmbedEnabled, type EmbedPlatform, EMBED_FEATURE_FLAGS } from "@/config/embedFeatureFlags";
 import { ArticleEmbed } from "@/features/article-embeds";
+import { QuoraArticleCard } from "@/features/article-embeds/QuoraArticleCard";
 import RedditEmbed from "@/components/embeds/RedditEmbed";
 
 interface FeedPostProps {
@@ -213,7 +214,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
            )
          ) ? (
           <div className="mb-2">
-            <ArticleEmbed url={post.mediaUrl} />
+            {post.platform === 'quora' || /quora\.com/.test(post.mediaUrl) ? (
+              <QuoraArticleCard url={post.mediaUrl} />
+            ) : (
+              <ArticleEmbed url={post.mediaUrl} />
+            )}
           </div>
         ) : null}
 
