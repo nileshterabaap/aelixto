@@ -25,6 +25,7 @@ import { isEmbedEnabled, type EmbedPlatform, EMBED_FEATURE_FLAGS } from "@/confi
 import { ArticleEmbed } from "@/features/article-embeds";
 import RedditEmbed from "@/components/embeds/RedditEmbed";
 import { resolveRenderer } from "@/lib/resolveRenderer";
+import { QuoraPreviewCard } from "@/features/article-embeds/QuoraPreviewCard";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -76,6 +77,14 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const platform = getPlatformIcon(post.platform);
   
+  // Check if this is a Quora URL for isolated preview card
+  const isQuoraUrl =
+    !!post.mediaUrl &&
+    (() => {
+      try { return /(^|\.)quora\.com$/i.test(new URL(post.mediaUrl).hostname); }
+      catch { return false; }
+    })();
+  
   // Check if this embed type is enabled via feature flags
   const embedEnabled = post.platform ? isEmbedEnabled(post.platform.toLowerCase() as EmbedPlatform) : true;
   
@@ -116,6 +125,114 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
       };
 
   const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost, isDeleting } = postActions;
+
+  // Quora preview is fully isolated and optional.
+  // If the flag is OFF, nothing changes.
+  // If ON and URL is Quora, render the preview and RETURN early.
+  // This does not touch Reddit or any other renderer.
+  if (EMBED_FEATURE_FLAGS.quora_preview && isQuoraUrl) {
+    return (
+      <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
+        <div className="p-5">
+          {/* Author Info */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full overflow-hidden bg-muted">
+              <img 
+                src={post.author.avatar} 
+                alt={post.author.username}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-base">{post.author.username}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {platform && post.platform !== 'twitter' && (
+                <img 
+                  src={platform.icon} 
+                  alt={platform.name}
+                  className="w-6 h-6"
+                />
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-6 w-6" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {post.isRealPost && (post as any).user_id === userId && (
+                    <DropdownMenuItem 
+                      onClick={() => deletePost()}
+                      disabled={isDeleting}
+                      className="text-destructive focus:text-destructive cursor-pointer"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          {/* Caption */}
+          {post.content && (
+            <p className="text-sm mb-3">{post.content}</p>
+          )}
+
+          {/* Quora Preview Card */}
+          <div className="mb-2">
+            <QuoraPreviewCard url={post.mediaUrl!} />
+          </div>
+
+          {/* Title */}
+          <div className="mt-3">
+            <h2 className="text-lg font-bold">{post.title}</h2>
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center justify-around px-2 py-4 mt-1">
+            <button
+              onClick={() => toggleLike()}
+              className="p-2 hover:opacity-60 transition-opacity"
+            >
+              <Heart className={`h-7 w-7 stroke-[1.5] ${isLiked ? 'fill-red-500 text-red-500' : 'fill-none'}`} />
+            </button>
+            <button 
+              onClick={() => setCommentsOpen(true)}
+              className="p-2 hover:opacity-60 transition-opacity"
+            >
+              <MessageCircle className="h-7 w-7 stroke-[1.5] fill-none" />
+            </button>
+            <button className="p-2 hover:opacity-60 transition-opacity">
+              <Repeat2 className="h-8 w-8 stroke-[2.5]" />
+            </button>
+            <button 
+              onClick={handleShare}
+              className="p-2 hover:opacity-60 transition-opacity"
+            >
+              <Share className="h-7 w-7 stroke-[1.5]" />
+            </button>
+            <button
+              onClick={() => toggleSave()}
+              className="p-2 hover:opacity-60 transition-opacity"
+            >
+              <Bookmark className={`h-7 w-7 stroke-[1.5] ${isSaved ? 'fill-current' : 'fill-none'}`} />
+            </button>
+          </div>
+        </div>
+        
+        {post.isRealPost && (
+          <CommentsDialog 
+            open={commentsOpen} 
+            onOpenChange={setCommentsOpen}
+            postId={post.id}
+          />
+        )}
+      </Card>
+    );
+  }
 
   const r = resolveRenderer(post);
   console.log('renderer', post.id, post.platform, post.mediaUrl, r.kind);

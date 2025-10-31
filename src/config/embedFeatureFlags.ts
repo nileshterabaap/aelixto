@@ -12,6 +12,8 @@ export const EMBED_FEATURE_FLAGS = {
   medium: true,
   // Article embeds - Universal system for written content
   articles: true,
+  // Quora preview card - isolated feature (default OFF)
+  quora_preview: false,
 } as const;
 
 export type EmbedPlatform = keyof typeof EMBED_FEATURE_FLAGS;
