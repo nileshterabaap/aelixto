@@ -84,9 +84,22 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
       try {
         let urlToParse = post.mediaUrl.trim();
         
-        // Prepend 'https://' if no protocol is found, as the URL constructor requires it
+        // Return false if URL is empty or too short
+        if (!urlToParse || urlToParse.length < 5) {
+          return false;
+        }
+        
+        // Clean URL: take first segment if there are spaces/duplicates
+        urlToParse = urlToParse.split(/\s+/)[0];
+        
+        // Prepend 'https://' if no protocol is found
         if (!urlToParse.startsWith('http://') && !urlToParse.startsWith('https://')) {
           urlToParse = `https://${urlToParse}`;
+        }
+        
+        // Final check: ensure there's content after the protocol
+        if (urlToParse === 'https://' || urlToParse === 'http://') {
+          return false;
         }
 
         const url = new URL(urlToParse);
