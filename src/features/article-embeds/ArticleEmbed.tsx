@@ -33,8 +33,16 @@ const cleanUrl = (url: string): string => {
   if (!url) return url;
   
   try {
-    // Trim and take first segment if there are spaces/duplicates
-    const cleaned = url.trim().split(/\s+/)[0];
+    // Trim and split by whitespace
+    const segments = url.trim().split(/\s+/);
+    
+    // Take the LAST segment (has query params for Quora URLs)
+    const cleaned = segments[segments.length - 1];
+    
+    // Skip if it's a relative URL or invalid
+    if (cleaned.startsWith('/') || cleaned.length < 10) {
+      return url;
+    }
     
     // Ensure it has a protocol
     if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
