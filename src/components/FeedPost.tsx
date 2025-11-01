@@ -81,8 +81,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const isQuoraUrl =
     !!post.mediaUrl &&
     (() => {
-      try { return /(^|\.)quora\.com$/i.test(new URL(post.mediaUrl).hostname); }
-      catch { return false; }
+      try {
+        // Clean the URL first (handle duplicates/spaces from DB)
+        const cleanedUrl = post.mediaUrl.split(/\s+/)[0];
+        return /(^|\.)quora\.com$/i.test(new URL(cleanedUrl).hostname);
+      } catch { return false; }
     })();
   
   // Check if this embed type is enabled via feature flags
