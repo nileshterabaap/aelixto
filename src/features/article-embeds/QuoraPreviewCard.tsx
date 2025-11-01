@@ -3,11 +3,18 @@ import { useEffect, useState } from "react";
 type Data = { title: string; image?: string; excerpt?: string; finalUrl: string };
 const TIMEOUT_MS = 3000;
 
+function cleanUrl(url: string): string {
+  // Remove any duplicate URLs or spaces that might be concatenated
+  const firstUrl = url.split(/\s+/)[0];
+  // Ensure the URL starts with http:// or https://
+  return firstUrl.startsWith('http') ? firstUrl : `https://${firstUrl}`;
+}
+
 async function fetchWithFallback(url: string, signal?: AbortSignal) {
+  const cleanedUrl = cleanUrl(url);
   const sources = [
-    `https://r.jina.ai/http/${encodeURIComponent(url)}`,
-    `https://r.jina.ai/http://r.jina.ai/http/${encodeURIComponent(url)}`,
-    `https://r.jina.ai/http/https://r.jina.ai/http/${encodeURIComponent(url)}`
+    `https://r.jina.ai/${cleanedUrl}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(cleanedUrl)}`,
   ];
   for (const src of sources) {
     try {
