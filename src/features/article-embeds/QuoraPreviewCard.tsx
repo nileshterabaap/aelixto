@@ -17,18 +17,14 @@ function isQuora(url: string) {
 async function normalizeQuoraUrl(raw: string): Promise<string> {
   try {
     const u = new URL(raw);
-    // If short link qr.ae, expand once via HEAD-like mirror (GET with no-cors is blocked).
-    if (u.hostname === "qr.ae") {
-      // use r.jina.ai to resolve final HTML, then look for canonical
-      const html = await safeFetchMirrors(raw);
-      const canon = extractCanonical(html) || raw;
-      return canon;
-    }
-    // Force https + www host and drop query strings that are just trackers
+    // keep it on www.quora.com whenever possible (avoid developments.quora.com)
     if (u.hostname.endsWith("quora.com")) {
-      const host = "www.quora.com";
-      const path = u.pathname || "/";
-      return `https://${host}${path}`;
+      return `https://www.quora.com${u.pathname}`;
+    }
+    // expand qr.ae by fetching once through r.jina.ai and reading canonical
+    if (u.hostname === "qr.ae") {
+      const html = await safeFetchMirrors(raw);
+      return extractCanonical(html) || raw;
     }
     return raw;
   } catch {
@@ -46,16 +42,19 @@ function extractCanonical(html: string): string | null {
 // --- HTML fetching (CORS-safe via mirrors) -----------------------------------
 
 async function safeFetchMirrors(url: string, signal?: AbortSignal): Promise<string> {
-  const sources = [
-    `https://r.jina.ai/http/${encodeURIComponent(url)}`,
-    `https://r.jina.ai/http/http://${encodeURIComponent(new URL(url).hostname)}${new URL(url).pathname}`,
-    `https://r.jina.ai/http/https://${encodeURIComponent(new URL(url).hostname)}${new URL(url).pathname}`
+  // r.jina.ai expects a RAW URL after /http/, not encoded
+  const raw = (u: string) => `https://r.jina.ai/http/${u}`;
+  const u = new URL(url);
+  const candidates = [
+    raw(`${u.protocol}//${u.host}${u.pathname}${u.search}`),
+    raw(`https://${u.host}${u.pathname}${u.search}`),
+    raw(`http://${u.host}${u.pathname}${u.search}`),
   ];
-  for (const src of sources) {
+  for (const src of candidates) {
     try {
-      const res = await fetch(src, { signal });
+      const res = await fetch(src, { signal, cache: "no-store" });
       if (res.ok) return await res.text();
-    } catch { /* next */ }
+    } catch {}
   }
   throw new Error("All mirrors failed");
 }
