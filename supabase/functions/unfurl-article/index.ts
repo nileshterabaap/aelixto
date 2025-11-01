@@ -98,27 +98,15 @@ const sanitizeHtml = (html: string): string => {
 const cleanUrl = (url: string): string => {
   if (!url) return url;
   
-  try {
-    // Trim and split by whitespace
-    const segments = url.trim().split(/\s+/);
-    
-    // Take the LAST segment (has query params for Quora URLs)
-    const cleaned = segments[segments.length - 1];
-    
-    // Skip if it's a relative URL or too short
-    if (cleaned.startsWith('/') || cleaned.length < 10) {
-      throw new Error('Invalid URL format');
-    }
-    
-    // Ensure it has a protocol
-    if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
-      return `https://${cleaned}`;
-    }
-    
-    return cleaned;
-  } catch {
-    return url;
+  // Trim and take first segment if there are spaces/duplicates
+  const cleaned = url.trim().split(/\s+/)[0];
+  
+  // Ensure it has a protocol
+  if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+    return `https://${cleaned}`;
   }
+  
+  return cleaned;
 };
 
 serve(async (req) => {
