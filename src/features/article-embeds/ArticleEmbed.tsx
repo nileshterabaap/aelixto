@@ -28,6 +28,25 @@ interface UnfurlResult {
   };
 }
 
+// Clean malformed URLs (handle duplicates, spaces, etc.)
+const cleanUrl = (url: string): string => {
+  if (!url) return url;
+  
+  try {
+    // Trim and take first segment if there are spaces/duplicates
+    const cleaned = url.trim().split(/\s+/)[0];
+    
+    // Ensure it has a protocol
+    if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+      return `https://${cleaned}`;
+    }
+    
+    return cleaned;
+  } catch {
+    return url;
+  }
+};
+
 // Determine renderer type based on URL
 const resolveRenderer = (url: string): 'reddit' | 'quora' | 'article' => {
   const urlLower = url.toLowerCase();
@@ -47,7 +66,10 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
   const [data, setData] = useState<UnfurlResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const rendererType = resolveRenderer(url);
+  
+  // Clean the URL before processing
+  const cleanedUrl = cleanUrl(url);
+  const rendererType = resolveRenderer(cleanedUrl);
 
   useEffect(() => {
     const unfurlArticle = async () => {
@@ -55,12 +77,12 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
         setIsLoading(true);
         setError(null);
 
-        console.log('[ArticleEmbed] Unfurling URL:', url);
+        console.log('[ArticleEmbed] Unfurling URL:', cleanedUrl);
 
         const { data: result, error: fetchError } = await supabase.functions.invoke(
           'unfurl-article',
           {
-            body: { url },
+            body: { url: cleanedUrl },
           }
         );
 
@@ -81,7 +103,7 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
     };
 
     unfurlArticle();
-  }, [url]);
+  }, [cleanedUrl]);
 
   if (isLoading) {
     return (
@@ -98,12 +120,19 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
 
   if (error || !data) {
     // Graceful fallback - just show title and link, no error message
+    let fallbackDomain = cleanedUrl;
+    try {
+      fallbackDomain = new URL(cleanedUrl).hostname;
+    } catch {
+      // If URL is still invalid, use as-is
+    }
+    
     return (
       <LinkPreviewCard
-        url={url}
-        title={data?.meta.title || new URL(url).hostname}
+        url={cleanedUrl}
+        title={data?.meta.title || fallbackDomain}
         description=""
-        domain={new URL(url).hostname}
+        domain={fallbackDomain}
         favicon={data?.site.favicon}
         siteName={data?.site.name}
       />

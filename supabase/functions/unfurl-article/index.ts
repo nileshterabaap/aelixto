@@ -94,21 +94,38 @@ const sanitizeHtml = (html: string): string => {
   return html;
 };
 
+// Clean malformed URLs (handle duplicates, spaces, etc.)
+const cleanUrl = (url: string): string => {
+  if (!url) return url;
+  
+  // Trim and take first segment if there are spaces/duplicates
+  const cleaned = url.trim().split(/\s+/)[0];
+  
+  // Ensure it has a protocol
+  if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+    return `https://${cleaned}`;
+  }
+  
+  return cleaned;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { url: targetUrl } = await req.json();
+    const { url: rawUrl } = await req.json();
 
-    if (!targetUrl) {
+    if (!rawUrl) {
       return new Response(
         JSON.stringify({ error: 'Missing url parameter' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    // Clean the URL before processing
+    const targetUrl = cleanUrl(rawUrl);
     console.log('[unfurl-article] Processing URL:', targetUrl);
 
     // Initialize Supabase client
