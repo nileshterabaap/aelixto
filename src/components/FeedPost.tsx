@@ -82,10 +82,18 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
     !!post.mediaUrl &&
     (() => {
       try {
-        // Clean the URL first (handle duplicates/spaces from DB)
-        const cleanedUrl = post.mediaUrl.split(/\s+/)[0];
-        return /(^|\.)quora\.com$/i.test(new URL(cleanedUrl).hostname);
-      } catch { return false; }
+        let urlToParse = post.mediaUrl.trim();
+        
+        // Prepend 'https://' if no protocol is found, as the URL constructor requires it
+        if (!urlToParse.startsWith('http://') && !urlToParse.startsWith('https://')) {
+          urlToParse = `https://${urlToParse}`;
+        }
+
+        const url = new URL(urlToParse);
+        return /(^|\.)quora\.com$/i.test(url.hostname);
+      } catch {
+        return false;
+      }
     })();
   
   // Check if this embed type is enabled via feature flags
