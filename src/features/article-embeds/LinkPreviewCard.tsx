@@ -28,39 +28,25 @@ export const LinkPreviewCard = ({
         rel="noopener noreferrer"
         className="block"
       >
+        {/* Thumbnail Image - displayed at the top */}
+        {image && (
+          <div className="relative w-full aspect-[16/9] bg-muted">
+            <img
+              src={image}
+              alt={title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          </div>
+        )}
+
         {/* Content */}
         <div className="p-5 space-y-3">
-          {/* Title */}
-          <h3 className="text-xl font-bold leading-tight text-foreground line-clamp-2">
-            {title}
-          </h3>
-
-          {/* Image */}
-          {image && (
-            <div className="relative w-full h-48 rounded-xl overflow-hidden bg-muted">
-              <img
-                src={image}
-                alt={title}
-                className="w-full h-full object-cover"
-                loading="lazy"
-                width="400"
-                height="192"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none';
-                }}
-              />
-            </div>
-          )}
-
-          {/* Description */}
-          {description && (
-            <p className="text-muted-foreground leading-relaxed line-clamp-3">
-              {description}
-            </p>
-          )}
-
-          {/* Site Info */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2">
+          {/* Site Info - at the top */}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             {favicon && (
               <img
                 src={favicon}
@@ -75,7 +61,24 @@ export const LinkPreviewCard = ({
             <span className="font-medium truncate">
               {siteName || domain}
             </span>
-            <ExternalLink className="h-3 w-3 ml-auto" />
+          </div>
+
+          {/* Title */}
+          <h3 className="text-base font-semibold leading-snug text-foreground line-clamp-2">
+            {title}
+          </h3>
+
+          {/* Description */}
+          {description && (
+            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
+              {description}
+            </p>
+          )}
+
+          {/* Read more link */}
+          <div className="flex items-center gap-1 text-sm font-medium text-primary pt-1">
+            <span>Read more</span>
+            <ExternalLink className="h-3 w-3" />
           </div>
         </div>
       </a>
