@@ -83,11 +83,11 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
 
         {/* Thumbnail */}
         {data.meta.image && (
-          <div className="relative w-full h-48 rounded-xl overflow-hidden bg-muted">
+          <div className="relative w-full h-48 rounded-xl overflow-hidden bg-muted mx-auto">
             <img
               src={data.meta.image}
               alt={data.meta.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover object-center"
               loading="lazy"
               width="400"
               height="192"
