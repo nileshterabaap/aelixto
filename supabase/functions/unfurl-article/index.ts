@@ -194,15 +194,17 @@ serve(async (req) => {
           redirect: 'follow',
         });
         
+        console.log('[unfurl-article] Mobile response status:', mobileResponse.status);
+        
         if (mobileResponse.ok) {
           html = await mobileResponse.text();
           resolvedUrl = mobileResponse.url;
-          console.log('[unfurl-article] Success with mobile user agent');
+          console.log('[unfurl-article] Success with mobile user agent, HTML length:', html.length);
         } else {
           throw new Error(`Mobile fetch failed: ${mobileResponse.status}`);
         }
       } catch (mobileError) {
-        console.log('[unfurl-article] Mobile strategy failed:', mobileError);
+        console.log('[unfurl-article] Mobile strategy failed:', mobileError instanceof Error ? mobileError.message : String(mobileError));
         
         // Strategy 2: Desktop with enhanced headers
         const desktopHeaders = {
@@ -229,15 +231,17 @@ serve(async (req) => {
             redirect: 'follow',
           });
           
+          console.log('[unfurl-article] Desktop response status:', desktopResponse.status);
+          
           if (desktopResponse.ok) {
             html = await desktopResponse.text();
             resolvedUrl = desktopResponse.url;
-            console.log('[unfurl-article] Success with desktop headers');
+            console.log('[unfurl-article] Success with desktop headers, HTML length:', html.length);
           } else {
             throw new Error(`Desktop fetch failed: ${desktopResponse.status}`);
           }
         } catch (desktopError) {
-          console.log('[unfurl-article] Desktop strategy failed:', desktopError);
+          console.log('[unfurl-article] Desktop strategy failed:', desktopError instanceof Error ? desktopError.message : String(desktopError));
           
           // Strategy 3: r.jina.ai proxy
           try {
@@ -251,15 +255,18 @@ serve(async (req) => {
               redirect: 'follow',
             });
             
+            console.log('[unfurl-article] Jina response status:', jinaResponse.status);
+            
             if (jinaResponse.ok) {
               html = await jinaResponse.text();
               resolvedUrl = targetUrl; // Use original URL
-              console.log('[unfurl-article] Success with r.jina.ai proxy');
+              console.log('[unfurl-article] Success with r.jina.ai proxy, HTML length:', html.length);
+              console.log('[unfurl-article] HTML sample (first 500 chars):', html.substring(0, 500));
             } else {
               throw new Error(`Jina fetch failed: ${jinaResponse.status}`);
             }
           } catch (jinaError) {
-            console.log('[unfurl-article] All strategies failed for Quora');
+            console.log('[unfurl-article] All strategies failed for Quora:', jinaError instanceof Error ? jinaError.message : String(jinaError));
             // Return minimal data with placeholder
             return new Response(
               JSON.stringify({
@@ -316,18 +323,21 @@ serve(async (req) => {
 
     // Extract metadata
     const title = extractTitle(html);
+    console.log('[unfurl-article] Extracted title:', title);
     
     // Description with fallback to content excerpt
     let description = extractMetaContent(html, 'og:description') || 
                      extractMetaContent(html, 'description', 'name') || 
                      extractMetaContent(html, 'twitter:description', 'name') || 
                      '';
+    console.log('[unfurl-article] Extracted description:', description ? description.substring(0, 100) : 'none');
     
     // If no description, extract from content
     if (!description) {
       const articleContent = extractArticleContent(html);
       if (articleContent) {
         description = extractTextExcerpt(articleContent);
+        console.log('[unfurl-article] Extracted description from content:', description.substring(0, 100));
       }
     }
     
@@ -336,6 +346,7 @@ serve(async (req) => {
                extractMetaContent(html, 'twitter:image', 'name') || 
                extractMetaContent(html, 'og:image:url') || 
                '';
+    console.log('[unfurl-article] Extracted og:image:', image ? 'found' : 'none');
     
     // Fallback to first content image if no OG image
     if (!image) {
@@ -344,6 +355,7 @@ serve(async (req) => {
         const contentImage = extractFirstContentImage(articleContent);
         if (contentImage) {
           image = contentImage.startsWith('http') ? contentImage : new URL(contentImage, resolvedUrl).href;
+          console.log('[unfurl-article] Found content image:', image);
         }
       }
     }
