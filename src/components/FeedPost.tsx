@@ -207,7 +207,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
 
           {/* Quora Preview Card */}
           <div className="mb-2">
-            <QuoraPreviewCard url={post.mediaUrl!} />
+            <QuoraPreviewCard url={post.mediaUrl!} thumbnail={(post as any).thumbnail_url} />
           </div>
 
           {/* Title */}

@@ -1,4 +1,4 @@
-export function QuoraPreviewCard({ url }: { url: string }) {
+export function QuoraPreviewCard({ url, thumbnail }: { url: string; thumbnail?: string | null }) {
   // Extract title from URL (last part of path, replace dashes with spaces)
   const getTitle = (urlString: string) => {
     try {
@@ -18,6 +18,13 @@ export function QuoraPreviewCard({ url }: { url: string }) {
 
   return (
     <article className="rounded-2xl border overflow-hidden">
+      {thumbnail && (
+        <img 
+          src={thumbnail} 
+          alt="" 
+          className="w-full h-auto object-cover aspect-[16/9]" 
+        />
+      )}
       <div className="p-4">
         <div className="text-xs text-muted-foreground mb-1">Quora</div>
         <h3 className="font-semibold text-base leading-snug line-clamp-2">{title}</h3>
