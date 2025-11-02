@@ -109,7 +109,7 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
               rel="noopener noreferrer"
             >
               <ExternalLink className="h-4 w-4 mr-2" />
-              Read on {data.site.name}
+              Continue Reading
             </a>
           </Button>
         </div>
