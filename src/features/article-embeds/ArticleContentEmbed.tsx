@@ -35,8 +35,31 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
     }
   };
 
-  // Use description if no HTML content
-  const excerpt = data.meta.description || '';
+  // Extract text from article HTML content, fallback to description
+  const getExcerpt = () => {
+    if (data.content?.html) {
+      // Remove HTML tags and get plain text
+      const text = data.content.html
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      
+      // Get first 2-3 sentences (up to 200 chars)
+      const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+      let excerpt = '';
+      for (const sentence of sentences.slice(0, 3)) {
+        if (excerpt.length + sentence.length <= 200) {
+          excerpt += sentence;
+        } else break;
+      }
+      return excerpt.trim() || data.meta.description || '';
+    }
+    return data.meta.description || '';
+  };
+  
+  const excerpt = getExcerpt();
 
   return (
     <article className="rounded-2xl overflow-hidden border border-border bg-card hover:shadow-lg transition-all">
