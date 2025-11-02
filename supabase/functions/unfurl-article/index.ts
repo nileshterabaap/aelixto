@@ -172,8 +172,7 @@ serve(async (req) => {
     // For Quora, use r.jina.ai to bypass restrictions
     let fetchUrl = targetUrl;
     if (kind === 'quora-post') {
-      const u = new URL(targetUrl);
-      fetchUrl = `https://r.jina.ai/http/${u.protocol}//${u.host}${u.pathname}${u.search}`;
+      fetchUrl = `https://r.jina.ai/${targetUrl}`;
       console.log('[unfurl-article] Using r.jina.ai for Quora:', fetchUrl);
     }
 
