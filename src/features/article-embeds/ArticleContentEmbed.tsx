@@ -87,11 +87,14 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
           </div>
         )}
 
-        {/* Excerpt (2-3 sentences, ~200-260 chars) */}
+        {/* Excerpt with fade effect */}
         {excerpt && (
-          <p className="text-muted-foreground leading-relaxed line-clamp-3">
-            {excerpt}
-          </p>
+          <div className="relative">
+            <p className="text-muted-foreground leading-relaxed line-clamp-3">
+              {excerpt}
+            </p>
+            <div className="absolute bottom-0 right-0 w-32 h-6 bg-gradient-to-l from-card to-transparent pointer-events-none" />
+          </div>
         )}
 
         {/* Site Info */}

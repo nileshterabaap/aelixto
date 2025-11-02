@@ -79,10 +79,11 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
 
         console.log('[ArticleEmbed] Unfurling URL:', cleanedUrl);
 
+        // Add timestamp to bypass cache
         const { data: result, error: fetchError } = await supabase.functions.invoke(
           'unfurl-article',
           {
-            body: { url: cleanedUrl },
+            body: { url: cleanedUrl, bustCache: Date.now() },
           }
         );
 
