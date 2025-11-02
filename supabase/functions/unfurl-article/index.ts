@@ -169,65 +169,150 @@ serve(async (req) => {
 
     console.log('[unfurl-article] Detected kind:', kind);
 
-    // For Quora, try multiple approaches to bypass restrictions
-    let fetchUrl = targetUrl;
-    let fetchHeaders = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'Connection': 'keep-alive',
-      'Upgrade-Insecure-Requests': '1',
-      'Sec-Fetch-Dest': 'document',
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'none',
-      'Cache-Control': 'max-age=0',
-    };
-
+    // Multi-strategy approach for fetching content
+    let html = '';
+    let resolvedUrl = targetUrl;
+    
     if (kind === 'quora-post') {
-      // Try direct fetch first, fallback to r.jina.ai if needed
-      console.log('[unfurl-article] Fetching Quora directly');
-    }
-
-    // Fetch HTML with proper headers
-    const response = await fetch(fetchUrl, {
-      headers: fetchHeaders,
-      redirect: 'follow',
-    });
-
-    if (!response.ok) {
-      console.log('[unfurl-article] HTTP error:', response.status);
-      // For 403/401, try to get OG data from error page or return minimal data
-      if (response.status === 403 || response.status === 401) {
-        const result = {
-          kind,
-          resolvedUrl: targetUrl,
-          site: {
-            name: new URL(targetUrl).hostname.replace('www.', ''),
-            domain: new URL(targetUrl).hostname,
-            favicon: new URL('/favicon.ico', targetUrl).href,
-          },
-          meta: {
-            title: targetUrl,
-            description: 'Content not available',
-            image: null,
-            publishedTime: null,
-          },
-          content: {
-            html: '',
-          },
+      console.log('[unfurl-article] Attempting Quora fetch with multiple strategies');
+      
+      // Strategy 1: Mobile user agent (less protection)
+      const mobileHeaders = {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+      };
+      
+      try {
+        console.log('[unfurl-article] Strategy 1: Mobile user agent');
+        const mobileResponse = await fetch(targetUrl, {
+          headers: mobileHeaders,
+          redirect: 'follow',
+        });
+        
+        if (mobileResponse.ok) {
+          html = await mobileResponse.text();
+          resolvedUrl = mobileResponse.url;
+          console.log('[unfurl-article] Success with mobile user agent');
+        } else {
+          throw new Error(`Mobile fetch failed: ${mobileResponse.status}`);
+        }
+      } catch (mobileError) {
+        console.log('[unfurl-article] Mobile strategy failed:', mobileError);
+        
+        // Strategy 2: Desktop with enhanced headers
+        const desktopHeaders = {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Cache-Control': 'max-age=0',
+          'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': '"Windows"',
         };
         
-        return new Response(
-          JSON.stringify(result),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        try {
+          console.log('[unfurl-article] Strategy 2: Enhanced desktop headers');
+          const desktopResponse = await fetch(targetUrl, {
+            headers: desktopHeaders,
+            redirect: 'follow',
+          });
+          
+          if (desktopResponse.ok) {
+            html = await desktopResponse.text();
+            resolvedUrl = desktopResponse.url;
+            console.log('[unfurl-article] Success with desktop headers');
+          } else {
+            throw new Error(`Desktop fetch failed: ${desktopResponse.status}`);
+          }
+        } catch (desktopError) {
+          console.log('[unfurl-article] Desktop strategy failed:', desktopError);
+          
+          // Strategy 3: r.jina.ai proxy
+          try {
+            console.log('[unfurl-article] Strategy 3: Using r.jina.ai proxy');
+            const jinaUrl = `https://r.jina.ai/${targetUrl}`;
+            const jinaResponse = await fetch(jinaUrl, {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              },
+              redirect: 'follow',
+            });
+            
+            if (jinaResponse.ok) {
+              html = await jinaResponse.text();
+              resolvedUrl = targetUrl; // Use original URL
+              console.log('[unfurl-article] Success with r.jina.ai proxy');
+            } else {
+              throw new Error(`Jina fetch failed: ${jinaResponse.status}`);
+            }
+          } catch (jinaError) {
+            console.log('[unfurl-article] All strategies failed for Quora');
+            // Return minimal data with placeholder
+            return new Response(
+              JSON.stringify({
+                kind,
+                resolvedUrl: targetUrl,
+                site: {
+                  name: 'Quora',
+                  domain: new URL(targetUrl).hostname,
+                  favicon: 'https://qsf.cf2.quoracdn.net/-4-images.favicon.ico-26-8c912802e29ec03e.ico',
+                },
+                meta: {
+                  title: 'Quora Post',
+                  description: 'Content blocked by Quora protection',
+                  image: null,
+                  publishedTime: null,
+                },
+                content: {
+                  html: '',
+                },
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
       }
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    } else {
+      // For non-Quora sites, use standard fetch
+      const standardHeaders = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0',
+      };
+      
+      const response = await fetch(targetUrl, {
+        headers: standardHeaders,
+        redirect: 'follow',
+      });
 
-    const html = await response.text();
-    const resolvedUrl = response.url;
+      if (!response.ok) {
+        console.log('[unfurl-article] HTTP error:', response.status);
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      html = await response.text();
+      resolvedUrl = response.url;
+    }
 
     // Extract metadata
     const title = extractTitle(html);
