@@ -37,7 +37,11 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
 
   // Extract text from article HTML content, fallback to description
   const getExcerpt = () => {
+    console.log('[ArticleContentEmbed] data.content:', data.content);
+    
     if (data.content?.html) {
+      console.log('[ArticleContentEmbed] HTML length:', data.content.html.length);
+      
       // Remove HTML tags and get plain text
       const text = data.content.html
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
@@ -45,6 +49,8 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
         .replace(/<[^>]+>/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
+      
+      console.log('[ArticleContentEmbed] Extracted text:', text.substring(0, 300));
       
       // Get first 2-3 sentences (up to 200 chars)
       const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
@@ -54,8 +60,13 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
           excerpt += sentence;
         } else break;
       }
-      return excerpt.trim() || data.meta.description || '';
+      
+      const result = excerpt.trim() || data.meta.description || '';
+      console.log('[ArticleContentEmbed] Final excerpt:', result);
+      return result;
     }
+    
+    console.log('[ArticleContentEmbed] No HTML content, using description');
     return data.meta.description || '';
   };
   
