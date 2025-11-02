@@ -169,27 +169,29 @@ serve(async (req) => {
 
     console.log('[unfurl-article] Detected kind:', kind);
 
-    // For Quora, use r.jina.ai to bypass restrictions
+    // For Quora, try multiple approaches to bypass restrictions
     let fetchUrl = targetUrl;
+    let fetchHeaders = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Cache-Control': 'max-age=0',
+    };
+
     if (kind === 'quora-post') {
-      fetchUrl = `https://r.jina.ai/${targetUrl}`;
-      console.log('[unfurl-article] Using r.jina.ai for Quora:', fetchUrl);
+      // Try direct fetch first, fallback to r.jina.ai if needed
+      console.log('[unfurl-article] Fetching Quora directly');
     }
 
     // Fetch HTML with proper headers
     const response = await fetch(fetchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Upgrade-Insecure-Requests': '1',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-        'Cache-Control': 'max-age=0',
-      },
+      headers: fetchHeaders,
       redirect: 'follow',
     });
 
