@@ -96,7 +96,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
 
     // Detect platform and media type
     let platform = "";
-    let mediaType = "image";
+    let mediaType = "none"; // Default to "none" for articles/blogs
     
     if (linkUrl.includes("youtube.com") || linkUrl.includes("youtu.be")) {
       platform = "youtube";
@@ -106,6 +106,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       mediaType = "video";
     } else if (linkUrl.includes("instagram.com")) {
       platform = "instagram";
+      mediaType = "image";
       if (linkUrl.includes("/reel/") || linkUrl.includes("/reels/")) {
         mediaType = "video";
       }
@@ -114,7 +115,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       mediaType = "none";
     } else if (linkUrl.includes("twitter.com") || linkUrl.includes("x.com")) {
       platform = "twitter";
-      mediaType = "video"; // Twitter embeds handle both images and videos
+      mediaType = "video";
     } else if (linkUrl.includes("pinterest.com") || linkUrl.includes("pin.it")) {
       platform = "pinterest";
       mediaType = "image";
@@ -130,14 +131,8 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     } else if (linkUrl.includes("spotify.com") || linkUrl.includes("open.spotify.com")) {
       platform = "spotify";
       mediaType = "none";
-    } else {
-      // Check if it's any blog-like URL
-      if (linkUrl.includes("blog") || linkUrl.includes(".wordpress.com") || 
-          linkUrl.includes("blogger.com") || linkUrl.includes("ghost.io") || 
-          linkUrl.includes("substack.com") || linkUrl.includes("dev.to")) {
-        mediaType = "none";
-      }
     }
+    // All other URLs default to "none" for article rendering
 
     console.log('[CreatePostDialog] Creating post with data:', {
       title: title.trim(),
