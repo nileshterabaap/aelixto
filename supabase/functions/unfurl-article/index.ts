@@ -67,18 +67,51 @@ const extractArticleContent = (html: string): string => {
   let cleaned = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   cleaned = cleaned.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
   
-  // Try to find main content areas
+  // Strategy 1: Try to find article tag
   const articleMatch = cleaned.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
-  if (articleMatch) return articleMatch[1];
+  if (articleMatch) {
+    console.log('[extractArticleContent] Found <article> tag, length:', articleMatch[1].length);
+    return articleMatch[1];
+  }
   
+  // Strategy 2: Try to find main tag
   const mainMatch = cleaned.match(/<main[^>]*>([\s\S]*?)<\/main>/i);
-  if (mainMatch) return mainMatch[1];
+  if (mainMatch) {
+    console.log('[extractArticleContent] Found <main> tag, length:', mainMatch[1].length);
+    return mainMatch[1];
+  }
   
-  // Look for divs with common content class names
-  const contentRegex = /<div[^>]*class=["'][^"']*(?:post|article|content|entry|story)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i;
-  const contentMatch = cleaned.match(contentRegex);
+  // Strategy 3: Look for divs with common content class/id names (more patterns)
+  const contentPatterns = [
+    /<div[^>]*(?:class|id)=["'][^"']*(?:post-content|article-content|entry-content|post-body|article-body)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+    /<div[^>]*(?:class|id)=["'][^"']*(?:content|main-content|primary-content)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+    /<div[^>]*(?:class|id)=["'][^"']*(?:post|article|entry|story)[^"']*["'][^>]*>([\s\S]*?)<\/div>/i,
+  ];
   
-  return contentMatch ? contentMatch[1] : '';
+  for (const pattern of contentPatterns) {
+    const match = cleaned.match(pattern);
+    if (match && match[1].length > 200) {
+      console.log('[extractArticleContent] Found content div with pattern, length:', match[1].length);
+      return match[1];
+    }
+  }
+  
+  // Strategy 4: Find the body content, remove header/footer/nav/aside
+  const bodyMatch = cleaned.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  if (bodyMatch) {
+    let bodyContent = bodyMatch[1];
+    // Remove common non-content elements
+    bodyContent = bodyContent.replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '');
+    bodyContent = bodyContent.replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '');
+    bodyContent = bodyContent.replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '');
+    bodyContent = bodyContent.replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
+    
+    console.log('[extractArticleContent] Using cleaned body content, length:', bodyContent.length);
+    return bodyContent;
+  }
+  
+  console.log('[extractArticleContent] No content found, returning empty');
+  return '';
 };
 
 // Sanitize HTML
@@ -394,7 +427,13 @@ serve(async (req) => {
       },
     };
 
-    console.log('[unfurl-article] Extracted data:', { kind, title: result.meta.title, hasContent: !!articleHtml });
+    console.log('[unfurl-article] Extracted data:', { 
+      kind, 
+      title: result.meta.title, 
+      contentLength: articleHtml.length,
+      hasContent: !!articleHtml,
+      descriptionLength: description.length 
+    });
 
     // Cache the result
     const { error: upsertError } = await supabase
