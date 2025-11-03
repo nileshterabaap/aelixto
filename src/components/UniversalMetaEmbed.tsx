@@ -83,22 +83,28 @@ const buildSpotifyEmbed = (url: string): string => {
 
 // Clean Facebook embed HTML to remove stats footer
 const cleanFacebookHtml = (html: string): string => {
-  // Remove views/reactions lines (e.g., "7.2K views · 589 reactions | ...")
-  html = html.replace(/[\d,.]+K?\s*views\s*[·|]\s*[\d,.]+K?\s*reactions?\s*\|/gi, "");
+  if (!html) return html;
 
-  // Decode HTML entities like &#xb7; etc.
+  // 1️⃣ Remove "7.2K views · 589 reactions | ..." style blocks
+  html = html.replace(/[\d,.]+K?\s*views\s*[·|]\s*[\d,.]+K?\s*reactions?\s*\|?/gi, "");
+
+  // 2️⃣ Remove bottom like/comment/share counts (numbers below reel)
+  html = html.replace(
+    /<div[^>]*>\s*(?:<span[^>]*>\s*\d+\s*(?:likes?|comments?|shares?)\s*<\/span>\s*)+<\/div>/gi,
+    ""
+  );
+
+  // 3️⃣ Remove entity codes like &#xb7; (dot)
   html = html.replace(/&#[xX]?[0-9A-Fa-f]+;/g, match => {
-    try {
-      const el = document.createElement("textarea");
-      el.innerHTML = match;
-      return el.value;
-    } catch {
-      return "";
-    }
+    const el = document.createElement("textarea");
+    el.innerHTML = match;
+    return el.value || "";
   });
 
-  // Trim extra whitespace left behind
-  return html.replace(/\s{2,}/g, " ").trim();
+  // 4️⃣ Trim leftover whitespace and empty lines
+  html = html.replace(/\s{2,}/g, " ").trim();
+
+  return html;
 };
 
 export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
