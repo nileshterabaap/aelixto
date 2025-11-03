@@ -382,10 +382,12 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {/* Title */}
-        <div className="mt-3">
-          <h2 className="text-lg font-bold">{post.title}</h2>
-        </div>
+        {/* Title - hide for Reddit embeds as they contain their own title */}
+        {r.kind !== 'reddit' && (
+          <div className="mt-3">
+            <h2 className="text-lg font-bold">{post.title}</h2>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center justify-around px-2 py-4 mt-1">
