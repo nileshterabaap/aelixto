@@ -188,7 +188,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <img 
                 src={platform.icon} 
                 alt={platform.name}
-                className="w-8 h-8 object-contain"
+                className={`object-contain ${post.platform === 'facebook' || post.platform === 'quora' ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
               <DropdownMenu>
@@ -294,7 +294,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <img 
                 src={platform.icon} 
                 alt={platform.name}
-                className="w-8 h-8 object-contain"
+                className={`object-contain ${post.platform === 'facebook' || post.platform === 'quora' ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
             <DropdownMenu>
