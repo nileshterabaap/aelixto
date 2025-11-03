@@ -173,8 +173,13 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
   // Show fallback if no embed HTML or if embed failed
   const platform = detectPlatform(expandedUrl);
+  
+  // For Facebook, don't show fallback - the embed should handle everything
+  if (platform === 'facebook') {
+    return null;
+  }
+  
   const platformName = platform === 'instagram' ? 'Instagram' : 
-                       platform === 'facebook' ? 'Facebook' :
                        platform === 'spotify' ? 'Spotify' :
                        platform === 'reddit' ? 'Reddit' :
                        platform === 'quora' ? 'Quora' :
