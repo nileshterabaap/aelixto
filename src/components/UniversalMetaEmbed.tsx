@@ -62,9 +62,9 @@ const buildFacebookEmbed = (url: string): string => {
   console.log('[UniversalMetaEmbed] Building Facebook embed - isVideo:', isVideo, 'URL:', cleanUrl);
   
   if (isVideo) {
-    return `<div class="fb-video" data-href="${cleanUrl}" data-width="auto" data-show-text="true"></div>`;
+    return `<div class="fb-video" data-href="${cleanUrl}" data-width="auto" data-show-text="false"></div>`;
   }
-  return `<div class="fb-post" data-href="${cleanUrl}" data-width="auto" data-show-text="true"></div>`;
+  return `<div class="fb-post" data-href="${cleanUrl}" data-width="auto" data-show-text="false"></div>`;
 };
 
 // Build Spotify embed HTML
@@ -163,6 +163,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     );
   }
 
+  // Only show embed if we have embed HTML - no fallback needed
   if (embedHtml) {
     return (
       <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
@@ -171,23 +172,27 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     );
   }
 
-  // Show fallback if no embed HTML or if embed failed
-  const platform = detectPlatform(expandedUrl);
-  const platformName = platform === 'instagram' ? 'Instagram' : 
-                       platform === 'facebook' ? 'Facebook' :
-                       platform === 'spotify' ? 'Spotify' :
-                       platform === 'reddit' ? 'Reddit' :
-                       platform === 'quora' ? 'Quora' :
-                       platform === 'medium' ? 'Medium' :
-                       platform === 'blog' ? 'Blog' : 'Web';
+  // Only show fallback if embed failed or not available
+  if (!embedHtml && fallbackData) {
+    const platform = detectPlatform(expandedUrl);
+    const platformName = platform === 'instagram' ? 'Instagram' : 
+                         platform === 'facebook' ? 'Facebook' :
+                         platform === 'spotify' ? 'Spotify' :
+                         platform === 'reddit' ? 'Reddit' :
+                         platform === 'quora' ? 'Quora' :
+                         platform === 'medium' ? 'Medium' :
+                         platform === 'blog' ? 'Blog' : 'Web';
 
-  return (
-    <OgCardFallback 
-      url={expandedUrl}
-      title={fallbackData?.title}
-      image={fallbackData?.image}
-      description={fallbackData?.description}
-      platform={platformName}
-    />
-  );
+    return (
+      <OgCardFallback 
+        url={expandedUrl}
+        title={fallbackData?.title}
+        image={fallbackData?.image}
+        description={fallbackData?.description}
+        platform={platformName}
+      />
+    );
+  }
+
+  return null;
 };
