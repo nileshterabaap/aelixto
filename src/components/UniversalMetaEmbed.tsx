@@ -43,14 +43,23 @@ const buildInstagramEmbed = (url: string): string => {
 
 // Build Facebook embed HTML (post or video)
 const buildFacebookEmbed = (url: string): string => {
-  // Clean URL by removing query parameters that might interfere with embedding
+  // Clean and normalize Facebook URLs for embedding
   let cleanUrl = url;
   try {
     const urlObj = new URL(url);
-    // For reels, keep only the base path without query params
-    if (url.includes('/reel/')) {
+    
+    // Handle share URLs - convert to proper format
+    if (url.includes('/share/r/') || url.includes('/share/v/')) {
+      console.log('[UniversalMetaEmbed] Detected Facebook share URL, cannot embed:', url);
+      // Share URLs don't work with embeds - we need the canonical URL
+      // This will fall back to OG card
+      return '';
+    }
+    
+    // For reels and videos, keep only the base path without query params
+    if (url.includes('/reel/') || url.includes('/videos/') || url.includes('/watch/')) {
       cleanUrl = `${urlObj.origin}${urlObj.pathname}`;
-      console.log('[UniversalMetaEmbed] Cleaned reel URL from', url, 'to', cleanUrl);
+      console.log('[UniversalMetaEmbed] Cleaned video/reel URL from', url, 'to', cleanUrl);
     }
   } catch (e) {
     console.error('[UniversalMetaEmbed] Failed to parse URL:', e);
