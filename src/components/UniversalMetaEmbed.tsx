@@ -48,14 +48,6 @@ const buildFacebookEmbed = (url: string): string => {
   try {
     const urlObj = new URL(url);
     
-    // Handle share URLs - convert to proper format
-    if (url.includes('/share/r/') || url.includes('/share/v/')) {
-      console.log('[UniversalMetaEmbed] Detected Facebook share URL, cannot embed:', url);
-      // Share URLs don't work with embeds - we need the canonical URL
-      // This will fall back to OG card
-      return '';
-    }
-    
     // For reels and videos, keep only the base path without query params
     if (url.includes('/reel/') || url.includes('/videos/') || url.includes('/watch/')) {
       cleanUrl = `${urlObj.origin}${urlObj.pathname}`;
@@ -100,13 +92,17 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       setIsLoading(true);
       
       try {
-        // Step 1: Expand short URLs
+        // Step 1: Expand short URLs and Facebook share URLs
         const platform = detectPlatform(url);
         let finalUrl = url;
 
-        // Only expand if it's a short link
-        if (url.includes('fb.watch') || url.includes('fb.me') || url.includes('bit.ly') || url.includes('pin.it')) {
-          console.log('[UniversalMetaEmbed] Expanding short URL:', url);
+        // Expand if it's a short link OR a Facebook share URL
+        const needsExpansion = url.includes('fb.watch') || url.includes('fb.me') || 
+                               url.includes('bit.ly') || url.includes('pin.it') ||
+                               url.includes('/share/r/') || url.includes('/share/v/');
+        
+        if (needsExpansion) {
+          console.log('[UniversalMetaEmbed] Expanding URL:', url);
           const { data: expandData, error: expandError } = await supabase.functions.invoke('expand-url', {
             body: { url }
           });
