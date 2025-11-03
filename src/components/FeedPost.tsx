@@ -183,14 +183,14 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             <div className="flex-1 min-w-0">
               <p className="font-bold text-base">{post.author.username}</p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {platform && post.platform !== 'twitter' && (
-                <img 
-                  src={platform.icon} 
-                  alt={platform.name}
-                  className="w-6 h-6"
-                />
-              )}
+          <div className="flex items-center gap-2 shrink-0">
+            {platform && post.platform !== 'twitter' && (
+              <img 
+                src={platform.icon} 
+                alt={platform.name}
+                className="w-8 h-8 object-contain"
+              />
+            )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -294,7 +294,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <img 
                 src={platform.icon} 
                 alt={platform.name}
-                className="w-6 h-6"
+                className="w-8 h-8 object-contain"
               />
             )}
             <DropdownMenu>
