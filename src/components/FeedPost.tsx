@@ -85,10 +85,15 @@ const detectPlatformFromUrl = (url?: string) => {
 export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
+  const [blogFavicon, setBlogFavicon] = useState<string | null>(null);
   
   // Try to get platform from post.platform or detect from URL
   const detectedPlatform = post.platform || detectPlatformFromUrl(post.mediaUrl);
   const platform = getPlatformIcon(detectedPlatform);
+  
+  // Use blog favicon if available, otherwise use platform icon
+  const displayIcon = blogFavicon || platform?.icon;
+  const displayName = blogFavicon ? 'Blog' : platform?.name;
   
   // Check if this is a Quora URL for isolated preview card
   const isQuoraUrl =
@@ -184,10 +189,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <p className="font-bold text-base">{post.author.username}</p>
             </div>
           <div className="flex items-center gap-2 shrink-0">
-            {platform && post.platform !== 'twitter' && (
+            {displayIcon && post.platform !== 'twitter' && (
               <img 
-                src={platform.icon} 
-                alt={platform.name}
+                src={displayIcon} 
+                alt={displayName || 'Platform'}
                 className={`object-contain ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
@@ -290,10 +295,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             <p className="font-bold text-base">{post.author.username}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {platform && post.platform !== 'twitter' && (
+            {displayIcon && post.platform !== 'twitter' && (
               <img 
-                src={platform.icon} 
-                alt={platform.name}
+                src={displayIcon} 
+                alt={displayName || 'Platform'}
                 className={`object-contain ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
@@ -343,7 +348,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             {r.kind === 'reddit' && <RedditEmbed url={r.url} />}
             {r.kind === 'twitter' && <TwitterEmbed url={r.url} />}
             {r.kind === 'pinterest' && <PinterestEmbed url={r.url} />}
-            {r.kind === 'article' && <ArticleEmbed url={r.url} />}
+            {r.kind === 'article' && <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />}
             {r.kind === 'universal' && <UniversalMetaEmbed url={r.url} />}
             {r.kind === 'image' && (
               <div className="rounded-2xl overflow-hidden">

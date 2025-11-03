@@ -7,6 +7,7 @@ import { LinkPreviewCard } from "./LinkPreviewCard";
 
 interface ArticleEmbedProps {
   url: string;
+  onFaviconLoaded?: (favicon: string) => void;
 }
 
 interface UnfurlResult {
@@ -62,7 +63,7 @@ const resolveRenderer = (url: string): 'reddit' | 'quora' | 'article' => {
   return 'article';
 };
 
-export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
+export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
   const [data, setData] = useState<UnfurlResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +95,13 @@ export const ArticleEmbed = ({ url }: ArticleEmbedProps) => {
         }
 
         console.log('[ArticleEmbed] Result:', result);
-        setData(result as UnfurlResult);
+        const unfurledData = result as UnfurlResult;
+        setData(unfurledData);
+        
+        // Pass favicon back to parent if it's a blog/article
+        if (unfurledData?.site?.favicon && onFaviconLoaded) {
+          onFaviconLoaded(unfurledData.site.favicon);
+        }
       } catch (err) {
         console.error('[ArticleEmbed] Exception:', err);
         setError('Failed to load article');
