@@ -3,96 +3,83 @@ import { Button } from "@/components/ui/button";
 
 // --- Helpers: safe DOM parsing on reader HTML (r.jina.ai result) ---
 function decodeEntities(s: string) {
-  // minimal decode; avoids showing &amp; etc.
   const el = document.createElement("textarea");
   el.innerHTML = s;
   return el.value.replace(/\s+/g, " ").trim();
 }
 
-function looksLikeBreadcrumbOrAd(el: Element): boolean {
-  const cls = (el.getAttribute("class") || "").toLowerCase();
-  const id  = (el.getAttribute("id") || "").toLowerCase();
-
-  // common breadcrumb / meta / nav / ad wrappers
-  const badTokens = [
-    "breadcrumb","breadcrumbs","crumb","nav","subnav","skiplink",
-    "promo","related","sidebar","share","social","footer",
-    "ad","ads","advert","sponsor","newsletter","cookie","consent"
-  ];
-
-  return badTokens.some(t =>
-    cls.includes(t) || id.includes(t) || el.tagName.toLowerCase()==="nav"
-  );
-}
-
 function resolveUrlMaybeRelative(src: string, baseUrl: string): string {
-  try {
-    return new URL(src, baseUrl).toString();
-  } catch { return src; }
+  try { return new URL(src, baseUrl).toString(); } catch { return src; }
 }
 
-// Find the main content root in reader-mode HTML; fall back gracefully
-function findArticleRoot(doc: Document): Element | null {
-  const candidates = [
-    "main article",
-    "article",
-    "main",
-    "article [role='main']",
-    "[data-component='article']",
-    "[itemprop='articleBody']",
-    ".article-content",
-    ".post-content",
-    ".entry-content",
-    "#content"
+const BAD_TEXT_RE = /\b(advert|advertisement|sponsor|cookie|privacy|terms|subscribe|newsletter|editorial|policy|health\s+library|related\s+content|read\s+more)\b/i;
+
+function isGarbagePara(t: string): boolean {
+  const clean = decodeEntities(t);
+  if (!clean) return true;
+  if (clean.length < 60) return true;                 // too short
+  if (BAD_TEXT_RE.test(clean)) return true;           // boilerplate
+  return false;
+}
+
+function findArticleRoot(doc: Document): Element {
+  const prefs = [
+    "main article", "article", "main", "[itemprop='articleBody']",
+    ".article-content", ".post-content", ".entry-content", "#content"
   ];
-  for (const sel of candidates) {
-    const node = doc.querySelector(sel);
-    if (node) return node;
+  for (const sel of prefs) {
+    const el = doc.querySelector(sel);
+    if (el) return el;
   }
-  // last resort: body
   return doc.body;
 }
 
-// Extract first meaningful paragraph and first useful image from the article
-function extractLead(doc: Document, baseUrl: string): { leadText?: string; heroImg?: string } {
+// 1) Lead paragraph = first good <p> after the page H1 (depth-first)
+function extractLeadParagraph(doc: Document): string | undefined {
   const root = findArticleRoot(doc);
-  if (!root) return {};
+  const h1 = root.querySelector("h1") || doc.querySelector("h1");
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+  let afterH1 = !h1; // if no h1, allow from start
+  while (walker.nextNode()) {
+    const el = walker.currentNode as Element;
+    if (el === h1) { afterH1 = true; continue; }
+    if (!afterH1) continue;
+    if (el.tagName.toLowerCase() !== "p") continue;
 
-  // remove obvious non-content sections from the search path
-  const pruned = root.cloneNode(true) as Element;
-  pruned.querySelectorAll("*").forEach(el => {
-    if (looksLikeBreadcrumbOrAd(el)) el.remove();
-  });
-
-  // 1) lead text: first non-empty paragraph with some length
-  let leadText: string | undefined;
-  const paras = Array.from(pruned.querySelectorAll("p"));
-  for (const p of paras) {
-    const t = decodeEntities(p.textContent || "");
-    // skip copyright, "advertisement", etc.
-    if (!t || t.length < 60) continue;
-    if (/advert/i.test(t)) continue;
-    leadText = t;
-    break;
+    const t = (el.textContent || "").trim();
+    if (!isGarbagePara(t)) return decodeEntities(t);
   }
-
-  // 2) hero image: first good img from article area
-  let heroImg: string | undefined;
-  const imgs = Array.from(pruned.querySelectorAll("img"));
-  for (const img of imgs) {
-    const src = img.getAttribute("src") || img.getAttribute("data-src") || "";
-    if (!src) continue;
-    if (src.startsWith("data:")) continue;
-    heroImg = resolveUrlMaybeRelative(src, baseUrl);
-    break;
+  // fallback: first acceptable <p> anywhere in root
+  for (const p of Array.from(root.querySelectorAll("p"))) {
+    const t = (p.textContent || "").trim();
+    if (!isGarbagePara(t)) return decodeEntities(t);
   }
-
-  return { leadText, heroImg };
+  return undefined;
 }
 
-// Optional: tighten summary to 2 sentences or ~200 chars
-function summarizeLead(text: string): string {
-  // prefer sentence boundary; fall back to char clamp
+// 2) Hero image = image near top of article; support srcset/data-src; fallback to og:image
+function pickHeroImage(doc: Document, pageUrl: string): string | undefined {
+  const root = findArticleRoot(doc);
+  // Prefer first <figure> img
+  const figureImg = root.querySelector("figure img");
+  const firstImg  = figureImg || root.querySelector("img");
+  if (firstImg) {
+    const src =
+      firstImg.getAttribute("src") ||
+      firstImg.getAttribute("data-src") ||
+      (firstImg.getAttribute("srcset") || "")
+        .split(",")
+        .map(s => s.trim().split(" ")[0])
+        .find(Boolean) || "";
+    if (src && !src.startsWith("data:")) {
+      return resolveUrlMaybeRelative(src, pageUrl);
+    }
+  }
+  const og = doc.querySelector("meta[property='og:image']")?.getAttribute("content") || "";
+  return og ? resolveUrlMaybeRelative(og, pageUrl) : undefined;
+}
+
+function summarize(text: string): string {
   const sentences = text.split(/(?<=[.!?])\s+/).slice(0, 2).join(" ");
   if (sentences.length <= 200) return sentences;
   return sentences.slice(0, 200).replace(/\s+\S*$/, "") + "…";
@@ -144,12 +131,16 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
         const parser = new DOMParser();
         const doc = parser.parseFromString(data.content.html, "text/html");
         
-        const { leadText, heroImg } = extractLead(doc, data.resolvedUrl);
+        // Extract first paragraph after H1
+        const lead = extractLeadParagraph(doc);
         
         // Use lead paragraph if found, otherwise keep meta description
-        if (leadText) {
-          excerpt = summarizeLead(leadText);
+        if (lead) {
+          excerpt = summarize(lead);
         }
+        
+        // Extract hero image (figure img > first img > og:image)
+        const heroImg = pickHeroImage(doc, data.resolvedUrl);
         
         // Use hero image from article body if found, otherwise keep og:image
         if (heroImg) {
