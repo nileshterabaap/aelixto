@@ -150,3 +150,39 @@ span[data-pin-href] button {
   width: 100% !important;
   margin: 0 auto !important;
 }
+
+/* ---------- Facebook embed chrome remover (non-invasive, iframe-safe) ---------- */
+
+/* Adjust these if needed per screen size */
+:root{
+  --fb-trim-top: 32px;      /* hides the small "views/reactions" block above the caption */
+  --fb-trim-bottom: 84px;   /* hides the like/comment/share counts bar at the bottom */
+}
+
+.fb-trim-container{
+  position: relative;
+  overflow: hidden;        /* crops iframe extra UI */
+  border-radius: 1rem;     /* keep your card rounding */
+}
+
+/* When FB replaces the blockquote with an iframe, nudge it upward and extend height */
+.fb-trim-container iframe{
+  display:block !important;
+  width:100% !important;
+  height:calc(100% + var(--fb-trim-top) + var(--fb-trim-bottom)) !important;
+  transform: translateY(calc(-1 * var(--fb-trim-top)));
+  border:0 !important;
+}
+
+/* FB sometimes keeps a wrapper div around the iframe; make sure container has height */
+.fb-trim-inner, .fb-trim-inner > *{
+  width:100%;
+}
+
+/* Optional: responsive tweaks */
+@media (min-width: 480px){
+  :root{
+    --fb-trim-top: 36px;
+    --fb-trim-bottom: 96px;
+  }
+}

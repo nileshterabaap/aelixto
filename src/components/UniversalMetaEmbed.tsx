@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { OgCardFallback } from '@/components/OgCardFallback';
+import { CleanFacebookEmbed } from '@/components/embeds/CleanFacebookEmbed';
 import { supabase } from '@/integrations/supabase/client';
 
 interface UniversalMetaEmbedProps {
@@ -79,32 +80,6 @@ const buildSpotifyEmbed = (url: string): string => {
   }
   
   return `<iframe style="border-radius:12px;display:block;" src="${embedUrl}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
-};
-
-// Clean Facebook embed HTML to remove stats footer
-const cleanFacebookHtml = (html: string): string => {
-  if (!html) return html;
-
-  // 1️⃣ Remove "7.2K views · 589 reactions | ..." style blocks
-  html = html.replace(/[\d,.]+K?\s*views\s*[·|]\s*[\d,.]+K?\s*reactions?\s*\|?/gi, "");
-
-  // 2️⃣ Remove bottom like/comment/share counts (numbers below reel)
-  html = html.replace(
-    /<div[^>]*>\s*(?:<span[^>]*>\s*\d+\s*(?:likes?|comments?|shares?)\s*<\/span>\s*)+<\/div>/gi,
-    ""
-  );
-
-  // 3️⃣ Remove entity codes like &#xb7; (dot)
-  html = html.replace(/&#[xX]?[0-9A-Fa-f]+;/g, match => {
-    const el = document.createElement("textarea");
-    el.innerHTML = match;
-    return el.value || "";
-  });
-
-  // 4️⃣ Trim leftover whitespace and empty lines
-  html = html.replace(/\s{2,}/g, " ").trim();
-
-  return html;
 };
 
 export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
@@ -190,13 +165,16 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   }
 
   if (embedHtml) {
-    // Clean Facebook embeds to remove stats footer
     const platform = detectPlatform(expandedUrl);
-    const cleanedHtml = platform === 'facebook' ? cleanFacebookHtml(embedHtml) : embedHtml;
+    const isFacebook = platform === 'facebook';
     
     return (
       <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
-        <RawEmbedRenderer embedHtml={cleanedHtml} />
+        {isFacebook ? (
+          <CleanFacebookEmbed html={embedHtml} />
+        ) : (
+          <RawEmbedRenderer embedHtml={embedHtml} />
+        )}
       </div>
     );
   }
