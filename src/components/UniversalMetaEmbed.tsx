@@ -113,18 +113,21 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           }
         }
 
-        setExpandedUrl(finalUrl);
+      setExpandedUrl(finalUrl);
+
+      // Re-detect platform from final expanded URL
+      const finalPlatform = detectPlatform(finalUrl);
 
       // Step 2: Build embed HTML based on platform
-      if (platform === 'instagram') {
+      if (finalPlatform === 'instagram') {
         const html = buildInstagramEmbed(finalUrl);
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Instagram embed');
-      } else if (platform === 'facebook') {
+      } else if (finalPlatform === 'facebook') {
         const html = buildFacebookEmbed(finalUrl);
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Facebook embed:', html);
-      } else if (platform === 'spotify') {
+      } else if (finalPlatform === 'spotify') {
         const html = buildSpotifyEmbed(finalUrl);
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Spotify embed');
@@ -132,7 +135,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
         // Step 3: Only fetch OG data for platforms without native embeds
         // Skip OG fetch for Instagram, Facebook, and Spotify since they have native embeds
-        if (platform !== 'instagram' && platform !== 'facebook' && platform !== 'spotify') {
+        if (finalPlatform !== 'instagram' && finalPlatform !== 'facebook' && finalPlatform !== 'spotify') {
           console.log('[UniversalMetaEmbed] Fetching OG data for fallback');
           const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
             body: { url: finalUrl }
