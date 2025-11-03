@@ -121,9 +121,11 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
 
   // Parse HTML and extract lead paragraph + hero image using DOM
   const parseContent = () => {
-    // Fallback values
+    // Fallback values - ALWAYS prioritize meta.image from edge function
     let excerpt = data.meta.description || '';
     let heroImage = data.meta.image || null;
+    
+    console.log('[ArticleContentEmbed] Initial meta.image:', data.meta.image);
     
     // Try DOM-based extraction if we have HTML content
     if (data.content?.html) {
@@ -139,13 +141,15 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
           excerpt = summarize(lead);
         }
         
-        // Extract hero image (figure img > first img > og:image)
-        const heroImg = pickHeroImage(doc, data.resolvedUrl);
-        
-        // Use hero image from article body if found, otherwise keep og:image
-        if (heroImg) {
-          heroImage = heroImg;
+        // Only try to extract image from HTML if we don't have one from meta
+        if (!heroImage) {
+          const heroImg = pickHeroImage(doc, data.resolvedUrl);
+          if (heroImg) {
+            heroImage = heroImg;
+          }
         }
+        
+        console.log('[ArticleContentEmbed] Final heroImage:', heroImage);
       } catch (err) {
         console.error('[ArticleContentEmbed] DOM parsing error:', err);
         // Keep fallback values
