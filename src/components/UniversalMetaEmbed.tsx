@@ -113,42 +113,36 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           }
         }
 
-      setExpandedUrl(finalUrl);
-
-      // Re-detect platform from final expanded URL
-      const finalPlatform = detectPlatform(finalUrl);
+        setExpandedUrl(finalUrl);
 
       // Step 2: Build embed HTML based on platform
-      if (finalPlatform === 'instagram') {
+      if (platform === 'instagram') {
         const html = buildInstagramEmbed(finalUrl);
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Instagram embed');
-      } else if (finalPlatform === 'facebook') {
+      } else if (platform === 'facebook') {
         const html = buildFacebookEmbed(finalUrl);
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Facebook embed:', html);
-      } else if (finalPlatform === 'spotify') {
+      } else if (platform === 'spotify') {
         const html = buildSpotifyEmbed(finalUrl);
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Spotify embed');
       }
 
-        // Step 3: Only fetch OG data for platforms without native embeds
-        // Skip OG fetch for Instagram, Facebook, and Spotify since they have native embeds
-        if (finalPlatform !== 'instagram' && finalPlatform !== 'facebook' && finalPlatform !== 'spotify') {
-          console.log('[UniversalMetaEmbed] Fetching OG data for fallback');
-          const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
-            body: { url: finalUrl }
-          });
+        // Step 3: Fetch OG data for fallback
+        console.log('[UniversalMetaEmbed] Fetching OG data for fallback');
+        const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
+          body: { url: finalUrl }
+        });
 
-          if (!ogError && ogData) {
-            setFallbackData({
-              title: ogData.meta?.title || ogData.title,
-              image: ogData.meta?.image || ogData.image,
-              description: ogData.meta?.description || ogData.description
-            });
-            console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
-          }
+        if (!ogError && ogData) {
+          setFallbackData({
+            title: ogData.meta?.title || ogData.title,
+            image: ogData.meta?.image || ogData.image,
+            description: ogData.meta?.description || ogData.description
+          });
+          console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
         }
 
       } catch (error) {
