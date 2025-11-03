@@ -193,7 +193,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <img 
                 src={displayIcon} 
                 alt={displayName || 'Platform'}
-                className={`object-contain ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' ? 'w-6 h-6' : 'w-8 h-8'}`}
+                className={`object-contain ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
               <DropdownMenu>
@@ -299,7 +299,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <img 
                 src={displayIcon} 
                 alt={displayName || 'Platform'}
-                className={`object-contain ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' ? 'w-6 h-6' : 'w-8 h-8'}`}
+                className={`object-contain ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
             <DropdownMenu>
