@@ -1,6 +1,103 @@
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+// --- Helpers: safe DOM parsing on reader HTML (r.jina.ai result) ---
+function decodeEntities(s: string) {
+  // minimal decode; avoids showing &amp; etc.
+  const el = document.createElement("textarea");
+  el.innerHTML = s;
+  return el.value.replace(/\s+/g, " ").trim();
+}
+
+function looksLikeBreadcrumbOrAd(el: Element): boolean {
+  const cls = (el.getAttribute("class") || "").toLowerCase();
+  const id  = (el.getAttribute("id") || "").toLowerCase();
+
+  // common breadcrumb / meta / nav / ad wrappers
+  const badTokens = [
+    "breadcrumb","breadcrumbs","crumb","nav","subnav","skiplink",
+    "promo","related","sidebar","share","social","footer",
+    "ad","ads","advert","sponsor","newsletter","cookie","consent"
+  ];
+
+  return badTokens.some(t =>
+    cls.includes(t) || id.includes(t) || el.tagName.toLowerCase()==="nav"
+  );
+}
+
+function resolveUrlMaybeRelative(src: string, baseUrl: string): string {
+  try {
+    return new URL(src, baseUrl).toString();
+  } catch { return src; }
+}
+
+// Find the main content root in reader-mode HTML; fall back gracefully
+function findArticleRoot(doc: Document): Element | null {
+  const candidates = [
+    "main article",
+    "article",
+    "main",
+    "article [role='main']",
+    "[data-component='article']",
+    "[itemprop='articleBody']",
+    ".article-content",
+    ".post-content",
+    ".entry-content",
+    "#content"
+  ];
+  for (const sel of candidates) {
+    const node = doc.querySelector(sel);
+    if (node) return node;
+  }
+  // last resort: body
+  return doc.body;
+}
+
+// Extract first meaningful paragraph and first useful image from the article
+function extractLead(doc: Document, baseUrl: string): { leadText?: string; heroImg?: string } {
+  const root = findArticleRoot(doc);
+  if (!root) return {};
+
+  // remove obvious non-content sections from the search path
+  const pruned = root.cloneNode(true) as Element;
+  pruned.querySelectorAll("*").forEach(el => {
+    if (looksLikeBreadcrumbOrAd(el)) el.remove();
+  });
+
+  // 1) lead text: first non-empty paragraph with some length
+  let leadText: string | undefined;
+  const paras = Array.from(pruned.querySelectorAll("p"));
+  for (const p of paras) {
+    const t = decodeEntities(p.textContent || "");
+    // skip copyright, "advertisement", etc.
+    if (!t || t.length < 60) continue;
+    if (/advert/i.test(t)) continue;
+    leadText = t;
+    break;
+  }
+
+  // 2) hero image: first good img from article area
+  let heroImg: string | undefined;
+  const imgs = Array.from(pruned.querySelectorAll("img"));
+  for (const img of imgs) {
+    const src = img.getAttribute("src") || img.getAttribute("data-src") || "";
+    if (!src) continue;
+    if (src.startsWith("data:")) continue;
+    heroImg = resolveUrlMaybeRelative(src, baseUrl);
+    break;
+  }
+
+  return { leadText, heroImg };
+}
+
+// Optional: tighten summary to 2 sentences or ~200 chars
+function summarizeLead(text: string): string {
+  // prefer sentence boundary; fall back to char clamp
+  const sentences = text.split(/(?<=[.!?])\s+/).slice(0, 2).join(" ");
+  if (sentences.length <= 200) return sentences;
+  return sentences.slice(0, 200).replace(/\s+\S*$/, "") + "…";
+}
+
 interface ArticleContentEmbedProps {
   data: {
     resolvedUrl: string;
@@ -35,42 +132,39 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
     }
   };
 
-  // Extract text from article HTML content, fallback to description
-  const getExcerpt = () => {
-    console.log('[ArticleContentEmbed] data.content:', data.content);
+  // Parse HTML and extract lead paragraph + hero image using DOM
+  const parseContent = () => {
+    // Fallback values
+    let excerpt = data.meta.description || '';
+    let heroImage = data.meta.image || null;
     
+    // Try DOM-based extraction if we have HTML content
     if (data.content?.html) {
-      console.log('[ArticleContentEmbed] HTML length:', data.content.html.length);
-      
-      // Remove HTML tags and get plain text
-      const text = data.content.html
-        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      
-      console.log('[ArticleContentEmbed] Extracted text:', text.substring(0, 300));
-      
-      // Get first 2-3 sentences (up to 200 chars)
-      const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
-      let excerpt = '';
-      for (const sentence of sentences.slice(0, 3)) {
-        if (excerpt.length + sentence.length <= 200) {
-          excerpt += sentence;
-        } else break;
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(data.content.html, "text/html");
+        
+        const { leadText, heroImg } = extractLead(doc, data.resolvedUrl);
+        
+        // Use lead paragraph if found, otherwise keep meta description
+        if (leadText) {
+          excerpt = summarizeLead(leadText);
+        }
+        
+        // Use hero image from article body if found, otherwise keep og:image
+        if (heroImg) {
+          heroImage = heroImg;
+        }
+      } catch (err) {
+        console.error('[ArticleContentEmbed] DOM parsing error:', err);
+        // Keep fallback values
       }
-      
-      const result = excerpt.trim() || data.meta.description || '';
-      console.log('[ArticleContentEmbed] Final excerpt:', result);
-      return result;
     }
     
-    console.log('[ArticleContentEmbed] No HTML content, using description');
-    return data.meta.description || '';
+    return { excerpt, heroImage };
   };
   
-  const excerpt = getExcerpt();
+  const { excerpt, heroImage } = parseContent();
 
   return (
     <article className="rounded-2xl overflow-hidden border border-border bg-card hover:shadow-lg transition-all">
@@ -82,10 +176,10 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
         </h3>
 
         {/* Thumbnail */}
-        {data.meta.image && (
+        {heroImage && (
           <div className="relative w-full h-48 rounded-xl overflow-hidden bg-muted mx-auto">
             <img
-              src={data.meta.image}
+              src={heroImage}
               alt={data.meta.title}
               className="w-full h-full object-cover object-center"
               loading="lazy"
