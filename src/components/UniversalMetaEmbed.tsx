@@ -81,6 +81,26 @@ const buildSpotifyEmbed = (url: string): string => {
   return `<iframe style="border-radius:12px;display:block;" src="${embedUrl}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
 };
 
+// Clean Facebook embed HTML to remove stats footer
+const cleanFacebookHtml = (html: string): string => {
+  // Remove views/reactions lines (e.g., "7.2K views · 589 reactions | ...")
+  html = html.replace(/[\d,.]+K?\s*views\s*[·|]\s*[\d,.]+K?\s*reactions?\s*\|/gi, "");
+
+  // Decode HTML entities like &#xb7; etc.
+  html = html.replace(/&#[xX]?[0-9A-Fa-f]+;/g, match => {
+    try {
+      const el = document.createElement("textarea");
+      el.innerHTML = match;
+      return el.value;
+    } catch {
+      return "";
+    }
+  });
+
+  // Trim extra whitespace left behind
+  return html.replace(/\s{2,}/g, " ").trim();
+};
+
 export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   const [embedHtml, setEmbedHtml] = useState<string | null>(null);
   const [fallbackData, setFallbackData] = useState<{ title?: string; image?: string; description?: string } | null>(null);
@@ -164,9 +184,13 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   }
 
   if (embedHtml) {
+    // Clean Facebook embeds to remove stats footer
+    const platform = detectPlatform(expandedUrl);
+    const cleanedHtml = platform === 'facebook' ? cleanFacebookHtml(embedHtml) : embedHtml;
+    
     return (
       <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
-        <RawEmbedRenderer embedHtml={embedHtml} />
+        <RawEmbedRenderer embedHtml={cleanedHtml} />
       </div>
     );
   }
