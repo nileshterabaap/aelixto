@@ -399,10 +399,35 @@ serve(async (req) => {
                          extractMetaContent(html, 'published_time') || 
                          '';
 
-    // Extract favicon
-    const faviconMatch = html.match(/<link[^>]*rel=["'](?:icon|shortcut icon)["'][^>]*href=["']([^"']+)["']/i);
-    const faviconHref = faviconMatch ? faviconMatch[1] : '/favicon.ico';
+    // Extract favicon - try multiple patterns
+    let faviconHref: string | null = null;
+    
+    // Try multiple favicon patterns in order of preference
+    const faviconPatterns = [
+      // Standard icon with href attribute first
+      /<link[^>]*rel=["'](?:icon|shortcut icon)["'][^>]*href=["']([^"']+)["']/i,
+      // Reverse order (href before rel)
+      /<link[^>]*href=["']([^"']+)["'][^>]*rel=["'](?:icon|shortcut icon)["']/i,
+      // Apple touch icon as fallback
+      /<link[^>]*rel=["']apple-touch-icon["'][^>]*href=["']([^"']+)["']/i,
+      /<link[^>]*href=["']([^"']+)["'][^>]*rel=["']apple-touch-icon["']/i,
+    ];
+    
+    for (const pattern of faviconPatterns) {
+      const match = html.match(pattern);
+      if (match && match[1]) {
+        faviconHref = match[1];
+        break;
+      }
+    }
+    
+    // Fallback to /favicon.ico if nothing found
+    if (!faviconHref) faviconHref = '/favicon.ico';
+    
+    // Convert to absolute URL
     const favicon = faviconHref.startsWith('http') ? faviconHref : new URL(faviconHref, resolvedUrl).href;
+    
+    console.log('[unfurl-article] Extracted favicon:', favicon);
 
     // Extract and sanitize article content
     const articleContent = extractArticleContent(html);
