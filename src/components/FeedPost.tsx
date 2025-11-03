@@ -171,11 +171,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <p className="font-bold text-base">{post.author.username}</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              {platform && (
+              {platform && post.platform !== 'twitter' && (
                 <img 
                   src={platform.icon} 
                   alt={platform.name}
-                  className="w-6 h-6 object-contain"
+                  className="w-6 h-6"
                 />
               )}
               <DropdownMenu>
@@ -277,11 +277,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             <p className="font-bold text-base">{post.author.username}</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {platform && (
+            {platform && post.platform !== 'twitter' && (
               <img 
                 src={platform.icon} 
                 alt={platform.name}
-                className="w-6 h-6 object-contain"
+                className="w-6 h-6"
               />
             )}
             <DropdownMenu>
