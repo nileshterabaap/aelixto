@@ -42,7 +42,7 @@ export const RedditPostEmbed = ({ url, data }: RedditPostEmbedProps) => {
           data-card-created={Date.now()}
         >
           <a href={url} target="_blank" rel="noopener noreferrer">
-            {data.meta.title || 'Reddit Post'}
+            {data.meta.title || ''}
           </a>
         </blockquote>
       </div>
