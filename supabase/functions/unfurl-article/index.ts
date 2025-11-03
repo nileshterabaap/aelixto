@@ -8,12 +8,40 @@ const corsHeaders = {
 
 const TTL_HOURS = 24;
 
+// Decode HTML entities
+const decodeHtmlEntities = (text: string): string => {
+  const entities: Record<string, string> = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#x27;': "'",
+    '&#39;': "'",
+    '&apos;': "'",
+    '&hellip;': '…',
+    '&ndash;': '–',
+    '&mdash;': '—',
+  };
+  
+  let decoded = text;
+  for (const [entity, char] of Object.entries(entities)) {
+    decoded = decoded.replace(new RegExp(entity, 'g'), char);
+  }
+  
+  // Handle numeric entities like &#39;
+  decoded = decoded.replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec));
+  // Handle hex entities like &#x27;
+  decoded = decoded.replace(/&#x([0-9A-Fa-f]+);/g, (match, hex) => String.fromCharCode(parseInt(hex, 16)));
+  
+  return decoded;
+};
+
 // Extract meta tag content
 const extractMetaContent = (html: string, property: string, attr = 'property'): string | null => {
   const regex = new RegExp(`<meta\\s+${attr}=["']${property}["']\\s+content=["']([^"']+)["']`, 'i');
   const reverseRegex = new RegExp(`<meta\\s+content=["']([^"']+)["']\\s+${attr}=["']${property}["']`, 'i');
   const match = html.match(regex) || html.match(reverseRegex);
-  return match ? match[1] : null;
+  return match ? decodeHtmlEntities(match[1]) : null;
 };
 
 // Extract title - prioritize actual article H1
@@ -25,7 +53,7 @@ const extractTitle = (html: string): string => {
   
   const h1Match = contentSection.match(/<h1[^>]*>([^<]+)<\/h1>/i);
   if (h1Match && h1Match[1].trim()) {
-    return h1Match[1].trim();
+    return decodeHtmlEntities(h1Match[1].trim());
   }
   
   // Fallback to meta tags
@@ -390,7 +418,16 @@ serve(async (req) => {
                extractMetaContent(html, 'twitter:image', 'name') || 
                extractMetaContent(html, 'og:image:url') || 
                '';
-    console.log('[unfurl-article] Extracted og:image:', image ? 'found' : 'none');
+    
+    if (image) {
+      // Make sure image URL is absolute
+      if (!image.startsWith('http')) {
+        image = new URL(image, resolvedUrl).href;
+      }
+      console.log('[unfurl-article] Extracted og:image:', image);
+    } else {
+      console.log('[unfurl-article] No og:image found, trying content image');
+    }
     
     // Fallback to first content image if no OG image
     if (!image) {
