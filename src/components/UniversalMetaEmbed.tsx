@@ -120,9 +120,9 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
         if (!ogError && ogData) {
           setFallbackData({
-            title: ogData.title,
-            image: ogData.image,
-            description: ogData.description
+            title: ogData.meta?.title || ogData.title,
+            image: ogData.meta?.image || ogData.image,
+            description: ogData.meta?.description || ogData.description
           });
           console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
         }
