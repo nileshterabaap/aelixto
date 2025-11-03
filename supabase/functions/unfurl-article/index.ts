@@ -16,8 +16,19 @@ const extractMetaContent = (html: string, property: string, attr = 'property'): 
   return match ? match[1] : null;
 };
 
-// Extract title
+// Extract title - prioritize actual article H1
 const extractTitle = (html: string): string => {
+  // First try to find H1 in article/main content
+  const articleMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+  const mainMatch = html.match(/<main[^>]*>([\s\S]*?)<\/main>/i);
+  const contentSection = articleMatch ? articleMatch[1] : (mainMatch ? mainMatch[1] : html);
+  
+  const h1Match = contentSection.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+  if (h1Match && h1Match[1].trim()) {
+    return h1Match[1].trim();
+  }
+  
+  // Fallback to meta tags
   const ogTitle = extractMetaContent(html, 'og:title');
   if (ogTitle) return ogTitle;
   
