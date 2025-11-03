@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { OgCardFallback } from '@/components/OgCardFallback';
-import { CleanFacebookEmbed } from '@/components/embeds/CleanFacebookEmbed';
 import { supabase } from '@/integrations/supabase/client';
 
 interface UniversalMetaEmbedProps {
@@ -63,9 +62,9 @@ const buildFacebookEmbed = (url: string): string => {
   console.log('[UniversalMetaEmbed] Building Facebook embed - isVideo:', isVideo, 'URL:', cleanUrl);
   
   if (isVideo) {
-    return `<div class="fb-video" data-href="${cleanUrl}" data-width="auto" data-show-text="true"></div>`;
+    return `<div class="fb-video" data-href="${cleanUrl}" data-width="auto" data-show-text="false"></div>`;
   }
-  return `<div class="fb-post" data-href="${cleanUrl}" data-width="auto" data-show-text="true"></div>`;
+  return `<div class="fb-post" data-href="${cleanUrl}" data-width="auto" data-show-text="false"></div>`;
 };
 
 // Build Spotify embed HTML
@@ -114,36 +113,42 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           }
         }
 
-        setExpandedUrl(finalUrl);
+      setExpandedUrl(finalUrl);
+
+      // Re-detect platform from final expanded URL
+      const finalPlatform = detectPlatform(finalUrl);
 
       // Step 2: Build embed HTML based on platform
-      if (platform === 'instagram') {
+      if (finalPlatform === 'instagram') {
         const html = buildInstagramEmbed(finalUrl);
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Instagram embed');
-      } else if (platform === 'facebook') {
+      } else if (finalPlatform === 'facebook') {
         const html = buildFacebookEmbed(finalUrl);
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Facebook embed:', html);
-      } else if (platform === 'spotify') {
+      } else if (finalPlatform === 'spotify') {
         const html = buildSpotifyEmbed(finalUrl);
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Spotify embed');
       }
 
-        // Step 3: Fetch OG data for fallback
-        console.log('[UniversalMetaEmbed] Fetching OG data for fallback');
-        const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
-          body: { url: finalUrl }
-        });
-
-        if (!ogError && ogData) {
-          setFallbackData({
-            title: ogData.meta?.title || ogData.title,
-            image: ogData.meta?.image || ogData.image,
-            description: ogData.meta?.description || ogData.description
+        // Step 3: Only fetch OG data for platforms without native embeds
+        // Skip OG fetch for Instagram, Facebook, and Spotify since they have native embeds
+        if (finalPlatform !== 'instagram' && finalPlatform !== 'facebook' && finalPlatform !== 'spotify') {
+          console.log('[UniversalMetaEmbed] Fetching OG data for fallback');
+          const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
+            body: { url: finalUrl }
           });
-          console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
+
+          if (!ogError && ogData) {
+            setFallbackData({
+              title: ogData.meta?.title || ogData.title,
+              image: ogData.meta?.image || ogData.image,
+              description: ogData.meta?.description || ogData.description
+            });
+            console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
+          }
         }
 
       } catch (error) {
@@ -164,38 +169,36 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     );
   }
 
+  // Only show embed if we have embed HTML - no fallback needed
   if (embedHtml) {
-    const platform = detectPlatform(expandedUrl);
-    const isFacebook = platform === 'facebook';
-    
     return (
       <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
-        {isFacebook ? (
-          <CleanFacebookEmbed html={embedHtml} />
-        ) : (
-          <RawEmbedRenderer embedHtml={embedHtml} />
-        )}
+        <RawEmbedRenderer embedHtml={embedHtml} />
       </div>
     );
   }
 
-  // Show fallback if no embed HTML or if embed failed
-  const platform = detectPlatform(expandedUrl);
-  const platformName = platform === 'instagram' ? 'Instagram' : 
-                       platform === 'facebook' ? 'Facebook' :
-                       platform === 'spotify' ? 'Spotify' :
-                       platform === 'reddit' ? 'Reddit' :
-                       platform === 'quora' ? 'Quora' :
-                       platform === 'medium' ? 'Medium' :
-                       platform === 'blog' ? 'Blog' : 'Web';
+  // Only show fallback if embed failed or not available
+  if (!embedHtml && fallbackData) {
+    const platform = detectPlatform(expandedUrl);
+    const platformName = platform === 'instagram' ? 'Instagram' : 
+                         platform === 'facebook' ? 'Facebook' :
+                         platform === 'spotify' ? 'Spotify' :
+                         platform === 'reddit' ? 'Reddit' :
+                         platform === 'quora' ? 'Quora' :
+                         platform === 'medium' ? 'Medium' :
+                         platform === 'blog' ? 'Blog' : 'Web';
 
-  return (
-    <OgCardFallback 
-      url={expandedUrl}
-      title={fallbackData?.title}
-      image={fallbackData?.image}
-      description={fallbackData?.description}
-      platform={platformName}
-    />
-  );
+    return (
+      <OgCardFallback 
+        url={expandedUrl}
+        title={fallbackData?.title}
+        image={fallbackData?.image}
+        description={fallbackData?.description}
+        platform={platformName}
+      />
+    );
+  }
+
+  return null;
 };

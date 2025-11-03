@@ -95,13 +95,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const displayIcon = blogFavicon || platform?.icon;
   const displayName = blogFavicon ? 'Blog' : platform?.name;
   
-  // Facebook helpers
-  const isFacebookUrl = (u?: string) =>
-    !!u && (u.includes("facebook.com") || u.includes("fb.watch") || u.includes("fb.me"));
-  
-  const isFacebookPlatform = (post.platform || "").toLowerCase() === "facebook";
-  const hasRawEmbed = Boolean((post as any).embed_html);
-  
   // Check if this is a Quora URL for isolated preview card
   const isQuoraUrl =
     !!post.mediaUrl &&
@@ -332,7 +325,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         </div>
 
         {/* Caption */}
-        {post.content && !(isFacebookPlatform && hasRawEmbed) && (
+        {post.content && (
           <p className="text-sm mb-3">{post.content}</p>
         )}
 
@@ -348,72 +341,63 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {/* FACEBOOK: show only the official embed if available */}
-        {embedEnabled && isFacebookPlatform && hasRawEmbed ? (
+        {/* Single renderer based on resolver */}
+        {embedEnabled && (
           <div className="mb-2">
-            <RawEmbedRenderer embedHtml={(post as any).embed_html} />
-          </div>
-        ) : (
-          <>
-            {/* Single renderer based on resolver */}
-            {embedEnabled && (
-              <div className="mb-2">
-                {r.kind === 'raw' && <RawEmbedRenderer embedHtml={r.html} />}
-                {r.kind === 'reddit' && <RedditEmbed url={r.url} />}
-                {r.kind === 'twitter' && <TwitterEmbed url={r.url} />}
-                {r.kind === 'pinterest' && <PinterestEmbed url={r.url} />}
-                {r.kind === 'article' && <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />}
-                {r.kind === 'universal' && !isFacebookUrl(post.mediaUrl) && <UniversalMetaEmbed url={r.url} />}
-                {r.kind === 'image' && !isFacebookPlatform && (
-                  <div className="rounded-2xl overflow-hidden">
-                    <img 
-                      src={r.url} 
-                      alt="Post content" 
-                      className="w-full h-auto object-cover aspect-video" 
-                    />
-                  </div>
-                )}
-                {r.kind === 'video' && post.platform === 'youtube' && (
-                  <div className={`rounded-2xl overflow-hidden bg-muted relative ${
-                    isYouTubeShort(r.url) ? 'aspect-[9/16]' : 'aspect-[16/9]'
-                  }`}>
-                    {isPlayingVideo ? (
-                      <iframe
-                        className="w-full h-full"
-                        src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=1`}
-                        title="YouTube video player"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
+            {r.kind === 'raw' && <RawEmbedRenderer embedHtml={r.html} />}
+            {r.kind === 'reddit' && <RedditEmbed url={r.url} />}
+            {r.kind === 'twitter' && <TwitterEmbed url={r.url} />}
+            {r.kind === 'pinterest' && <PinterestEmbed url={r.url} />}
+            {r.kind === 'article' && <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />}
+            {r.kind === 'universal' && <UniversalMetaEmbed url={r.url} />}
+            {r.kind === 'image' && (
+              <div className="rounded-2xl overflow-hidden">
+                <img 
+                  src={r.url} 
+                  alt="Post content" 
+                  className="w-full h-auto object-cover aspect-video" 
+                />
+              </div>
+            )}
+            {r.kind === 'video' && post.platform === 'youtube' && (
+              <div className={`rounded-2xl overflow-hidden bg-muted relative ${
+                isYouTubeShort(r.url) ? 'aspect-[9/16]' : 'aspect-[16/9]'
+              }`}>
+                {isPlayingVideo ? (
+                  <iframe
+                    className="w-full h-full"
+                    src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=1`}
+                    title="YouTube video player"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                ) : (
+                  <>
+                    <div className="absolute inset-0">
+                      <img 
+                        src={getYouTubeThumbnail(r.url)} 
+                        alt="Video thumbnail"
+                        className="w-full h-full object-cover"
                       />
-                    ) : (
-                      <>
-                        <div className="absolute inset-0">
-                          <img 
-                            src={getYouTubeThumbnail(r.url)} 
-                            alt="Video thumbnail"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <button
-                          onClick={handleVideoClick}
-                          className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group"
-                        >
-                          <div className="h-20 w-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center group-hover:bg-black/70 transition-all">
-                            <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent ml-1"></div>
-                          </div>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-                {r.kind === 'video' && post.platform !== 'youtube' && !isFacebookPlatform && (
-                  <div className="rounded-2xl overflow-hidden">
-                    <video src={r.url} className="w-full h-auto" controls playsInline />
-                  </div>
+                    </div>
+                    <button
+                      onClick={handleVideoClick}
+                      className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group"
+                    >
+                      <div className="h-20 w-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center group-hover:bg-black/70 transition-all">
+                        <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent ml-1"></div>
+                      </div>
+                    </button>
+                  </>
                 )}
               </div>
             )}
-          </>
+            {r.kind === 'video' && post.platform !== 'youtube' && (
+              <div className="rounded-2xl overflow-hidden">
+                <video src={r.url} className="w-full h-auto" controls playsInline />
+              </div>
+            )}
+          </div>
         )}
 
         {/* Title - hide for Reddit embeds as they contain their own title */}
