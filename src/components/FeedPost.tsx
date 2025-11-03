@@ -72,10 +72,23 @@ const getPlatformIcon = (platform?: string) => {
   }
 };
 
+const detectPlatformFromUrl = (url?: string) => {
+  if (!url) return null;
+  
+  if (url.includes('spotify.com')) return 'spotify';
+  if (url.includes('instagram.com')) return 'instagram';
+  if (url.includes('facebook.com') || url.includes('fb.watch') || url.includes('fb.me')) return 'facebook';
+  
+  return null;
+};
+
 export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
-  const platform = getPlatformIcon(post.platform);
+  
+  // Try to get platform from post.platform or detect from URL
+  const detectedPlatform = post.platform || detectPlatformFromUrl(post.mediaUrl);
+  const platform = getPlatformIcon(detectedPlatform);
   
   // Check if this is a Quora URL for isolated preview card
   const isQuoraUrl =
