@@ -94,23 +94,23 @@ const UserProfile = () => {
         {/* Profile Content */}
         <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
           {/* Avatar and Stats Container */}
-          <div className="flex items-center justify-between -mt-[110px] pt-6 relative px-2">
+          <div className="flex items-center justify-between -mt-[70px] pt-6 relative px-4">
             {/* Left Stats - Followers */}
-            <div className="text-center flex-shrink-0 w-24">
-              <div className="text-3xl font-bold leading-none mb-1">0</div>
-              <div className="text-sm font-medium">Followers</div>
+            <div className="text-center flex-shrink-0 w-20">
+              <div className="text-2xl font-bold leading-none mb-1">0</div>
+              <div className="text-xs font-medium">Followers</div>
             </div>
             
             {/* Avatar */}
-            <Avatar className="h-[220px] w-[220px] border-[12px] border-background shadow-2xl flex-shrink-0 mx-2">
+            <Avatar className="h-[140px] w-[140px] border-[8px] border-background shadow-2xl flex-shrink-0 mx-1">
               <AvatarImage src={profile.avatar_url || undefined} />
-              <AvatarFallback className="text-6xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
+              <AvatarFallback className="text-4xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
             </Avatar>
             
             {/* Right Stats - Following */}
-            <div className="text-center flex-shrink-0 w-24">
-              <div className="text-3xl font-bold leading-none mb-1">0</div>
-              <div className="text-sm font-medium">Following</div>
+            <div className="text-center flex-shrink-0 w-20">
+              <div className="text-2xl font-bold leading-none mb-1">0</div>
+              <div className="text-xs font-medium">Following</div>
             </div>
           </div>
 
