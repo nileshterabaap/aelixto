@@ -95,7 +95,7 @@ const UserProfile = () => {
         {/* Profile Content */}
         <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
           {/* Avatar and Stats Container */}
-          <div className="flex items-center justify-between -mt-[160px] pt-4 relative px-4">
+          <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
             {/* Left Stats - Followers */}
             <div className="text-center flex-shrink-0 w-20">
               <div className="text-2xl font-bold leading-none mb-1">0</div>
@@ -103,7 +103,7 @@ const UserProfile = () => {
             </div>
             
             {/* Avatar */}
-            <Avatar className="h-[140px] w-[140px] border-[8px] border-background shadow-2xl flex-shrink-0 mx-1">
+            <Avatar className="h-[140px] w-[140px] border-[8px] border-background shadow-2xl flex-shrink-0 mx-1 -mt-8">
               <AvatarImage src={profile.avatar_url || undefined} />
               <AvatarFallback className="text-4xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
             </Avatar>
