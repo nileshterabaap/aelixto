@@ -60,29 +60,9 @@ const UserProfile = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      {/* Header with Name and Username */}
-      <div className="bg-background border-b sticky top-0 z-50">
-        <div className="mx-auto max-w-2xl px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3 flex-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="bg-red-500 hover:bg-red-600 text-white rounded-full h-10 w-10 shadow-lg flex-shrink-0"
-              onClick={() => navigate('/')}
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-bold leading-tight truncate">{profile.display_name || profile.username}</h1>
-              <p className="text-muted-foreground text-sm truncate">@{profile.username}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      
       <main className="mx-auto max-w-2xl">
-        {/* Cover Image */}
-        <div className="relative h-[340px] bg-gradient-to-r from-purple-500 to-pink-500">
+        {/* Cover Image with Header Overlay */}
+        <div className="relative h-[400px] bg-gradient-to-r from-purple-500 to-pink-500">
           {profile.cover_url && (
             <img
               src={profile.cover_url}
@@ -90,6 +70,26 @@ const UserProfile = () => {
               className="w-full h-full object-cover"
             />
           )}
+          
+          {/* Header Overlay */}
+          <div className="absolute top-0 left-0 right-0 z-10">
+            <div className="mx-auto max-w-2xl px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3 flex-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="bg-red-500 hover:bg-red-600 text-white rounded-full h-10 w-10 shadow-lg flex-shrink-0"
+                  onClick={() => navigate('/')}
+                >
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-xl font-bold leading-tight truncate text-white drop-shadow-lg">{profile.display_name || profile.username}</h1>
+                  <p className="text-white/95 text-sm truncate drop-shadow-lg">@{profile.username}</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Profile Content */}
