@@ -88,13 +88,6 @@ const UserProfile = () => {
               <ArrowLeft className="h-[22px] w-[22px]" />
             </button>
 
-            {/* External Link Button */}
-            <button
-              className="absolute top-4 right-4 h-10 w-10 rounded-full bg-black/35 backdrop-blur border border-white/20 text-white flex items-center justify-center hover:bg-black/50 transition-colors"
-            >
-              <ExternalLink className="h-[22px] w-[22px]" />
-            </button>
-
             {/* Name Overlay - Bottom Left */}
             <div className="absolute bottom-4 left-5 text-white drop-shadow-lg z-10">
               <h1 className="text-[28px] sm:text-[30px] font-extrabold leading-[1.1]">{profile.display_name || profile.username}</h1>
@@ -102,14 +95,21 @@ const UserProfile = () => {
             </div>
           </div>
 
-          {/* Profile Content */}
-          <div className="px-4 pb-6">
+          {/* Profile Content with Curved Sides */}
+          <div className="relative px-4 pb-6">
+            {/* Curved white overlay on sides */}
+            <div className="absolute left-0 right-0 -top-8 h-16 bg-background">
+              <svg viewBox="0 0 100 20" className="w-full h-full" preserveAspectRatio="none">
+                <path d="M0,20 Q25,0 50,0 T100,20 L100,20 L0,20 Z" fill="currentColor" className="text-background" />
+              </svg>
+            </div>
+
             {/* Avatar and Stats Container */}
-            <div className="grid grid-cols-3 items-center gap-2 -mt-14">
+            <div className="grid grid-cols-3 items-center gap-2 -mt-14 relative z-10">
               {/* Left Stats - Followers */}
               <div className="text-center">
-                <div className="text-[36px] sm:text-[40px] font-extrabold leading-none tracking-tight">0</div>
-                <div className="text-[14px] text-muted-foreground font-medium">Followers</div>
+                <div className="text-[32px] sm:text-[36px] font-extrabold leading-none tracking-tight">0</div>
+                <div className="text-[13px] text-muted-foreground font-medium">Followers</div>
               </div>
               
               {/* Avatar */}
@@ -122,16 +122,16 @@ const UserProfile = () => {
               
               {/* Right Stats - Following */}
               <div className="text-center">
-                <div className="text-[36px] sm:text-[40px] font-extrabold leading-none tracking-tight">0</div>
-                <div className="text-[14px] text-muted-foreground font-medium">Following</div>
+                <div className="text-[32px] sm:text-[36px] font-extrabold leading-none tracking-tight">0</div>
+                <div className="text-[13px] text-muted-foreground font-medium">Following</div>
               </div>
             </div>
 
             {/* Aelix Score */}
             <div className="flex justify-center mt-5">
-              <div className="rounded-[22px] border-2 border-foreground/15 px-10 py-4 bg-background shadow-[0_6px_18px_rgba(0,0,0,0.06)]">
-                <div className="text-[36px] sm:text-[40px] font-extrabold text-center leading-none">{profile.aelix_score.toLocaleString()}</div>
-                <div className="text-[13px] font-semibold text-center tracking-[0.2em] uppercase text-muted-foreground mt-1">Aelix Score</div>
+              <div className="rounded-[22px] border-2 border-foreground/15 px-8 py-3 bg-background shadow-[0_6px_18px_rgba(0,0,0,0.06)]">
+                <div className="text-[32px] sm:text-[36px] font-extrabold text-center leading-none">{profile.aelix_score.toLocaleString()}</div>
+                <div className="text-[12px] font-semibold text-center tracking-[0.2em] uppercase text-muted-foreground mt-1">Aelix Score</div>
               </div>
             </div>
 
