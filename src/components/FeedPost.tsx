@@ -400,8 +400,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {/* Title - hide for Reddit and Facebook embeds as they contain their own title */}
-        {r.kind !== 'reddit' && !(r.kind === 'universal' && detectedPlatform === 'facebook') && (
+        {/* Title - hide for Reddit embeds as they contain their own title */}
+        {r.kind !== 'reddit' && (
           <div className="mt-3">
             <h2 className="text-lg font-bold">{post.title}</h2>
           </div>
