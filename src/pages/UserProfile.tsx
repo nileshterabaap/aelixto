@@ -114,7 +114,7 @@ const UserProfile = () => {
               
               {/* Avatar */}
               <div className="flex justify-center">
-                <Avatar className="h-[160px] w-[160px] sm:h-[180px] sm:w-[180px] rounded-full border-[6px] border-background shadow-[0_8px_20px_rgba(0,0,0,0.25)] bg-background">
+                <Avatar className="h-[160px] w-[160px] sm:h-[180px] sm:w-[180px] rounded-full border-[6px] border-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] bg-white">
                   <AvatarImage src={profile.avatar_url || undefined} className="object-cover" />
                   <AvatarFallback className="text-5xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
                 </Avatar>
