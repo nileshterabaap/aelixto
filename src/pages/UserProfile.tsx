@@ -96,8 +96,8 @@ const UserProfile = () => {
           {/* Avatar and Stats Container */}
           <div className="flex items-center justify-between -mt-[110px] pt-6 relative px-2">
             {/* Left Stats - Followers */}
-            <div className="text-center flex-shrink-0">
-              <div className="text-3xl font-bold leading-none mb-1">7058</div>
+            <div className="text-center flex-shrink-0 w-24">
+              <div className="text-3xl font-bold leading-none mb-1">0</div>
               <div className="text-sm font-medium">Followers</div>
             </div>
             
@@ -108,8 +108,8 @@ const UserProfile = () => {
             </Avatar>
             
             {/* Right Stats - Following */}
-            <div className="text-center flex-shrink-0">
-              <div className="text-3xl font-bold leading-none mb-1">85</div>
+            <div className="text-center flex-shrink-0 w-24">
+              <div className="text-3xl font-bold leading-none mb-1">0</div>
               <div className="text-sm font-medium">Following</div>
             </div>
           </div>
