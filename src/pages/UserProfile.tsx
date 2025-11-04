@@ -103,7 +103,7 @@ const UserProfile = () => {
             </div>
             
             {/* Avatar */}
-            <Avatar className="h-[140px] w-[140px] border-[8px] border-background shadow-2xl flex-shrink-0 mx-1 -mt-16">
+            <Avatar className="h-[140px] w-[140px] border-[8px] border-background shadow-2xl flex-shrink-0 mx-1 -mt-20">
               <AvatarImage src={profile.avatar_url || undefined} />
               <AvatarFallback className="text-4xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
             </Avatar>
