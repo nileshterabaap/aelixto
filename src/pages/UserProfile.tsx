@@ -102,11 +102,13 @@ const UserProfile = () => {
               <div className="text-xs font-medium">Followers</div>
             </div>
             
-            {/* Avatar */}
-            <Avatar className="h-[140px] w-[140px] border-[8px] border-background shadow-2xl flex-shrink-0 mx-1 -mt-20">
-              <AvatarImage src={profile.avatar_url || undefined} />
-              <AvatarFallback className="text-4xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
-            </Avatar>
+            {/* Avatar - Centered */}
+            <div className="absolute left-1/2 -translate-x-1/2 -mt-20">
+              <Avatar className="h-[140px] w-[140px] border-[8px] border-background shadow-2xl">
+                <AvatarImage src={profile.avatar_url || undefined} />
+                <AvatarFallback className="text-4xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
+              </Avatar>
+            </div>
             
             {/* Right Stats - Following */}
             <div className="text-center flex-shrink-0 w-20">
