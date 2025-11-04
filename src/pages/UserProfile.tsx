@@ -7,7 +7,7 @@ import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Play, ExternalLink, Instagram } from "lucide-react";
+import { ArrowLeft, Play, Camera, Menu } from "lucide-react";
 import { Profile } from "@/hooks/useCurrentProfile";
 
 const UserProfile = () => {
@@ -60,132 +60,108 @@ const UserProfile = () => {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 pb-20">
+    <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
-      <main className="mx-auto max-w-[430px] pt-4 pb-2">
-        {/* Profile Card */}
-        <div className="rounded-[28px] border-2 border-foreground/15 shadow-[0_10px_40px_rgba(0,0,0,0.08)] overflow-hidden bg-background">
+      <main className="mx-auto max-w-2xl">
+        {/* Cover Image with Name Overlay */}
+        <div className="relative h-[340px] bg-gradient-to-r from-purple-500 to-pink-500">
+          {profile.cover_url && (
+            <img
+              src={profile.cover_url}
+              alt="Cover"
+              className="w-full h-full object-cover"
+            />
+          )}
           
-          {/* Cover Image */}
-          <div className="relative h-[220px] sm:h-[260px] bg-gradient-to-r from-purple-500 to-pink-500 overflow-hidden">
-            {profile.cover_url && (
-              <img
-                src={profile.cover_url}
-                alt="Cover"
-                className="w-full h-full object-cover"
-              />
-            )}
-            
-            {/* Subtle overlay */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/5 to-black/15" />
-            
-            {/* Name & Username - Top Left */}
-            <div className="absolute top-5 left-5 z-10">
-              <h1 className="text-[28px] sm:text-[30px] font-extrabold leading-[1.1] text-black drop-shadow-none">
-                {profile.display_name || profile.username}
-              </h1>
-              <p className="mt-1 text-[16px] font-medium text-black/70">@{profile.username}</p>
+          {/* Back Button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 left-4 bg-red-500 hover:bg-red-600 text-white rounded-full h-12 w-12 shadow-lg"
+            onClick={() => navigate('/')}
+          >
+            <ArrowLeft className="h-6 w-6" />
+          </Button>
+
+          {/* Name Overlay */}
+          <div className="absolute top-8 left-20 text-white drop-shadow-lg">
+            <h1 className="text-2xl font-bold leading-tight">{profile.display_name || profile.username}</h1>
+            <p className="text-white/95 text-base">@{profile.username}</p>
+          </div>
+        </div>
+
+        {/* Profile Content */}
+        <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
+          {/* Avatar and Stats Container */}
+          <div className="flex items-center justify-between -mt-[110px] pt-6 relative px-2">
+            {/* Left Stats - Followers */}
+            <div className="text-center flex-shrink-0 w-24">
+              <div className="text-3xl font-bold leading-none mb-1">0</div>
+              <div className="text-sm font-medium">Followers</div>
             </div>
             
-            {/* Back Button - Orange */}
-            <button
-              onClick={() => navigate('/')}
-              className="absolute top-4 left-4 h-10 w-10 rounded-full bg-[#FF8A00] text-black flex items-center justify-center shadow-lg hover:bg-[#FF8A00]/90 transition-colors"
-            >
-              <ArrowLeft className="h-[22px] w-[22px]" />
-            </button>
-
-            {/* External Link Button */}
-            <button
-              className="absolute top-4 right-4 h-10 w-10 rounded-xl bg-black/35 text-white border border-white/30 backdrop-blur flex items-center justify-center hover:bg-black/50 transition-colors"
-            >
-              <ExternalLink className="h-5 w-5" />
-            </button>
+            {/* Avatar */}
+            <Avatar className="h-[220px] w-[220px] border-[12px] border-background shadow-2xl flex-shrink-0 mx-2">
+              <AvatarImage src={profile.avatar_url || undefined} />
+              <AvatarFallback className="text-6xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
+            </Avatar>
+            
+            {/* Right Stats - Following */}
+            <div className="text-center flex-shrink-0 w-24">
+              <div className="text-3xl font-bold leading-none mb-1">0</div>
+              <div className="text-sm font-medium">Following</div>
+            </div>
           </div>
 
-          {/* Profile Content */}
-          <div className="relative px-4 pb-6 bg-background">
-            {/* Curved white background behind avatar - larger curve */}
-            <div className="absolute left-0 right-0 -top-12 h-20 bg-background z-10">
-              <svg viewBox="0 0 100 30" className="w-full h-full" preserveAspectRatio="none">
-                <path d="M0,30 Q25,5 50,5 T100,30 L100,30 L0,30 Z" fill="currentColor" className="text-background" />
-              </svg>
+          {/* Aelix Score */}
+          <div className="flex justify-center mt-6 mb-6">
+            <div className="border-[3px] border-foreground rounded-[32px] px-12 py-4">
+              <div className="text-4xl font-bold text-center leading-none mb-1">{profile.aelix_score.toLocaleString()}</div>
+              <div className="text-xs font-bold text-center tracking-[0.2em] uppercase">Aelix Score</div>
             </div>
-
-            {/* Avatar - Centered and Overlapping */}
-            <div className="relative flex justify-center -mt-[48px] z-20">
-              <Avatar className="h-[140px] w-[140px] rounded-full border-[6px] border-white shadow-[0_8px_22px_rgba(0,0,0,0.25)] bg-white overflow-hidden">
-                <AvatarImage src={profile.avatar_url || undefined} className="w-full h-full object-cover" />
-                <AvatarFallback className="text-4xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
-              </Avatar>
-            </div>
-
-            {/* Followers / Following - Symmetric Row Below Avatar */}
-            <div className="mt-3 grid grid-cols-3 items-center">
-              <div className="text-center">
-                <div className="text-[40px] font-extrabold tracking-tight leading-none">0</div>
-                <div className="text-[15px] text-muted-foreground font-medium">Followers</div>
-              </div>
-              <div /> {/* Spacer for symmetry */}
-              <div className="text-center">
-                <div className="text-[40px] font-extrabold tracking-tight leading-none">0</div>
-                <div className="text-[15px] text-muted-foreground font-medium">Following</div>
-              </div>
-            </div>
-
-            {/* Aelix Score Badge */}
-            <div className="mt-5 flex justify-center">
-              <div className="rounded-[22px] border-2 border-black bg-white px-10 py-4 shadow-[0_6px_18px_rgba(0,0,0,0.06)]">
-                <div className="text-[40px] font-extrabold text-center leading-none">{profile.aelix_score.toLocaleString()}</div>
-                <div className="mt-1 text-[13px] tracking-[0.25em] font-semibold uppercase text-muted-foreground text-center">AELIX SCORE</div>
-              </div>
-            </div>
-
-            {/* Bio */}
-            {profile.bio && (
-              <p className="text-center italic text-[16px] leading-6 text-foreground/90 mt-5 px-6">"{profile.bio}"</p>
-            )}
-
-            {/* Edit Profile Button */}
-            <button
-              onClick={() => navigate('/settings')}
-              className="mt-6 w-full rounded-full border-2 border-black bg-white py-4 text-[18px] font-semibold shadow-[0_6px_18px_rgba(0,0,0,0.06)] hover:bg-muted/50 transition-colors"
-            >
-              Edit Profile
-            </button>
-
-            {/* Menu Icon */}
-            <div className="mt-6 flex justify-start">
-              <div className="flex flex-col gap-1.5">
-                <div className="h-1 w-10 bg-black rounded-full" />
-                <div className="h-1 w-10 bg-black rounded-full" />
-                <div className="h-1 w-10 bg-black rounded-full" />
-              </div>
-            </div>
-
-            {/* Social Media Buttons */}
-            <div className="mt-6 flex items-center gap-4">
-              <button className="flex-1 rounded-full bg-black text-white h-14 px-5 font-semibold flex items-center justify-center gap-2 hover:bg-black/90 transition-colors">
-                <Play className="h-5 w-5 fill-current" />
-              </button>
-              <button className="flex-1 rounded-full border-2 border-foreground/15 h-14 px-5 text-foreground/70 font-semibold flex items-center justify-center gap-2 hover:bg-muted/50 transition-colors">
-                <Instagram className="h-5 w-5" />
-              </button>
-              <button className="flex-1 rounded-full border-2 border-foreground/15 h-14 px-5 text-foreground/70 font-semibold flex items-center justify-center gap-2 hover:bg-muted/50 transition-colors">
-                <span className="text-xl font-bold">𝕏</span>
-              </button>
-            </div>
-
-            {/* Content Tabs */}
-            <Tabs defaultValue="posts" className="w-full mt-6">
-              <TabsContent value="posts" className="mt-0">
-                <p className="text-center text-muted-foreground py-12 text-base">
-                  No posts yet
-                </p>
-              </TabsContent>
-            </Tabs>
           </div>
+
+          {/* Bio */}
+          {profile.bio && (
+            <p className="text-center italic text-base mb-6 px-4">"{profile.bio}"</p>
+          )}
+
+          {/* Edit Profile Button */}
+          <Button 
+            variant="outline" 
+            className="w-full rounded-full py-6 text-base font-bold border-[2.5px] mb-6 hover:bg-muted"
+            onClick={() => navigate('/settings')}
+          >
+            Edit Profile
+          </Button>
+
+          {/* Menu Icon */}
+          <div className="mb-4 pl-1">
+            <Menu className="h-7 w-7 stroke-[3]" />
+          </div>
+
+          {/* Social Links */}
+          <div className="flex gap-3 mb-8">
+            <Button className="flex-1 rounded-full py-5 bg-foreground hover:bg-foreground/90 text-background">
+              <Play className="h-5 w-5 fill-current" />
+            </Button>
+            <Button variant="outline" className="flex-1 rounded-full py-5 border-[2.5px]">
+              <Camera className="h-5 w-5" />
+            </Button>
+            <Button variant="outline" className="flex-1 rounded-full py-5 border-[2.5px]">
+              <span className="text-xl font-bold">𝕏</span>
+            </Button>
+          </div>
+
+          {/* Content */}
+          <Tabs defaultValue="posts" className="w-full">
+            <TabsContent value="posts" className="mt-0">
+              <p className="text-center text-muted-foreground py-12 text-base">
+                No posts yet
+              </p>
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
 
