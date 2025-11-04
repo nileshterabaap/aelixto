@@ -122,28 +122,40 @@ export type Database = {
       }
       profiles: {
         Row: {
+          aelix_score: number
           avatar_url: string | null
           bio: string | null
+          cover_url: string | null
           created_at: string
+          display_name: string | null
           id: string
+          settings: Json
           updated_at: string
           user_id: string
           username: string
         }
         Insert: {
+          aelix_score?: number
           avatar_url?: string | null
           bio?: string | null
+          cover_url?: string | null
           created_at?: string
+          display_name?: string | null
           id?: string
+          settings?: Json
           updated_at?: string
           user_id: string
           username: string
         }
         Update: {
+          aelix_score?: number
           avatar_url?: string | null
           bio?: string | null
+          cover_url?: string | null
           created_at?: string
+          display_name?: string | null
           id?: string
+          settings?: Json
           updated_at?: string
           user_id?: string
           username?: string
