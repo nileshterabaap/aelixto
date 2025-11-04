@@ -7,7 +7,7 @@ import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Play, Camera, Menu } from "lucide-react";
 import { Profile } from "@/hooks/useCurrentProfile";
 
 const UserProfile = () => {
@@ -65,7 +65,7 @@ const UserProfile = () => {
       
       <main className="mx-auto max-w-2xl">
         {/* Cover Image with Name Overlay */}
-        <div className="relative h-64 bg-gradient-to-r from-purple-500 to-pink-500">
+        <div className="relative h-72 bg-gradient-to-r from-purple-500 to-pink-500">
           {profile.cover_url && (
             <img
               src={profile.cover_url}
@@ -78,92 +78,89 @@ const UserProfile = () => {
           <Button
             variant="ghost"
             size="icon"
-            className="absolute top-4 left-4 bg-destructive hover:bg-destructive/90 text-white rounded-full h-12 w-12"
+            className="absolute top-6 left-6 bg-destructive hover:bg-destructive/90 text-white rounded-full h-14 w-14 shadow-lg"
             onClick={() => navigate('/')}
           >
             <ArrowLeft className="h-6 w-6" />
           </Button>
 
           {/* Name Overlay */}
-          <div className="absolute top-4 left-20 text-white">
-            <h1 className="text-2xl font-bold">{profile.display_name || profile.username}</h1>
-            <p className="text-white/90">@{profile.username}</p>
+          <div className="absolute top-8 left-24 text-white drop-shadow-lg">
+            <h1 className="text-3xl font-bold leading-tight">{profile.display_name || profile.username}</h1>
+            <p className="text-white/95 text-lg">@{profile.username}</p>
           </div>
         </div>
 
         {/* Profile Content */}
-        <div className="bg-background rounded-t-3xl -mt-8 relative pt-16 px-6 pb-6">
+        <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
           {/* Avatar with Stats */}
-          <div className="flex justify-between items-start -mt-24 mb-8">
-            <Avatar className="h-40 w-40 border-8 border-background shadow-xl">
+          <div className="flex justify-between items-start -mt-20 pt-6">
+            <Avatar className="h-44 w-44 border-[10px] border-background shadow-2xl">
               <AvatarImage src={profile.avatar_url || undefined} />
-              <AvatarFallback className="text-4xl">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
+              <AvatarFallback className="text-5xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
             </Avatar>
             
             {/* Follower Stats */}
-            <div className="flex gap-8 pt-8">
+            <div className="flex gap-12 pt-4 pr-4">
               <div className="text-center">
-                <div className="text-2xl font-bold">0</div>
+                <div className="text-3xl font-bold leading-none mb-1">0</div>
                 <div className="text-sm text-muted-foreground">Followers</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold">0</div>
+                <div className="text-3xl font-bold leading-none mb-1">0</div>
                 <div className="text-sm text-muted-foreground">Following</div>
               </div>
             </div>
           </div>
 
           {/* Aelix Score */}
-          <div className="flex justify-center mb-6">
-            <div className="border-4 border-foreground rounded-full px-8 py-3">
-              <div className="text-4xl font-bold text-center">{profile.aelix_score.toLocaleString()}</div>
-              <div className="text-sm font-semibold text-center tracking-wider">AELIX SCORE</div>
+          <div className="flex justify-center my-8">
+            <div className="border-[3px] border-foreground rounded-full px-12 py-4">
+              <div className="text-5xl font-bold text-center leading-none mb-1">{profile.aelix_score.toLocaleString()}</div>
+              <div className="text-xs font-bold text-center tracking-[0.2em] uppercase">Aelix Score</div>
             </div>
           </div>
 
           {/* Bio */}
           {profile.bio && (
-            <p className="text-center italic text-lg mb-6">"{profile.bio}"</p>
+            <p className="text-center italic text-lg mb-8 px-4">"{profile.bio}"</p>
           )}
 
           {/* Edit Profile Button */}
           <Button 
             variant="outline" 
-            className="w-full rounded-full py-6 text-lg font-semibold mb-6"
+            className="w-full rounded-full py-7 text-base font-semibold border-2 mb-6 hover:bg-muted"
             onClick={() => navigate('/settings')}
           >
             Edit Profile
           </Button>
 
-          {/* Social Links Placeholder */}
-          <div className="flex gap-3 mb-8">
-            <Button variant="default" className="flex-1 rounded-full bg-black text-white hover:bg-black/90">
-              <span className="font-semibold">▶</span>
+          {/* Social Links */}
+          <div className="flex gap-3 mb-10">
+            <Button className="flex-1 rounded-full py-6 bg-foreground hover:bg-foreground/90 text-background">
+              <Play className="h-5 w-5 fill-current" />
             </Button>
-            <Button variant="outline" className="flex-1 rounded-full">
-              <span className="font-semibold">📷</span>
+            <Button variant="outline" className="flex-1 rounded-full py-6 border-2">
+              <Camera className="h-5 w-5" />
             </Button>
-            <Button variant="outline" className="flex-1 rounded-full">
-              <span className="font-semibold">𝕏</span>
+            <Button variant="outline" className="flex-1 rounded-full py-6 border-2">
+              <span className="text-xl font-bold">𝕏</span>
             </Button>
           </div>
 
-          {/* Content Grid */}
-          <div className="border-t pt-6">
-            <div className="flex gap-2 mb-4">
-              <div className="h-8 w-8 bg-foreground"></div>
-              <div className="h-8 w-8 bg-foreground"></div>
-              <div className="h-8 w-8 bg-foreground"></div>
-            </div>
-            
-            <Tabs defaultValue="posts" className="w-full">
-              <TabsContent value="posts" className="mt-0">
-                <p className="text-center text-muted-foreground py-8">
-                  No posts yet
-                </p>
-              </TabsContent>
-            </Tabs>
+          {/* Menu Icon */}
+          <div className="mb-6 pl-1">
+            <Menu className="h-8 w-8 stroke-[3]" />
           </div>
+
+          {/* Content */}
+          <Tabs defaultValue="posts" className="w-full">
+            <TabsContent value="posts" className="mt-0">
+              <p className="text-center text-muted-foreground py-12 text-base">
+                No posts yet
+              </p>
+            </TabsContent>
+          </Tabs>
         </div>
       </main>
 
