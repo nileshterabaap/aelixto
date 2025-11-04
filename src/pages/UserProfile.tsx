@@ -78,7 +78,7 @@ const UserProfile = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="bg-red-500 hover:bg-red-600 text-white rounded-full h-10 w-10 shadow-lg flex-shrink-0"
+                  className="bg-black/20 hover:bg-black/30 text-white rounded-full h-10 w-10 shadow-lg flex-shrink-0"
                   onClick={() => navigate('/')}
                 >
                   <ArrowLeft className="h-5 w-5" />
@@ -95,7 +95,7 @@ const UserProfile = () => {
         {/* Profile Content */}
         <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
           {/* Avatar and Stats Container */}
-          <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
+          <div className="flex items-center justify-between -mt-[160px] pt-4 relative px-4">
             {/* Left Stats - Followers */}
             <div className="text-center flex-shrink-0 w-20">
               <div className="text-2xl font-bold leading-none mb-1">0</div>
