@@ -93,22 +93,21 @@ const UserProfile = () => {
 
         {/* Profile Content */}
         <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
-          {/* Avatar centered with Stats on sides */}
-          <div className="flex items-end justify-center -mt-32 pt-6 relative">
-            {/* Left Stats - Followers */}
-            <div className="absolute left-6 bottom-12 text-center">
-              <div className="text-4xl font-bold leading-none mb-1">0</div>
-              <div className="text-sm text-muted-foreground">Followers</div>
-            </div>
-            
-            {/* Avatar */}
+          {/* Avatar centered */}
+          <div className="flex justify-center -mt-32 pt-6">
             <Avatar className="h-56 w-56 border-[12px] border-background shadow-2xl">
               <AvatarImage src={profile.avatar_url || undefined} />
               <AvatarFallback className="text-6xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
             </Avatar>
-            
-            {/* Right Stats - Following */}
-            <div className="absolute right-6 bottom-12 text-center">
+          </div>
+
+          {/* Stats row below avatar */}
+          <div className="flex justify-center gap-24 mt-6">
+            <div className="text-center">
+              <div className="text-4xl font-bold leading-none mb-1">0</div>
+              <div className="text-sm text-muted-foreground">Followers</div>
+            </div>
+            <div className="text-center">
               <div className="text-4xl font-bold leading-none mb-1">0</div>
               <div className="text-sm text-muted-foreground">Following</div>
             </div>
