@@ -94,7 +94,7 @@ const UserProfile = () => {
         {/* Profile Content */}
         <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
           {/* Avatar and Stats Container */}
-          <div className="flex items-center justify-between -mt-[85px] pt-4 relative px-4">
+          <div className="flex items-center justify-between -mt-[130px] pt-2 relative px-4">
             {/* Left Stats - Followers */}
             <div className="text-center flex-shrink-0 w-20">
               <div className="text-2xl font-bold leading-none mb-1">0</div>
@@ -115,7 +115,7 @@ const UserProfile = () => {
           </div>
 
           {/* Aelix Score */}
-          <div className="flex justify-center mt-4 mb-5">
+          <div className="flex justify-center mt-2 mb-4">
             <div className="border-[2.5px] border-foreground rounded-[20px] px-16 py-2.5">
               <div className="text-3xl font-bold text-center leading-none mb-0.5">{profile.aelix_score.toLocaleString()}</div>
               <div className="text-[10px] font-bold text-center tracking-[0.15em] uppercase">Aelix Score</div>
