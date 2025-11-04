@@ -41,7 +41,7 @@ export const useCurrentProfile = () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
 
       if (error && error.code !== 'PGRST116') {
@@ -92,7 +92,7 @@ export const useCurrentProfile = () => {
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .select()
         .single();
 
