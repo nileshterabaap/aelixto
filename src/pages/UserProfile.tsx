@@ -106,11 +106,18 @@ const UserProfile = () => {
 
           {/* Profile Content */}
           <div className="relative px-4 pb-6 bg-background">
+            {/* Curved white background behind avatar */}
+            <div className="absolute left-0 right-0 -top-8 h-16 bg-background">
+              <svg viewBox="0 0 100 20" className="w-full h-full" preserveAspectRatio="none">
+                <path d="M0,20 Q25,0 50,0 T100,20 L100,20 L0,20 Z" fill="currentColor" className="text-background" />
+              </svg>
+            </div>
+
             {/* Avatar - Centered and Overlapping */}
-            <div className="relative flex justify-center -mt-[56px] z-20">
-              <Avatar className="h-[180px] w-[180px] rounded-full border-[6px] border-white shadow-[0_8px_22px_rgba(0,0,0,0.25)] bg-white overflow-hidden">
+            <div className="relative flex justify-center -mt-[48px] z-20">
+              <Avatar className="h-[140px] w-[140px] rounded-full border-[6px] border-white shadow-[0_8px_22px_rgba(0,0,0,0.25)] bg-white overflow-hidden">
                 <AvatarImage src={profile.avatar_url || undefined} className="w-full h-full object-cover" />
-                <AvatarFallback className="text-5xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
+                <AvatarFallback className="text-4xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
               </Avatar>
             </div>
 
