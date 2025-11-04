@@ -119,9 +119,9 @@ const UserProfile = () => {
 
           {/* Aelix Score */}
           <div className="flex justify-center mt-4 mb-4">
-            <div className="border-[2.5px] border-foreground rounded-[20px] px-16 py-2.5">
-              <div className="text-3xl font-bold text-center leading-none mb-0.5">{profile.aelix_score.toLocaleString()}</div>
-              <div className="text-[10px] font-bold text-center tracking-[0.15em] uppercase">Aelix Score</div>
+            <div className="border-2 border-foreground rounded-[16px] px-10 py-2">
+              <div className="text-2xl font-bold text-center leading-none mb-0.5">{profile.aelix_score.toLocaleString()}</div>
+              <div className="text-[9px] font-bold text-center tracking-[0.15em] uppercase">Aelix Score</div>
             </div>
           </div>
 
@@ -133,7 +133,7 @@ const UserProfile = () => {
           {/* Edit Profile Button */}
           <Button 
             variant="outline" 
-            className="w-full rounded-full py-6 text-base font-bold border-[2.5px] mb-6 hover:bg-muted"
+            className="w-full rounded-full py-4 text-sm font-bold border-2 mb-6 hover:bg-muted"
             onClick={() => navigate('/settings')}
           >
             Edit Profile
