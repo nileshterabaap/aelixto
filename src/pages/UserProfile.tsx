@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
@@ -61,10 +60,28 @@ const UserProfile = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
+      {/* Header with Name and Username */}
+      <div className="bg-background border-b sticky top-0 z-50">
+        <div className="mx-auto max-w-2xl px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3 flex-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="bg-red-500 hover:bg-red-600 text-white rounded-full h-10 w-10 shadow-lg flex-shrink-0"
+              onClick={() => navigate('/')}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl font-bold leading-tight truncate">{profile.display_name || profile.username}</h1>
+              <p className="text-muted-foreground text-sm truncate">@{profile.username}</p>
+            </div>
+          </div>
+        </div>
+      </div>
       
       <main className="mx-auto max-w-2xl">
-        {/* Cover Image with Name Overlay */}
+        {/* Cover Image */}
         <div className="relative h-[340px] bg-gradient-to-r from-purple-500 to-pink-500">
           {profile.cover_url && (
             <img
@@ -73,22 +90,6 @@ const UserProfile = () => {
               className="w-full h-full object-cover"
             />
           )}
-          
-          {/* Back Button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 left-4 bg-red-500 hover:bg-red-600 text-white rounded-full h-12 w-12 shadow-lg"
-            onClick={() => navigate('/')}
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-
-          {/* Name Overlay */}
-          <div className="absolute top-8 left-20 text-white drop-shadow-lg">
-            <h1 className="text-2xl font-bold leading-tight">{profile.display_name || profile.username}</h1>
-            <p className="text-white/95 text-base">@{profile.username}</p>
-          </div>
         </div>
 
         {/* Profile Content */}
