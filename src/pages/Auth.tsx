@@ -17,18 +17,23 @@ const Auth = () => {
   useEffect(() => {
     // Check if user is already logged in
     const checkUser = async () => {
+      console.log('Auth - Checking existing session...');
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('Auth - Existing session:', session?.user?.id);
       if (session?.user) {
         setUser(session.user);
+        console.log('Auth - Redirecting to /');
         navigate("/");
       }
     };
     checkUser();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth - State change:', event, 'User:', session?.user?.id);
       setUser(session?.user ?? null);
       if (session?.user) {
+        console.log('Auth - User logged in, redirecting to /');
         navigate("/");
       }
     });
@@ -45,7 +50,8 @@ const Auth = () => {
     const password = formData.get("signup-password") as string;
     const username = formData.get("username") as string;
 
-    const { error } = await supabase.auth.signUp({
+    console.log('Auth - Signing up:', email);
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -56,15 +62,18 @@ const Auth = () => {
       },
     });
 
+    console.log('Auth - Signup result:', data?.user?.id, 'Error:', error);
     setLoading(false);
 
     if (error) {
+      console.error('Auth - Signup error:', error);
       toast({
         title: "Sign up failed",
         description: error.message,
         variant: "destructive",
       });
     } else {
+      console.log('Auth - Signup success, session:', data?.session?.user?.id);
       toast({
         title: "Welcome!",
         description: "Your account has been created successfully.",
@@ -80,20 +89,24 @@ const Auth = () => {
     const email = formData.get("signin-email") as string;
     const password = formData.get("signin-password") as string;
 
-    const { error } = await supabase.auth.signInWithPassword({
+    console.log('Auth - Signing in:', email);
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
+    console.log('Auth - Signin result:', data?.user?.id, 'Error:', error);
     setLoading(false);
 
     if (error) {
+      console.error('Auth - Signin error:', error);
       toast({
         title: "Sign in failed",
         description: error.message,
         variant: "destructive",
       });
     } else {
+      console.log('Auth - Signin success, session:', data?.session?.user?.id);
       toast({
         title: "Welcome back!",
         description: "You've successfully signed in.",
