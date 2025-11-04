@@ -39,14 +39,10 @@ const Index = () => {
   useEffect(() => {
     // Check authentication
     const checkAuth = async () => {
-      console.log('Index - Checking auth...');
-      const { data: { session }, error } = await supabase.auth.getSession();
-      console.log('Index - Session:', session?.user?.id, 'Error:', error);
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        console.log('Index - No session, redirecting to auth');
         navigate("/auth");
       } else {
-        console.log('Index - Session found, setting user');
         setUser(session.user);
       }
       setLoading(false);

@@ -19,10 +19,8 @@ interface HeaderProps {
 
 export const Header = ({ onCreatePost }: HeaderProps) => {
   const navigate = useNavigate();
-  const { user, loading: sessionLoading } = useSession();
-  const { profile, loading: profileLoading } = useCurrentProfile();
-
-  console.log('Header - User:', user?.id, 'Session Loading:', sessionLoading, 'Profile:', profile?.username, 'Profile Loading:', profileLoading);
+  const { user } = useSession();
+  const { profile } = useCurrentProfile();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -56,9 +54,7 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
               </div>
             </Button>
 
-            {sessionLoading ? (
-              <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
-            ) : user ? (
+            {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
