@@ -63,12 +63,12 @@ const UserProfile = () => {
     <div className="min-h-screen bg-muted/30 pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
-      <main className="mx-auto max-w-[430px] px-4 pt-4 pb-2">
+      <main className="mx-auto max-w-[430px] pt-4 pb-2">
         {/* Profile Card */}
         <div className="rounded-[28px] border-2 border-foreground/15 shadow-[0_10px_40px_rgba(0,0,0,0.08)] overflow-hidden bg-background">
           
           {/* Cover Image */}
-          <div className="relative h-[220px] sm:h-[260px] bg-gradient-to-r from-purple-500 to-pink-500 rounded-t-[28px] overflow-hidden">
+          <div className="relative h-[220px] sm:h-[260px] bg-gradient-to-r from-purple-500 to-pink-500 overflow-hidden">
             {profile.cover_url && (
               <img
                 src={profile.cover_url}
@@ -106,10 +106,10 @@ const UserProfile = () => {
 
           {/* Profile Content */}
           <div className="relative px-4 pb-6 bg-background">
-            {/* Curved white background behind avatar */}
-            <div className="absolute left-0 right-0 -top-8 h-16 bg-background">
-              <svg viewBox="0 0 100 20" className="w-full h-full" preserveAspectRatio="none">
-                <path d="M0,20 Q25,0 50,0 T100,20 L100,20 L0,20 Z" fill="currentColor" className="text-background" />
+            {/* Curved white background behind avatar - larger curve */}
+            <div className="absolute left-0 right-0 -top-12 h-20 bg-background z-10">
+              <svg viewBox="0 0 100 30" className="w-full h-full" preserveAspectRatio="none">
+                <path d="M0,30 Q25,5 50,5 T100,30 L100,30 L0,30 Z" fill="currentColor" className="text-background" />
               </svg>
             </div>
 
