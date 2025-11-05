@@ -104,7 +104,7 @@ const UserProfile = () => {
             
             {/* Avatar - Centered */}
             <div className="absolute left-1/2 -translate-x-1/2 -mt-20">
-              <Avatar className="h-[140px] w-[140px] border-[8px] border-background shadow-2xl">
+              <Avatar className="h-[140px] w-[140px] border-[8px] border-background">
                 <AvatarImage src={profile.avatar_url || undefined} />
                 <AvatarFallback className="text-4xl font-bold">{profile.display_name?.[0] || profile.username[0]}</AvatarFallback>
               </Avatar>
