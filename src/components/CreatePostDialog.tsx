@@ -7,6 +7,9 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
+import { ImageUploadButton } from "@/components/ImageUploadButton";
+import { useImageUpload } from "@/hooks/useImageUpload";
+import { useSession } from "@/hooks/useSession";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -20,7 +23,10 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
   const [showThumbnailInput, setShowThumbnailInput] = useState(false);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState("");
   const createPost = useCreatePost();
+  const { uploadImage, uploading } = useImageUpload();
+  const { user } = useSession();
 
   const handleLinkSubmit = async () => {
     if (!linkUrl.trim()) return;
@@ -91,8 +97,18 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setStep(2);
   };
 
+  const handleImageUpload = async (file: File) => {
+    if (!user) return;
+    const url = await uploadImage(file, "posts", user.id);
+    if (url) {
+      setUploadedImageUrl(url);
+      setThumbnailUrl(url);
+    }
+  };
+
   const handlePost = () => {
-    if (!linkUrl.trim()) return;
+    // Allow posting with either a link URL or uploaded image
+    if (!linkUrl.trim() && !uploadedImageUrl.trim()) return;
 
     // Detect platform and media type
     let platform = "";
@@ -134,11 +150,15 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     }
     // All other URLs default to "none" for article rendering
 
+    // Use uploaded image if available, otherwise use link
+    const finalMediaUrl = uploadedImageUrl || linkUrl;
+    const finalMediaType = uploadedImageUrl ? "image" : mediaType;
+
     console.log('[CreatePostDialog] Creating post with data:', {
       title: title.trim(),
       content: caption.trim(),
-      media_type: mediaType,
-      media_url: linkUrl,
+      media_type: finalMediaType,
+      media_url: finalMediaUrl,
       platform: platform,
       thumbnail_url: thumbnailUrl,
     });
@@ -146,8 +166,8 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     createPost.mutate({
       title: title.trim() || undefined,
       content: caption.trim() || "",
-      media_type: mediaType,
-      media_url: linkUrl,
+      media_type: finalMediaType,
+      media_url: finalMediaUrl,
       platform: platform || undefined,
       thumbnail_url: thumbnailUrl || undefined,
     });
@@ -159,6 +179,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setTitle("");
     setCaption("");
     setShowThumbnailInput(false);
+    setUploadedImageUrl("");
     onOpenChange(false);
   };
 
@@ -174,6 +195,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setTitle("");
     setCaption("");
     setShowThumbnailInput(false);
+    setUploadedImageUrl("");
     onOpenChange(false);
   };
 
@@ -212,6 +234,27 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
               />
             </div>
 
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or
+                </span>
+              </div>
+            </div>
+
+            <ImageUploadButton
+              onFileSelect={async (file) => {
+                await handleImageUpload(file);
+                setStep(2);
+              }}
+              uploading={uploading}
+            >
+              Upload Image from Device
+            </ImageUploadButton>
+
             <Button 
               onClick={handleLinkSubmit} 
               className="w-full" 
@@ -245,27 +288,31 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
             </div>
 
             <div className="space-y-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setShowThumbnailInput(!showThumbnailInput)}
-                className="w-full"
-              >
-                {showThumbnailInput ? "Hide" : "Change"} Thumbnail
-              </Button>
+              {!uploadedImageUrl && (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowThumbnailInput(!showThumbnailInput)}
+                    className="w-full"
+                  >
+                    {showThumbnailInput ? "Hide" : "Change"} Thumbnail
+                  </Button>
 
-              {showThumbnailInput && (
-                <div>
-                  <Label htmlFor="thumbnail">Thumbnail URL</Label>
-                  <Input
-                    id="thumbnail"
-                    type="url"
-                    placeholder="https://..."
-                    value={thumbnailUrl}
-                    onChange={(e) => setThumbnailUrl(e.target.value)}
-                    className="mt-1.5"
-                  />
-                </div>
+                  {showThumbnailInput && (
+                    <div>
+                      <Label htmlFor="thumbnail">Thumbnail URL</Label>
+                      <Input
+                        id="thumbnail"
+                        type="url"
+                        placeholder="https://..."
+                        value={thumbnailUrl}
+                        onChange={(e) => setThumbnailUrl(e.target.value)}
+                        className="mt-1.5"
+                      />
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

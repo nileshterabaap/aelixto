@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
@@ -10,11 +10,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
+import { ImageUploadButton } from "@/components/ImageUploadButton";
+import { useImageUpload } from "@/hooks/useImageUpload";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const Settings = () => {
   const navigate = useNavigate();
   const { user } = useSession();
   const { profile, loading, upsertProfile } = useCurrentProfile();
+  const { uploadImage, uploading } = useImageUpload();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
@@ -25,7 +29,7 @@ const Settings = () => {
   });
 
   // Initialize form when profile loads
-  useState(() => {
+  useEffect(() => {
     if (profile) {
       setFormData({
         username: profile.username,
@@ -35,7 +39,23 @@ const Settings = () => {
         cover_url: profile.cover_url || '',
       });
     }
-  });
+  }, [profile]);
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!user) return;
+    const url = await uploadImage(file, "avatars", user.id);
+    if (url) {
+      setFormData({ ...formData, avatar_url: url });
+    }
+  };
+
+  const handleCoverUpload = async (file: File) => {
+    if (!user) return;
+    const url = await uploadImage(file, "covers", user.id);
+    if (url) {
+      setFormData({ ...formData, cover_url: url });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,25 +135,42 @@ const Settings = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="avatar_url">Avatar URL</Label>
-            <Input
-              id="avatar_url"
-              type="url"
-              value={formData.avatar_url}
-              onChange={(e) => setFormData({ ...formData, avatar_url: e.target.value })}
-              placeholder="https://..."
-            />
+            <Label>Avatar</Label>
+            <div className="flex items-center gap-4">
+              <Avatar className="h-20 w-20">
+                <AvatarImage src={formData.avatar_url || undefined} />
+                <AvatarFallback className="text-2xl">
+                  {formData.display_name?.[0] || formData.username[0] || "?"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <ImageUploadButton
+                  onFileSelect={handleAvatarUpload}
+                  uploading={uploading}
+                >
+                  Upload Avatar
+                </ImageUploadButton>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="cover_url">Cover Image URL</Label>
-            <Input
-              id="cover_url"
-              type="url"
-              value={formData.cover_url}
-              onChange={(e) => setFormData({ ...formData, cover_url: e.target.value })}
-              placeholder="https://..."
-            />
+            <Label>Cover Image</Label>
+            {formData.cover_url && (
+              <div className="rounded-lg overflow-hidden border h-32 mb-2">
+                <img 
+                  src={formData.cover_url} 
+                  alt="Cover preview" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            <ImageUploadButton
+              onFileSelect={handleCoverUpload}
+              uploading={uploading}
+            >
+              Upload Cover Image
+            </ImageUploadButton>
           </div>
 
           <Button type="submit" className="w-full">
