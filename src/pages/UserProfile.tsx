@@ -88,6 +88,13 @@ const UserProfile = () => {
                   <p className="text-white/95 text-sm truncate drop-shadow-lg">@{profile.username}</p>
                 </div>
               </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="bg-black/20 hover:bg-black/30 text-white rounded-full h-9 w-9 shadow-lg flex-shrink-0"
+              >
+                <Menu className="h-4 w-4 stroke-[2.5]" />
+              </Button>
             </div>
           </div>
         </div>
@@ -138,11 +145,6 @@ const UserProfile = () => {
           >
             Edit Profile
           </Button>
-
-          {/* Menu Icon */}
-          <div className="mb-4 pl-1">
-            <Menu className="h-7 w-7 stroke-[3]" />
-          </div>
 
           {/* Social Links */}
           <div className="flex gap-3 mb-8">
