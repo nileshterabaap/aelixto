@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      follows: {
+        Row: {
+          created_at: string
+          follower_id: string
+          following_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          follower_id: string
+          following_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          follower_id?: string
+          following_id?: string
+          id?: string
+        }
+        Relationships: []
+      }
       likes: {
         Row: {
           created_at: string
@@ -129,6 +150,7 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          search_tsv: unknown
           settings: Json
           updated_at: string
           user_id: string
@@ -142,6 +164,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          search_tsv?: unknown
           settings?: Json
           updated_at?: string
           user_id: string
@@ -155,6 +178,7 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          search_tsv?: unknown
           settings?: Json
           updated_at?: string
           user_id?: string
@@ -196,7 +220,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      search_profiles: {
+        Args: { cursor?: string; limit_count: number; q: string }
+        Returns: {
+          avatar_url: string
+          display_name: string
+          id: string
+          is_following: boolean
+          username: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
