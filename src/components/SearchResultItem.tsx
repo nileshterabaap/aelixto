@@ -14,9 +14,9 @@ interface SearchResultItemProps {
 export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) => {
   const navigate = useNavigate();
   const { user } = useSession();
-  const { isFollowing, follow, unfollow, loading } = useFollow(result.id);
+  const { isFollowing, follow, unfollow, loading } = useFollow(result.user_id);
   
-  const isMe = user?.id === result.id;
+  const isMe = user?.id === result.user_id;
 
   const handleClick = () => {
     navigate(`/u/${result.username}`);

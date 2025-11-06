@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface SearchResult {
   id: string;
+  user_id: string;
   username: string;
   display_name: string | null;
   avatar_url: string | null;

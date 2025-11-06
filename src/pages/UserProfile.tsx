@@ -26,8 +26,8 @@ const UserProfile = () => {
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   
-  const { isFollowing, follow, unfollow, loading: followLoading, counts } = useFollow(profile?.id);
-  const isMe = user?.id === profile?.id;
+  const { isFollowing, follow, unfollow, loading: followLoading, counts } = useFollow(profile?.user_id);
+  const isMe = user?.id === profile?.user_id;
 
   useEffect(() => {
     if (username) {

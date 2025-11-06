@@ -242,6 +242,7 @@ export type Database = {
           display_name: string
           id: string
           is_following: boolean
+          user_id: string
           username: string
         }[]
       }
