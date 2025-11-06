@@ -109,6 +109,7 @@ export type Database = {
           created_at: string
           embed_html: string | null
           id: string
+          is_public: boolean
           likes_count: number | null
           media_type: string | null
           media_url: string | null
@@ -123,6 +124,7 @@ export type Database = {
           created_at?: string
           embed_html?: string | null
           id?: string
+          is_public?: boolean
           likes_count?: number | null
           media_type?: string | null
           media_url?: string | null
@@ -137,6 +139,7 @@ export type Database = {
           created_at?: string
           embed_html?: string | null
           id?: string
+          is_public?: boolean
           likes_count?: number | null
           media_type?: string | null
           media_url?: string | null
@@ -235,6 +238,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_following_count: { Args: never; Returns: number }
+      get_following_feed: {
+        Args: { cursor?: string; limit_count: number }
+        Returns: {
+          content: string
+          created_at: string
+          embed_html: string
+          id: string
+          is_public: boolean
+          likes_count: number
+          media_type: string
+          media_url: string
+          platform: string
+          profile_avatar_url: string
+          profile_display_name: string
+          profile_id: string
+          profile_username: string
+          saves_count: number
+          thumbnail_url: string
+          title: string
+          user_id: string
+        }[]
+      }
       search_profiles: {
         Args: { cursor?: string; limit_count: number; q: string }
         Returns: {
