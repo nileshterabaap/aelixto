@@ -1,7 +1,10 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { SearchResult } from "@/hooks/useUserSearch";
+import { useFollow } from "@/hooks/useFollow";
+import { useSession } from "@/hooks/useSession";
 
 interface SearchResultItemProps {
   result: SearchResult;
@@ -10,10 +13,23 @@ interface SearchResultItemProps {
 
 export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) => {
   const navigate = useNavigate();
+  const { user } = useSession();
+  const { isFollowing, follow, unfollow, loading } = useFollow(result.id);
+  
+  const isMe = user?.id === result.id;
 
   const handleClick = () => {
     navigate(`/u/${result.username}`);
     onSelect?.();
+  };
+
+  const handleFollowClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isFollowing) {
+      unfollow();
+    } else {
+      follow();
+    }
   };
 
   return (
@@ -37,10 +53,16 @@ export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) =>
         </p>
       </div>
       
-      {result.is_following && (
-        <Badge variant="secondary" className="text-xs">
-          Following
-        </Badge>
+      {!isMe && user && (
+        <Button
+          size="sm"
+          variant={isFollowing ? "secondary" : "default"}
+          disabled={loading}
+          onClick={handleFollowClick}
+          className="text-xs"
+        >
+          {loading ? "..." : isFollowing ? "Following" : "Follow"}
+        </Button>
       )}
     </div>
   );

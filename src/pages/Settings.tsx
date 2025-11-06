@@ -28,6 +28,13 @@ const Settings = () => {
     cover_url: '',
   });
 
+  // Check ownership and redirect if not owner
+  useEffect(() => {
+    if (!loading && profile && user && user.id !== profile.id) {
+      navigate(`/u/${profile.username}`);
+    }
+  }, [loading, profile, user, navigate]);
+
   // Initialize form when profile loads
   useEffect(() => {
     if (profile) {

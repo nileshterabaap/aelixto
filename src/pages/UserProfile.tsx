@@ -15,13 +15,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ArrowLeft, Play, Camera, Menu, Settings as SettingsIcon, LogOut } from "lucide-react";
 import { Profile } from "@/hooks/useCurrentProfile";
+import { useSession } from "@/hooks/useSession";
+import { useFollow } from "@/hooks/useFollow";
 
 const UserProfile = () => {
   const { username } = useParams<{ username: string }>();
   const navigate = useNavigate();
+  const { user } = useSession();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  
+  const { isFollowing, follow, unfollow, loading: followLoading, counts } = useFollow(profile?.id);
+  const isMe = user?.id === profile?.id;
 
   useEffect(() => {
     if (username) {
@@ -111,15 +117,25 @@ const UserProfile = () => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => navigate('/settings')}>
-                    <SettingsIcon className="mr-2 h-4 w-4" />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
-                  </DropdownMenuItem>
+                  {isMe && (
+                    <>
+                      <DropdownMenuItem onClick={() => navigate('/settings')}>
+                        <SettingsIcon className="mr-2 h-4 w-4" />
+                        Settings
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleSignOut}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  {!isMe && user && (
+                    <DropdownMenuItem onClick={() => navigate('/')}>
+                      <ArrowLeft className="mr-2 h-4 w-4" />
+                      Back to Home
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -132,7 +148,7 @@ const UserProfile = () => {
           <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
             {/* Left Stats - Followers */}
             <div className="text-center flex-shrink-0 w-20 -ml-2">
-              <div className="text-2xl font-bold leading-none mb-1">0</div>
+              <div className="text-2xl font-bold leading-none mb-1">{counts.followers}</div>
               <div className="text-xs font-medium">Followers</div>
             </div>
             
@@ -146,7 +162,7 @@ const UserProfile = () => {
             
             {/* Right Stats - Following */}
             <div className="text-center flex-shrink-0 w-20 -mr-2">
-              <div className="text-2xl font-bold leading-none mb-1">0</div>
+              <div className="text-2xl font-bold leading-none mb-1">{counts.following}</div>
               <div className="text-xs font-medium">Following</div>
             </div>
           </div>
@@ -164,14 +180,28 @@ const UserProfile = () => {
             <p className="text-center italic text-base mb-6 px-4">"{profile.bio}"</p>
           )}
 
-          {/* Edit Profile Button */}
-          <Button 
-            variant="outline" 
-            className="w-full rounded-full py-4 text-sm font-bold border-2 mb-6 hover:bg-muted"
-            onClick={() => navigate('/settings')}
-          >
-            Edit Profile
-          </Button>
+          {/* Action Button - Edit or Follow */}
+          {isMe ? (
+            <Button 
+              variant="outline" 
+              className="w-full rounded-full py-4 text-sm font-bold border-2 mb-6 hover:bg-muted"
+              onClick={() => navigate('/settings')}
+            >
+              Edit Profile
+            </Button>
+          ) : user ? (
+            <Button 
+              disabled={followLoading}
+              onClick={() => (isFollowing ? unfollow() : follow())}
+              className={`w-full rounded-full py-4 text-sm font-bold border-2 mb-6 ${
+                isFollowing 
+                  ? 'bg-foreground text-background hover:bg-foreground/90' 
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
+              }`}
+            >
+              {followLoading ? 'Loading...' : isFollowing ? 'Following' : 'Follow'}
+            </Button>
+          ) : null}
 
           {/* Social Links */}
           <div className="flex gap-3 mb-8">
