@@ -212,35 +212,35 @@ const UserProfile = () => {
             <Button 
               onClick={() => setActiveTab("youtube")}
               variant="outline"
-              className={`flex-1 rounded-full py-8 border-2 transition-colors ${
+              className={`flex-1 rounded-full py-6 border-2 transition-colors ${
                 activeTab === "youtube" 
                   ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <Youtube size={48} strokeWidth={2.5} />
+              <Youtube size={32} strokeWidth={2} />
             </Button>
             <Button 
               onClick={() => setActiveTab("instagram")}
               variant="outline"
-              className={`flex-1 rounded-full py-8 border-2 transition-colors ${
+              className={`flex-1 rounded-full py-6 border-2 transition-colors ${
                 activeTab === "instagram" 
                   ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <Instagram size={48} strokeWidth={2.5} />
+              <Instagram size={32} strokeWidth={2} />
             </Button>
             <Button 
               onClick={() => setActiveTab("x")}
               variant="outline"
-              className={`flex-1 rounded-full py-8 border-2 transition-colors ${
+              className={`flex-1 rounded-full py-6 border-2 transition-colors ${
                 activeTab === "x" 
                   ? "bg-foreground hover:bg-foreground/90 !text-background border-foreground" 
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <span className="text-[3rem] font-black leading-none">𝕏</span>
+              <span className="text-3xl font-bold leading-none">𝕏</span>
             </Button>
           </div>
 
