@@ -207,24 +207,36 @@ const UserProfile = () => {
             </Button>
           ) : null}
 
-          {/* Hamburger Menu Icon */}
-          <div className="mb-6">
-            <div className="flex flex-col gap-1.5 w-12">
-              <div className="h-1 bg-foreground rounded-full"></div>
-              <div className="h-1 bg-foreground rounded-full"></div>
-              <div className="h-1 bg-foreground rounded-full"></div>
-            </div>
-          </div>
-
-          {/* Social Links */}
+          {/* Social Platform Buttons */}
           <div className="flex gap-3 mb-8">
-            <Button className="flex-1 rounded-full py-5 bg-foreground hover:bg-foreground/90 text-background">
+            <Button 
+              onClick={() => setActiveTab("youtube")}
+              className={`flex-1 rounded-full py-5 ${
+                activeTab === "youtube" 
+                  ? "bg-foreground hover:bg-foreground/90 text-background" 
+                  : "bg-background border-2 border-foreground/20 hover:border-foreground/40 text-foreground"
+              }`}
+            >
               <Play className="h-5 w-5 fill-current" />
             </Button>
-            <Button variant="outline" className="flex-1 rounded-full py-5 border-[2.5px]">
+            <Button 
+              onClick={() => setActiveTab("instagram")}
+              className={`flex-1 rounded-full py-5 ${
+                activeTab === "instagram" 
+                  ? "bg-foreground hover:bg-foreground/90 text-background" 
+                  : "bg-background border-2 border-foreground/20 hover:border-foreground/40 text-foreground"
+              }`}
+            >
               <Camera className="h-5 w-5" />
             </Button>
-            <Button variant="outline" className="flex-1 rounded-full py-5 border-[2.5px]">
+            <Button 
+              onClick={() => setActiveTab("x")}
+              className={`flex-1 rounded-full py-5 ${
+                activeTab === "x" 
+                  ? "bg-foreground hover:bg-foreground/90 text-background" 
+                  : "bg-background border-2 border-foreground/20 hover:border-foreground/40 text-foreground"
+              }`}
+            >
               <span className="text-xl font-bold">𝕏</span>
             </Button>
           </div>
