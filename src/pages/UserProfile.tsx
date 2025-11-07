@@ -13,7 +13,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut, Youtube, Instagram } from "lucide-react";
+import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut, Youtube, Instagram, Facebook, Pin } from "lucide-react";
+import redditIcon from "@/assets/reddit-icon.png";
+import tiktokIcon from "@/assets/tiktok-icon.png";
 import { Profile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { useFollow } from "@/hooks/useFollow";
@@ -208,11 +210,11 @@ const UserProfile = () => {
           ) : null}
 
           {/* Social Platform Buttons */}
-          <div className="flex gap-3 mb-8">
+          <div className="grid grid-cols-3 gap-3 mb-8">
             <Button 
               onClick={() => setActiveTab("youtube")}
               variant="outline"
-              className={`flex-1 rounded-full py-6 border-2 transition-colors [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
+              className={`rounded-full py-6 border-2 transition-colors [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
                 activeTab === "youtube" 
                   ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
@@ -223,7 +225,7 @@ const UserProfile = () => {
             <Button 
               onClick={() => setActiveTab("instagram")}
               variant="outline"
-              className={`flex-1 rounded-full py-6 border-2 transition-colors [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
+              className={`rounded-full py-6 border-2 transition-colors [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
                 activeTab === "instagram" 
                   ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
@@ -234,13 +236,79 @@ const UserProfile = () => {
             <Button 
               onClick={() => setActiveTab("x")}
               variant="outline"
-              className={`flex-1 rounded-full py-6 border-2 transition-colors ${
-                activeTab === "x" 
+              className={`rounded-full py-6 border-2 transition-colors ${
+                activeTab === "x" || activeTab === "twitter"
                   ? "bg-foreground hover:bg-foreground/90 !text-background border-foreground" 
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
               <span className="text-[27px] font-bold leading-none">𝕏</span>
+            </Button>
+            <Button 
+              onClick={() => setActiveTab("reddit")}
+              variant="outline"
+              className={`rounded-full py-6 border-2 transition-colors ${
+                activeTab === "reddit" 
+                  ? "bg-foreground hover:bg-foreground/90 border-foreground" 
+                  : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
+              }`}
+            >
+              <img src={redditIcon} alt="Reddit" className={`w-[27px] h-[27px] ${activeTab === "reddit" ? "brightness-0 invert" : ""}`} />
+            </Button>
+            <Button 
+              onClick={() => setActiveTab("pinterest")}
+              variant="outline"
+              className={`rounded-full py-6 border-2 transition-colors [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
+                activeTab === "pinterest" 
+                  ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
+                  : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
+              }`}
+            >
+              <Pin size={27} strokeWidth={2} />
+            </Button>
+            <Button 
+              onClick={() => setActiveTab("tiktok")}
+              variant="outline"
+              className={`rounded-full py-6 border-2 transition-colors ${
+                activeTab === "tiktok" 
+                  ? "bg-foreground hover:bg-foreground/90 border-foreground" 
+                  : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
+              }`}
+            >
+              <img src={tiktokIcon} alt="TikTok" className={`w-[27px] h-[27px] ${activeTab === "tiktok" ? "brightness-0 invert" : ""}`} />
+            </Button>
+            <Button 
+              onClick={() => setActiveTab("facebook")}
+              variant="outline"
+              className={`rounded-full py-6 border-2 transition-colors [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
+                activeTab === "facebook" 
+                  ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
+                  : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
+              }`}
+            >
+              <Facebook size={27} strokeWidth={2} />
+            </Button>
+            <Button 
+              onClick={() => setActiveTab("quora")}
+              variant="outline"
+              className={`rounded-full py-6 border-2 transition-colors ${
+                activeTab === "quora" 
+                  ? "bg-foreground hover:bg-foreground/90 !text-background border-foreground" 
+                  : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
+              }`}
+            >
+              <span className="text-[22px] font-bold leading-none">Q</span>
+            </Button>
+            <Button 
+              onClick={() => setActiveTab("spotify")}
+              variant="outline"
+              className={`rounded-full py-6 border-2 transition-colors ${
+                activeTab === "spotify" 
+                  ? "bg-foreground hover:bg-foreground/90 !text-background border-foreground" 
+                  : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
+              }`}
+            >
+              <span className="text-[22px] font-bold leading-none">♫</span>
             </Button>
           </div>
 
