@@ -13,9 +13,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut, Youtube, Instagram, Facebook, Pin } from "lucide-react";
+import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut } from "lucide-react";
+import youtubeIcon from "@/assets/youtube-icon.png";
+import instagramIcon from "@/assets/instagram-icon.png";
+import twitterIcon from "@/assets/twitter-icon.png";
 import redditIcon from "@/assets/reddit-icon.png";
+import pinterestIcon from "@/assets/pinterest-icon.png";
 import tiktokIcon from "@/assets/tiktok-icon.png";
+import facebookIcon from "@/assets/facebook-icon.png";
+import quoraIcon from "@/assets/quora-icon.png";
+import spotifyIcon from "@/assets/spotify-icon.png";
 import { Profile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { useFollow } from "@/hooks/useFollow";
@@ -215,35 +222,35 @@ const UserProfile = () => {
               <Button 
                 onClick={() => setActiveTab("youtube")}
                 variant="outline"
-                className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
+                className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 ${
                   activeTab === "youtube" 
-                    ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
+                    ? "bg-foreground hover:bg-foreground/90 border-foreground" 
                     : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
                 }`}
               >
-                <Youtube size={27} strokeWidth={2} />
+                <img src={youtubeIcon} alt="YouTube" className={`w-[27px] h-[27px] ${activeTab === "youtube" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("instagram")}
                 variant="outline"
-                className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
+                className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 ${
                   activeTab === "instagram" 
-                    ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
+                    ? "bg-foreground hover:bg-foreground/90 border-foreground" 
                     : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
                 }`}
               >
-                <Instagram size={27} strokeWidth={2} />
+                <img src={instagramIcon} alt="Instagram" className={`w-[27px] h-[27px] ${activeTab === "instagram" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("x")}
                 variant="outline"
                 className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 ${
                   activeTab === "x" || activeTab === "twitter"
-                    ? "bg-foreground hover:bg-foreground/90 !text-background border-foreground" 
+                    ? "bg-foreground hover:bg-foreground/90 border-foreground" 
                     : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
                 }`}
               >
-                <span className="text-[27px] font-bold leading-none">𝕏</span>
+                <img src={twitterIcon} alt="X" className={`w-[27px] h-[27px] ${activeTab === "x" || activeTab === "twitter" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("reddit")}
@@ -259,13 +266,13 @@ const UserProfile = () => {
               <Button 
                 onClick={() => setActiveTab("pinterest")}
                 variant="outline"
-                className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
+                className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 ${
                   activeTab === "pinterest" 
-                    ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
+                    ? "bg-foreground hover:bg-foreground/90 border-foreground" 
                     : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
                 }`}
               >
-                <Pin size={27} strokeWidth={2} />
+                <img src={pinterestIcon} alt="Pinterest" className={`w-[27px] h-[27px] ${activeTab === "pinterest" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("tiktok")}
@@ -281,35 +288,35 @@ const UserProfile = () => {
               <Button 
                 onClick={() => setActiveTab("facebook")}
                 variant="outline"
-                className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
+                className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 ${
                   activeTab === "facebook" 
-                    ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
+                    ? "bg-foreground hover:bg-foreground/90 border-foreground" 
                     : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
                 }`}
               >
-                <Facebook size={27} strokeWidth={2} />
+                <img src={facebookIcon} alt="Facebook" className={`w-[27px] h-[27px] ${activeTab === "facebook" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("quora")}
                 variant="outline"
                 className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 ${
                   activeTab === "quora" 
-                    ? "bg-foreground hover:bg-foreground/90 !text-background border-foreground" 
+                    ? "bg-foreground hover:bg-foreground/90 border-foreground" 
                     : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
                 }`}
               >
-                <span className="text-[22px] font-bold leading-none">Q</span>
+                <img src={quoraIcon} alt="Quora" className={`w-[27px] h-[27px] ${activeTab === "quora" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("spotify")}
                 variant="outline"
                 className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 ${
                   activeTab === "spotify" 
-                    ? "bg-foreground hover:bg-foreground/90 !text-background border-foreground" 
+                    ? "bg-foreground hover:bg-foreground/90 border-foreground" 
                     : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
                 }`}
               >
-                <span className="text-[22px] font-bold leading-none">♫</span>
+                <img src={spotifyIcon} alt="Spotify" className={`w-[27px] h-[27px] ${activeTab === "spotify" ? "brightness-0 invert" : ""}`} />
               </Button>
             </div>
           </div>
