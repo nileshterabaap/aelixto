@@ -16,6 +16,9 @@ import {
 import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut, Youtube, Instagram, Facebook, Pin } from "lucide-react";
 import redditIcon from "@/assets/reddit-icon.png";
 import tiktokIcon from "@/assets/tiktok-icon.png";
+import xIcon from "@/assets/x-icon.png";
+import quoraIcon from "@/assets/quora-icon.png";
+import spotifyIcon from "@/assets/spotify-icon.png";
 import { Profile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { useFollow } from "@/hooks/useFollow";
@@ -239,11 +242,11 @@ const UserProfile = () => {
                 variant="outline"
                 className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 ${
                   activeTab === "x" || activeTab === "twitter"
-                    ? "bg-foreground hover:bg-foreground/90 !text-background border-foreground" 
+                    ? "bg-foreground hover:bg-foreground/90 border-foreground" 
                     : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
                 }`}
               >
-                <span className="text-[27px] font-bold leading-none">𝕏</span>
+                <img src={xIcon} alt="X" className={`w-[27px] h-[27px] ${activeTab === "x" || activeTab === "twitter" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("reddit")}
@@ -294,22 +297,22 @@ const UserProfile = () => {
                 variant="outline"
                 className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 ${
                   activeTab === "quora" 
-                    ? "bg-foreground hover:bg-foreground/90 !text-background border-foreground" 
+                    ? "bg-foreground hover:bg-foreground/90 border-foreground" 
                     : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
                 }`}
               >
-                <span className="text-[22px] font-bold leading-none">Q</span>
+                <img src={quoraIcon} alt="Quora" className={`w-[27px] h-[27px] ${activeTab === "quora" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("spotify")}
                 variant="outline"
                 className={`rounded-full py-6 px-8 border-2 transition-colors flex-shrink-0 ${
                   activeTab === "spotify" 
-                    ? "bg-foreground hover:bg-foreground/90 !text-background border-foreground" 
+                    ? "bg-foreground hover:bg-foreground/90 border-foreground" 
                     : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
                 }`}
               >
-                <span className="text-[22px] font-bold leading-none">♫</span>
+                <img src={spotifyIcon} alt="Spotify" className={`w-[27px] h-[27px] ${activeTab === "spotify" ? "brightness-0 invert" : ""}`} />
               </Button>
             </div>
           </div>
