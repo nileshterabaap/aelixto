@@ -218,7 +218,7 @@ const UserProfile = () => {
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <Youtube className="h-11 w-11" strokeWidth={2.5} />
+              <Youtube className="h-14 w-14" strokeWidth={2.5} />
             </Button>
             <Button 
               onClick={() => setActiveTab("instagram")}
@@ -229,7 +229,7 @@ const UserProfile = () => {
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <Instagram className="h-11 w-11" strokeWidth={2.5} />
+              <Instagram className="h-14 w-14" strokeWidth={2.5} />
             </Button>
             <Button 
               onClick={() => setActiveTab("x")}
@@ -240,7 +240,7 @@ const UserProfile = () => {
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <span className="text-3xl font-black">𝕏</span>
+              <span className="text-5xl font-black">𝕏</span>
             </Button>
           </div>
 
