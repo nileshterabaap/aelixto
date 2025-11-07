@@ -22,15 +22,17 @@ export const ProfilePlatformTabs = ({
             onClick={() => onTabChange(tab.key)}
             className={`
               flex items-center justify-center gap-2 px-6 py-3 rounded-full text-sm font-semibold
-              transition-all whitespace-nowrap min-w-[140px]
+              transition-all whitespace-nowrap shadow-sm hover:shadow-md
               ${
                 activeTab === tab.key
                   ? "bg-foreground text-background"
-                  : "bg-background border-2 border-foreground/20 hover:border-foreground/40"
+                  : "bg-background border border-foreground/30 text-foreground hover:bg-foreground/5"
               }
             `}
           >
-            <img src={tab.icon} alt={tab.label} className="h-5 w-5" />
+            {tab.icon && (
+              <img src={tab.icon} alt={tab.label} className="h-5 w-5 rounded-sm" />
+            )}
             <span>{tab.label}</span>
           </button>
         ))}

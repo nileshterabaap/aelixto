@@ -1,7 +1,82 @@
-import { useUserPlatformPosts } from "@/hooks/useUserPlatformPosts";
+import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { Play } from "lucide-react";
+import { useState, useMemo } from "react";
+import { getPostThumbnail } from "@/lib/thumbnails";
+import instagramIcon from "@/assets/instagram-icon.png";
+import youtubeIcon from "@/assets/youtube-icon.png";
+import redditIcon from "@/assets/reddit-icon.png";
+import twitterIcon from "@/assets/twitter-icon.png";
+import pinterestIcon from "@/assets/pinterest-icon.png";
+import tiktokIcon from "@/assets/tiktok-icon.png";
+
+const PLATFORM_ICONS: Record<string, string> = {
+  instagram: instagramIcon,
+  youtube: youtubeIcon,
+  reddit: redditIcon,
+  twitter: twitterIcon,
+  x: twitterIcon,
+  pinterest: pinterestIcon,
+  tiktok: tiktokIcon,
+};
+
+function PlatformBadge({ platform }: { platform?: string | null }) {
+  const icon = platform ? PLATFORM_ICONS[platform.toLowerCase()] : undefined;
+  if (!icon) return null;
+  
+  return (
+    <div className="absolute top-2 right-2 z-10">
+      <img
+        src={icon}
+        alt={platform || ""}
+        className="w-8 h-8 rounded-full shadow-md ring-2 ring-white/70 object-cover"
+      />
+    </div>
+  );
+}
+
+function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }) {
+  const [imageError, setImageError] = useState(false);
+  const thumbnail = useMemo(() => getPostThumbnail(post), [post]);
+
+  const getAspectRatio = () => {
+    if (post.platform === "youtube") return "aspect-video";
+    if (post.platform === "instagram" || post.platform === "tiktok") return "aspect-square";
+    return "aspect-[4/5]";
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className="relative rounded-3xl overflow-hidden bg-muted group transition-all shadow-sm hover:shadow-md"
+    >
+      <PlatformBadge platform={post.platform} />
+      
+      <div className={`${getAspectRatio()} w-full`}>
+        {thumbnail && !imageError ? (
+          <img
+            src={thumbnail}
+            alt={post.title || "Post"}
+            onError={() => setImageError(true)}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full bg-muted/40 animate-pulse" />
+        )}
+      </div>
+
+      {/* Play button overlay for videos */}
+      {post.media_type === "video" && (
+        <div className="absolute inset-0 grid place-items-center">
+          <div className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm grid place-items-center">
+            <div className="w-0 h-0 border-l-[14px] border-l-white border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent ml-1" />
+          </div>
+        </div>
+      )}
+    </button>
+  );
+}
 
 interface ProfilePlatformGridProps {
   userId: string;
@@ -28,7 +103,7 @@ export const ProfilePlatformGrid = ({
 
   if (items.length === 0) {
     return (
-      <div className="text-center py-8">
+      <div className="text-center py-10">
         <p className="text-sm text-muted-foreground">
           No posts to show yet for this filter.
         </p>
@@ -36,70 +111,15 @@ export const ProfilePlatformGrid = ({
     );
   }
 
-  // Determine aspect ratio based on platform
-  const getAspectRatio = () => {
-    if (activeTab === "tiktok" || activeTab === "instagram") {
-      return "aspect-square";
-    }
-    if (activeTab === "youtube") {
-      return "aspect-video";
-    }
-    return "aspect-square";
-  };
-
-  const aspectRatio = getAspectRatio();
-
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
         {items.map((post) => (
-          <div
+          <PostCard
             key={post.id}
+            post={post}
             onClick={() => navigate(`/post/${post.id}`)}
-            className="relative group cursor-pointer rounded-2xl overflow-hidden bg-muted"
-          >
-            <div className={`${aspectRatio} w-full relative`}>
-              {post.thumbnail_url ? (
-                <img
-                  src={post.thumbnail_url}
-                  alt={post.title || "Post"}
-                  className="w-full h-full object-cover"
-                />
-              ) : post.media_url ? (
-                <img
-                  src={post.media_url}
-                  alt={post.title || "Post"}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-muted">
-                  <p className="text-xs text-muted-foreground text-center px-2">
-                    {post.title || post.content}
-                  </p>
-                </div>
-              )}
-              
-              {/* Play button overlay */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-12 h-12 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center">
-                  <Play className="h-6 w-6 text-white fill-white" />
-                </div>
-              </div>
-              
-              {/* Platform glyph */}
-              <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm rounded-full p-1.5 w-7 h-7 flex items-center justify-center">
-                <span className="text-white text-xs font-bold">
-                  {activeTab === "youtube" && "▶"}
-                  {activeTab === "instagram" && "📷"}
-                  {(activeTab === "x" || activeTab === "twitter") && "𝕏"}
-                  {activeTab === "reddit" && "👽"}
-                  {activeTab === "pinterest" && "📌"}
-                  {activeTab === "tiktok" && "🎵"}
-                  {!["youtube", "instagram", "x", "twitter", "reddit", "pinterest", "tiktok"].includes(activeTab) && "🔗"}
-                </span>
-              </div>
-            </div>
-          </div>
+          />
         ))}
       </div>
 
