@@ -13,13 +13,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Play, Camera, Menu, Settings as SettingsIcon, LogOut } from "lucide-react";
+import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut } from "lucide-react";
 import { Profile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { useFollow } from "@/hooks/useFollow";
 import { useUserPlatformTabs } from "@/hooks/useUserPlatformTabs";
 import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
 import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
+import youtubeIcon from "@/assets/youtube-icon.png";
+import instagramIcon from "@/assets/instagram-icon.png";
+import twitterIcon from "@/assets/twitter-icon.png";
 
 const UserProfile = () => {
   const { username } = useParams<{ username: string }>();
@@ -217,7 +220,7 @@ const UserProfile = () => {
                   : "bg-background border-2 border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <Play className="h-5 w-5 fill-current" />
+              <img src={youtubeIcon} alt="YouTube" className="h-6 w-6" />
             </Button>
             <Button 
               onClick={() => setActiveTab("instagram")}
@@ -227,7 +230,7 @@ const UserProfile = () => {
                   : "bg-background border-2 border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <Camera className="h-5 w-5" />
+              <img src={instagramIcon} alt="Instagram" className="h-6 w-6" />
             </Button>
             <Button 
               onClick={() => setActiveTab("x")}
@@ -237,7 +240,7 @@ const UserProfile = () => {
                   : "bg-background border-2 border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <span className="text-xl font-bold">𝕏</span>
+              <img src={twitterIcon} alt="X" className="h-6 w-6" />
             </Button>
           </div>
 
