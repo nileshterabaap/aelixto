@@ -1,6 +1,7 @@
 import { useUserPlatformPosts } from "@/hooks/useUserPlatformPosts";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
+import { Play } from "lucide-react";
 
 interface ProfilePlatformGridProps {
   userId: string;
@@ -50,12 +51,12 @@ export const ProfilePlatformGrid = ({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2">
         {items.map((post) => (
           <div
             key={post.id}
             onClick={() => navigate(`/post/${post.id}`)}
-            className="relative group cursor-pointer rounded-lg overflow-hidden bg-muted"
+            className="relative group cursor-pointer rounded-2xl overflow-hidden bg-muted"
           >
             <div className={`${aspectRatio} w-full relative`}>
               {post.thumbnail_url ? (
@@ -78,8 +79,15 @@ export const ProfilePlatformGrid = ({
                 </div>
               )}
               
+              {/* Play button overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center">
+                  <Play className="h-6 w-6 text-white fill-white" />
+                </div>
+              </div>
+              
               {/* Platform glyph */}
-              <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm rounded-full p-1.5">
+              <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm rounded-full p-1.5 w-7 h-7 flex items-center justify-center">
                 <span className="text-white text-xs font-bold">
                   {activeTab === "youtube" && "▶"}
                   {activeTab === "instagram" && "📷"}
@@ -89,15 +97,6 @@ export const ProfilePlatformGrid = ({
                   {activeTab === "tiktok" && "🎵"}
                   {!["youtube", "instagram", "x", "twitter", "reddit", "pinterest", "tiktok"].includes(activeTab) && "🔗"}
                 </span>
-              </div>
-
-              {/* Hover overlay */}
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <div className="text-white text-center px-2">
-                  <p className="text-xs font-medium">
-                    ❤️ {post.likes_count} · 💾 {post.saves_count}
-                  </p>
-                </div>
               </div>
             </div>
           </div>

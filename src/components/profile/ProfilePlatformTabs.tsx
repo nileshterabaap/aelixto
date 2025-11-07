@@ -14,25 +14,24 @@ export const ProfilePlatformTabs = ({
   if (tabs.length === 0) return null;
 
   return (
-    <div className="mb-6 -mx-6 px-6 overflow-x-auto no-scrollbar">
-      <div className="flex gap-2 min-w-max pb-2">
+    <div className="mb-6 overflow-x-auto no-scrollbar">
+      <div className="flex gap-3 min-w-max pb-2">
         {tabs.map((tab) => (
           <button
             key={tab.key}
             onClick={() => onTabChange(tab.key)}
             className={`
-              flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium
-              transition-all whitespace-nowrap
+              flex items-center justify-center gap-2 px-6 py-3 rounded-full text-sm font-semibold
+              transition-all whitespace-nowrap min-w-[140px]
               ${
                 activeTab === tab.key
-                  ? "bg-foreground text-background shadow-md"
-                  : "border border-foreground/30 hover:bg-foreground/5"
+                  ? "bg-foreground text-background"
+                  : "bg-background border-2 border-foreground/20 hover:border-foreground/40"
               }
             `}
           >
-            <img src={tab.icon} alt={tab.label} className="h-4 w-4" />
+            <img src={tab.icon} alt={tab.label} className="h-5 w-5" />
             <span>{tab.label}</span>
-            <span className="text-xs opacity-70">({tab.count})</span>
           </button>
         ))}
       </div>

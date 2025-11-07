@@ -207,6 +207,15 @@ const UserProfile = () => {
             </Button>
           ) : null}
 
+          {/* Hamburger Menu Icon */}
+          <div className="mb-6">
+            <div className="flex flex-col gap-1.5 w-12">
+              <div className="h-1 bg-foreground rounded-full"></div>
+              <div className="h-1 bg-foreground rounded-full"></div>
+              <div className="h-1 bg-foreground rounded-full"></div>
+            </div>
+          </div>
+
           {/* Social Links */}
           <div className="flex gap-3 mb-8">
             <Button className="flex-1 rounded-full py-5 bg-foreground hover:bg-foreground/90 text-background">
