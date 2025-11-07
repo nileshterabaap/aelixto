@@ -218,7 +218,7 @@ const UserProfile = () => {
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <Youtube size={48} strokeWidth={2.5} />
+              <Youtube size={64} strokeWidth={2.5} />
             </Button>
             <Button 
               onClick={() => setActiveTab("instagram")}
@@ -229,7 +229,7 @@ const UserProfile = () => {
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <Instagram size={48} strokeWidth={2.5} />
+              <Instagram size={64} strokeWidth={2.5} />
             </Button>
             <Button 
               onClick={() => setActiveTab("x")}
@@ -244,16 +244,9 @@ const UserProfile = () => {
             </Button>
           </div>
 
-          {/* Platform Tabs & Posts Grid */}
+          {/* Platform Posts Grid */}
           {!tabsLoading && tabs.length > 0 ? (
-            <>
-              <ProfilePlatformTabs
-                tabs={tabs}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-              />
-              <ProfilePlatformGrid userId={profile.user_id} activeTab={activeTab} />
-            </>
+            <ProfilePlatformGrid userId={profile.user_id} activeTab={activeTab} />
           ) : !tabsLoading ? (
             <p className="text-center text-muted-foreground py-12 text-base">
               No posts yet
