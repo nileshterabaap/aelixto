@@ -212,24 +212,24 @@ const UserProfile = () => {
             <Button 
               onClick={() => setActiveTab("youtube")}
               variant="outline"
-              className={`flex-1 rounded-full py-6 border-2 transition-colors [&_svg]:!w-[33px] [&_svg]:!h-[33px] ${
+              className={`flex-1 rounded-full py-6 border-2 transition-colors [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
                 activeTab === "youtube" 
                   ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <Youtube size={33} strokeWidth={2} />
+              <Youtube size={27} strokeWidth={2} />
             </Button>
             <Button 
               onClick={() => setActiveTab("instagram")}
               variant="outline"
-              className={`flex-1 rounded-full py-6 border-2 transition-colors [&_svg]:!w-[33px] [&_svg]:!h-[33px] ${
+              className={`flex-1 rounded-full py-6 border-2 transition-colors [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
                 activeTab === "instagram" 
                   ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <Instagram size={33} strokeWidth={2} />
+              <Instagram size={27} strokeWidth={2} />
             </Button>
             <Button 
               onClick={() => setActiveTab("x")}
@@ -240,7 +240,7 @@ const UserProfile = () => {
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <span className="text-3xl font-bold leading-none">𝕏</span>
+              <span className="text-[27px] font-bold leading-none">𝕏</span>
             </Button>
           </div>
 

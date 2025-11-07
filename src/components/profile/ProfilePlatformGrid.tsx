@@ -61,8 +61,6 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
       onClick={onClick}
       className="relative rounded-3xl overflow-hidden bg-muted group transition-all shadow-sm hover:shadow-md"
     >
-      <PlatformBadge platform={post.platform} />
-      
       <div className={`${getAspectRatio()} w-full bg-muted/60`}>
         {thumbnail && !imageError ? (
           <img
