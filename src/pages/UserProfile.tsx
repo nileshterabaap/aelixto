@@ -212,29 +212,29 @@ const UserProfile = () => {
             <Button 
               onClick={() => setActiveTab("youtube")}
               variant="outline"
-              className={`flex-1 rounded-full py-6 border-2 ${
+              className={`flex-1 rounded-full py-6 border-2 transition-colors ${
                 activeTab === "youtube" 
-                  ? "bg-foreground hover:bg-foreground/90 text-background border-foreground" 
+                  ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:text-background" 
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <Youtube size={64} strokeWidth={2.5} />
+              <Youtube size={80} strokeWidth={2.5} />
             </Button>
             <Button 
               onClick={() => setActiveTab("instagram")}
               variant="outline"
-              className={`flex-1 rounded-full py-6 border-2 ${
+              className={`flex-1 rounded-full py-6 border-2 transition-colors ${
                 activeTab === "instagram" 
-                  ? "bg-foreground hover:bg-foreground/90 text-background border-foreground" 
+                  ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:text-background" 
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <Instagram size={64} strokeWidth={2.5} />
+              <Instagram size={80} strokeWidth={2.5} />
             </Button>
             <Button 
               onClick={() => setActiveTab("x")}
               variant="outline"
-              className={`flex-1 rounded-full py-6 border-2 ${
+              className={`flex-1 rounded-full py-6 border-2 transition-colors ${
                 activeTab === "x" 
                   ? "bg-foreground hover:bg-foreground/90 text-background border-foreground" 
                   : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"

@@ -45,6 +45,17 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
     return "aspect-[4/5]";
   };
 
+  // Log for debugging if no thumbnail is found
+  if (!thumbnail) {
+    console.log("No thumbnail for post:", { 
+      id: post.id, 
+      platform: post.platform,
+      thumbnail_url: post.thumbnail_url,
+      media_url: post.media_url,
+      media_type: post.media_type
+    });
+  }
+
   return (
     <button
       onClick={onClick}
@@ -52,17 +63,24 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
     >
       <PlatformBadge platform={post.platform} />
       
-      <div className={`${getAspectRatio()} w-full`}>
+      <div className={`${getAspectRatio()} w-full bg-muted/60`}>
         {thumbnail && !imageError ? (
           <img
             src={thumbnail}
             alt={post.title || "Post"}
-            onError={() => setImageError(true)}
+            onError={(e) => {
+              console.error("Image failed to load:", thumbnail);
+              setImageError(true);
+            }}
             className="w-full h-full object-cover"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full bg-muted/40 animate-pulse" />
+          <div className="w-full h-full bg-gradient-to-br from-muted/80 to-muted/40 flex items-center justify-center">
+            <p className="text-xs text-muted-foreground px-2 text-center">
+              {post.title || "No preview available"}
+            </p>
+          </div>
         )}
       </div>
 
