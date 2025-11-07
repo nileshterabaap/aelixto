@@ -261,6 +261,36 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_user_platform_counts: {
+        Args: { target_user: string }
+        Returns: {
+          platform: string
+          post_count: number
+        }[]
+      }
+      get_user_platform_posts: {
+        Args: {
+          cursor?: string
+          limit_count: number
+          platform_name: string
+          target_user: string
+        }
+        Returns: {
+          content: string
+          created_at: string
+          embed_html: string
+          id: string
+          is_public: boolean
+          likes_count: number
+          media_type: string
+          media_url: string
+          platform: string
+          saves_count: number
+          thumbnail_url: string
+          title: string
+          user_id: string
+        }[]
+      }
       search_profiles: {
         Args: { cursor?: string; limit_count: number; q: string }
         Returns: {

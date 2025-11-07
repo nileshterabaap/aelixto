@@ -17,6 +17,9 @@ import { ArrowLeft, Play, Camera, Menu, Settings as SettingsIcon, LogOut } from 
 import { Profile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { useFollow } from "@/hooks/useFollow";
+import { useUserPlatformTabs } from "@/hooks/useUserPlatformTabs";
+import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
+import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
 
 const UserProfile = () => {
   const { username } = useParams<{ username: string }>();
@@ -28,6 +31,7 @@ const UserProfile = () => {
   
   const { isFollowing, follow, unfollow, loading: followLoading, counts } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
+  const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
 
   useEffect(() => {
     if (username) {
@@ -216,14 +220,21 @@ const UserProfile = () => {
             </Button>
           </div>
 
-          {/* Content */}
-          <Tabs defaultValue="posts" className="w-full">
-            <TabsContent value="posts" className="mt-0">
-              <p className="text-center text-muted-foreground py-12 text-base">
-                No posts yet
-              </p>
-            </TabsContent>
-          </Tabs>
+          {/* Platform Tabs & Posts Grid */}
+          {!tabsLoading && tabs.length > 0 ? (
+            <>
+              <ProfilePlatformTabs
+                tabs={tabs}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+              />
+              <ProfilePlatformGrid userId={profile.user_id} activeTab={activeTab} />
+            </>
+          ) : !tabsLoading ? (
+            <p className="text-center text-muted-foreground py-12 text-base">
+              No posts yet
+            </p>
+          ) : null}
         </div>
       </main>
 
