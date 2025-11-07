@@ -13,16 +13,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut } from "lucide-react";
+import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut, Youtube, Instagram } from "lucide-react";
 import { Profile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { useFollow } from "@/hooks/useFollow";
 import { useUserPlatformTabs } from "@/hooks/useUserPlatformTabs";
 import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
 import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
-import youtubeIcon from "@/assets/youtube-icon.png";
-import instagramIcon from "@/assets/instagram-icon.png";
-import twitterIcon from "@/assets/twitter-icon.png";
 
 const UserProfile = () => {
   const { username } = useParams<{ username: string }>();
@@ -214,33 +211,36 @@ const UserProfile = () => {
           <div className="flex gap-3 mb-8">
             <Button 
               onClick={() => setActiveTab("youtube")}
-              className={`flex-1 rounded-full py-5 ${
+              variant="outline"
+              className={`flex-1 rounded-full py-6 border-2 ${
                 activeTab === "youtube" 
-                  ? "bg-foreground hover:bg-foreground/90 text-background" 
-                  : "bg-background border-2 border-foreground/20 hover:border-foreground/40 text-foreground"
+                  ? "bg-foreground hover:bg-foreground/90 text-background border-foreground" 
+                  : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <img src={youtubeIcon} alt="YouTube" className="h-6 w-6" />
+              <Youtube className="h-6 w-6" />
             </Button>
             <Button 
               onClick={() => setActiveTab("instagram")}
-              className={`flex-1 rounded-full py-5 ${
+              variant="outline"
+              className={`flex-1 rounded-full py-6 border-2 ${
                 activeTab === "instagram" 
-                  ? "bg-foreground hover:bg-foreground/90 text-background" 
-                  : "bg-background border-2 border-foreground/20 hover:border-foreground/40 text-foreground"
+                  ? "bg-foreground hover:bg-foreground/90 text-background border-foreground" 
+                  : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <img src={instagramIcon} alt="Instagram" className="h-6 w-6" />
+              <Instagram className="h-6 w-6" />
             </Button>
             <Button 
               onClick={() => setActiveTab("x")}
-              className={`flex-1 rounded-full py-5 ${
+              variant="outline"
+              className={`flex-1 rounded-full py-6 border-2 ${
                 activeTab === "x" 
-                  ? "bg-foreground hover:bg-foreground/90 text-background" 
-                  : "bg-background border-2 border-foreground/20 hover:border-foreground/40 text-foreground"
+                  ? "bg-foreground hover:bg-foreground/90 text-background border-foreground" 
+                  : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
               }`}
             >
-              <img src={twitterIcon} alt="X" className="h-6 w-6" />
+              <span className="text-xl font-bold">𝕏</span>
             </Button>
           </div>
 
