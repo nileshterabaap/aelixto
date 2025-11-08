@@ -209,27 +209,29 @@ const UserProfile = () => {
 
           {/* Dynamic Platform Buttons */}
           {tabs.length > 0 && (
-            <div className="flex gap-3 mb-8 flex-wrap">
-              {tabs.map((tab) => (
-                <Button 
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  variant="outline"
-                  className={`flex-1 min-w-[80px] rounded-full py-6 border-2 transition-colors ${
-                    activeTab === tab.key 
-                      ? "bg-foreground hover:bg-foreground/90 border-foreground" 
-                      : "bg-background border-muted hover:border-foreground/40"
-                  }`}
-                >
-                  <img 
-                    src={tab.icon} 
-                    alt={tab.label}
-                    className={`w-[27px] h-[27px] ${
-                      activeTab === tab.key ? "brightness-0 invert" : ""
+            <div className="overflow-x-auto no-scrollbar mb-8">
+              <div className="flex gap-3 min-w-max">
+                {tabs.map((tab) => (
+                  <Button 
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    variant="outline"
+                    className={`min-w-[80px] rounded-full py-6 border-2 transition-colors ${
+                      activeTab === tab.key 
+                        ? "bg-foreground hover:bg-foreground/90 border-foreground" 
+                        : "bg-background border-muted hover:border-foreground/40"
                     }`}
-                  />
-                </Button>
-              ))}
+                  >
+                    <img 
+                      src={tab.icon} 
+                      alt={tab.label}
+                      className={`w-[27px] h-[27px] ${
+                        activeTab === tab.key ? "brightness-0 invert" : ""
+                      }`}
+                    />
+                  </Button>
+                ))}
+              </div>
             </div>
           )}
 
