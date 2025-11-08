@@ -20,7 +20,7 @@ Deno.serve(async (req) => {
     // Get posts without thumbnails
     const { data: posts, error: fetchError } = await supabase
       .from('posts')
-      .select('id, platform, media_url, media_type, thumbnail_url')
+      .select('id, platform, media_url, media_type, thumbnail_url, title')
       .is('thumbnail_url', null)
       .limit(100); // Process in batches
 
@@ -41,6 +41,7 @@ Deno.serve(async (req) => {
 
     for (const post of posts || []) {
       let thumbnailUrl: string | null = null;
+      let titleToSave: string | null = post.title;
 
       // 1) YouTube - use maxresdefault
       if (post.platform === 'youtube' && post.media_url) {
@@ -73,17 +74,25 @@ Deno.serve(async (req) => {
           if (ogData?.image) {
             thumbnailUrl = ogData.image;
           }
+          // Also save title if we don't have one
+          if (ogData?.title && !post.title) {
+            titleToSave = ogData.title;
+          }
         } catch (err) {
           console.log(`Failed to fetch OG for post ${post.id}:`, err);
         }
       }
 
-      // Update if we found a thumbnail
-      if (thumbnailUrl) {
-        console.log(`Updating post ${post.id} with thumbnail: ${thumbnailUrl}`);
+      // Update if we found a thumbnail or title
+      if (thumbnailUrl || (titleToSave && titleToSave !== post.title)) {
+        console.log(`Updating post ${post.id} with thumbnail: ${thumbnailUrl}, title: ${titleToSave}`);
+        const updateData: any = {};
+        if (thumbnailUrl) updateData.thumbnail_url = thumbnailUrl;
+        if (titleToSave && titleToSave !== post.title) updateData.title = titleToSave;
+        
         const updatePromise = supabase
           .from('posts')
-          .update({ thumbnail_url: thumbnailUrl })
+          .update(updateData)
           .eq('id', post.id)
           .select()
           .then();
