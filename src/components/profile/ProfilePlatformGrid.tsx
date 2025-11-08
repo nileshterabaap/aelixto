@@ -48,7 +48,6 @@ function PlatformBadge({ platform }: { platform?: string | null }) {
 function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }) {
   const [imageError, setImageError] = useState(false);
   const thumbnail = useMemo(() => getPostThumbnail(post), [post]);
-  const platformIcon = post.platform ? PLATFORM_ICONS[post.platform.toLowerCase()] : undefined;
 
   const getAspectRatio = () => {
     if (post.platform === "youtube") return "aspect-video";
@@ -74,14 +73,7 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/10 to-muted/40 flex flex-col items-center justify-center gap-3 p-4">
-            {platformIcon && (
-              <img 
-                src={platformIcon} 
-                alt={post.platform || ""}
-                className="w-16 h-16 opacity-40"
-              />
-            )}
+          <div className="w-full h-full bg-gradient-to-br from-muted/80 to-muted/40 flex items-center justify-center p-4">
             {post.title && (
               <p className="text-xs text-muted-foreground px-2 text-center line-clamp-3">
                 {post.title}
@@ -90,11 +82,6 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
           </div>
         )}
       </div>
-
-      {/* Platform badge overlay */}
-      {platformIcon && (
-        <PlatformBadge platform={post.platform} />
-      )}
 
       {/* Play button overlay for videos */}
       {post.media_type === "video" && (
