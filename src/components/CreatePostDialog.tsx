@@ -54,24 +54,8 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
           console.error("Failed to fetch video title:", error);
         }
       }
-    } else if (linkUrl.includes("instagram.com")) {
-      thumbnail = linkUrl + "media/?size=l";
-    } else if (
-      linkUrl.includes("reddit.com") || 
-      linkUrl.includes("medium.com") || 
-      linkUrl.includes("quora.com") ||
-      linkUrl.includes("facebook.com") ||
-      linkUrl.includes("fb.watch") ||
-      linkUrl.includes("fb.me") ||
-      linkUrl.includes("spotify.com") ||
-      linkUrl.includes("blog") || 
-      linkUrl.includes(".wordpress.com") || 
-      linkUrl.includes("blogger.com") || 
-      linkUrl.includes("ghost.io") || 
-      linkUrl.includes("substack.com") ||
-      linkUrl.includes("dev.to")
-    ) {
-      // Fetch OG data for blog/article platforms
+    } else {
+      // Fetch OG data for all platforms (Instagram, Twitter, Reddit, Facebook, etc.)
       console.log('[CreatePostDialog] Fetching OG data for:', linkUrl);
       try {
         const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {

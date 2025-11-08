@@ -48,23 +48,13 @@ function PlatformBadge({ platform }: { platform?: string | null }) {
 function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }) {
   const [imageError, setImageError] = useState(false);
   const thumbnail = useMemo(() => getPostThumbnail(post), [post]);
+  const platformIcon = post.platform ? PLATFORM_ICONS[post.platform.toLowerCase()] : undefined;
 
   const getAspectRatio = () => {
     if (post.platform === "youtube") return "aspect-video";
     if (post.platform === "instagram" || post.platform === "tiktok") return "aspect-square";
     return "aspect-[4/5]";
   };
-
-  // Log for debugging if no thumbnail is found
-  if (!thumbnail) {
-    console.log("No thumbnail for post:", { 
-      id: post.id, 
-      platform: post.platform,
-      thumbnail_url: post.thumbnail_url,
-      media_url: post.media_url,
-      media_type: post.media_type
-    });
-  }
 
   return (
     <button
@@ -84,13 +74,27 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-muted/80 to-muted/40 flex items-center justify-center">
-            <p className="text-xs text-muted-foreground px-2 text-center">
-              {post.title || "No preview available"}
-            </p>
+          <div className="w-full h-full bg-gradient-to-br from-primary/20 via-primary/10 to-muted/40 flex flex-col items-center justify-center gap-3 p-4">
+            {platformIcon && (
+              <img 
+                src={platformIcon} 
+                alt={post.platform || ""}
+                className="w-16 h-16 opacity-40"
+              />
+            )}
+            {post.title && (
+              <p className="text-xs text-muted-foreground px-2 text-center line-clamp-3">
+                {post.title}
+              </p>
+            )}
           </div>
         )}
       </div>
+
+      {/* Platform badge overlay */}
+      {platformIcon && (
+        <PlatformBadge platform={post.platform} />
+      )}
 
       {/* Play button overlay for videos */}
       {post.media_type === "video" && (
