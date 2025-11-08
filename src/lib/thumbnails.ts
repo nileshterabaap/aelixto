@@ -18,8 +18,8 @@ export function getPostThumbnail(post: PlatformPost): string | null {
     if (videoId) return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
   }
 
-  // 3) Use media_url if it's an image
-  if (post.media_type === "image" && post.media_url) {
+  // 3) Use media_url for all media types (images and videos)
+  if (post.media_url) {
     return post.media_url;
   }
 
