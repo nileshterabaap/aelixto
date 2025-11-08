@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import pinterestIcon from "@/assets/pinterest-icon.png";
+import pinterestIcon from "@/assets/platforms/pinterest.svg";
 import { loadPinterestEmbed } from "@/lib/ScriptLoader";
 
 interface PinterestEmbedProps {
