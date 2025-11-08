@@ -11,12 +11,16 @@ import type { Post } from "@/data/demoData";
 import { useState } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
 import { CommentsDialog } from "@/components/CommentsDialog";
-import youtubeIcon from "@/assets/youtube-icon.png";
-import instagramIcon from "@/assets/instagram-icon.png";
-import tiktokIcon from "@/assets/tiktok-icon.png";
-import redditIcon from "@/assets/reddit-icon.png";
-import twitterIcon from "@/assets/twitter-icon.png";
-import pinterestIcon from "@/assets/pinterest-icon.png";
+import youtubeIcon from "@/assets/platforms/youtube.svg";
+import instagramIcon from "@/assets/platforms/instagram.svg";
+import tiktokIcon from "@/assets/platforms/tiktok.svg";
+import redditIcon from "@/assets/platforms/reddit.svg";
+import twitterIcon from "@/assets/platforms/x.svg";
+import pinterestIcon from "@/assets/platforms/pinterest.svg";
+import facebookIcon from "@/assets/platforms/facebook.svg";
+import quoraIcon from "@/assets/platforms/quora.svg";
+import spotifyIcon from "@/assets/platforms/spotify.svg";
+import mediumIcon from "@/assets/platforms/medium.svg";
 import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
 import { RawEmbedRenderer } from "@/components/RawEmbedRenderer";
@@ -56,17 +60,18 @@ const getPlatformIcon = (platform?: string) => {
     case 'reddit':
       return { name: 'Reddit', icon: redditIcon };
     case 'twitter':
+    case 'x':
       return { name: 'X', icon: twitterIcon };
     case 'pinterest':
       return { name: 'Pinterest', icon: pinterestIcon };
     case 'facebook':
-      return { name: 'Facebook', icon: 'https://upload.wikimedia.org/wikipedia/commons/5/51/Facebook_f_logo_%282019%29.svg' };
+      return { name: 'Facebook', icon: facebookIcon };
     case 'spotify':
-      return { name: 'Spotify', icon: 'https://upload.wikimedia.org/wikipedia/commons/8/84/Spotify_icon.svg' };
+      return { name: 'Spotify', icon: spotifyIcon };
     case 'quora':
-      return { name: 'Quora', icon: 'https://upload.wikimedia.org/wikipedia/commons/9/91/Quora_logo_2015.svg' };
+      return { name: 'Quora', icon: quoraIcon };
     case 'medium':
-      return { name: 'Medium', icon: 'https://upload.wikimedia.org/wikipedia/commons/e/ec/Medium_logo_Monogram.svg' };
+      return { name: 'Medium', icon: mediumIcon };
     default:
       return null;
   }

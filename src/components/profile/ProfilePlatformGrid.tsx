@@ -3,21 +3,31 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useState, useMemo } from "react";
 import { getPostThumbnail } from "@/lib/thumbnails";
-import instagramIcon from "@/assets/instagram-icon.png";
-import youtubeIcon from "@/assets/youtube-icon.png";
-import redditIcon from "@/assets/reddit-icon.png";
-import twitterIcon from "@/assets/twitter-icon.png";
-import pinterestIcon from "@/assets/pinterest-icon.png";
-import tiktokIcon from "@/assets/tiktok-icon.png";
+import instagramIcon from "@/assets/platforms/instagram.svg";
+import youtubeIcon from "@/assets/platforms/youtube.svg";
+import redditIcon from "@/assets/platforms/reddit.svg";
+import xIcon from "@/assets/platforms/x.svg";
+import pinterestIcon from "@/assets/platforms/pinterest.svg";
+import tiktokIcon from "@/assets/platforms/tiktok.svg";
+import facebookIcon from "@/assets/platforms/facebook.svg";
+import quoraIcon from "@/assets/platforms/quora.svg";
+import spotifyIcon from "@/assets/platforms/spotify.svg";
+import mediumIcon from "@/assets/platforms/medium.svg";
+import blogIcon from "@/assets/platforms/blog.svg";
 
 const PLATFORM_ICONS: Record<string, string> = {
   instagram: instagramIcon,
   youtube: youtubeIcon,
   reddit: redditIcon,
-  twitter: twitterIcon,
-  x: twitterIcon,
+  twitter: xIcon,
+  x: xIcon,
   pinterest: pinterestIcon,
   tiktok: tiktokIcon,
+  facebook: facebookIcon,
+  quora: quoraIcon,
+  spotify: spotifyIcon,
+  medium: mediumIcon,
+  blog: blogIcon,
 };
 
 function PlatformBadge({ platform }: { platform?: string | null }) {
