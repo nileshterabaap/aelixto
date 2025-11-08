@@ -12,14 +12,14 @@ export function getPostThumbnail(post: PlatformPost): string | null {
   // 1) Use stored thumbnail if available
   if (post.thumbnail_url) return post.thumbnail_url;
 
-  // 2) YouTube - generate thumbnail from video URL
+  // 2) YouTube - generate thumbnail from video URL (use maxresdefault like Feed)
   if (post.platform === "youtube" && post.media_url) {
     const videoId = extractYouTubeId(post.media_url);
-    if (videoId) return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    if (videoId) return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
   }
 
-  // 3) Use media_url for all media types (images and videos)
-  if (post.media_url) {
+  // 3) For image types, use media_url directly
+  if (post.media_type === "image" && post.media_url) {
     return post.media_url;
   }
 

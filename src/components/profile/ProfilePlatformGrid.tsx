@@ -50,9 +50,11 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
   const thumbnail = useMemo(() => getPostThumbnail(post), [post]);
 
   const getAspectRatio = () => {
-    if (post.platform === "youtube") return "aspect-video";
-    if (post.platform === "instagram" || post.platform === "tiktok") return "aspect-square";
-    return "aspect-[4/5]";
+    // Match Feed styling
+    if (post.platform === "youtube") return "aspect-video"; // 16:9
+    if (post.platform === "instagram" || post.platform === "tiktok") return "aspect-square"; // 1:1
+    if (post.platform === "reddit" || post.platform === "quora" || post.platform === "medium") return "aspect-[4/3]";
+    return "aspect-[4/5]"; // Default for other platforms
   };
 
   return (
