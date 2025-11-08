@@ -14,15 +14,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut } from "lucide-react";
-import youtubeIcon from "@/assets/youtube-icon.png";
-import instagramIcon from "@/assets/instagram-icon.png";
-import redditIcon from "@/assets/reddit-icon.png";
-import pinterestIcon from "@/assets/pinterest-icon.png";
-import tiktokIcon from "@/assets/tiktok-icon.png";
-import xIcon from "@/assets/x-icon.png";
-import facebookIcon from "@/assets/facebook-icon.png";
-import quoraIcon from "@/assets/quora-icon.png";
-import spotifyIcon from "@/assets/spotify-icon.png";
+import youtubeIcon from "@/assets/youtube-icon.svg";
+import instagramIcon from "@/assets/instagram-icon.svg";
+import redditIcon from "@/assets/reddit-icon.svg";
+import pinterestIcon from "@/assets/pinterest-icon.svg";
+import tiktokIcon from "@/assets/tiktok-icon.svg";
+import xIcon from "@/assets/x-icon.svg";
+import facebookIcon from "@/assets/facebook-icon.svg";
+import quoraIcon from "@/assets/quora-icon.svg";
+import spotifyIcon from "@/assets/spotify-icon.svg";
 import { Profile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { useFollow } from "@/hooks/useFollow";
@@ -228,7 +228,7 @@ const UserProfile = () => {
                     : "bg-background border-muted hover:border-foreground/40"
                 }`}
               >
-                <img src={youtubeIcon} alt="YouTube" className={`w-[27px] h-[27px] ${activeTab === "youtube" ? "invert brightness-0" : ""}`} />
+                <img src={youtubeIcon} alt="YouTube" className={`w-[27px] h-[27px] ${activeTab === "youtube" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("instagram")}
@@ -239,7 +239,7 @@ const UserProfile = () => {
                     : "bg-background border-muted hover:border-foreground/40"
                 }`}
               >
-                <img src={instagramIcon} alt="Instagram" className={`w-[27px] h-[27px] ${activeTab === "instagram" ? "invert brightness-0" : ""}`} />
+                <img src={instagramIcon} alt="Instagram" className={`w-[27px] h-[27px] ${activeTab === "instagram" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("x")}
@@ -250,7 +250,7 @@ const UserProfile = () => {
                     : "bg-background border-muted hover:border-foreground/40"
                 }`}
               >
-                <img src={xIcon} alt="X" className={`w-[27px] h-[27px] ${activeTab === "x" || activeTab === "twitter" ? "invert brightness-0" : ""}`} />
+                <img src={xIcon} alt="X" className={`w-[27px] h-[27px] ${activeTab === "x" || activeTab === "twitter" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("reddit")}
@@ -261,7 +261,7 @@ const UserProfile = () => {
                     : "bg-background border-muted hover:border-foreground/40"
                 }`}
               >
-                <img src={redditIcon} alt="Reddit" className={`w-[27px] h-[27px] ${activeTab === "reddit" ? "invert brightness-0" : ""}`} />
+                <img src={redditIcon} alt="Reddit" className={`w-[27px] h-[27px] ${activeTab === "reddit" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("pinterest")}
@@ -272,7 +272,7 @@ const UserProfile = () => {
                     : "bg-background border-muted hover:border-foreground/40"
                 }`}
               >
-                <img src={pinterestIcon} alt="Pinterest" className={`w-[27px] h-[27px] ${activeTab === "pinterest" ? "invert brightness-0" : ""}`} />
+                <img src={pinterestIcon} alt="Pinterest" className={`w-[27px] h-[27px] ${activeTab === "pinterest" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("tiktok")}
@@ -283,7 +283,7 @@ const UserProfile = () => {
                     : "bg-background border-muted hover:border-foreground/40"
                 }`}
               >
-                <img src={tiktokIcon} alt="TikTok" className={`w-[27px] h-[27px] ${activeTab === "tiktok" ? "invert brightness-0" : ""}`} />
+                <img src={tiktokIcon} alt="TikTok" className={`w-[27px] h-[27px] ${activeTab === "tiktok" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("facebook")}
@@ -294,7 +294,7 @@ const UserProfile = () => {
                     : "bg-background border-muted hover:border-foreground/40"
                 }`}
               >
-                <img src={facebookIcon} alt="Facebook" className={`w-[27px] h-[27px] ${activeTab === "facebook" ? "invert brightness-0" : ""}`} />
+                <img src={facebookIcon} alt="Facebook" className={`w-[27px] h-[27px] ${activeTab === "facebook" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("quora")}
@@ -305,7 +305,7 @@ const UserProfile = () => {
                     : "bg-background border-muted hover:border-foreground/40"
                 }`}
               >
-                <img src={quoraIcon} alt="Quora" className={`w-[27px] h-[27px] ${activeTab === "quora" ? "invert brightness-0" : ""}`} />
+                <img src={quoraIcon} alt="Quora" className={`w-[27px] h-[27px] ${activeTab === "quora" ? "brightness-0 invert" : ""}`} />
               </Button>
               <Button 
                 onClick={() => setActiveTab("spotify")}
@@ -316,7 +316,7 @@ const UserProfile = () => {
                     : "bg-background border-muted hover:border-foreground/40"
                 }`}
               >
-                <img src={spotifyIcon} alt="Spotify" className={`w-[27px] h-[27px] ${activeTab === "spotify" ? "invert brightness-0" : ""}`} />
+                <img src={spotifyIcon} alt="Spotify" className={`w-[27px] h-[27px] ${activeTab === "spotify" ? "brightness-0 invert" : ""}`} />
               </Button>
             </div>
           </div>
