@@ -1,12 +1,17 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import youtubeIcon from "@/assets/youtube-icon.png";
-import instagramIcon from "@/assets/instagram-icon.png";
-import twitterIcon from "@/assets/twitter-icon.png";
-import redditIcon from "@/assets/reddit-icon.png";
-import pinterestIcon from "@/assets/pinterest-icon.png";
-import tiktokIcon from "@/assets/tiktok-icon.png";
+import youtubeIcon from "@/assets/platforms/youtube.svg";
+import instagramIcon from "@/assets/platforms/instagram.svg";
+import xIcon from "@/assets/platforms/x.svg";
+import redditIcon from "@/assets/platforms/reddit.svg";
+import pinterestIcon from "@/assets/platforms/pinterest.svg";
+import tiktokIcon from "@/assets/platforms/tiktok.svg";
+import facebookIcon from "@/assets/platforms/facebook.svg";
+import quoraIcon from "@/assets/platforms/quora.svg";
+import mediumIcon from "@/assets/platforms/medium.svg";
+import blogIcon from "@/assets/platforms/blog.svg";
+import spotifyIcon from "@/assets/platforms/spotify.svg";
 
 export type PlatformTab = {
   key: string;
@@ -18,15 +23,16 @@ export type PlatformTab = {
 const PLATFORM_META: Record<string, { label: string; icon: string }> = {
   youtube: { label: "YouTube", icon: youtubeIcon },
   instagram: { label: "Instagram", icon: instagramIcon },
-  x: { label: "X", icon: twitterIcon },
-  twitter: { label: "X", icon: twitterIcon },
+  x: { label: "X", icon: xIcon },
+  twitter: { label: "X", icon: xIcon },
   reddit: { label: "Reddit", icon: redditIcon },
   pinterest: { label: "Pinterest", icon: pinterestIcon },
-  facebook: { label: "Facebook", icon: instagramIcon },
+  facebook: { label: "Facebook", icon: facebookIcon },
   tiktok: { label: "TikTok", icon: tiktokIcon },
-  quora: { label: "Quora", icon: redditIcon },
-  medium: { label: "Medium", icon: youtubeIcon },
-  blog: { label: "Blogs", icon: youtubeIcon },
+  quora: { label: "Quora", icon: quoraIcon },
+  medium: { label: "Medium", icon: mediumIcon },
+  blog: { label: "Blogs", icon: blogIcon },
+  spotify: { label: "Spotify", icon: spotifyIcon },
 };
 
 export const useUserPlatformTabs = (userId: string | undefined) => {

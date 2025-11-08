@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut, Youtube, Instagram } from "lucide-react";
+import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut } from "lucide-react";
 import { Profile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { useFollow } from "@/hooks/useFollow";
@@ -207,42 +207,31 @@ const UserProfile = () => {
             </Button>
           ) : null}
 
-          {/* Social Platform Buttons */}
-          <div className="flex gap-3 mb-8">
-            <Button 
-              onClick={() => setActiveTab("youtube")}
-              variant="outline"
-              className={`flex-1 rounded-full py-6 border-2 transition-colors [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
-                activeTab === "youtube" 
-                  ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
-                  : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
-              }`}
-            >
-              <Youtube size={27} strokeWidth={2} />
-            </Button>
-            <Button 
-              onClick={() => setActiveTab("instagram")}
-              variant="outline"
-              className={`flex-1 rounded-full py-6 border-2 transition-colors [&_svg]:!w-[27px] [&_svg]:!h-[27px] ${
-                activeTab === "instagram" 
-                  ? "bg-foreground hover:bg-foreground/90 border-foreground [&>svg]:!text-background" 
-                  : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
-              }`}
-            >
-              <Instagram size={27} strokeWidth={2} />
-            </Button>
-            <Button 
-              onClick={() => setActiveTab("x")}
-              variant="outline"
-              className={`flex-1 rounded-full py-6 border-2 transition-colors ${
-                activeTab === "x" 
-                  ? "bg-foreground hover:bg-foreground/90 !text-background border-foreground" 
-                  : "bg-background border-foreground/20 hover:border-foreground/40 text-foreground"
-              }`}
-            >
-              <span className="text-[27px] font-bold leading-none">𝕏</span>
-            </Button>
-          </div>
+          {/* Dynamic Platform Buttons */}
+          {tabs.length > 0 && (
+            <div className="flex gap-3 mb-8 flex-wrap">
+              {tabs.map((tab) => (
+                <Button 
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  variant="outline"
+                  className={`flex-1 min-w-[80px] rounded-full py-6 border-2 transition-colors ${
+                    activeTab === tab.key 
+                      ? "bg-foreground hover:bg-foreground/90 border-foreground" 
+                      : "bg-background border-muted hover:border-foreground/40"
+                  }`}
+                >
+                  <img 
+                    src={tab.icon} 
+                    alt={tab.label}
+                    className={`w-[27px] h-[27px] ${
+                      activeTab === tab.key ? "brightness-0 invert" : ""
+                    }`}
+                  />
+                </Button>
+              ))}
+            </div>
+          )}
 
           {/* Platform Posts Grid */}
           {!tabsLoading && tabs.length > 0 ? (
