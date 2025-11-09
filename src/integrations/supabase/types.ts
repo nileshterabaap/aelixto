@@ -376,6 +376,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      is_conversation_participant: {
+        Args: { _conversation_id: string; _user_id: string }
+        Returns: boolean
+      }
       search_profiles: {
         Args: { cursor?: string; limit_count: number; q: string }
         Returns: {
