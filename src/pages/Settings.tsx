@@ -30,7 +30,7 @@ const Settings = () => {
 
   // Check ownership and redirect if not owner
   useEffect(() => {
-    if (!loading && profile && user && user.id !== profile.id) {
+    if (!loading && profile && user && user.id !== profile.user_id) {
       navigate(`/u/${profile.username}`);
     }
   }, [loading, profile, user, navigate]);
