@@ -11,7 +11,10 @@ export const useStartConversation = () => {
   const [loading, setLoading] = useState(false);
 
   const startConversation = async (otherUserId: string) => {
+    console.log('startConversation called with:', { otherUserId, currentUserId: user?.id });
+    
     if (!user) {
+      console.error('No user found');
       toast({
         title: 'Error',
         description: 'You must be logged in to send messages',
@@ -21,6 +24,7 @@ export const useStartConversation = () => {
     }
 
     if (user.id === otherUserId) {
+      console.error('Cannot message yourself');
       toast({
         title: 'Error',
         description: 'You cannot message yourself',
@@ -32,15 +36,21 @@ export const useStartConversation = () => {
     setLoading(true);
 
     try {
+      console.log('Checking for existing conversations...');
       // Check if conversation already exists
       const { data: existingParticipants, error: participantError } = await supabase
         .from('conversation_participants')
         .select('conversation_id')
         .eq('user_id', user.id);
 
-      if (participantError) throw participantError;
+      console.log('Existing participants query result:', { existingParticipants, participantError });
+      if (participantError) {
+        console.error('Error fetching existing participants:', participantError);
+        throw participantError;
+      }
 
       if (existingParticipants && existingParticipants.length > 0) {
+        console.log('Found existing conversations, checking for existing conversation with other user...');
         // Check if any of these conversations include the other user
         const conversationIds = existingParticipants.map(p => p.conversation_id);
         
@@ -50,15 +60,21 @@ export const useStartConversation = () => {
           .eq('user_id', otherUserId)
           .in('conversation_id', conversationIds);
 
-        if (otherError) throw otherError;
+        console.log('Other user participants query result:', { otherUserParticipants, otherError });
+        if (otherError) {
+          console.error('Error fetching other user participants:', otherError);
+          throw otherError;
+        }
 
         if (otherUserParticipants && otherUserParticipants.length > 0) {
+          console.log('Found existing conversation, navigating to it:', otherUserParticipants[0].conversation_id);
           // Conversation exists, navigate to it
           navigate(`/conversation/${otherUserParticipants[0].conversation_id}`);
           return;
         }
       }
 
+      console.log('No existing conversation found, creating new conversation...');
       // Create new conversation
       const { data: newConversation, error: conversationError } = await supabase
         .from('conversations')
@@ -66,8 +82,13 @@ export const useStartConversation = () => {
         .select()
         .single();
 
-      if (conversationError) throw conversationError;
+      console.log('New conversation result:', { newConversation, conversationError });
+      if (conversationError) {
+        console.error('Error creating conversation:', conversationError);
+        throw conversationError;
+      }
 
+      console.log('Adding participants to conversation...');
       // Add both participants
       const { error: participantsError } = await supabase
         .from('conversation_participants')
@@ -76,8 +97,13 @@ export const useStartConversation = () => {
           { conversation_id: newConversation.id, user_id: otherUserId },
         ]);
 
-      if (participantsError) throw participantsError;
+      console.log('Participants insert result:', { participantsError });
+      if (participantsError) {
+        console.error('Error adding participants:', participantsError);
+        throw participantsError;
+      }
 
+      console.log('Successfully created conversation, navigating to:', newConversation.id);
       // Navigate to new conversation
       navigate(`/conversation/${newConversation.id}`);
     } catch (error) {
