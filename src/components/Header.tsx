@@ -105,15 +105,18 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
                 </PopoverContent>
               </Popover>
             )}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-10 w-10"
-              onClick={() => navigate('/saved')}
-            >
-              <Bookmark className="h-8 w-8 stroke-[2.5]" />
-            </Button>
-            <Button 
+            {user && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-10 w-10"
+                onClick={() => navigate('/saved')}
+              >
+                <Bookmark className="h-8 w-8 stroke-[2.5]" />
+              </Button>
+            )}
+            {user && (
+              <Button
               variant="ghost" 
               size="icon" 
               className="h-10 w-10 relative"
@@ -126,6 +129,7 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
                 </div>
               )}
             </Button>
+            )}
 
             {!user && (
               <Button 
