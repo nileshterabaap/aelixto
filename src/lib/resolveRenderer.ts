@@ -36,7 +36,7 @@ export function resolveRenderer(post: any): Renderer {
   const isBlocked = blocked.some(d => url.includes(d));
   if (!isBlocked && post?.mediaType === 'none') return { kind: 'article', url };
 
-  // 5) universal meta (not reddit, not facebook - facebook embeds don't work)
+  // 5) universal meta (not reddit, not facebook - facebook embeds are unreliable)
   const universalAllow = ['instagram.com','spotify.com'];
   if (universalAllow.some(d => url.includes(d))) return { kind: 'universal', url };
 

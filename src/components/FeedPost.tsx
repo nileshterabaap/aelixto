@@ -355,6 +355,24 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             {r.kind === 'pinterest' && <PinterestEmbed url={r.url} />}
             {r.kind === 'article' && <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />}
             {r.kind === 'universal' && <UniversalMetaEmbed url={r.url} />}
+            {r.kind === 'none' && detectedPlatform === 'facebook' && post.mediaUrl && (
+              <Card className="overflow-hidden border-2 border-border hover:border-primary/50 transition-colors">
+                <a 
+                  href={post.mediaUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="block p-6"
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <img src={facebookIcon} alt="Facebook" className="w-8 h-8" />
+                    <h3 className="font-semibold text-lg">View on Facebook</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Click to view this post on Facebook
+                  </p>
+                </a>
+              </Card>
+            )}
             {r.kind === 'image' && (
               <div className="rounded-2xl overflow-hidden">
                 <img 
