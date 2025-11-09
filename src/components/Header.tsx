@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useUserSearch } from "@/hooks/useUserSearch";
+import { useConversations } from "@/hooks/useConversations";
 import { SearchResultItem } from "@/components/SearchResultItem";
 
 interface HeaderProps {
@@ -34,6 +35,10 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const { results, loading, hasMore, loadMore } = useUserSearch(searchQuery, searchOpen);
+  const { conversations } = useConversations();
+  
+  // Calculate total unread messages
+  const totalUnreadMessages = conversations.reduce((total, conv) => total + conv.unread_count, 0);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -110,9 +115,11 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
               onClick={() => navigate('/messages')}
             >
               <MessageCircle className="h-8 w-8 stroke-[2.5]" />
-              <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive text-[11px] font-bold text-white flex items-center justify-center">
-                3
-              </div>
+              {totalUnreadMessages > 0 && (
+                <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive text-[11px] font-bold text-white flex items-center justify-center">
+                  {totalUnreadMessages}
+                </div>
+              )}
             </Button>
 
             {!user && (
