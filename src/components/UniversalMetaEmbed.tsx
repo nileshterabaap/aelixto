@@ -48,7 +48,6 @@ const buildFacebookEmbed = (url: string): string => {
   try {
     const urlObj = new URL(url);
     
-    // For share URLs, keep them as-is - they should be expanded first
     // For reels and videos, keep only the base path without query params
     if (url.includes('/reel/') || url.includes('/videos/') || url.includes('/watch/')) {
       cleanUrl = `${urlObj.origin}${urlObj.pathname}`;
@@ -63,9 +62,9 @@ const buildFacebookEmbed = (url: string): string => {
   console.log('[UniversalMetaEmbed] Building Facebook embed - isVideo:', isVideo, 'URL:', cleanUrl);
   
   if (isVideo) {
-    return `<div class="fb-video" data-href="${cleanUrl}" data-width="500" data-show-text="true"></div>`;
+    return `<div class="fb-video" data-href="${cleanUrl}" data-width="auto" data-show-text="true"></div>`;
   }
-  return `<div class="fb-post" data-href="${cleanUrl}" data-width="500" data-show-text="true"></div>`;
+  return `<div class="fb-post" data-href="${cleanUrl}" data-width="auto" data-show-text="true"></div>`;
 };
 
 // Build Spotify embed HTML
@@ -100,8 +99,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         // Expand if it's a short link OR a Facebook share URL
         const needsExpansion = url.includes('fb.watch') || url.includes('fb.me') || 
                                url.includes('bit.ly') || url.includes('pin.it') ||
-                               url.includes('/share/r/') || url.includes('/share/v/') ||
-                               url.includes('/share/p/');
+                               url.includes('/share/r/') || url.includes('/share/v/');
         
         if (needsExpansion) {
           console.log('[UniversalMetaEmbed] Expanding URL:', url);
