@@ -86,6 +86,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   const [fallbackData, setFallbackData] = useState<{ title?: string; image?: string; description?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedUrl, setExpandedUrl] = useState(url);
+  const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
     const processUrl = async () => {
@@ -163,10 +164,13 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     );
   }
 
-  if (embedHtml) {
+  if (embedHtml && !showFallback) {
     return (
       <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
-        <RawEmbedRenderer embedHtml={embedHtml} />
+        <RawEmbedRenderer 
+          embedHtml={embedHtml} 
+          onError={() => setShowFallback(true)}
+        />
       </div>
     );
   }

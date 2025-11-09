@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { loadInstagramEmbed, loadFacebookSDK } from '@/lib/ScriptLoader';
 
 interface RawEmbedRendererProps {
   embedHtml: string;
+  onError?: () => void;
 }
 
 // Strip script tags for security while preserving the embed HTML
@@ -52,8 +53,9 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
   return 'unknown';
 };
 
-export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
+export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const [embedFailed, setEmbedFailed] = useState(false);
   const platform = detectPlatform(embedHtml);
   let sanitizedHtml = sanitizeEmbedHtml(embedHtml);
   
@@ -91,17 +93,37 @@ export const RawEmbedRenderer = ({ embedHtml }: RawEmbedRendererProps) => {
           if (window.FB?.XFBML?.parse) {
             console.log('[RawEmbedRenderer] Parsing Facebook embed');
             window.FB.XFBML.parse(containerRef.current);
+            
+            // Check for Facebook embed errors after a delay
+            setTimeout(() => {
+              if (containerRef.current) {
+                const fbError = containerRef.current.querySelector('.fb-error');
+                const noPost = containerRef.current.textContent?.includes('no longer available');
+                
+                if (fbError || noPost) {
+                  console.log('[RawEmbedRenderer] Facebook embed failed, triggering fallback');
+                  setEmbedFailed(true);
+                  onError?.();
+                }
+              }
+            }, 3000); // Wait 3 seconds for embed to load
           } else {
             console.log('[RawEmbedRenderer] FB.XFBML.parse not available');
           }
         }
       } catch (error) {
         console.error('[RawEmbedRenderer] Failed to load embed script:', error);
+        setEmbedFailed(true);
+        onError?.();
       }
     };
 
     processEmbed();
-  }, [embedHtml, platform]);
+  }, [embedHtml, platform, onError]);
+
+  if (embedFailed) {
+    return null; // Let parent component show fallback
+  }
 
   return (
     <div 
