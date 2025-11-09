@@ -106,11 +106,11 @@ export const useStartConversation = () => {
       console.log('Successfully created conversation, navigating to:', newConversation.id);
       // Navigate to new conversation
       navigate(`/conversation/${newConversation.id}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting conversation:', error);
       toast({
         title: 'Error',
-        description: 'Failed to start conversation',
+        description: error?.message || 'Failed to start conversation',
         variant: 'destructive',
       });
     } finally {
