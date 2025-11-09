@@ -13,11 +13,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut } from "lucide-react";
+import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut, MessageCircle } from "lucide-react";
 import { Profile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { useFollow } from "@/hooks/useFollow";
 import { useUserPlatformTabs } from "@/hooks/useUserPlatformTabs";
+import { useStartConversation } from "@/hooks/useStartConversation";
 import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
 import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
 
@@ -32,6 +33,7 @@ const UserProfile = () => {
   const { isFollowing, follow, unfollow, loading: followLoading, counts } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
+  const { startConversation, loading: conversationLoading } = useStartConversation();
 
   useEffect(() => {
     if (username) {
@@ -184,7 +186,7 @@ const UserProfile = () => {
             <p className="text-center italic text-base mb-6 px-4">"{profile.bio}"</p>
           )}
 
-          {/* Action Button - Edit or Follow */}
+          {/* Action Buttons - Edit or Follow/Message */}
           {isMe ? (
             <Button 
               variant="outline" 
@@ -194,17 +196,28 @@ const UserProfile = () => {
               Edit Profile
             </Button>
           ) : user ? (
-            <Button 
-              disabled={followLoading}
-              onClick={() => (isFollowing ? unfollow() : follow())}
-              className={`w-full rounded-full py-4 text-sm font-bold border-2 mb-6 ${
-                isFollowing 
-                  ? 'bg-foreground text-background hover:bg-foreground/90' 
-                  : 'bg-primary text-primary-foreground hover:bg-primary/90'
-              }`}
-            >
-              {followLoading ? 'Loading...' : isFollowing ? 'Following' : 'Follow'}
-            </Button>
+            <div className="flex gap-3 mb-6">
+              <Button 
+                disabled={followLoading}
+                onClick={() => (isFollowing ? unfollow() : follow())}
+                className={`flex-1 rounded-full py-4 text-sm font-bold border-2 ${
+                  isFollowing 
+                    ? 'bg-foreground text-background hover:bg-foreground/90' 
+                    : 'bg-primary text-primary-foreground hover:bg-primary/90'
+                }`}
+              >
+                {followLoading ? 'Loading...' : isFollowing ? 'Following' : 'Follow'}
+              </Button>
+              <Button
+                disabled={conversationLoading}
+                onClick={() => startConversation(profile.user_id)}
+                variant="outline"
+                className="flex-1 rounded-full py-4 text-sm font-bold border-2 hover:bg-muted"
+              >
+                <MessageCircle className="h-4 w-4 mr-2" />
+                Message
+              </Button>
+            </div>
           ) : null}
 
           {/* Dynamic Platform Buttons */}

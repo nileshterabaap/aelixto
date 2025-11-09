@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Discover from "./pages/Discover";
 import Notifications from "./pages/Notifications";
 import Messages from "./pages/Messages";
+import Conversation from "./pages/Conversation";
 import Profile from "./pages/Profile";
 import UserProfile from "./pages/UserProfile";
 import PostDetail from "./pages/PostDetail";
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/discover" element={<Discover />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/messages" element={<Messages />} />
+          <Route path="/conversation/:conversationId" element={<Conversation />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/u/:username" element={<UserProfile />} />
           <Route path="/post/:postId" element={<PostDetail />} />
