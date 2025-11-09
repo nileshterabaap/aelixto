@@ -38,7 +38,7 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
     enabled: !!userId,
   });
 
-  // Toggle like
+  // Toggle like with optimistic update
   const likeMutation = useMutation({
     mutationFn: async () => {
       if (!userId) throw new Error("Not authenticated");
@@ -53,13 +53,31 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
         await supabase.from("likes").insert({ post_id: postId, user_id: userId });
       }
     },
+    onMutate: async () => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["like", postId, userId] });
+      
+      // Snapshot previous value
+      const previousLike = queryClient.getQueryData(["like", postId, userId]);
+      
+      // Optimistically update
+      queryClient.setQueryData(["like", postId, userId], !isLiked);
+      
+      return { previousLike };
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousLike !== undefined) {
+        queryClient.setQueryData(["like", postId, userId], context.previousLike);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["like", postId, userId] });
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
   });
 
-  // Toggle save
+  // Toggle save with optimistic update
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!userId) throw new Error("Not authenticated");
@@ -76,9 +94,28 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
         toast({ title: "Post saved!", description: "Added to your saved collection" });
       }
     },
+    onMutate: async () => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["save", postId, userId] });
+      
+      // Snapshot previous value
+      const previousSave = queryClient.getQueryData(["save", postId, userId]);
+      
+      // Optimistically update
+      queryClient.setQueryData(["save", postId, userId], !isSaved);
+      
+      return { previousSave };
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousSave !== undefined) {
+        queryClient.setQueryData(["save", postId, userId], context.previousSave);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["save", postId, userId] });
       queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ["saved-posts"] });
     },
   });
 

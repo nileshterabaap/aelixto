@@ -37,9 +37,28 @@ export const useRepost = (postId: string, userId: string | undefined) => {
         toast({ title: "Reposted!", description: "Added to your profile" });
       }
     },
+    onMutate: async () => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ["repost", postId, userId] });
+      
+      // Snapshot previous value
+      const previousRepost = queryClient.getQueryData(["repost", postId, userId]);
+      
+      // Optimistically update
+      queryClient.setQueryData(["repost", postId, userId], !isReposted);
+      
+      return { previousRepost };
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousRepost !== undefined) {
+        queryClient.setQueryData(["repost", postId, userId], context.previousRepost);
+      }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["repost", postId, userId] });
       queryClient.invalidateQueries({ queryKey: ["posts"] });
+      queryClient.invalidateQueries({ queryKey: ["platform-posts"] });
     },
   });
 

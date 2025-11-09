@@ -436,9 +436,11 @@ export type Database = {
           embed_html: string
           id: string
           is_public: boolean
+          is_repost: boolean
           likes_count: number
           media_type: string
           media_url: string
+          original_user_id: string
           platform: string
           saves_count: number
           thumbnail_url: string

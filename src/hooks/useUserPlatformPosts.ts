@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface PlatformPost {
@@ -15,65 +15,31 @@ export interface PlatformPost {
   thumbnail_url: string | null;
   title: string | null;
   is_public: boolean;
+  is_repost: boolean;
+  original_user_id: string | null;
 }
 
 export const useUserPlatformPosts = (
   userId: string | undefined,
   platform: string | undefined
 ) => {
-  const [items, setItems] = useState<PlatformPost[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-  const [hasMore, setHasMore] = useState(true);
+  const { data: items = [], isLoading: loading } = useQuery({
+    queryKey: ["platform-posts", userId, platform],
+    queryFn: async () => {
+      if (!userId || !platform) return [];
 
-  useEffect(() => {
-    if (!userId || !platform) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    fetchPosts();
-  }, [userId, platform]);
-
-  const fetchPosts = async (cursor?: string) => {
-    if (!userId || !platform) return;
-
-    try {
       const { data, error } = await supabase.rpc("get_user_platform_posts", {
         target_user: userId,
         platform_name: platform,
-        limit_count: 20,
-        cursor: cursor || null,
+        limit_count: 50,
+        cursor: null,
       });
 
       if (error) throw error;
+      return (data || []) as PlatformPost[];
+    },
+    enabled: !!userId && !!platform,
+  });
 
-      const posts = (data || []) as PlatformPost[];
-      
-      if (cursor) {
-        setItems((prev) => [...prev, ...posts]);
-      } else {
-        setItems(posts);
-      }
-
-      setHasMore(posts.length === 20);
-    } catch (err) {
-      setError(err as Error);
-      console.error("Error fetching platform posts:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadMore = () => {
-    if (items.length > 0 && hasMore) {
-      const lastItem = items[items.length - 1];
-      fetchPosts(lastItem.created_at);
-    }
-  };
-
-  return { items, loading, error, hasMore, loadMore };
+  return { items, loading, error: null, hasMore: false, loadMore: () => {} };
 };
