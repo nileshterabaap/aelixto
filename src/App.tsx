@@ -14,6 +14,7 @@ import PostDetail from "./pages/PostDetail";
 import Settings from "./pages/Settings";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import SavedPosts from "./pages/SavedPosts";
 
 const queryClient = new QueryClient();
 
@@ -33,6 +34,7 @@ const App = () => (
           <Route path="/u/:username" element={<UserProfile />} />
           <Route path="/post/:postId" element={<PostDetail />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/saved" element={<SavedPosts />} />
           <Route path="/auth" element={<Auth />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

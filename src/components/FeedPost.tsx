@@ -10,6 +10,7 @@ import {
 import type { Post } from "@/data/demoData";
 import { useState } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
+import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
 import instagramIcon from "@/assets/platforms/instagram.svg";
@@ -171,7 +172,12 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         isDeleting: false 
       };
 
+  const repostActions = post.isRealPost && userId
+    ? useRepost(post.id, userId)
+    : { isReposted: false, toggleRepost: () => {}, isReposting: false };
+
   const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost, isDeleting } = postActions;
+  const { isReposted, toggleRepost } = repostActions;
 
   // Quora preview is fully isolated and optional.
   // If the flag is OFF, nothing changes.
@@ -252,8 +258,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             >
               <MessageCircle className="h-7 w-7 stroke-[1.5] fill-none" />
             </button>
-            <button className="p-2 hover:opacity-60 transition-opacity">
-              <Repeat2 className="h-8 w-8 stroke-[2.5]" />
+            <button 
+              onClick={() => toggleRepost()}
+              className="p-2 hover:opacity-60 transition-opacity"
+            >
+              <Repeat2 className={`h-8 w-8 stroke-[2.5] ${isReposted ? 'text-green-500' : ''}`} />
             </button>
             <button 
               onClick={handleShare}
@@ -426,8 +435,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           >
             <MessageCircle className="h-7 w-7 stroke-[1.5] fill-none" />
           </button>
-          <button className="p-2 hover:opacity-60 transition-opacity">
-            <Repeat2 className="h-8 w-8 stroke-[2.5]" />
+          <button 
+            onClick={() => toggleRepost()}
+            className="p-2 hover:opacity-60 transition-opacity"
+          >
+            <Repeat2 className={`h-8 w-8 stroke-[2.5] ${isReposted ? 'text-green-500' : ''}`} />
           </button>
           <button 
             onClick={handleShare}

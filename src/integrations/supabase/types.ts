@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      comments: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          post_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          post_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_participants: {
         Row: {
           conversation_id: string
@@ -190,6 +225,7 @@ export type Database = {
       }
       posts: {
         Row: {
+          comments_count: number | null
           content: string
           created_at: string
           embed_html: string | null
@@ -199,12 +235,14 @@ export type Database = {
           media_type: string | null
           media_url: string | null
           platform: string | null
+          reposts_count: number | null
           saves_count: number | null
           thumbnail_url: string | null
           title: string | null
           user_id: string
         }
         Insert: {
+          comments_count?: number | null
           content: string
           created_at?: string
           embed_html?: string | null
@@ -214,12 +252,14 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           platform?: string | null
+          reposts_count?: number | null
           saves_count?: number | null
           thumbnail_url?: string | null
           title?: string | null
           user_id: string
         }
         Update: {
+          comments_count?: number | null
           content?: string
           created_at?: string
           embed_html?: string | null
@@ -229,6 +269,7 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           platform?: string | null
+          reposts_count?: number | null
           saves_count?: number | null
           thumbnail_url?: string | null
           title?: string | null
@@ -288,6 +329,35 @@ export type Database = {
           username?: string
         }
         Relationships: []
+      }
+      reposts: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reposts_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saves: {
         Row: {
