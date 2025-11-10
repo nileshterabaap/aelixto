@@ -9,15 +9,15 @@ import { useEffect, useState } from "react";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 
 export default function SavedPosts() {
-  const { session } = useSession();
+  const { session, loading } = useSession();
   const navigate = useNavigate();
   const [createPostOpen, setCreatePostOpen] = useState(false);
 
   useEffect(() => {
-    if (!session) {
+    if (!loading && !session) {
       navigate("/auth");
     }
-  }, [session, navigate]);
+  }, [session, loading, navigate]);
 
   const { data: savedPosts = [], isLoading } = useQuery({
     queryKey: ["saved-posts", session?.user?.id],
@@ -89,10 +89,10 @@ export default function SavedPosts() {
     enabled: !!session?.user?.id,
   });
 
-  if (isLoading) {
+  if (loading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Loading saved posts...</p>
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
