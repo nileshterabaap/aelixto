@@ -132,14 +132,9 @@ span[data-pin-href] button {
   max-width: 100%;
 }
 
-/* Instagram embed styles */
-.embed-container .instagram-media,
-.embed-container iframe[src*="instagram.com"] {
-  min-width: 100% !important;
-  max-width: 100% !important;
-  width: 100% !important;
+/* Instagram embed styles - let Instagram handle its own sizing */
+.embed-container .instagram-media {
   margin: 0 auto !important;
-  border-radius: 1rem !important;
 }
 
 /* Facebook embed styles */
