@@ -13,6 +13,7 @@ import { useSession } from "@/hooks/useSession";
 import { ImageUploadButton } from "@/components/ImageUploadButton";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ const Settings = () => {
     avatar_url: '',
     cover_url: '',
   });
+  const [aelixScoreEnabled, setAelixScoreEnabled] = useState(true);
 
   // Check ownership and redirect if not owner
   useEffect(() => {
@@ -45,6 +47,9 @@ const Settings = () => {
         avatar_url: profile.avatar_url || '',
         cover_url: profile.cover_url || '',
       });
+      // Load Aelix Score preference from settings
+      const settings = profile.settings as any;
+      setAelixScoreEnabled(settings?.aelix_score_enabled !== false);
     }
   }, [profile]);
 
@@ -66,7 +71,12 @@ const Settings = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await upsertProfile(formData);
+    await upsertProfile({
+      ...formData,
+      settings: {
+        aelix_score_enabled: aelixScoreEnabled,
+      },
+    });
   };
 
   if (!user) {
@@ -178,6 +188,22 @@ const Settings = () => {
             >
               Upload Cover Image
             </ImageUploadButton>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="aelix-score">Aelix Score</Label>
+                <p className="text-sm text-muted-foreground">
+                  Display your Aelix Score on your profile
+                </p>
+              </div>
+              <Switch
+                id="aelix-score"
+                checked={aelixScoreEnabled}
+                onCheckedChange={setAelixScoreEnabled}
+              />
+            </div>
           </div>
 
           <Button type="submit" className="w-full">

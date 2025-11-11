@@ -174,12 +174,14 @@ const UserProfile = () => {
           </div>
 
           {/* Aelix Score */}
-          <div className="flex justify-center mt-4 mb-4">
-            <div className="border-2 border-foreground rounded-[16px] px-10 py-2">
-              <div className="text-2xl font-bold text-center leading-none mb-0.5">{profile.aelix_score.toLocaleString()}</div>
-              <div className="text-[9px] font-bold text-center tracking-[0.15em] uppercase">Aelix Score</div>
+          {((profile.settings as any)?.aelix_score_enabled !== false) && (
+            <div className="flex justify-center mt-4 mb-4">
+              <div className="border-2 border-foreground rounded-[16px] px-10 py-2">
+                <div className="text-2xl font-bold text-center leading-none mb-0.5">{profile.aelix_score.toLocaleString()}</div>
+                <div className="text-[9px] font-bold text-center tracking-[0.15em] uppercase">Aelix Score</div>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Bio */}
           {profile.bio && (
