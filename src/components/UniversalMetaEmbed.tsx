@@ -38,7 +38,7 @@ const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 're
 
 // Build Instagram embed HTML
 const buildInstagramEmbed = (url: string): string => {
-  return `<blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="${url}" data-instgrm-version="14" style="min-width:326px;max-width:540px;width:calc(100% - 2px);"></blockquote>`;
+  return `<blockquote class="instagram-media" data-instgrm-permalink="${url}" data-instgrm-version="14"></blockquote>`;
 };
 
 // Build Facebook embed HTML (post or video)
