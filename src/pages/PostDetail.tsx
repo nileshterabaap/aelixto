@@ -32,8 +32,15 @@ const PostDetail = () => {
   const navigate = useNavigate();
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | undefined>();
 
   useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUserId(user?.id);
+    };
+    getUser();
+    
     if (postId) {
       fetchPost();
     }
@@ -122,7 +129,7 @@ const PostDetail = () => {
       </div>
 
       <main className="mx-auto max-w-2xl px-4 py-6">
-        <FeedPost post={post} />
+        <FeedPost post={post} userId={userId} />
       </main>
     </div>
   );

@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   try {
     // Origin validation
     const origin = req.headers.get('origin') || '';
-    const allowedOrigins = ['aelixto.com', '.lovable.dev', 'localhost'];
+    const allowedOrigins = ['aelixto.com', '.lovable.dev', '.lovable.app', 'localhost'];
     const isAllowed = allowedOrigins.some(domain => 
       origin.includes(domain) || origin.includes('localhost')
     );
