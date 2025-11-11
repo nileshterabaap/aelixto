@@ -163,6 +163,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
       isRealPost: post.isRealPost,
       postId: post.id 
     });
+    alert(`🎬 Video clicked! isRealPost=${post.isRealPost}, platform=${post.platform}`);
     
     if (post.mediaType === 'video' && post.platform === 'youtube' && post.mediaUrl) {
       // Track video play event before starting playback

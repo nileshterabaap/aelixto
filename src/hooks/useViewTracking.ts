@@ -16,6 +16,7 @@ interface TrackViewParams {
 export async function trackView({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
   try {
     console.log('[trackView] Starting track:', { postId, eventType, durationMs });
+    alert(`🎯 Tracking ${eventType} for post ${postId.substring(0, 8)}...`);
     
     // Get current user (may be null for anonymous)
     const { data: { user } } = await supabase.auth.getUser();
