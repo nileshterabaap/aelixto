@@ -157,9 +157,17 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   };
 
   const handleVideoClick = async () => {
+    console.log('[FeedPost] handleVideoClick', { 
+      mediaType: post.mediaType, 
+      platform: post.platform, 
+      isRealPost: post.isRealPost,
+      postId: post.id 
+    });
+    
     if (post.mediaType === 'video' && post.platform === 'youtube' && post.mediaUrl) {
       // Track video play event before starting playback
       if (post.isRealPost) {
+        console.log('[FeedPost] Tracking video play for post:', post.id);
         await trackVideoPlay(post.id);
       }
       setIsPlayingVideo(true);
