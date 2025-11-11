@@ -14,12 +14,18 @@ import { ImageUploadButton } from "@/components/ImageUploadButton";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 
 const Settings = () => {
   const navigate = useNavigate();
   const { user } = useSession();
   const { profile, loading, upsertProfile } = useCurrentProfile();
   const { uploadImage, uploading } = useImageUpload();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
@@ -204,6 +210,53 @@ const Settings = () => {
                 onCheckedChange={setAelixScoreEnabled}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Reset Aelix Score</Label>
+            <p className="text-sm text-muted-foreground mb-2">
+              Reset your Aelix Score back to 0. This action cannot be undone.
+            </p>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" type="button" className="w-full">
+                  Reset Aelix Score
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will reset your Aelix Score to 0. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={async () => {
+                    const { error } = await supabase
+                      .from('profiles')
+                      .update({ aelix_score: 0 })
+                      .eq('user_id', user?.id);
+                    
+                    if (error) {
+                      toast({
+                        title: "Error",
+                        description: "Failed to reset Aelix Score",
+                        variant: "destructive",
+                      });
+                    } else {
+                      toast({
+                        title: "Success",
+                        description: "Aelix Score has been reset to 0",
+                      });
+                      queryClient.invalidateQueries({ queryKey: ['profile'] });
+                    }
+                  }}>
+                    Reset Score
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
 
           <Button type="submit" className="w-full">
