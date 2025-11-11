@@ -48,11 +48,9 @@ const buildFacebookEmbed = (url: string): string => {
   try {
     const urlObj = new URL(url);
     
-    // For reels and videos, keep only the base path without query params
-    if (url.includes('/reel/') || url.includes('/videos/') || url.includes('/watch/')) {
-      cleanUrl = `${urlObj.origin}${urlObj.pathname}`;
-      console.log('[UniversalMetaEmbed] Cleaned video/reel URL from', url, 'to', cleanUrl);
-    }
+    // Remove all query parameters for cleaner embedding
+    cleanUrl = `${urlObj.origin}${urlObj.pathname}`;
+    console.log('[UniversalMetaEmbed] Cleaned Facebook URL from', url, 'to', cleanUrl);
   } catch (e) {
     console.error('[UniversalMetaEmbed] Failed to parse URL:', e);
   }
@@ -61,10 +59,11 @@ const buildFacebookEmbed = (url: string): string => {
   const isVideo = cleanUrl.includes('/videos/') || cleanUrl.includes('/watch/') || cleanUrl.includes('/reel/');
   console.log('[UniversalMetaEmbed] Building Facebook embed - isVideo:', isVideo, 'URL:', cleanUrl);
   
+  // Use specific width and enable lazy loading for better performance
   if (isVideo) {
-    return `<div class="fb-video" data-href="${cleanUrl}" data-width="auto" data-show-text="true"></div>`;
+    return `<div class="fb-video" data-href="${cleanUrl}" data-width="500" data-show-text="true" data-lazy="true"></div>`;
   }
-  return `<div class="fb-post" data-href="${cleanUrl}" data-width="auto" data-show-text="true"></div>`;
+  return `<div class="fb-post" data-href="${cleanUrl}" data-width="500" data-show-text="true" data-lazy="true"></div>`;
 };
 
 // Build Spotify embed HTML
