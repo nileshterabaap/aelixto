@@ -165,6 +165,12 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
       setIsPlayingVideo(true);
     }
   };
+
+  const handleNonYouTubeVideoPlay = async () => {
+    if (post.isRealPost) {
+      await trackVideoPlay(post.id);
+    }
+  };
   
   // Only use post actions for real posts
   const postActions = post.isRealPost && userId 
@@ -456,7 +462,13 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'video' && post.platform !== 'youtube' && (
               <div className="rounded-2xl overflow-hidden">
-                <video src={r.url} className="w-full h-auto" controls playsInline />
+                <video 
+                  src={r.url} 
+                  className="w-full h-auto" 
+                  controls 
+                  playsInline
+                  onPlay={handleNonYouTubeVideoPlay}
+                />
               </div>
             )}
           </div>
