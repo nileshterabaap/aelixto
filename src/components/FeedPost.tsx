@@ -157,18 +157,9 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   };
 
   const handleVideoClick = async () => {
-    console.log('[FeedPost] handleVideoClick', { 
-      mediaType: post.mediaType, 
-      platform: post.platform, 
-      isRealPost: post.isRealPost,
-      postId: post.id 
-    });
-    alert(`🎬 Video clicked! isRealPost=${post.isRealPost}, platform=${post.platform}`);
-    
     if (post.mediaType === 'video' && post.platform === 'youtube' && post.mediaUrl) {
       // Track video play event before starting playback
       if (post.isRealPost) {
-        console.log('[FeedPost] Tracking video play for post:', post.id);
         await trackVideoPlay(post.id);
       }
       setIsPlayingVideo(true);
@@ -374,12 +365,42 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {/* Single renderer based on resolver */}
         {embedEnabled && (
           <div className="mb-2">
-            {r.kind === 'raw' && <RawEmbedRenderer embedHtml={r.html} />}
-            {r.kind === 'reddit' && <RedditEmbed url={r.url} />}
-            {r.kind === 'twitter' && <TwitterEmbed url={r.url} />}
-            {r.kind === 'pinterest' && <PinterestEmbed url={r.url} />}
-            {r.kind === 'article' && <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />}
-            {r.kind === 'universal' && <UniversalMetaEmbed url={r.url} />}
+            {r.kind === 'raw' && post.isRealPost && (
+              <ImageViewTracker postId={post.id}>
+                <RawEmbedRenderer embedHtml={r.html} />
+              </ImageViewTracker>
+            )}
+            {r.kind === 'raw' && !post.isRealPost && <RawEmbedRenderer embedHtml={r.html} />}
+            {r.kind === 'reddit' && post.isRealPost && (
+              <ImageViewTracker postId={post.id}>
+                <RedditEmbed url={r.url} />
+              </ImageViewTracker>
+            )}
+            {r.kind === 'reddit' && !post.isRealPost && <RedditEmbed url={r.url} />}
+            {r.kind === 'twitter' && post.isRealPost && (
+              <ImageViewTracker postId={post.id}>
+                <TwitterEmbed url={r.url} />
+              </ImageViewTracker>
+            )}
+            {r.kind === 'twitter' && !post.isRealPost && <TwitterEmbed url={r.url} />}
+            {r.kind === 'pinterest' && post.isRealPost && (
+              <ImageViewTracker postId={post.id}>
+                <PinterestEmbed url={r.url} />
+              </ImageViewTracker>
+            )}
+            {r.kind === 'pinterest' && !post.isRealPost && <PinterestEmbed url={r.url} />}
+            {r.kind === 'article' && post.isRealPost && (
+              <ImageViewTracker postId={post.id}>
+                <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
+              </ImageViewTracker>
+            )}
+            {r.kind === 'article' && !post.isRealPost && <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />}
+            {r.kind === 'universal' && post.isRealPost && (
+              <ImageViewTracker postId={post.id}>
+                <UniversalMetaEmbed url={r.url} />
+              </ImageViewTracker>
+            )}
+            {r.kind === 'universal' && !post.isRealPost && <UniversalMetaEmbed url={r.url} />}
             {r.kind === 'image' && post.isRealPost && (
               <ImageViewTracker postId={post.id}>
                 <div className="rounded-2xl overflow-hidden">
