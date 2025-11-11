@@ -31,6 +31,8 @@ import { ArticleEmbed } from "@/features/article-embeds";
 import RedditEmbed from "@/components/embeds/RedditEmbed";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { QuoraPreviewCard } from "@/features/article-embeds/QuoraPreviewCard";
+import { useVideoPlayTracking } from "@/hooks/useViewTracking";
+import { ImageViewTracker } from "@/components/ImageViewTracker";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean };
@@ -92,6 +94,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [blogFavicon, setBlogFavicon] = useState<string | null>(null);
+  const trackVideoPlay = useVideoPlayTracking();
   
   // Try to get platform from post.platform or detect from URL
   const detectedPlatform = post.platform || detectPlatformFromUrl(post.mediaUrl);
@@ -153,8 +156,12 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
     return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : url;
   };
 
-  const handleVideoClick = () => {
+  const handleVideoClick = async () => {
     if (post.mediaType === 'video' && post.platform === 'youtube' && post.mediaUrl) {
+      // Track video play event before starting playback
+      if (post.isRealPost) {
+        await trackVideoPlay(post.id);
+      }
       setIsPlayingVideo(true);
     }
   };
@@ -364,7 +371,18 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             {r.kind === 'pinterest' && <PinterestEmbed url={r.url} />}
             {r.kind === 'article' && <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />}
             {r.kind === 'universal' && <UniversalMetaEmbed url={r.url} />}
-            {r.kind === 'image' && (
+            {r.kind === 'image' && post.isRealPost && (
+              <ImageViewTracker postId={post.id}>
+                <div className="rounded-2xl overflow-hidden">
+                  <img 
+                    src={r.url} 
+                    alt="Post content" 
+                    className="w-full h-auto object-cover aspect-video" 
+                  />
+                </div>
+              </ImageViewTracker>
+            )}
+            {r.kind === 'image' && !post.isRealPost && (
               <div className="rounded-2xl overflow-hidden">
                 <img 
                   src={r.url} 

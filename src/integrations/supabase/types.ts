@@ -223,6 +223,53 @@ export type Database = {
           },
         ]
       }
+      post_views: {
+        Row: {
+          author_id: string
+          created_at: string
+          device_hash: string | null
+          duration_ms: number
+          event_type: string
+          hour_bucket: string
+          id: number
+          ip_hash: string | null
+          post_id: string
+          viewer_id: string | null
+        }
+        Insert: {
+          author_id: string
+          created_at?: string
+          device_hash?: string | null
+          duration_ms?: number
+          event_type: string
+          hour_bucket?: string
+          id?: number
+          ip_hash?: string | null
+          post_id: string
+          viewer_id?: string | null
+        }
+        Update: {
+          author_id?: string
+          created_at?: string
+          device_hash?: string | null
+          duration_ms?: number
+          event_type?: string
+          hour_bucket?: string
+          id?: number
+          ip_hash?: string | null
+          post_id?: string
+          viewer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_views_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       posts: {
         Row: {
           comments_count: number | null
