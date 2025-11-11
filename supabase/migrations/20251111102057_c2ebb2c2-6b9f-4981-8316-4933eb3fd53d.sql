@@ -1,0 +1,100 @@
+-- Update get_following_feed to include repost information
+DROP FUNCTION IF EXISTS public.get_following_feed(integer, timestamp with time zone);
+
+CREATE OR REPLACE FUNCTION public.get_following_feed(limit_count integer, cursor timestamp with time zone DEFAULT NULL::timestamp with time zone)
+ RETURNS TABLE(
+   id uuid,
+   user_id uuid,
+   content text,
+   created_at timestamp with time zone,
+   likes_count integer,
+   saves_count integer,
+   media_type text,
+   media_url text,
+   platform text,
+   embed_html text,
+   thumbnail_url text,
+   title text,
+   is_public boolean,
+   profile_id uuid,
+   profile_username text,
+   profile_display_name text,
+   profile_avatar_url text,
+   is_repost boolean,
+   reposted_by_user_id uuid,
+   reposted_by_username text,
+   reposted_at timestamp with time zone
+ )
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+  WITH following_posts AS (
+    SELECT 
+      p.id,
+      p.user_id,
+      p.content,
+      p.created_at,
+      p.likes_count,
+      p.saves_count,
+      p.media_type,
+      p.media_url,
+      p.platform,
+      p.embed_html,
+      p.thumbnail_url,
+      p.title,
+      p.is_public,
+      pr.id as profile_id,
+      pr.username as profile_username,
+      pr.display_name as profile_display_name,
+      pr.avatar_url as profile_avatar_url,
+      false as is_repost,
+      NULL::uuid as reposted_by_user_id,
+      NULL::text as reposted_by_username,
+      p.created_at as sort_time
+    FROM posts p
+    LEFT JOIN profiles pr ON pr.user_id = p.user_id
+    WHERE p.is_public = true
+      AND p.user_id IN (
+        SELECT following_id FROM follows WHERE follower_id = auth.uid()
+      )
+      AND (cursor IS NULL OR p.created_at < cursor)
+    
+    UNION ALL
+    
+    SELECT 
+      p.id,
+      p.user_id,
+      p.content,
+      p.created_at,
+      p.likes_count,
+      p.saves_count,
+      p.media_type,
+      p.media_url,
+      p.platform,
+      p.embed_html,
+      p.thumbnail_url,
+      p.title,
+      p.is_public,
+      pr.id as profile_id,
+      pr.username as profile_username,
+      pr.display_name as profile_display_name,
+      pr.avatar_url as profile_avatar_url,
+      true as is_repost,
+      r.user_id as reposted_by_user_id,
+      pr_reposter.username as reposted_by_username,
+      r.created_at as sort_time
+    FROM reposts r
+    INNER JOIN posts p ON p.id = r.post_id
+    LEFT JOIN profiles pr ON pr.user_id = p.user_id
+    LEFT JOIN profiles pr_reposter ON pr_reposter.user_id = r.user_id
+    WHERE p.is_public = true
+      AND r.user_id IN (
+        SELECT following_id FROM follows WHERE follower_id = auth.uid()
+      )
+      AND (cursor IS NULL OR r.created_at < cursor)
+  )
+  SELECT * FROM following_posts
+  ORDER BY sort_time DESC
+  LIMIT GREATEST(1, LEAST(limit_count, 50));
+$function$;

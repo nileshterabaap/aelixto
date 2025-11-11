@@ -449,6 +449,7 @@ export type Database = {
           embed_html: string
           id: string
           is_public: boolean
+          is_repost: boolean
           likes_count: number
           media_type: string
           media_url: string
@@ -457,6 +458,9 @@ export type Database = {
           profile_display_name: string
           profile_id: string
           profile_username: string
+          reposted_at: string
+          reposted_by_user_id: string
+          reposted_by_username: string
           saves_count: number
           thumbnail_url: string
           title: string

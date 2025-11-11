@@ -71,6 +71,8 @@ const Index = () => {
     timestamp: new Date(post.created_at),
     saves: post.saves_count,
     isRealPost: true,
+    isRepost: post.is_repost,
+    repostedByUsername: post.reposted_by_username,
   })) : [];
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;

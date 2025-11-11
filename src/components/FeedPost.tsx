@@ -35,7 +35,7 @@ import { useVideoPlayTracking } from "@/hooks/useViewTracking";
 import { ImageViewTracker } from "@/components/ImageViewTracker";
 
 interface FeedPostProps {
-  post: Post & { isRealPost?: boolean };
+  post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
   userId?: string;
 }
 
@@ -309,6 +309,14 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
       <div className="p-5">
+        {/* Repost Indicator */}
+        {post.isRepost && post.repostedByUsername && (
+          <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
+            <Repeat2 className="w-4 h-4" />
+            <span>Reposted by <span className="font-semibold text-foreground">@{post.repostedByUsername}</span></span>
+          </div>
+        )}
+        
         {/* Author Info */}
         <div className="flex items-center gap-3 mb-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-full overflow-hidden bg-muted">

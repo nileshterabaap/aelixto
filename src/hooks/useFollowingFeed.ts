@@ -15,6 +15,9 @@ interface FeedPost {
   thumbnail_url: string | null;
   title: string | null;
   is_public: boolean;
+  is_repost?: boolean;
+  reposted_by_user_id?: string | null;
+  reposted_by_username?: string | null;
   profiles?: {
     username: string;
     display_name: string | null;
@@ -93,6 +96,9 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
         thumbnail_url: item.thumbnail_url,
         title: item.title,
         is_public: item.is_public,
+        is_repost: item.is_repost,
+        reposted_by_user_id: item.reposted_by_user_id,
+        reposted_by_username: item.reposted_by_username,
         profiles: {
           username: item.profile_username,
           display_name: item.profile_display_name,
