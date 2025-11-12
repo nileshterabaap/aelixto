@@ -14,6 +14,16 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
   const [imageError, setImageError] = useState(false);
   const rawThumb = getPostThumb(post);
   const src = imageError ? "/placeholder.svg" : maybeProxy(rawThumb, 480);
+  
+  // Debug logging
+  if (post.platform === "instagram" && post.thumbnail_url) {
+    console.log("Instagram thumb:", {
+      original: post.thumbnail_url.substring(0, 100),
+      decoded: rawThumb.substring(0, 100),
+      final: src.substring(0, 100)
+    });
+  }
+  
   const cleanTitle = decodeHtml(post.content || post.title || "Post");
 
   const getAspectRatio = () => {
@@ -35,6 +45,8 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
         onError={() => setImageError(true)}
         className="w-full h-full object-cover"
         loading="lazy"
+        crossOrigin="anonymous"
+        referrerPolicy="no-referrer"
       />
 
       {/* Play button overlay for videos */}

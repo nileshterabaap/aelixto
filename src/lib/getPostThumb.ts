@@ -37,8 +37,27 @@ export function maybeProxy(url?: string | null, w = 480) {
   if (!url) return "/placeholder.svg";
   // Don't proxy local/relative paths
   if (url.startsWith("/")) return url;
-  try { new URL(url); } catch { return "/placeholder.svg"; }
-  // If an img proxy route exists in the app, use it. If not, just return the URL.
-  const hasProxy = true; // keep true only if /api/img-proxy is present; otherwise set false
+  
+  try { 
+    new URL(url); 
+  } catch { 
+    return "/placeholder.svg"; 
+  }
+  
+  // Don't proxy CDN URLs that work fine directly (Instagram, Facebook, YouTube, etc.)
+  const cdnDomains = [
+    'cdninstagram.com',
+    'fbcdn.net', 
+    'ytimg.com',
+    'googleusercontent.com',
+    'twimg.com'
+  ];
+  
+  if (cdnDomains.some(domain => url.includes(domain))) {
+    return url; // Use CDN URLs directly
+  }
+  
+  // For other external URLs, use proxy if available
+  const hasProxy = true;
   return hasProxy ? `/api/img-proxy?u=${encodeURIComponent(url)}&w=${w}` : url;
 }
