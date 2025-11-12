@@ -75,25 +75,7 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full bg-gradient-to-br from-muted/80 to-muted/40 flex flex-col items-center justify-center p-4 gap-2">
-            {post.platform && PLATFORM_ICONS[post.platform.toLowerCase()] && (
-              <img 
-                src={PLATFORM_ICONS[post.platform.toLowerCase()]} 
-                alt={post.platform}
-                className="w-12 h-12 opacity-40"
-              />
-            )}
-            {post.title && (
-              <p className="text-xs text-muted-foreground px-2 text-center line-clamp-3">
-                {post.title}
-              </p>
-            )}
-            {!post.title && post.platform && (
-              <p className="text-xs text-muted-foreground px-2 text-center">
-                {post.platform.charAt(0).toUpperCase() + post.platform.slice(1)} Post
-              </p>
-            )}
-          </div>
+          <div className="w-full h-full bg-gradient-to-br from-muted/80 to-muted/40" />
         )}
       </div>
 
