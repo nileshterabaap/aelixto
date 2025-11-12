@@ -87,8 +87,6 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
           </div>
         </div>
       )}
-
-      <PlatformBadge platform={post.platform} />
     </button>
   );
 }

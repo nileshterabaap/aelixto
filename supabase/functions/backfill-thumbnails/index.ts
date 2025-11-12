@@ -51,43 +51,16 @@ Deno.serve(async (req) => {
         }
       }
       
-      // 2) Instagram - always use oEmbed API (don't rely on media_url)
-      else if (post.platform === 'instagram' && post.media_url) {
-        try {
-          const oembedUrl = `https://graph.facebook.com/v12.0/instagram_oembed?url=${encodeURIComponent(post.media_url)}&fields=thumbnail_url,author_name`;
-          console.log(`Fetching Instagram oEmbed for ${post.id}: ${oembedUrl}`);
-          const response = await fetch(oembedUrl);
-          
-          console.log(`Instagram oEmbed response status for ${post.id}: ${response.status}`);
-          
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`Instagram oEmbed data for ${post.id}:`, JSON.stringify(data));
-            
-            if (data.thumbnail_url) {
-              thumbnailUrl = data.thumbnail_url;
-            }
-            if (data.author_name && !post.title) {
-              titleToSave = data.author_name;
-            }
-          } else {
-            const errorText = await response.text();
-            console.log(`Instagram oEmbed error for ${post.id}: ${errorText}`);
-          }
-        } catch (err) {
-          console.log(`Failed to fetch Instagram oEmbed for post ${post.id}:`, err);
-        }
-      }
-      
-      // 3) Image type with direct image URL - use media_url
+      // 2) For images/videos with media_url that's a direct image
       else if (post.media_type === 'image' && post.media_url && 
                !post.media_url.includes('instagram.com') &&
                !post.media_url.includes('facebook.com')) {
         thumbnailUrl = post.media_url;
       }
       
-      // 4) Other social platforms - use fetch-og
+      // 3) Social platforms (including Instagram) - use fetch-og
       else if (post.media_url && (
+        post.platform === 'instagram' ||
         post.platform === 'reddit' ||
         post.platform === 'twitter' ||
         post.platform === 'x' ||
