@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.record-view]
 verify_jwt = false
+
+[functions.fetch-post-preview]
+verify_jwt = false
+
+[functions.img-proxy]
+verify_jwt = false

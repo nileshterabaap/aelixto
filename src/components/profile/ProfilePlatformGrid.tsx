@@ -1,53 +1,35 @@
 import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { getPostThumbnail } from "@/lib/thumbnails";
-import instagramIcon from "@/assets/platforms/instagram.svg";
-import youtubeIcon from "@/assets/platforms/youtube.svg";
-import redditIcon from "@/assets/platforms/reddit.svg";
-import xIcon from "@/assets/platforms/x.svg";
-import pinterestIcon from "@/assets/platforms/pinterest.svg";
-import tiktokIcon from "@/assets/platforms/tiktok.svg";
-import facebookIcon from "@/assets/platforms/facebook.svg";
-import quoraIcon from "@/assets/platforms/quora.svg";
-import spotifyIcon from "@/assets/platforms/spotify.svg";
-import mediumIcon from "@/assets/platforms/medium.svg";
-import blogIcon from "@/assets/platforms/blog.svg";
-
-const PLATFORM_ICONS: Record<string, string> = {
-  instagram: instagramIcon,
-  youtube: youtubeIcon,
-  reddit: redditIcon,
-  twitter: xIcon,
-  x: xIcon,
-  pinterest: pinterestIcon,
-  tiktok: tiktokIcon,
-  facebook: facebookIcon,
-  quora: quoraIcon,
-  spotify: spotifyIcon,
-  medium: mediumIcon,
-  blog: blogIcon,
-};
-
-function PlatformBadge({ platform }: { platform?: string | null }) {
-  const icon = platform ? PLATFORM_ICONS[platform.toLowerCase()] : undefined;
-  if (!icon) return null;
-  
-  return (
-    <div className="absolute top-2 right-2 z-10">
-      <img
-        src={icon}
-        alt={platform || ""}
-        className="w-8 h-8 rounded-full shadow-md ring-2 ring-white/70 object-cover"
-      />
-    </div>
-  );
-}
+import { supabase } from "@/integrations/supabase/client";
 
 function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }) {
   const [imageError, setImageError] = useState(false);
   const thumbnail = useMemo(() => getPostThumbnail(post), [post]);
+  
+  // Use image proxy for external URLs
+  const proxyUrl = useMemo(() => {
+    if (!thumbnail) return null;
+    // Skip proxy for Supabase storage URLs
+    if (thumbnail.includes('supabase.co') || thumbnail.startsWith('/')) {
+      return thumbnail;
+    }
+    // Use image proxy for external URLs
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    return `${supabaseUrl}/functions/v1/img-proxy?u=${encodeURIComponent(thumbnail)}&w=480`;
+  }, [thumbnail]);
+  
+  // Trigger thumbnail fetch if missing
+  useEffect(() => {
+    if (!thumbnail && post.media_url && post.platform) {
+      console.log(`[ProfilePlatformGrid] Triggering thumbnail fetch for post ${post.id}`);
+      supabase.functions.invoke('fetch-post-preview', {
+        body: { postId: post.id, url: post.media_url, platform: post.platform }
+      }).catch(err => console.error('[ProfilePlatformGrid] Failed to fetch thumbnail:', err));
+    }
+  }, [post.id, post.media_url, post.platform, thumbnail]);
 
   const getAspectRatio = () => {
     // Match Feed styling
@@ -63,12 +45,12 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
       className="relative rounded-3xl overflow-hidden bg-muted group transition-all shadow-sm hover:shadow-md"
     >
       <div className={`${getAspectRatio()} w-full bg-muted/60`}>
-        {thumbnail && !imageError ? (
+        {proxyUrl && !imageError ? (
           <img
-            src={thumbnail}
+            src={proxyUrl}
             alt={post.title || "Post"}
             onError={(e) => {
-              console.error("Image failed to load:", thumbnail);
+              console.error("Image failed to load:", proxyUrl);
               setImageError(true);
             }}
             className="w-full h-full object-cover"
@@ -80,7 +62,7 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
       </div>
 
       {/* Play button overlay for videos */}
-      {post.media_type === "video" && thumbnail && !imageError && (
+      {post.media_type === "video" && proxyUrl && !imageError && (
         <div className="absolute inset-0 grid place-items-center">
           <div className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm grid place-items-center">
             <div className="w-0 h-0 border-l-[14px] border-l-white border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent ml-1" />
