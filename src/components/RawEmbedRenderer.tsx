@@ -79,11 +79,42 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           console.log('[RawEmbedRenderer] Loading Instagram script...');
           await loadInstagramEmbed();
           
-          // Process Instagram embeds after script loads
-          if (window.instgrm?.Embeds?.process) {
-            console.log('[RawEmbedRenderer] Processing Instagram embed');
-            window.instgrm.Embeds.process();
-          }
+          // Wait a bit for DOM to be ready
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Process Instagram embeds after script loads with retry
+          const processWithRetry = async (attempts = 3) => {
+            for (let i = 0; i < attempts; i++) {
+              if (window.instgrm?.Embeds?.process) {
+                console.log(`[RawEmbedRenderer] Processing Instagram embed (attempt ${i + 1})`);
+                try {
+                  window.instgrm.Embeds.process();
+                  
+                  // Check if embed rendered successfully after a delay
+                  setTimeout(() => {
+                    if (containerRef.current) {
+                      const hasIframe = containerRef.current.querySelector('iframe');
+                      if (!hasIframe) {
+                        console.log('[RawEmbedRenderer] Instagram embed failed to render iframe, triggering fallback');
+                        setEmbedFailed(true);
+                        onError?.();
+                      }
+                    }
+                  }, 3000);
+                  break;
+                } catch (e) {
+                  console.error('[RawEmbedRenderer] Error processing Instagram embed:', e);
+                  if (i === attempts - 1) {
+                    setEmbedFailed(true);
+                    onError?.();
+                  }
+                }
+              }
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          };
+          
+          await processWithRetry();
         } else if (platform === 'facebook') {
           console.log('[RawEmbedRenderer] Loading Facebook SDK...');
           await loadFacebookSDK();

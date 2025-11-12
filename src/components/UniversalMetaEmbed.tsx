@@ -38,7 +38,8 @@ const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 're
 
 // Build Instagram embed HTML
 const buildInstagramEmbed = (url: string): string => {
-  return `<blockquote class="instagram-media" data-instgrm-permalink="${url}" data-instgrm-version="14"></blockquote>`;
+  // Use Instagram's recommended embed format with captioned attribute
+  return `<blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="${url}" data-instgrm-version="14" style="background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:540px; min-width:326px; padding:0; width:99.375%; width:-webkit-calc(100% - 2px); width:calc(100% - 2px);"><a href="${url}" style="background:#FFFFFF; line-height:0; padding:0 0; text-align:center; text-decoration:none; width:100%;" target="_blank"></a></blockquote>`;
 };
 
 // Build Facebook embed HTML (post or video)
