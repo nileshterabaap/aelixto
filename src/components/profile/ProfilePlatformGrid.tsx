@@ -4,10 +4,17 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 
+function decodeHtml(html: string) {
+  const txt = document.createElement("textarea");
+  txt.innerHTML = html;
+  return txt.value;
+}
+
 function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }) {
   const [imageError, setImageError] = useState(false);
   const rawThumb = getPostThumb(post);
   const src = maybeProxy(rawThumb, 480);
+  const cleanTitle = decodeHtml(post.content || post.title || "Post");
 
   const getAspectRatio = () => {
     // Match Feed styling
@@ -24,9 +31,9 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
     >
       <img
         src={src}
-        alt={post.title || "Post"}
+        alt={cleanTitle}
         onError={() => setImageError(true)}
-        className="w-full h-full object-cover"
+        className="w-full h-full object-cover bg-muted"
         loading="lazy"
       />
 
