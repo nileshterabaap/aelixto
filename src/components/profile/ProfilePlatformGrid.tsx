@@ -13,7 +13,7 @@ function decodeHtml(html: string) {
 function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }) {
   const [imageError, setImageError] = useState(false);
   const rawThumb = getPostThumb(post);
-  const src = maybeProxy(rawThumb, 480);
+  const src = imageError ? "/images/placeholder-thumb.png" : maybeProxy(rawThumb, 480);
   const cleanTitle = decodeHtml(post.content || post.title || "Post");
 
   const getAspectRatio = () => {
@@ -27,19 +27,19 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
   return (
     <button
       onClick={onClick}
-      className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} bg-muted`}
+      className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} bg-muted/50`}
     >
       <img
         src={src}
-        alt={cleanTitle}
+        alt=""
         onError={() => setImageError(true)}
-        className="w-full h-full object-cover bg-muted"
+        className="w-full h-full object-cover"
         loading="lazy"
       />
 
       {/* Play button overlay for videos */}
       {post.media_type === "video" && !imageError && (
-        <div className="absolute inset-0 grid place-items-center">
+        <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <div className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm grid place-items-center">
             <div className="w-0 h-0 border-l-[14px] border-l-white border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent ml-1" />
           </div>
