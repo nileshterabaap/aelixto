@@ -93,7 +93,11 @@ Deno.serve(async (req) => {
         post.platform === 'x' ||
         post.platform === 'facebook' ||
         post.platform === 'quora' ||
-        post.platform === 'medium'
+        post.platform === 'medium' ||
+        post.platform === 'linkedin' ||
+        post.platform === 'spotify' ||
+        post.platform === 'blog' ||
+        (!post.platform && post.media_type === 'none')
       )) {
         try {
           const { data: ogData } = await supabase.functions.invoke('fetch-og', {
