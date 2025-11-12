@@ -1,3 +1,9 @@
+function decodeHtmlEntities(text: string): string {
+  const txt = document.createElement("textarea");
+  txt.innerHTML = text;
+  return txt.value;
+}
+
 export function getPostThumb(p: {
   platform?: string | null;
   thumbnail_url?: string | null;   // server field
@@ -9,8 +15,8 @@ export function getPostThumb(p: {
   const tu = p.thumbnail_url || p.thumbnailUrl;
   const mu = p.media_url || p.mediaUrl;
 
-  // 1) server-derived thumbnail wins
-  if (tu) return tu;
+  // 1) server-derived thumbnail wins (decode HTML entities first)
+  if (tu) return decodeHtmlEntities(tu);
 
   // 2) platform-based derivations used in Feed
   if (platform === "youtube" && mu) {
