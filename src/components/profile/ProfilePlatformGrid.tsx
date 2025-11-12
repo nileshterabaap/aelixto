@@ -13,7 +13,7 @@ function decodeHtml(html: string) {
 function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }) {
   const [imageError, setImageError] = useState(false);
   const rawThumb = getPostThumb(post);
-  const src = imageError ? "/images/placeholder-thumb.png" : maybeProxy(rawThumb, 480);
+  const src = imageError ? "/placeholder.svg" : maybeProxy(rawThumb, 480);
   const cleanTitle = decodeHtml(post.content || post.title || "Post");
 
   const getAspectRatio = () => {

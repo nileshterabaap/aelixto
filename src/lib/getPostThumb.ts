@@ -23,13 +23,15 @@ export function getPostThumb(p: {
   if (mu && /\.(png|jpg|jpeg|webp|gif)(\?|$)/i.test(mu)) return mu;
 
   // 4) safe placeholder
-  return "/images/placeholder-thumb.png";
+  return "/placeholder.svg";
 }
 
 /** Optional proxy helper; if /api/img-proxy exists use it, else return original. */
 export function maybeProxy(url?: string | null, w = 480) {
-  if (!url) return "/images/placeholder-thumb.png";
-  try { new URL(url); } catch { return "/images/placeholder-thumb.png"; }
+  if (!url) return "/placeholder.svg";
+  // Don't proxy local/relative paths
+  if (url.startsWith("/")) return url;
+  try { new URL(url); } catch { return "/placeholder.svg"; }
   // If an img proxy route exists in the app, use it. If not, just return the URL.
   const hasProxy = true; // keep true only if /api/img-proxy is present; otherwise set false
   return hasProxy ? `/api/img-proxy?u=${encodeURIComponent(url)}&w=${w}` : url;
