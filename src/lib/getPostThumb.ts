@@ -44,13 +44,17 @@ export function maybeProxy(url?: string | null, w = 480) {
     return "/placeholder.svg"; 
   }
   
-  // Don't proxy CDN URLs that work fine directly (Instagram, Facebook, YouTube, etc.)
+  // Don't proxy CDN URLs that work fine directly
   const cdnDomains = [
     'cdninstagram.com',
     'fbcdn.net', 
     'ytimg.com',
     'googleusercontent.com',
-    'twimg.com'
+    'twimg.com',
+    'unsplash.com',
+    'pbs.twimg.com',
+    'i.redd.it',
+    'preview.redd.it'
   ];
   
   if (cdnDomains.some(domain => url.includes(domain))) {

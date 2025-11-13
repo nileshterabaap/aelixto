@@ -15,9 +15,9 @@ function PostCard({ post, onClick }: { post: PlatformPost; onClick: () => void }
   const rawThumb = getPostThumb(post);
   const src = imageError ? "/placeholder.svg" : maybeProxy(rawThumb, 480);
   
-  // Debug logging
-  if (post.platform === "instagram" && post.thumbnail_url) {
-    console.log("Instagram thumb:", {
+  // Debug logging for all platforms
+  if (post.thumbnail_url) {
+    console.log(`${post.platform} thumb:`, {
       original: post.thumbnail_url.substring(0, 100),
       decoded: rawThumb.substring(0, 100),
       final: src.substring(0, 100)
