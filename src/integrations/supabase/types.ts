@@ -282,6 +282,9 @@ export type Database = {
           media_type: string | null
           media_url: string | null
           platform: string | null
+          preview_image_url: string | null
+          preview_text: string | null
+          preview_title: string | null
           reposts_count: number | null
           saves_count: number | null
           thumbnail_url: string | null
@@ -299,6 +302,9 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           platform?: string | null
+          preview_image_url?: string | null
+          preview_text?: string | null
+          preview_title?: string | null
           reposts_count?: number | null
           saves_count?: number | null
           thumbnail_url?: string | null
@@ -316,6 +322,9 @@ export type Database = {
           media_type?: string | null
           media_url?: string | null
           platform?: string | null
+          preview_image_url?: string | null
+          preview_text?: string | null
+          preview_title?: string | null
           reposts_count?: number | null
           saves_count?: number | null
           thumbnail_url?: string | null
