@@ -8,10 +8,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
-import { useState } from "react";
+import { useState, memo } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
+import { LazyEmbed } from "@/components/LazyEmbed";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
 import instagramIcon from "@/assets/platforms/instagram.svg";
 import tiktokIcon from "@/assets/platforms/tiktok.svg";
@@ -380,11 +381,27 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {embedEnabled && (
           <div className="mb-2">
             {r.kind === 'raw' && post.isRealPost && (
-              <ImageViewTracker postId={post.id}>
-                <RawEmbedRenderer embedHtml={r.html} />
-              </ImageViewTracker>
+              <LazyEmbed
+                thumbnailUrl={(post as any).thumbnail_url}
+                previewTitle={(post as any).preview_title}
+                previewText={(post as any).preview_text}
+                platform={post.platform || undefined}
+                mediaUrl={post.mediaUrl}
+              >
+                <ImageViewTracker postId={post.id}>
+                  <RawEmbedRenderer embedHtml={r.html} />
+                </ImageViewTracker>
+              </LazyEmbed>
             )}
-            {r.kind === 'raw' && !post.isRealPost && <RawEmbedRenderer embedHtml={r.html} />}
+            {r.kind === 'raw' && !post.isRealPost && (
+              <LazyEmbed
+                thumbnailUrl={(post as any).thumbnail_url}
+                platform={post.platform || undefined}
+                mediaUrl={post.mediaUrl}
+              >
+                <RawEmbedRenderer embedHtml={r.html} />
+              </LazyEmbed>
+            )}
             {r.kind === 'reddit' && post.isRealPost && (
               <ImageViewTracker postId={post.id}>
                 <RedditEmbed url={r.url} />
@@ -436,37 +453,43 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               </div>
             )}
             {r.kind === 'video' && post.platform === 'youtube' && (
-              <div className={`rounded-2xl overflow-hidden bg-muted relative ${
-                isYouTubeShort(r.url) ? 'aspect-[9/16]' : 'aspect-[16/9]'
-              }`}>
-                {isPlayingVideo ? (
-                  <iframe
-                    className="w-full h-full"
-                    src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=1`}
-                    title="YouTube video player"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
-                ) : (
-                  <>
-                    <div className="absolute inset-0">
-                      <img 
-                        src={getYouTubeThumbnail(r.url)} 
+              <LazyEmbed
+                thumbnailUrl={getYouTubeThumbnail(r.url)}
+                platform="youtube"
+                mediaUrl={r.url}
+              >
+                <div className={`rounded-2xl overflow-hidden bg-muted relative ${
+                  isYouTubeShort(r.url) ? 'aspect-[9/16]' : 'aspect-[16/9]'
+                }`}>
+                  {isPlayingVideo ? (
+                    <iframe
+                      className="w-full h-full"
+                      src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=1`}
+                      title="YouTube video player"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <div 
+                      className="w-full h-full cursor-pointer group"
+                      onClick={handleVideoClick}
+                    >
+                      <img
+                        src={getYouTubeThumbnail(r.url)}
                         alt="Video thumbnail"
                         className="w-full h-full object-cover"
                       />
-                    </div>
-                    <button
-                      onClick={handleVideoClick}
-                      className="absolute inset-0 z-10 flex items-center justify-center cursor-pointer group"
-                    >
-                      <div className="h-20 w-20 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center group-hover:bg-black/70 transition-all">
-                        <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent ml-1"></div>
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                        <div className="bg-red-600 rounded-full p-4 group-hover:scale-110 transition-transform">
+                          <svg className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z"/>
+                          </svg>
+                        </div>
                       </div>
-                    </button>
-                  </>
-                )}
-              </div>
+                    </div>
+                  )}
+                </div>
+              </LazyEmbed>
             )}
             {r.kind === 'video' && post.platform !== 'youtube' && (
               <div className="rounded-2xl overflow-hidden">
@@ -534,3 +557,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
     </Card>
   );
 };
+
+// Memoize the component to prevent unnecessary re-renders
+export const MemoizedFeedPost = memo(FeedPost, (prevProps, nextProps) => {
+  return (
+    prevProps.post.id === nextProps.post.id &&
+    prevProps.userId === nextProps.userId
+  );
+});
