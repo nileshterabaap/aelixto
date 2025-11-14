@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
@@ -10,13 +10,11 @@ import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
-import { useVirtualizer } from '@tanstack/react-virtual';
 
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
-  const parentRef = useRef<HTMLDivElement>(null);
   
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
@@ -80,44 +78,11 @@ const Index = () => {
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
 
-  // Virtual scrolling for performance
-  const rowVirtualizer = useVirtualizer({
-    count: allPosts.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 600, // Estimated height of each post
-    overscan: 2 // Number of items to render outside visible area
-  });
-
   useEffect(() => {
     if (!sessionLoading && !user && !isDemoMode) {
       navigate("/auth");
     }
   }, [user, sessionLoading, isDemoMode, navigate]);
-
-  // Prefetch next posts when user stops scrolling
-  useEffect(() => {
-    if (showDemoFeed || !hasMore) return;
-    
-    let scrollTimeout: NodeJS.Timeout;
-    const handleScroll = () => {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        // If user is near bottom and has stopped scrolling, prefetch
-        if (parentRef.current) {
-          const { scrollTop, scrollHeight, clientHeight } = parentRef.current;
-          if (scrollHeight - scrollTop - clientHeight < 1000) {
-            loadMore();
-          }
-        }
-      }, 150);
-    };
-
-    parentRef.current?.addEventListener('scroll', handleScroll);
-    return () => {
-      clearTimeout(scrollTimeout);
-      parentRef.current?.removeEventListener('scroll', handleScroll);
-    };
-  }, [showDemoFeed, hasMore, loadMore]);
 
   const loading = showDemoFeed ? demoLoading : followingLoading;
 
@@ -141,10 +106,7 @@ const Index = () => {
     <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
-      <main 
-        ref={parentRef}
-        className="mx-auto max-w-2xl px-4 py-6 h-[calc(100vh-120px)] overflow-auto"
-      >
+      <main className="mx-auto max-w-2xl px-4 py-6">
         {!showDemoFeed && followingEmpty ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <h2 className="text-xl font-semibold">No posts yet</h2>
@@ -162,34 +124,10 @@ const Index = () => {
             </a>
           </div>
         ) : (
-          <div
-            style={{
-              height: `${rowVirtualizer.getTotalSize()}px`,
-              width: '100%',
-              position: 'relative',
-            }}
-          >
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const post = allPosts[virtualRow.index];
-              return (
-                <div
-                  key={post.id}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${virtualRow.start}px)`,
-                  }}
-                  className="pb-4"
-                >
-                  <FeedPost 
-                    post={post}
-                    userId={user?.id}
-                  />
-                </div>
-              );
-            })}
+          <div className="space-y-6">
+            {allPosts.map((post) => (
+              <FeedPost key={post.id} post={post} userId={user?.id} />
+            ))}
           </div>
         )}
       </main>
