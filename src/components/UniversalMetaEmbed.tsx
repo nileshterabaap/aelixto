@@ -116,7 +116,35 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
         setExpandedUrl(finalUrl);
 
-      // Step 2: Build embed HTML based on platform
+      // Step 2: Fetch OG data first to check availability
+      console.log('[UniversalMetaEmbed] Fetching OG data for availability check');
+      const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
+        body: { url: finalUrl }
+      });
+
+      if (!ogError && ogData) {
+        setFallbackData({
+          title: ogData.meta?.title || ogData.title,
+          image: ogData.meta?.image || ogData.image,
+          description: ogData.meta?.description || ogData.description
+        });
+        console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
+        
+        // Check if Facebook content requires login or is unavailable
+        const isFacebookBlocked = platform === 'facebook' && (
+          finalUrl.includes('facebook.com/login') ||
+          (ogData.title && ogData.title.includes('Log in to Facebook') && !ogData.image)
+        );
+        
+        if (isFacebookBlocked) {
+          console.log('[UniversalMetaEmbed] Facebook content blocked, showing fallback only');
+          setShowFallback(true);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      // Step 3: Build embed HTML based on platform (only if not blocked)
       if (platform === 'instagram') {
         const html = buildInstagramEmbed(finalUrl);
         setEmbedHtml(html);
@@ -130,21 +158,6 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Spotify embed');
       }
-
-        // Step 3: Fetch OG data for fallback
-        console.log('[UniversalMetaEmbed] Fetching OG data for fallback');
-        const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
-          body: { url: finalUrl }
-        });
-
-        if (!ogError && ogData) {
-          setFallbackData({
-            title: ogData.meta?.title || ogData.title,
-            image: ogData.meta?.image || ogData.image,
-            description: ogData.meta?.description || ogData.description
-          });
-          console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
-        }
 
       } catch (error) {
         console.error('[UniversalMetaEmbed] Error processing URL:', error);
