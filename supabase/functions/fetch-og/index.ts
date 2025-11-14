@@ -94,10 +94,20 @@ serve(async (req) => {
     const image = imageMatch ? imageMatch[1] : (imageFallback ? imageFallback[1] : (imageFallback2 ? imageFallback2[1] : null));
     const description = descriptionMatch ? descriptionMatch[1] : (descriptionFallback ? descriptionFallback[1] : (descriptionFallback2 ? descriptionFallback2[1] : null));
 
-    console.log('[fetch-og] Extracted OG data:', { title, image, description, finalUrl });
+    // Check if Facebook post is unavailable (redirects to login or missing content)
+    const isFacebookLogin = finalUrl.includes('facebook.com/login') || 
+                            (title && title.includes('Log in to Facebook') && !image);
+
+    console.log('[fetch-og] Extracted OG data:', { title, image, description, finalUrl, isFacebookLogin });
 
     return new Response(
-      JSON.stringify({ title, image, description, finalUrl }),
+      JSON.stringify({ 
+        title, 
+        image, 
+        description, 
+        finalUrl,
+        unavailable: isFacebookLogin
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
