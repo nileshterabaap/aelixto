@@ -144,13 +144,6 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
             description: ogData.meta?.description || ogData.description
           });
           console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
-          
-          // If Facebook post is unavailable, skip embed and show fallback
-          if (platform === 'facebook' && ogData.unavailable) {
-            console.log('[UniversalMetaEmbed] Facebook post unavailable, showing fallback');
-            setEmbedHtml(null);
-            setShowFallback(true);
-          }
         }
 
       } catch (error) {
