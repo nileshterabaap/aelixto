@@ -129,19 +129,6 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           description: ogData.meta?.description || ogData.description
         });
         console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
-        
-        // Check if Facebook content requires login or is unavailable
-        const isFacebookBlocked = platform === 'facebook' && (
-          finalUrl.includes('facebook.com/login') ||
-          (ogData.title && ogData.title.includes('Log in to Facebook') && !ogData.image)
-        );
-        
-        if (isFacebookBlocked) {
-          console.log('[UniversalMetaEmbed] Facebook content blocked, showing fallback only');
-          setShowFallback(true);
-          setIsLoading(false);
-          return;
-        }
       }
 
       // Step 3: Build embed HTML based on platform (only if not blocked)
