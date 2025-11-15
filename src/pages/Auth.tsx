@@ -101,12 +101,8 @@ const Auth = () => {
     }
   };
 
-  const handleMagicLink = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleForgotPassword = async (email: string) => {
     setLoading(true);
-
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("magic-email") as string;
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -124,7 +120,7 @@ const Auth = () => {
     } else {
       toast({
         title: "Check your email",
-        description: "We sent you a magic link to sign in!",
+        description: "We sent you a password reset link!",
       });
     }
 
@@ -157,9 +153,8 @@ const Auth = () => {
         </div>
 
         <Tabs defaultValue="signin" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="signin">Sign In</TabsTrigger>
-            <TabsTrigger value="magic">Magic Link</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
           </TabsList>
 
@@ -188,6 +183,27 @@ const Auth = () => {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
+
+              <Button
+                type="button"
+                variant="link"
+                className="w-full text-sm text-muted-foreground"
+                onClick={() => {
+                  const email = (document.getElementById('signin-email') as HTMLInputElement)?.value;
+                  if (email) {
+                    handleForgotPassword(email);
+                  } else {
+                    toast({
+                      title: "Email required",
+                      description: "Please enter your email address first.",
+                      variant: "destructive",
+                    });
+                  }
+                }}
+                disabled={loading}
+              >
+                Forgot password?
+              </Button>
               
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center">
@@ -207,29 +223,6 @@ const Auth = () => {
               >
                 Continue with Google
               </Button>
-            </form>
-          </TabsContent>
-
-          <TabsContent value="magic">
-            <form onSubmit={handleMagicLink} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="magic-email">Email</Label>
-                <Input
-                  id="magic-email"
-                  name="magic-email"
-                  type="email"
-                  placeholder="your@email.com"
-                  required
-                />
-              </div>
-              
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Sending..." : "Send Magic Link"}
-              </Button>
-
-              <p className="text-xs text-muted-foreground text-center">
-                We'll email you a magic link for a password-free sign in.
-              </p>
             </form>
           </TabsContent>
 
