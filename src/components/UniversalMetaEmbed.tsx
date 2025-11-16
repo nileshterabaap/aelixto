@@ -49,8 +49,21 @@ const buildFacebookEmbed = (url: string): string => {
   try {
     const urlObj = new URL(url);
     
-    // Remove all query parameters for cleaner embedding
-    cleanUrl = `${urlObj.origin}${urlObj.pathname}`;
+    // Only remove tracking/share query parameters, keep essential post identification params
+    const essentialParams = ['story_fbid', 'id', 'fbid', 'post_id', 'v'];
+    const params = new URLSearchParams(urlObj.search);
+    const cleanParams = new URLSearchParams();
+    
+    // Preserve essential parameters
+    essentialParams.forEach(param => {
+      const value = params.get(param);
+      if (value) {
+        cleanParams.set(param, value);
+      }
+    });
+    
+    const queryString = cleanParams.toString();
+    cleanUrl = `${urlObj.origin}${urlObj.pathname}${queryString ? '?' + queryString : ''}`;
     console.log('[UniversalMetaEmbed] Cleaned Facebook URL from', url, 'to', cleanUrl);
   } catch (e) {
     console.error('[UniversalMetaEmbed] Failed to parse URL:', e);
