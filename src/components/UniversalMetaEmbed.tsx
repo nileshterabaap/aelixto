@@ -99,6 +99,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   const [fallbackData, setFallbackData] = useState<{ title?: string; image?: string; description?: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedUrl, setExpandedUrl] = useState(url);
+  const [embedUrl, setEmbedUrl] = useState(url); // Separate URL for embedding
   const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
@@ -125,7 +126,19 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           if (!expandError && expandData?.finalUrl) {
             finalUrl = expandData.finalUrl;
             console.log('[UniversalMetaEmbed] Expanded to:', finalUrl);
+            
+            // If expanded URL is a login redirect, use original URL for embedding
+            if (finalUrl.includes('/login/') && platform === 'facebook') {
+              console.log('[UniversalMetaEmbed] Expanded URL is login redirect, using original for embed');
+              setEmbedUrl(url); // Use original share URL for embedding
+            } else {
+              setEmbedUrl(finalUrl);
+            }
+          } else {
+            setEmbedUrl(url);
           }
+        } else {
+          setEmbedUrl(url);
         }
 
         setExpandedUrl(finalUrl);
@@ -147,15 +160,15 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
       // Step 3: Build embed HTML based on platform (only if not blocked)
       if (platform === 'instagram') {
-        const html = buildInstagramEmbed(finalUrl);
+        const html = buildInstagramEmbed(embedUrl);
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Instagram embed');
       } else if (platform === 'facebook') {
-        const html = buildFacebookEmbed(finalUrl);
+        const html = buildFacebookEmbed(embedUrl);
         setEmbedHtml(html);
-        console.log('[UniversalMetaEmbed] Built Facebook embed:', html);
+        console.log('[UniversalMetaEmbed] Built Facebook embed using URL:', embedUrl);
       } else if (platform === 'spotify') {
-        const html = buildSpotifyEmbed(finalUrl);
+        const html = buildSpotifyEmbed(embedUrl);
         setEmbedHtml(html);
         console.log('[UniversalMetaEmbed] Built Spotify embed');
       }
