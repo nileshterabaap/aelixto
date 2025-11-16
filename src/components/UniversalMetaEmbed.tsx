@@ -113,7 +113,8 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         // Expand if it's a short link OR a Facebook share URL
         const needsExpansion = url.includes('fb.watch') || url.includes('fb.me') || 
                                url.includes('bit.ly') || url.includes('pin.it') ||
-                               url.includes('/share/r/') || url.includes('/share/v/');
+                               // Expand ALL Facebook share URLs (/share/r/, /share/p/, /share/v/, or just /share/)
+                               (url.includes('facebook.com') && url.includes('/share/'));
         
         if (needsExpansion) {
           console.log('[UniversalMetaEmbed] Expanding URL:', url);
@@ -178,15 +179,21 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   }
 
   if (embedHtml && !showFallback) {
+    console.log('[UniversalMetaEmbed] Rendering embed, showFallback:', showFallback);
     return (
       <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
         <RawEmbedRenderer 
           embedHtml={embedHtml} 
-          onError={() => setShowFallback(true)}
+          onError={() => {
+            console.log('[UniversalMetaEmbed] onError called, setting showFallback to true');
+            setShowFallback(true);
+          }}
         />
       </div>
     );
   }
+  
+  console.log('[UniversalMetaEmbed] Showing fallback, showFallback:', showFallback, 'embedHtml exists:', !!embedHtml);
 
   // Show fallback if no embed HTML or if embed failed
   const platform = detectPlatform(expandedUrl);
