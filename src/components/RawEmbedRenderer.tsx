@@ -125,31 +125,27 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
               console.log('[RawEmbedRenderer] Parsing Facebook embed');
               window.FB.XFBML.parse(containerRef.current);
               
-              // Check for errors multiple times with more aggressive detection
+              // Check for errors multiple times - immediate, after 2s, and after 4s
               const checkForError = () => {
                 if (containerRef.current) {
-                  const text = (containerRef.current.textContent || '').toLowerCase();
+                  const text = containerRef.current.textContent || '';
                   const fbError = containerRef.current.querySelector('.fb-error');
                   
-                  console.log('[RawEmbedRenderer] Checking for FB errors. Text length:', text.length, 'Text:', text.substring(0, 200));
+                  console.log('[RawEmbedRenderer] Checking for FB errors. Text length:', text.length, 'Text:', text.substring(0, 150));
                   
-                  // Aggressive error detection - check for ANY Facebook error indicators
+                  // Check for various Facebook error messages
                   const hasError = fbError ||
                     text.includes('no longer available') ||
                     text.includes('been removed') ||
                     text.includes('privacy setting') ||
-                    text.includes('privacy settings') ||
-                    text.includes('this content') ||
+                    text.includes('This content isn') ||
                     text.includes("isn't available") ||
-                    text.includes('content not found') ||
-                    text.includes('post is no longer') ||
-                    text.includes('may have changed') ||
-                    text.includes('help center') ||
-                    // If there's text but no iframe after 3 seconds, it's likely an error
-                    (text.length > 30 && !containerRef.current.querySelector('iframe'));
+                    text.includes('Content Not Found') ||
+                    // Check if there's minimal content (just error text, no actual post)
+                    (text.length > 50 && text.length < 300 && !containerRef.current.querySelector('iframe'));
                   
                   if (hasError) {
-                    console.log('[RawEmbedRenderer] Facebook embed error detected! Text:', text.substring(0, 200));
+                    console.log('[RawEmbedRenderer] Facebook embed error detected! Triggering fallback. Text:', text.substring(0, 150));
                     setEmbedFailed(true);
                     onError?.();
                     return true;
@@ -158,17 +154,16 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
                 return false;
               };
               
-              // Check at 500ms, 1.5s, 3s, and 5s intervals
+              // Check immediately
               setTimeout(() => {
                 if (checkForError()) return;
+                // Check again after 2 seconds
                 setTimeout(() => {
                   if (checkForError()) return;
-                  setTimeout(() => {
-                    if (checkForError()) return;
-                    setTimeout(checkForError, 2000);
-                  }, 1500);
-                }, 1000);
-              }, 500);
+                  // Final check after 4 seconds
+                  setTimeout(checkForError, 2000);
+                }, 2000);
+              }, 1000);
             } else {
               console.log('[RawEmbedRenderer] FB.XFBML.parse not available');
             }
