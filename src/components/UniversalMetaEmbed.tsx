@@ -105,11 +105,14 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   useEffect(() => {
     const processUrl = async () => {
       setIsLoading(true);
+      setShowFallback(false); // Reset fallback state for new URL
+      setEmbedHtml(null); // Clear previous embed
       
       try {
         // Step 1: Expand short URLs and Facebook share URLs
         const platform = detectPlatform(url);
         let finalUrl = url;
+        let shouldSkipEmbed = false; // Local variable to track if we should skip embed
 
         // Expand if it's a short link OR a Facebook share URL
         const needsExpansion = url.includes('fb.watch') || url.includes('fb.me') || 
@@ -130,8 +133,8 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
             // If expanded URL is a login redirect, skip embed and go straight to fallback
             if (finalUrl.includes('/login/') && platform === 'facebook') {
               console.log('[UniversalMetaEmbed] Expanded URL is login redirect, skipping embed');
-              setShowFallback(true);
-              setEmbedUrl(''); // Clear embed URL to prevent embed attempt
+              shouldSkipEmbed = true;
+              setEmbedUrl('');
             } else {
               setEmbedUrl(finalUrl);
             }
@@ -159,8 +162,8 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
       }
 
-      // Step 3: Build embed HTML based on platform (only if not showing fallback)
-      if (!showFallback) {
+      // Step 3: Build embed HTML based on platform (only if not skipping)
+      if (!shouldSkipEmbed) {
         if (platform === 'instagram') {
           const html = buildInstagramEmbed(embedUrl);
           setEmbedHtml(html);
@@ -174,6 +177,9 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           setEmbedHtml(html);
           console.log('[UniversalMetaEmbed] Built Spotify embed');
         }
+      } else {
+        // If we're skipping embed, set fallback immediately
+        setShowFallback(true);
       }
 
       } catch (error) {
