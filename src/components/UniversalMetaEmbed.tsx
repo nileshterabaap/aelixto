@@ -127,10 +127,11 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
             finalUrl = expandData.finalUrl;
             console.log('[UniversalMetaEmbed] Expanded to:', finalUrl);
             
-            // If expanded URL is a login redirect, use original URL for embedding
+            // If expanded URL is a login redirect, skip embed and go straight to fallback
             if (finalUrl.includes('/login/') && platform === 'facebook') {
-              console.log('[UniversalMetaEmbed] Expanded URL is login redirect, using original for embed');
-              setEmbedUrl(url); // Use original share URL for embedding
+              console.log('[UniversalMetaEmbed] Expanded URL is login redirect, skipping embed');
+              setShowFallback(true);
+              setEmbedUrl(''); // Clear embed URL to prevent embed attempt
             } else {
               setEmbedUrl(finalUrl);
             }
@@ -158,19 +159,21 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
       }
 
-      // Step 3: Build embed HTML based on platform (only if not blocked)
-      if (platform === 'instagram') {
-        const html = buildInstagramEmbed(embedUrl);
-        setEmbedHtml(html);
-        console.log('[UniversalMetaEmbed] Built Instagram embed');
-      } else if (platform === 'facebook') {
-        const html = buildFacebookEmbed(embedUrl);
-        setEmbedHtml(html);
-        console.log('[UniversalMetaEmbed] Built Facebook embed using URL:', embedUrl);
-      } else if (platform === 'spotify') {
-        const html = buildSpotifyEmbed(embedUrl);
-        setEmbedHtml(html);
-        console.log('[UniversalMetaEmbed] Built Spotify embed');
+      // Step 3: Build embed HTML based on platform (only if not showing fallback)
+      if (!showFallback) {
+        if (platform === 'instagram') {
+          const html = buildInstagramEmbed(embedUrl);
+          setEmbedHtml(html);
+          console.log('[UniversalMetaEmbed] Built Instagram embed');
+        } else if (platform === 'facebook' && embedUrl) {
+          const html = buildFacebookEmbed(embedUrl);
+          setEmbedHtml(html);
+          console.log('[UniversalMetaEmbed] Built Facebook embed using URL:', embedUrl);
+        } else if (platform === 'spotify') {
+          const html = buildSpotifyEmbed(embedUrl);
+          setEmbedHtml(html);
+          console.log('[UniversalMetaEmbed] Built Spotify embed');
+        }
       }
 
       } catch (error) {
