@@ -105,19 +105,17 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   useEffect(() => {
     const processUrl = async () => {
       setIsLoading(true);
-      setShowFallback(false); // Reset fallback state for new URL
-      setEmbedHtml(null); // Clear previous embed
+      setShowFallback(false);
+      setEmbedHtml(null);
       
       try {
         // Step 1: Expand short URLs and Facebook share URLs
         const platform = detectPlatform(url);
         let finalUrl = url;
-        let shouldSkipEmbed = false; // Local variable to track if we should skip embed
 
         // Expand if it's a short link OR a Facebook share URL
         const needsExpansion = url.includes('fb.watch') || url.includes('fb.me') || 
                                url.includes('bit.ly') || url.includes('pin.it') ||
-                               // Expand ALL Facebook share URLs (/share/r/, /share/p/, /share/v/, or just /share/)
                                (url.includes('facebook.com') && url.includes('/share/'));
         
         if (needsExpansion) {
@@ -129,15 +127,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           if (!expandError && expandData?.finalUrl) {
             finalUrl = expandData.finalUrl;
             console.log('[UniversalMetaEmbed] Expanded to:', finalUrl);
-            
-            // If expanded URL is a login redirect, skip embed and go straight to fallback
-            if (finalUrl.includes('/login/') && platform === 'facebook') {
-              console.log('[UniversalMetaEmbed] Expanded URL is login redirect, skipping embed');
-              shouldSkipEmbed = true;
-              setEmbedUrl('');
-            } else {
-              setEmbedUrl(finalUrl);
-            }
+            setEmbedUrl(finalUrl);
           } else {
             setEmbedUrl(url);
           }
@@ -162,24 +152,19 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
       }
 
-      // Step 3: Build embed HTML based on platform (only if not skipping)
-      if (!shouldSkipEmbed) {
-        if (platform === 'instagram') {
-          const html = buildInstagramEmbed(embedUrl);
-          setEmbedHtml(html);
-          console.log('[UniversalMetaEmbed] Built Instagram embed');
-        } else if (platform === 'facebook' && embedUrl) {
-          const html = buildFacebookEmbed(embedUrl);
-          setEmbedHtml(html);
-          console.log('[UniversalMetaEmbed] Built Facebook embed using URL:', embedUrl);
-        } else if (platform === 'spotify') {
-          const html = buildSpotifyEmbed(embedUrl);
-          setEmbedHtml(html);
-          console.log('[UniversalMetaEmbed] Built Spotify embed');
-        }
-      } else {
-        // If we're skipping embed, set fallback immediately
-        setShowFallback(true);
+      // Step 3: Build embed HTML based on platform
+      if (platform === 'instagram') {
+        const html = buildInstagramEmbed(embedUrl);
+        setEmbedHtml(html);
+        console.log('[UniversalMetaEmbed] Built Instagram embed');
+      } else if (platform === 'facebook') {
+        const html = buildFacebookEmbed(embedUrl);
+        setEmbedHtml(html);
+        console.log('[UniversalMetaEmbed] Built Facebook embed using URL:', embedUrl);
+      } else if (platform === 'spotify') {
+        const html = buildSpotifyEmbed(embedUrl);
+        setEmbedHtml(html);
+        console.log('[UniversalMetaEmbed] Built Spotify embed');
       }
 
       } catch (error) {
