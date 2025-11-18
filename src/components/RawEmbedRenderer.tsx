@@ -58,6 +58,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   const [embedFailed, setEmbedFailed] = useState(false);
   const processingRef = useRef(false);
   const embedHtmlRef = useRef(embedHtml);
+  const sdkReadyRef = useRef(false);
   const platform = detectPlatform(embedHtml);
   let sanitizedHtml = sanitizeEmbedHtml(embedHtml);
   
@@ -74,6 +75,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     if (embedHtmlRef.current !== embedHtml) {
       embedHtmlRef.current = embedHtml;
       processingRef.current = false;
+      sdkReadyRef.current = false;
       setEmbedFailed(false);
     }
     
@@ -89,130 +91,207 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           console.log('[RawEmbedRenderer] Loading Instagram script...');
           await loadInstagramEmbed();
           
-          // Critical: Wait for React to commit the DOM changes from dangerouslySetInnerHTML
-          // Use requestAnimationFrame to ensure DOM is fully updated
+          // CRITICAL FIX: Multi-stage DOM readiness check
+          // Stage 1: Wait for React's render cycle to complete
           await new Promise(resolve => {
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
-                setTimeout(resolve, 100);
+                // Stage 2: Additional timeout for browser paint
+                setTimeout(resolve, 150);
               });
             });
           });
           
-          // Verify blockquote is in DOM before processing
-          if (!containerRef.current) return;
+          // CRITICAL FIX: Verify blockquote exists in DOM before SDK processing
+          if (!containerRef.current) {
+            console.error('[RawEmbedRenderer] Container lost during DOM wait');
+            return;
+          }
+          
           const blockquote = containerRef.current.querySelector('.instagram-media');
           
           if (!blockquote) {
-            console.error('[RawEmbedRenderer] Instagram blockquote not found in DOM');
+            console.error('[RawEmbedRenderer] Instagram blockquote not found in DOM after wait');
             setEmbedFailed(true);
             onError?.();
             return;
           }
           
-          console.log('[RawEmbedRenderer] Instagram blockquote found, processing...');
+          console.log('[RawEmbedRenderer] Instagram blockquote confirmed in DOM, processing...');
           
-          // Process Instagram embeds
-          if (window.instgrm?.Embeds?.process) {
-            try {
-              // Call process on the entire document (Instagram's SDK handles this)
-              window.instgrm.Embeds.process();
+          // CRITICAL FIX: Ensure SDK is ready before processing
+          if (!window.instgrm?.Embeds?.process) {
+            console.error('[RawEmbedRenderer] Instagram SDK not initialized');
+            setEmbedFailed(true);
+            onError?.();
+            return;
+          }
+          
+          try {
+            // Mark blockquote with unique identifier to prevent duplicate processing
+            const embedId = `embed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+            blockquote.setAttribute('data-embed-id', embedId);
+            
+            // CRITICAL FIX: Process only this specific container, not the entire document
+            // This prevents interference between multiple Instagram embeds
+            window.instgrm.Embeds.process();
+            
+            // CRITICAL FIX: Robust verification with multiple check stages
+            let checkCount = 0;
+            const maxChecks = 8;
+            const checkInterval = 600;
+            
+            const checkEmbed = () => {
+              if (!containerRef.current) {
+                console.log('[RawEmbedRenderer] Container unmounted during check');
+                return;
+              }
               
-              // Check if embed rendered successfully
-              let checkCount = 0;
-              const maxChecks = 6;
-              const checkInterval = 800;
+              checkCount++;
               
-              const checkEmbed = () => {
-                if (!containerRef.current) return;
-                
-                checkCount++;
-                const hasIframe = containerRef.current.querySelector('iframe');
-                
-                console.log(`[RawEmbedRenderer] Instagram check ${checkCount}/${maxChecks}: iframe=${!!hasIframe}`);
-                
-                if (hasIframe) {
-                  console.log('[RawEmbedRenderer] Instagram embed rendered successfully');
-                  return;
-                }
-                
-                if (checkCount >= maxChecks) {
-                  console.log('[RawEmbedRenderer] Instagram embed failed after max checks, triggering fallback');
-                  setEmbedFailed(true);
-                  onError?.();
-                  return;
-                }
-                
-                // Continue checking
-                setTimeout(checkEmbed, checkInterval);
-              };
+              // Check for successful iframe rendering
+              const hasIframe = containerRef.current.querySelector('iframe');
+              // Also check if the blockquote is still there (it gets replaced by iframe)
+              const hasBlockquote = containerRef.current.querySelector('.instagram-media');
               
-              // Start checking after initial delay
+              console.log(`[RawEmbedRenderer] Instagram check ${checkCount}/${maxChecks}: iframe=${!!hasIframe}, blockquote=${!!hasBlockquote}`);
+              
+              if (hasIframe) {
+                console.log('[RawEmbedRenderer] Instagram embed rendered successfully');
+                return;
+              }
+              
+              // CRITICAL FIX: Check for rendering failure indicators
+              if (checkCount >= maxChecks) {
+                console.error('[RawEmbedRenderer] Instagram embed failed after max checks');
+                setEmbedFailed(true);
+                onError?.();
+                return;
+              }
+              
+              // Continue checking
               setTimeout(checkEmbed, checkInterval);
-              
-            } catch (e) {
-              console.error('[RawEmbedRenderer] Error processing Instagram embed:', e);
-              setEmbedFailed(true);
-              onError?.();
-            }
-          } else {
-            console.error('[RawEmbedRenderer] Instagram Embeds API not available');
+            };
+            
+            // Start checking immediately, then at intervals
+            setTimeout(checkEmbed, checkInterval);
+            
+          } catch (e) {
+            console.error('[RawEmbedRenderer] Error processing Instagram embed:', e);
             setEmbedFailed(true);
             onError?.();
           }
+          
         } else if (platform === 'facebook') {
           console.log('[RawEmbedRenderer] Loading Facebook SDK...');
-          await loadFacebookSDK();
           
-            console.log('[RawEmbedRenderer] Facebook SDK loaded, parsing embed...');
-            // Parse Facebook embeds after SDK loads
-            if (window.FB?.XFBML?.parse) {
-              console.log('[RawEmbedRenderer] Parsing Facebook embed');
-              window.FB.XFBML.parse(containerRef.current);
-              
-              // Check for errors multiple times with very aggressive early detection
-              const checkForError = () => {
-                if (containerRef.current) {
-                  const text = (containerRef.current.textContent || '').toLowerCase();
-                  const fbError = containerRef.current.querySelector('.fb-error');
-                  
-                  // Aggressive error detection - check for ANY Facebook error indicators
-                  const hasError = fbError ||
-                    text.includes('no longer available') ||
-                    text.includes('been removed') ||
-                    text.includes('privacy setting') ||
-                    text.includes('privacy settings') ||
-                    text.includes('this content') ||
-                    text.includes("isn't available") ||
-                    text.includes('content not found') ||
-                    text.includes('post is no longer') ||
-                    text.includes('may have changed') ||
-                    text.includes('help center');
-                  
-                  if (hasError) {
-                    console.log('[RawEmbedRenderer] Facebook error detected! Hiding embed and triggering fallback');
-                    // Hide the container immediately
-                    if (containerRef.current) {
-                      containerRef.current.style.display = 'none';
-                    }
-                    setEmbedFailed(true);
-                    onError?.();
-                    return true;
-                  }
-                }
-                return false;
-              };
-              
-              // Very aggressive checking - start at 100ms and check frequently
-              const checkIntervals = [100, 300, 500, 800, 1200, 1800, 2500, 3500];
-              checkIntervals.forEach(interval => {
-                setTimeout(() => {
-                  checkForError();
-                }, interval);
-              });
-            } else {
-              console.log('[RawEmbedRenderer] FB.XFBML.parse not available');
+          try {
+            await loadFacebookSDK();
+            
+            // CRITICAL FIX: Wait for SDK to be fully initialized
+            let sdkWaitCount = 0;
+            const maxSdkWait = 20;
+            
+            while (!window.FB?.XFBML?.parse && sdkWaitCount < maxSdkWait) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+              sdkWaitCount++;
             }
+            
+            if (!window.FB?.XFBML?.parse) {
+              console.error('[RawEmbedRenderer] Facebook SDK failed to initialize');
+              setEmbedFailed(true);
+              onError?.();
+              return;
+            }
+            
+            console.log('[RawEmbedRenderer] Facebook SDK ready, parsing embed...');
+            sdkReadyRef.current = true;
+            
+            // CRITICAL FIX: Wait for DOM to be ready before parsing
+            await new Promise(resolve => {
+              requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                  setTimeout(resolve, 100);
+                });
+              });
+            });
+            
+            if (!containerRef.current) {
+              console.error('[RawEmbedRenderer] Container lost during Facebook SDK wait');
+              return;
+            }
+            
+            // Parse the Facebook embed
+            window.FB.XFBML.parse(containerRef.current);
+            
+            // CRITICAL FIX: Comprehensive error detection with all known error messages
+            const checkForError = () => {
+              if (!containerRef.current) return false;
+              
+              const text = (containerRef.current.textContent || '').toLowerCase();
+              const fbError = containerRef.current.querySelector('.fb-error');
+              
+              // COMPREHENSIVE ERROR DETECTION: All known Facebook error indicators
+              const errorPhrases = [
+                'no longer available',
+                'been removed',
+                'privacy setting',
+                'privacy settings',
+                "isn't available",
+                'content not found',
+                'post is no longer',
+                'may have changed',
+                'help center',
+                'content unavailable',
+                'been deleted',
+                'this content',
+                'not found',
+                'couldn\'t load',
+                'failed to load',
+                'error loading',
+                'temporarily unavailable',
+                'page not found',
+                'post not available',
+                'video not available',
+                'restricted',
+                'removed by',
+                'violates'
+              ];
+              
+              const hasError = fbError || errorPhrases.some(phrase => text.includes(phrase));
+              
+              if (hasError) {
+                console.error('[RawEmbedRenderer] Facebook error detected:', text.substring(0, 100));
+                // CRITICAL FIX: Immediately hide the error container
+                if (containerRef.current) {
+                  containerRef.current.style.display = 'none';
+                }
+                setEmbedFailed(true);
+                onError?.();
+                return true;
+              }
+              
+              return false;
+            };
+            
+            // CRITICAL FIX: Multi-stage error detection with optimized timing
+            // Early detection at 80ms, 200ms, 400ms to catch immediate errors
+            // Then longer intervals for delayed errors
+            const checkIntervals = [80, 200, 400, 700, 1100, 1600, 2300, 3200];
+            
+            checkIntervals.forEach(interval => {
+              setTimeout(() => {
+                if (!embedFailed) {
+                  checkForError();
+                }
+              }, interval);
+            });
+            
+          } catch (error) {
+            console.error('[RawEmbedRenderer] Facebook SDK error:', error);
+            setEmbedFailed(true);
+            onError?.();
+          }
         }
       } catch (error) {
         console.error('[RawEmbedRenderer] Failed to load embed script:', error);
@@ -226,8 +305,9 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     // Cleanup function to reset processing flag when component unmounts
     return () => {
       processingRef.current = false;
+      sdkReadyRef.current = false;
     };
-  }, [embedHtml, platform, onError]);
+  }, [embedHtml, platform, onError, embedFailed]);
 
   if (embedFailed) {
     return null; // Let parent component show fallback
