@@ -56,6 +56,7 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
 export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [embedFailed, setEmbedFailed] = useState(false);
+  const hasProcessedRef = useRef(false);
   const platform = detectPlatform(embedHtml);
   let sanitizedHtml = sanitizeEmbedHtml(embedHtml);
   
@@ -68,8 +69,11 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   console.log('[RawEmbedRenderer] Embed HTML:', embedHtml);
 
   useEffect(() => {
+    // Reset processed flag on new embed
+    hasProcessedRef.current = false;
+    
     const processEmbed = async () => {
-      if (!containerRef.current) return;
+      if (!containerRef.current || hasProcessedRef.current) return;
 
       console.log('[RawEmbedRenderer] Processing embed for platform:', platform);
 
@@ -79,42 +83,62 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           console.log('[RawEmbedRenderer] Loading Instagram script...');
           await loadInstagramEmbed();
           
-          // Wait a bit for DOM to be ready
-          await new Promise(resolve => setTimeout(resolve, 100));
+          // Wait for DOM to be fully ready and script to initialize
+          await new Promise(resolve => setTimeout(resolve, 200));
           
-          // Process Instagram embeds after script loads with retry
-          const processWithRetry = async (attempts = 3) => {
-            for (let i = 0; i < attempts; i++) {
-              if (window.instgrm?.Embeds?.process) {
-                console.log(`[RawEmbedRenderer] Processing Instagram embed (attempt ${i + 1})`);
-                try {
-                  window.instgrm.Embeds.process();
-                  
-                  // Check if embed rendered successfully after a delay
-                  setTimeout(() => {
-                    if (containerRef.current) {
-                      const hasIframe = containerRef.current.querySelector('iframe');
-                      if (!hasIframe) {
-                        console.log('[RawEmbedRenderer] Instagram embed failed to render iframe, triggering fallback');
-                        setEmbedFailed(true);
-                        onError?.();
-                      }
-                    }
-                  }, 3000);
-                  break;
-                } catch (e) {
-                  console.error('[RawEmbedRenderer] Error processing Instagram embed:', e);
-                  if (i === attempts - 1) {
-                    setEmbedFailed(true);
-                    onError?.();
-                  }
+          // Mark as processed to prevent duplicate processing
+          hasProcessedRef.current = true;
+          
+          // Process Instagram embeds - only call once per container
+          if (window.instgrm?.Embeds?.process) {
+            console.log('[RawEmbedRenderer] Processing Instagram embed');
+            try {
+              // Process only this specific container
+              window.instgrm.Embeds.process();
+              
+              // Check if embed rendered successfully with multiple checks
+              let checkCount = 0;
+              const maxChecks = 5;
+              const checkInterval = 1000;
+              
+              const checkEmbed = () => {
+                if (!containerRef.current) return;
+                
+                checkCount++;
+                const hasIframe = containerRef.current.querySelector('iframe');
+                const hasBlockquote = containerRef.current.querySelector('.instagram-media');
+                
+                console.log(`[RawEmbedRenderer] Instagram check ${checkCount}: iframe=${!!hasIframe}, blockquote=${!!hasBlockquote}`);
+                
+                if (hasIframe) {
+                  console.log('[RawEmbedRenderer] Instagram embed rendered successfully');
+                  return;
                 }
-              }
-              await new Promise(resolve => setTimeout(resolve, 500));
+                
+                if (checkCount >= maxChecks) {
+                  console.log('[RawEmbedRenderer] Instagram embed failed after max checks, triggering fallback');
+                  setEmbedFailed(true);
+                  onError?.();
+                  return;
+                }
+                
+                // Continue checking
+                setTimeout(checkEmbed, checkInterval);
+              };
+              
+              // Start checking after initial delay
+              setTimeout(checkEmbed, checkInterval);
+              
+            } catch (e) {
+              console.error('[RawEmbedRenderer] Error processing Instagram embed:', e);
+              setEmbedFailed(true);
+              onError?.();
             }
-          };
-          
-          await processWithRetry();
+          } else {
+            console.error('[RawEmbedRenderer] Instagram Embeds API not available');
+            setEmbedFailed(true);
+            onError?.();
+          }
         } else if (platform === 'facebook') {
           console.log('[RawEmbedRenderer] Loading Facebook SDK...');
           await loadFacebookSDK();
@@ -177,6 +201,11 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     };
 
     processEmbed();
+    
+    // Cleanup function to reset processed flag when component unmounts
+    return () => {
+      hasProcessedRef.current = false;
+    };
   }, [embedHtml, platform, onError]);
 
   if (embedFailed) {
