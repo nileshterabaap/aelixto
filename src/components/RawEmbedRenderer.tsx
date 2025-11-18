@@ -56,7 +56,8 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
 export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [embedFailed, setEmbedFailed] = useState(false);
-  const hasProcessedRef = useRef(false);
+  const processingRef = useRef(false);
+  const embedHtmlRef = useRef(embedHtml);
   const platform = detectPlatform(embedHtml);
   let sanitizedHtml = sanitizeEmbedHtml(embedHtml);
   
@@ -69,13 +70,18 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   console.log('[RawEmbedRenderer] Embed HTML:', embedHtml);
 
   useEffect(() => {
-    // Reset processed flag on new embed
-    hasProcessedRef.current = false;
+    // Only reset if embed HTML actually changed
+    if (embedHtmlRef.current !== embedHtml) {
+      embedHtmlRef.current = embedHtml;
+      processingRef.current = false;
+      setEmbedFailed(false);
+    }
     
     const processEmbed = async () => {
-      if (!containerRef.current || hasProcessedRef.current) return;
+      if (!containerRef.current || processingRef.current) return;
 
       console.log('[RawEmbedRenderer] Processing embed for platform:', platform);
+      processingRef.current = true;
 
       try {
         // Load appropriate script based on platform
@@ -83,32 +89,47 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           console.log('[RawEmbedRenderer] Loading Instagram script...');
           await loadInstagramEmbed();
           
-          // Wait for DOM to be fully ready and script to initialize
-          await new Promise(resolve => setTimeout(resolve, 200));
+          // Critical: Wait for React to commit the DOM changes from dangerouslySetInnerHTML
+          // Use requestAnimationFrame to ensure DOM is fully updated
+          await new Promise(resolve => {
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                setTimeout(resolve, 100);
+              });
+            });
+          });
           
-          // Mark as processed to prevent duplicate processing
-          hasProcessedRef.current = true;
+          // Verify blockquote is in DOM before processing
+          if (!containerRef.current) return;
+          const blockquote = containerRef.current.querySelector('.instagram-media');
           
-          // Process Instagram embeds - only call once per container
+          if (!blockquote) {
+            console.error('[RawEmbedRenderer] Instagram blockquote not found in DOM');
+            setEmbedFailed(true);
+            onError?.();
+            return;
+          }
+          
+          console.log('[RawEmbedRenderer] Instagram blockquote found, processing...');
+          
+          // Process Instagram embeds
           if (window.instgrm?.Embeds?.process) {
-            console.log('[RawEmbedRenderer] Processing Instagram embed');
             try {
-              // Process only this specific container
+              // Call process on the entire document (Instagram's SDK handles this)
               window.instgrm.Embeds.process();
               
-              // Check if embed rendered successfully with multiple checks
+              // Check if embed rendered successfully
               let checkCount = 0;
-              const maxChecks = 5;
-              const checkInterval = 1000;
+              const maxChecks = 6;
+              const checkInterval = 800;
               
               const checkEmbed = () => {
                 if (!containerRef.current) return;
                 
                 checkCount++;
                 const hasIframe = containerRef.current.querySelector('iframe');
-                const hasBlockquote = containerRef.current.querySelector('.instagram-media');
                 
-                console.log(`[RawEmbedRenderer] Instagram check ${checkCount}: iframe=${!!hasIframe}, blockquote=${!!hasBlockquote}`);
+                console.log(`[RawEmbedRenderer] Instagram check ${checkCount}/${maxChecks}: iframe=${!!hasIframe}`);
                 
                 if (hasIframe) {
                   console.log('[RawEmbedRenderer] Instagram embed rendered successfully');
@@ -202,9 +223,9 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
 
     processEmbed();
     
-    // Cleanup function to reset processed flag when component unmounts
+    // Cleanup function to reset processing flag when component unmounts
     return () => {
-      hasProcessedRef.current = false;
+      processingRef.current = false;
     };
   }, [embedHtml, platform, onError]);
 
