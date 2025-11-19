@@ -120,76 +120,61 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             return;
           }
           
-          console.log('[RawEmbedRenderer] Instagram blockquote confirmed in DOM, processing...');
-          
-          // CRITICAL FIX: Ensure SDK is ready before processing
-          if (!window.instgrm?.Embeds?.process) {
-            console.error('[RawEmbedRenderer] Instagram SDK not initialized');
-            if (!errorReportedRef.current && containerRef.current) {
-              errorReportedRef.current = true;
-              containerRef.current.style.display = 'none';
-              onError?.();
+            console.log('[RawEmbedRenderer] Instagram blockquote confirmed in DOM, processing...');
+            
+            // CRITICAL FIX: Ensure SDK is ready before processing
+            if (!window.instgrm?.Embeds?.process) {
+              console.error('[RawEmbedRenderer] Instagram SDK not initialized');
+              if (!errorReportedRef.current && containerRef.current) {
+                errorReportedRef.current = true;
+                containerRef.current.style.display = 'none';
+                onError?.();
+              }
+              return;
             }
-            return;
-          }
-          
-          try {
-            // Mark blockquote with unique identifier to prevent duplicate processing
-            const embedId = `embed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-            blockquote.setAttribute('data-embed-id', embedId);
             
-            // CRITICAL FIX: Process only this specific container, not the entire document
-            // This prevents interference between multiple Instagram embeds
-            window.instgrm.Embeds.process();
-            
-            // CRITICAL FIX: Immediate check + rapid early checks to catch failures fast
-            let checkCount = 0;
-            const maxChecks = 15;
-            // Much more aggressive timing: check at 0, 100, 200, 300, 500, 700, 1000, 1500, 2000, 2500...
-            const getCheckInterval = (count: number) => {
-              if (count === 0) return 0; // Immediate first check
-              if (count <= 3) return 100; // Very fast early checks
-              if (count <= 6) return 200; // Fast checks
-              return 500; // Slower checks for late rendering
-            };
-            
-            const checkEmbed = () => {
-              if (!containerRef.current || errorReportedRef.current) {
-                console.log('[RawEmbedRenderer] Container unmounted or error already reported');
-                return;
-              }
+            try {
+              // Process the Instagram embed
+              window.instgrm.Embeds.process();
               
-              checkCount++;
+              // Aggressive checking with fast early intervals
+              let checkCount = 0;
+              const maxChecks = 20;
+              const getCheckInterval = (count: number) => {
+                if (count === 0) return 0;
+                if (count <= 4) return 50;
+                if (count <= 8) return 100;
+                if (count <= 12) return 200;
+                return 400;
+              };
               
-              // Check for successful iframe rendering
-              const hasIframe = containerRef.current.querySelector('iframe');
-              // Also check if the blockquote is still there (it gets replaced by iframe)
-              const hasBlockquote = containerRef.current.querySelector('.instagram-media');
-              
-              console.log(`[RawEmbedRenderer] Instagram check ${checkCount}/${maxChecks}: iframe=${!!hasIframe}, blockquote=${!!hasBlockquote}`);
-              
-              if (hasIframe) {
-                console.log('[RawEmbedRenderer] Instagram embed rendered successfully');
-                return;
-              }
-              
-              // CRITICAL FIX: Check for rendering failure indicators
-              if (checkCount >= maxChecks) {
-                console.error('[RawEmbedRenderer] Instagram embed failed after max checks');
-                if (!errorReportedRef.current) {
-                  errorReportedRef.current = true;
-                  containerRef.current.style.display = 'none';
-                  onError?.();
+              const checkEmbed = () => {
+                if (!containerRef.current || errorReportedRef.current) return;
+                
+                checkCount++;
+                const hasIframe = containerRef.current.querySelector('iframe');
+                
+                console.log(`[RawEmbedRenderer] Instagram check ${checkCount}/${maxChecks}: iframe=${!!hasIframe}`);
+                
+                if (hasIframe) {
+                  console.log('[RawEmbedRenderer] Instagram embed rendered successfully');
+                  return;
                 }
-                return;
-              }
+                
+                if (checkCount >= maxChecks) {
+                  console.error('[RawEmbedRenderer] Instagram embed failed after max checks');
+                  if (!errorReportedRef.current) {
+                    errorReportedRef.current = true;
+                    containerRef.current.style.display = 'none';
+                    onError?.();
+                  }
+                  return;
+                }
+                
+                setTimeout(checkEmbed, getCheckInterval(checkCount));
+              };
               
-              // Continue checking with dynamic intervals
-              setTimeout(checkEmbed, getCheckInterval(checkCount));
-            };
-            
-            // Start checking immediately
-            checkEmbed();
+              checkEmbed();
             
           } catch (e) {
             console.error('[RawEmbedRenderer] Error processing Instagram embed:', e);
