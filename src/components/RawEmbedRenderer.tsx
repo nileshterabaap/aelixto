@@ -55,10 +55,10 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
 
 export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [embedFailed, setEmbedFailed] = useState(false);
   const processingRef = useRef(false);
   const embedHtmlRef = useRef(embedHtml);
   const sdkReadyRef = useRef(false);
+  const errorReportedRef = useRef(false);
   const platform = detectPlatform(embedHtml);
   let sanitizedHtml = sanitizeEmbedHtml(embedHtml);
   
@@ -76,7 +76,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
       embedHtmlRef.current = embedHtml;
       processingRef.current = false;
       sdkReadyRef.current = false;
-      setEmbedFailed(false);
+      errorReportedRef.current = false;
     }
     
     const processEmbed = async () => {
@@ -112,8 +112,11 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           
           if (!blockquote) {
             console.error('[RawEmbedRenderer] Instagram blockquote not found in DOM after wait');
-            setEmbedFailed(true);
-            onError?.();
+            if (!errorReportedRef.current && containerRef.current) {
+              errorReportedRef.current = true;
+              containerRef.current.style.display = 'none';
+              onError?.();
+            }
             return;
           }
           
@@ -122,8 +125,11 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           // CRITICAL FIX: Ensure SDK is ready before processing
           if (!window.instgrm?.Embeds?.process) {
             console.error('[RawEmbedRenderer] Instagram SDK not initialized');
-            setEmbedFailed(true);
-            onError?.();
+            if (!errorReportedRef.current && containerRef.current) {
+              errorReportedRef.current = true;
+              containerRef.current.style.display = 'none';
+              onError?.();
+            }
             return;
           }
           
@@ -136,14 +142,20 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             // This prevents interference between multiple Instagram embeds
             window.instgrm.Embeds.process();
             
-            // CRITICAL FIX: Robust verification with multiple check stages
+            // CRITICAL FIX: Immediate check + rapid early checks to catch failures fast
             let checkCount = 0;
-            const maxChecks = 8;
-            const checkInterval = 600;
+            const maxChecks = 15;
+            // Much more aggressive timing: check at 0, 100, 200, 300, 500, 700, 1000, 1500, 2000, 2500...
+            const getCheckInterval = (count: number) => {
+              if (count === 0) return 0; // Immediate first check
+              if (count <= 3) return 100; // Very fast early checks
+              if (count <= 6) return 200; // Fast checks
+              return 500; // Slower checks for late rendering
+            };
             
             const checkEmbed = () => {
-              if (!containerRef.current) {
-                console.log('[RawEmbedRenderer] Container unmounted during check');
+              if (!containerRef.current || errorReportedRef.current) {
+                console.log('[RawEmbedRenderer] Container unmounted or error already reported');
                 return;
               }
               
@@ -164,22 +176,28 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
               // CRITICAL FIX: Check for rendering failure indicators
               if (checkCount >= maxChecks) {
                 console.error('[RawEmbedRenderer] Instagram embed failed after max checks');
-                setEmbedFailed(true);
-                onError?.();
+                if (!errorReportedRef.current) {
+                  errorReportedRef.current = true;
+                  containerRef.current.style.display = 'none';
+                  onError?.();
+                }
                 return;
               }
               
-              // Continue checking
-              setTimeout(checkEmbed, checkInterval);
+              // Continue checking with dynamic intervals
+              setTimeout(checkEmbed, getCheckInterval(checkCount));
             };
             
-            // Start checking immediately, then at intervals
-            setTimeout(checkEmbed, checkInterval);
+            // Start checking immediately
+            checkEmbed();
             
           } catch (e) {
             console.error('[RawEmbedRenderer] Error processing Instagram embed:', e);
-            setEmbedFailed(true);
-            onError?.();
+            if (!errorReportedRef.current && containerRef.current) {
+              errorReportedRef.current = true;
+              containerRef.current.style.display = 'none';
+              onError?.();
+            }
           }
           
         } else if (platform === 'facebook') {
@@ -199,8 +217,11 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             
             if (!window.FB?.XFBML?.parse) {
               console.error('[RawEmbedRenderer] Facebook SDK failed to initialize');
-              setEmbedFailed(true);
-              onError?.();
+              if (!errorReportedRef.current && containerRef.current) {
+                errorReportedRef.current = true;
+                containerRef.current.style.display = 'none';
+                onError?.();
+              }
               return;
             }
             
@@ -216,17 +237,17 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
               });
             });
             
-            if (!containerRef.current) {
-              console.error('[RawEmbedRenderer] Container lost during Facebook SDK wait');
+            if (!containerRef.current || errorReportedRef.current) {
+              console.error('[RawEmbedRenderer] Container lost or error already reported');
               return;
             }
             
             // Parse the Facebook embed
             window.FB.XFBML.parse(containerRef.current);
             
-            // CRITICAL FIX: Comprehensive error detection with all known error messages
+            // CRITICAL FIX: Ultra-aggressive error detection with immediate checks
             const checkForError = () => {
-              if (!containerRef.current) return false;
+              if (!containerRef.current || errorReportedRef.current) return false;
               
               const text = (containerRef.current.textContent || '').toLowerCase();
               const fbError = containerRef.current.querySelector('.fb-error');
@@ -262,26 +283,25 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
               
               if (hasError) {
                 console.error('[RawEmbedRenderer] Facebook error detected:', text.substring(0, 100));
-                // CRITICAL FIX: Immediately hide the error container
-                if (containerRef.current) {
+                // CRITICAL FIX: Report error once and hide container
+                if (!errorReportedRef.current) {
+                  errorReportedRef.current = true;
                   containerRef.current.style.display = 'none';
+                  onError?.();
                 }
-                setEmbedFailed(true);
-                onError?.();
                 return true;
               }
               
               return false;
             };
             
-            // CRITICAL FIX: Multi-stage error detection with optimized timing
-            // Early detection at 80ms, 200ms, 400ms to catch immediate errors
-            // Then longer intervals for delayed errors
-            const checkIntervals = [80, 200, 400, 700, 1100, 1600, 2300, 3200];
+            // CRITICAL FIX: Immediate first check + very aggressive early timing
+            // Check at 0, 10, 30, 60, 100, 200, 400, 700, 1200, 1800, 2500, 3500ms
+            const checkIntervals = [0, 10, 30, 60, 100, 200, 400, 700, 1200, 1800, 2500, 3500];
             
             checkIntervals.forEach(interval => {
               setTimeout(() => {
-                if (!embedFailed) {
+                if (!errorReportedRef.current) {
                   checkForError();
                 }
               }, interval);
@@ -289,14 +309,20 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             
           } catch (error) {
             console.error('[RawEmbedRenderer] Facebook SDK error:', error);
-            setEmbedFailed(true);
-            onError?.();
+            if (!errorReportedRef.current && containerRef.current) {
+              errorReportedRef.current = true;
+              containerRef.current.style.display = 'none';
+              onError?.();
+            }
           }
         }
       } catch (error) {
         console.error('[RawEmbedRenderer] Failed to load embed script:', error);
-        setEmbedFailed(true);
-        onError?.();
+        if (!errorReportedRef.current && containerRef.current) {
+          errorReportedRef.current = true;
+          containerRef.current.style.display = 'none';
+          onError?.();
+        }
       }
     };
 
@@ -306,12 +332,9 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     return () => {
       processingRef.current = false;
       sdkReadyRef.current = false;
+      errorReportedRef.current = false;
     };
-  }, [embedHtml, platform, onError, embedFailed]);
-
-  if (embedFailed) {
-    return null; // Let parent component show fallback
-  }
+  }, [embedHtml, platform, onError]);
 
   return (
     <div 
