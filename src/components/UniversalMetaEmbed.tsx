@@ -73,8 +73,12 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         const needsExpansion = url.includes('fb.watch') || url.includes('fb.me') || url.includes('bit.ly') || url.includes('pin.it') || (url.includes('facebook.com') && url.includes('/share/'));
         
         if (needsExpansion) {
+          console.log('[UniversalMetaEmbed] Expanding URL:', url);
           const { data: expandData } = await supabase.functions.invoke('expand-url', { body: { url } });
-          if (expandData?.finalUrl) finalUrl = expandData.finalUrl;
+          if (expandData?.finalUrl) {
+            finalUrl = expandData.finalUrl;
+            console.log('[UniversalMetaEmbed] Expanded to:', finalUrl);
+          }
         }
 
         setExpandedUrl(finalUrl);
@@ -83,8 +87,18 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           setEmbedHtml(buildInstagramEmbed(finalUrl));
           setEmbedProcessing(true);
         } else if (platform === 'facebook') {
-          setEmbedHtml(buildFacebookEmbed(finalUrl));
-          setEmbedProcessing(true);
+          // FACEBOOK FIX: Never use SDK embed, always fetch OG data for link card
+          // The Facebook SDK doesn't work reliably with new /share/ URLs
+          console.log('[UniversalMetaEmbed] Facebook detected, fetching OG data for:', finalUrl);
+          const { data: ogData } = await supabase.functions.invoke('fetch-og', { body: { url: finalUrl } });
+          if (ogData) {
+            console.log('[UniversalMetaEmbed] Facebook OG data:', ogData);
+            setFallbackData({
+              title: ogData.meta?.title || ogData.title,
+              image: ogData.meta?.image || ogData.image,
+              description: ogData.meta?.description || ogData.description
+            });
+          }
         } else if (platform === 'spotify') {
           setEmbedHtml(buildSpotifyEmbed(finalUrl));
         } else {
@@ -119,6 +133,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     );
   }
 
+  // For Instagram, render the embed if available
   if (embedHtml && !showFallback) {
     return (
       <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
@@ -127,6 +142,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           onError={async () => {
             setEmbedProcessing(false);
             if (!fallbackData) {
+              console.log('[UniversalMetaEmbed] Embed failed, fetching OG fallback for:', expandedUrl);
               const { data: ogData } = await supabase.functions.invoke('fetch-og', { body: { url: expandedUrl } });
               if (ogData) {
                 setFallbackData({
