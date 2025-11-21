@@ -1,6 +1,5 @@
 import { ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { decodeHtmlEntities } from "@/lib/htmlEntities";
 
 interface OgCardFallbackProps {
   url: string;
@@ -11,10 +10,6 @@ interface OgCardFallbackProps {
 }
 
 export const OgCardFallback = ({ url, title, image, description, platform }: OgCardFallbackProps) => {
-  // Decode HTML entities for display
-  const decodedTitle = title ? decodeHtmlEntities(title) : undefined;
-  const decodedDescription = description ? decodeHtmlEntities(description) : undefined;
-  
   return (
     <Card className="overflow-hidden border-2 border-border hover:border-primary/50 transition-colors">
       <a 
@@ -27,7 +22,7 @@ export const OgCardFallback = ({ url, title, image, description, platform }: OgC
           <div className="aspect-video w-full overflow-hidden bg-muted">
             <img 
               src={image} 
-              alt={decodedTitle || "Post preview"} 
+              alt={title || "Post preview"} 
               className="w-full h-full object-cover"
             />
           </div>
@@ -36,11 +31,11 @@ export const OgCardFallback = ({ url, title, image, description, platform }: OgC
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-base line-clamp-2 mb-1">
-                {decodedTitle || "View on " + platform}
+                {title || "View on " + platform}
               </h3>
-              {decodedDescription && (
+              {description && (
                 <p className="text-sm text-foreground/80 line-clamp-2 mb-2">
-                  {decodedDescription}
+                  {description}
                 </p>
               )}
               <p className="text-sm text-muted-foreground truncate">

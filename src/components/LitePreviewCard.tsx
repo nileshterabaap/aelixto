@@ -1,7 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { decodeHtmlEntities } from "@/lib/htmlEntities";
 
 interface LitePreviewCardProps {
   url: string;
@@ -28,10 +27,6 @@ export const LitePreviewCard = ({
     }
   };
 
-  // Decode HTML entities for display
-  const decodedTitle = title ? decodeHtmlEntities(title) : undefined;
-  const decodedText = text ? decodeHtmlEntities(text) : undefined;
-
   return (
     <Card className="overflow-hidden border-2 border-border rounded-2xl hover:shadow-lg transition-shadow">
       {/* Image */}
@@ -39,7 +34,7 @@ export const LitePreviewCard = ({
         <div className="relative w-full aspect-video overflow-hidden">
           <img 
             src={image} 
-            alt={decodedTitle || 'Preview'} 
+            alt={title || 'Preview'} 
             className="w-full h-full object-cover"
             loading="lazy"
           />
@@ -53,15 +48,15 @@ export const LitePreviewCard = ({
 
       {/* Content */}
       <div className="p-4">
-        {decodedTitle && (
+        {title && (
           <h3 className="font-bold text-lg mb-2 line-clamp-2">
-            {decodedTitle}
+            {title}
           </h3>
         )}
         
-        {decodedText && (
+        {text && (
           <p className="text-sm text-muted-foreground mb-4 line-clamp-3">
-            {decodedText}
+            {text}
           </p>
         )}
 
