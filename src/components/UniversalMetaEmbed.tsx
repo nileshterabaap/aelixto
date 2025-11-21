@@ -3,6 +3,45 @@ import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
 
+// Expand Facebook URLs (e.g. /share/ links) to canonical post URLs
+const expandFacebookUrl = async (url: string): Promise<string | null> => {
+  try {
+    const { data, error } = await supabase.functions.invoke('expand-url', {
+      body: { url },
+    });
+
+    if (error || !data?.finalUrl) {
+      console.warn('[expandFacebookUrl] Failed to expand, using original URL:', error);
+      return null;
+    }
+
+    return data.finalUrl as string;
+  } catch (err) {
+    console.warn('[expandFacebookUrl] Exception while expanding Facebook URL:', err);
+    return null;
+  }
+};
+
+// Check if an expanded URL is embed-compatible with Facebook SDK
+const isFacebookEmbedCompatibleUrl = (url: string): boolean => {
+  try {
+    const u = new URL(url);
+    if (!u.hostname.includes('facebook.com')) return false;
+
+    // Allow known post formats that work with Facebook SDK
+    if (u.pathname.includes('/story.php')) return true;
+    if (u.pathname.includes('/posts/')) return true;
+    if (u.pathname.includes('/permalink/')) return true;
+    if (u.searchParams.has('story_fbid')) return true;
+    if (u.searchParams.has('fbid')) return true;
+    if (u.searchParams.has('post_id')) return true;
+
+    return false;
+  } catch {
+    return false;
+  }
+};
+
 interface UniversalMetaEmbedProps {
   url: string;
 }
@@ -87,17 +126,48 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           setEmbedHtml(buildInstagramEmbed(finalUrl));
           setEmbedProcessing(true);
         } else if (platform === 'facebook') {
-          // FACEBOOK FIX: Never use SDK embed, always fetch OG data for link card
-          // The Facebook SDK doesn't work reliably with new /share/ URLs
-          console.log('[UniversalMetaEmbed] Facebook detected, fetching OG data for:', finalUrl);
-          const { data: ogData } = await supabase.functions.invoke('fetch-og', { body: { url: finalUrl } });
-          if (ogData) {
-            console.log('[UniversalMetaEmbed] Facebook OG data:', ogData);
-            setFallbackData({
-              title: ogData.meta?.title || ogData.title,
-              image: ogData.meta?.image || ogData.image,
-              description: ogData.meta?.description || ogData.description
-            });
+          console.log('[UniversalMetaEmbed] Facebook detected, starting embed flow for:', finalUrl);
+
+          let candidateUrl = finalUrl;
+
+          // Step 1: Try to expand /share/ or other shortened URLs
+          try {
+            const expanded = await expandFacebookUrl(finalUrl);
+            if (expanded) {
+              console.log('[UniversalMetaEmbed] Expanded Facebook URL:', expanded);
+              candidateUrl = expanded;
+            }
+          } catch (err) {
+            console.warn('[UniversalMetaEmbed] Failed to expand Facebook URL, using original:', err);
+          }
+
+          // Step 2: Try SDK embed for URLs that look like real posts
+          if (isFacebookEmbedCompatibleUrl(candidateUrl)) {
+            const embedHtml = buildFacebookEmbed(candidateUrl);
+
+            if (embedHtml) {
+              console.log('[UniversalMetaEmbed] Using Facebook SDK embed for:', candidateUrl);
+              setEmbedHtml(embedHtml);
+              setFallbackData(null);
+              setEmbedProcessing(true);
+            }
+          } else {
+            // Step 3: Fallback to OG preview card
+            console.log('[UniversalMetaEmbed] Falling back to OG card for Facebook URL:', finalUrl);
+            try {
+              const { data: ogData } = await supabase.functions.invoke('fetch-og', {
+                body: { url: finalUrl },
+              });
+              if (ogData) {
+                setFallbackData({
+                  title: ogData.meta?.title || ogData.title,
+                  image: ogData.meta?.image || ogData.image,
+                  description: ogData.meta?.description || ogData.description
+                });
+              }
+            } catch (err) {
+              console.warn('[UniversalMetaEmbed] Failed to fetch OG data for Facebook URL:', err);
+            }
           }
         } else if (platform === 'spotify') {
           setEmbedHtml(buildSpotifyEmbed(finalUrl));

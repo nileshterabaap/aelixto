@@ -392,8 +392,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {/* Single renderer based on resolver */}
         {embedEnabled && (
           <div className="mb-2">
-            {/* Raw Embed HTML (used for platforms like Instagram, NOT Facebook) */}
-            {r.kind === 'raw' && !isFacebook && post.isRealPost && (
+            {/* Raw Embed HTML (Instagram, Facebook SDK embeds, etc.) */}
+            {r.kind === 'raw' && post.isRealPost && (
               <LazyEmbed
                 thumbnailUrl={(post as any).thumbnail_url}
                 previewTitle={(post as any).preview_title}
@@ -406,7 +406,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 </ImageViewTracker>
               </LazyEmbed>
             )}
-            {r.kind === 'raw' && !isFacebook && !post.isRealPost && (
+            {r.kind === 'raw' && !post.isRealPost && (
               <LazyEmbed
                 thumbnailUrl={(post as any).thumbnail_url}
                 platform={post.platform || undefined}
@@ -447,13 +447,13 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               </div>
             )}
             
-            {/* Universal meta embeds (NO Instagram; Facebook always allowed as card) */}
-            {(r.kind === 'universal' || (r.kind === 'raw' && isFacebook)) && !isInstagram && post.isRealPost && (
+            {/* Universal meta embeds (NO Instagram) */}
+            {r.kind === 'universal' && !isInstagram && post.isRealPost && (
               <ImageViewTracker postId={post.id}>
-                <UniversalMetaEmbed url={r.kind === 'universal' ? r.url : mediaUrl} />
+                <UniversalMetaEmbed url={r.url} />
               </ImageViewTracker>
             )}
-            {(r.kind === 'universal' || (r.kind === 'raw' && isFacebook)) && !isInstagram && !post.isRealPost && <UniversalMetaEmbed url={r.kind === 'universal' ? r.url : mediaUrl} />}
+            {r.kind === 'universal' && !isInstagram && !post.isRealPost && <UniversalMetaEmbed url={r.url} />}
             {r.kind === 'image' && post.isRealPost && (
               <ImageViewTracker postId={post.id}>
                 <div className="rounded-2xl overflow-hidden">
