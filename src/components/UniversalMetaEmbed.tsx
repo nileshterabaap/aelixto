@@ -42,42 +42,70 @@ const buildInstagramEmbed = (url: string): string => {
   return `<blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="${url}" data-instgrm-version="14" style="background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:540px; min-width:326px; padding:0; width:99.375%; width:-webkit-calc(100% - 2px); width:calc(100% - 2px);"><a href="${url}" style="background:#FFFFFF; line-height:0; padding:0 0; text-align:center; text-decoration:none; width:100%;" target="_blank"></a></blockquote>`;
 };
 
-// Build Facebook embed HTML (post or video)
-const buildFacebookEmbed = (url: string): string => {
-  // Clean and normalize Facebook URLs for embedding
-  let cleanUrl = url;
+// Normalize Facebook URLs for reliable embedding
+const normalizeFacebookUrl = (raw: string): string => {
+  let url = raw.trim();
+  
+  console.log('[FB EMBED] Starting normalization for:', url);
+
+  // 1) Always use www. instead of mobile variants
+  url = url
+    .replace(/^https?:\/\/m\.facebook\.com\//, 'https://www.facebook.com/')
+    .replace(/^https?:\/\/lm\.facebook\.com\//, 'https://www.facebook.com/')
+    .replace(/^https?:\/\/l\.facebook\.com\//, 'https://www.facebook.com/');
+
+  // 2) If it's an l.facebook.com redirect, extract the "u" param
   try {
-    const urlObj = new URL(url);
-    
-    // Only remove tracking/share query parameters, keep essential post identification params
-    const essentialParams = ['story_fbid', 'id', 'fbid', 'post_id', 'v'];
-    const params = new URLSearchParams(urlObj.search);
-    const cleanParams = new URLSearchParams();
-    
-    // Preserve essential parameters
-    essentialParams.forEach(param => {
-      const value = params.get(param);
-      if (value) {
-        cleanParams.set(param, value);
-      }
-    });
-    
-    const queryString = cleanParams.toString();
-    cleanUrl = `${urlObj.origin}${urlObj.pathname}${queryString ? '?' + queryString : ''}`;
-    console.log('[UniversalMetaEmbed] Cleaned Facebook URL from', url, 'to', cleanUrl);
+    const u = new URL(url);
+    if (u.hostname.endsWith('facebook.com') && u.pathname === '/l.php' && u.searchParams.get('u')) {
+      const extractedUrl = decodeURIComponent(u.searchParams.get('u')!);
+      console.log('[FB EMBED] Extracted redirect URL:', extractedUrl);
+      url = extractedUrl;
+    }
   } catch (e) {
-    console.error('[UniversalMetaEmbed] Failed to parse URL:', e);
+    console.warn('[FB EMBED] Failed to parse redirect URL:', e);
   }
+
+  // 3) Strip tracking / share junk that shouldn't affect the canonical post
+  const stripParams = [
+    'mibextid',
+    'ref',
+    'refid',
+    'sfnsn',
+    'app',
+    'paipv',
+  ];
   
-  // Detect if it's a video or reel based on URL pattern
-  const isVideo = cleanUrl.includes('/videos/') || cleanUrl.includes('/watch/') || cleanUrl.includes('/reel/');
-  console.log('[UniversalMetaEmbed] Building Facebook embed - isVideo:', isVideo, 'URL:', cleanUrl);
-  
-  // Use specific width and enable lazy loading for better performance
-  if (isVideo) {
-    return `<div class="fb-video" data-href="${cleanUrl}" data-width="500" data-show-text="true" data-lazy="true"></div>`;
+  try {
+    const u2 = new URL(url);
+    stripParams.forEach(p => u2.searchParams.delete(p));
+    // Also drop hash fragments that aren't part of the post identity
+    u2.hash = '';
+    url = u2.toString();
+  } catch (e) {
+    console.warn('[FB EMBED] Failed to clean URL params:', e);
   }
-  return `<div class="fb-post" data-href="${cleanUrl}" data-width="500" data-show-text="true" data-lazy="true"></div>`;
+
+  console.log('[FB EMBED] Normalized URL:', url);
+  return url;
+};
+
+// Build Facebook embed using direct iframe approach (more reliable)
+const buildFacebookEmbed = (url: string): string => {
+  const canonical = normalizeFacebookUrl(url);
+  
+  console.log('[FB EMBED] Building embed:', {
+    originalUrl: url,
+    normalizedUrl: canonical,
+    embedType: 'iframe-plugins-post'
+  });
+  
+  // Use Facebook's plugins/post.php iframe - works for posts, videos, and reels
+  const embedSrc = `https://www.facebook.com/v19.0/plugins/post.php?href=${encodeURIComponent(
+    canonical
+  )}&show_text=true&width=500`;
+  
+  return `<iframe src="${embedSrc}" style="border:none;overflow:hidden;width:100%;min-height:500px;" scrolling="no" frameborder="0" allow="encrypted-media; clipboard-write; picture-in-picture; web-share" allowfullscreen="true"></iframe>`;
 };
 
 // Build Spotify embed HTML
@@ -171,7 +199,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         } else if (platform === 'facebook' && embedUrl) {
           const html = buildFacebookEmbed(embedUrl);
           setEmbedHtml(html);
-          console.log('[UniversalMetaEmbed] Built Facebook embed using URL:', embedUrl);
+          console.log('[FB EMBED] Built Facebook iframe embed');
         } else if (platform === 'spotify') {
           const html = buildSpotifyEmbed(embedUrl);
           setEmbedHtml(html);
@@ -202,6 +230,21 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
   if (embedHtml && !showFallback) {
     console.log('[UniversalMetaEmbed] Rendering embed, showFallback:', showFallback);
+    
+    // For Facebook iframes and Spotify, render directly without RawEmbedRenderer
+    const isFacebookIframe = embedHtml.includes('facebook.com/v19.0/plugins/post.php');
+    const isSpotifyIframe = embedHtml.includes('open.spotify.com/embed');
+    
+    if (isFacebookIframe || isSpotifyIframe) {
+      return (
+        <div 
+          className="relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block"
+          dangerouslySetInnerHTML={{ __html: embedHtml }}
+        />
+      );
+    }
+    
+    // For Instagram, use RawEmbedRenderer for SDK processing
     return (
       <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
         <RawEmbedRenderer 
