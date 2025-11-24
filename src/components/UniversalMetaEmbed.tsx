@@ -150,6 +150,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         const platform = detectPlatform(url);
         let finalUrl = url;
         let urlForEmbed = url;
+        let shouldShowFallback = false;
 
         // Step 1: Expand short URLs and Facebook share URLs
         const needsExpansion = url.includes('fb.watch') || url.includes('fb.me') || 
@@ -171,7 +172,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               // If expanded URL is a login redirect, use fallback
               if (finalUrl.includes('/login/') && platform === 'facebook') {
                 console.log('[UniversalMetaEmbed] Expanded URL is login redirect, will use fallback');
-                setShowFallback(true);
+                shouldShowFallback = true;
               }
             } else {
               console.warn('[UniversalMetaEmbed] Expansion failed, using original URL:', expandError);
@@ -199,8 +200,8 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           }
         }).catch(err => console.warn('[UniversalMetaEmbed] OG fetch failed:', err));
 
-        // Step 3: Build embed HTML based on platform (skip if already showing fallback)
-        if (!showFallback) {
+        // Step 3: Build embed HTML based on platform (skip if we should show fallback)
+        if (!shouldShowFallback) {
           if (platform === 'instagram') {
             const html = buildInstagramEmbed(urlForEmbed);
             setEmbedHtml(html);
@@ -214,6 +215,8 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
             setEmbedHtml(html);
             console.log('[UniversalMetaEmbed] Built Spotify embed');
           }
+        } else {
+          setShowFallback(true);
         }
 
       } catch (error) {
