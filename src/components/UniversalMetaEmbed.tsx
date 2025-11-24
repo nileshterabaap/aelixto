@@ -129,82 +129,78 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   useEffect(() => {
     const processUrl = async () => {
       setIsLoading(true);
-      setShowFallback(false); // Reset fallback state for new URL
-      setEmbedHtml(null); // Clear previous embed
+      setShowFallback(false);
+      setEmbedHtml(null);
       
       try {
-        // Step 1: Expand short URLs and Facebook share URLs
         const platform = detectPlatform(url);
         let finalUrl = url;
-        let shouldSkipEmbed = false; // Local variable to track if we should skip embed
+        let urlForEmbed = url;
 
-        // Expand if it's a short link OR a Facebook share URL
+        // Step 1: Expand short URLs and Facebook share URLs
         const needsExpansion = url.includes('fb.watch') || url.includes('fb.me') || 
                                url.includes('bit.ly') || url.includes('pin.it') ||
-                               // Expand ALL Facebook share URLs (/share/r/, /share/p/, /share/v/, or just /share/)
                                (url.includes('facebook.com') && url.includes('/share/'));
         
         if (needsExpansion) {
           console.log('[UniversalMetaEmbed] Expanding URL:', url);
-          const { data: expandData, error: expandError } = await supabase.functions.invoke('expand-url', {
-            body: { url }
-          });
+          try {
+            const { data: expandData, error: expandError } = await supabase.functions.invoke('expand-url', {
+              body: { url }
+            });
 
-          if (!expandError && expandData?.finalUrl) {
-            finalUrl = expandData.finalUrl;
-            console.log('[UniversalMetaEmbed] Expanded to:', finalUrl);
-            
-            // If expanded URL is a login redirect, skip embed and go straight to fallback
-            if (finalUrl.includes('/login/') && platform === 'facebook') {
-              console.log('[UniversalMetaEmbed] Expanded URL is login redirect, skipping embed');
-              shouldSkipEmbed = true;
-              setEmbedUrl('');
+            if (!expandError && expandData?.finalUrl) {
+              finalUrl = expandData.finalUrl;
+              urlForEmbed = finalUrl;
+              console.log('[UniversalMetaEmbed] Expanded to:', finalUrl);
+              
+              // If expanded URL is a login redirect, use fallback
+              if (finalUrl.includes('/login/') && platform === 'facebook') {
+                console.log('[UniversalMetaEmbed] Expanded URL is login redirect, will use fallback');
+                setShowFallback(true);
+              }
             } else {
-              setEmbedUrl(finalUrl);
+              console.warn('[UniversalMetaEmbed] Expansion failed, using original URL:', expandError);
+              urlForEmbed = url;
             }
-          } else {
-            setEmbedUrl(url);
+          } catch (err) {
+            console.error('[UniversalMetaEmbed] Expansion error:', err);
+            urlForEmbed = url;
           }
-        } else {
-          setEmbedUrl(url);
         }
 
         setExpandedUrl(finalUrl);
+        setEmbedUrl(urlForEmbed);
 
-      // Step 2: Fetch OG data first to check availability
-      console.log('[UniversalMetaEmbed] Fetching OG data for availability check');
-      const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
-        body: { url: finalUrl }
-      });
+        // Step 2: Fetch OG data for fallback (non-blocking)
+        supabase.functions.invoke('fetch-og', {
+          body: { url: finalUrl }
+        }).then(({ data: ogData, error: ogError }) => {
+          if (!ogError && ogData) {
+            setFallbackData({
+              title: ogData.meta?.title || ogData.title,
+              image: ogData.meta?.image || ogData.image,
+              description: ogData.meta?.description || ogData.description
+            });
+          }
+        }).catch(err => console.warn('[UniversalMetaEmbed] OG fetch failed:', err));
 
-      if (!ogError && ogData) {
-        setFallbackData({
-          title: ogData.meta?.title || ogData.title,
-          image: ogData.meta?.image || ogData.image,
-          description: ogData.meta?.description || ogData.description
-        });
-        console.log('[UniversalMetaEmbed] OG data fetched:', ogData);
-      }
-
-      // Step 3: Build embed HTML based on platform (only if not skipping)
-      if (!shouldSkipEmbed) {
-        if (platform === 'instagram') {
-          const html = buildInstagramEmbed(embedUrl);
-          setEmbedHtml(html);
-          console.log('[UniversalMetaEmbed] Built Instagram embed');
-        } else if (platform === 'facebook' && embedUrl) {
-          const html = buildFacebookEmbed(embedUrl);
-          setEmbedHtml(html);
-          console.log('[FB EMBED] Built Facebook iframe embed');
-        } else if (platform === 'spotify') {
-          const html = buildSpotifyEmbed(embedUrl);
-          setEmbedHtml(html);
-          console.log('[UniversalMetaEmbed] Built Spotify embed');
+        // Step 3: Build embed HTML based on platform (skip if already showing fallback)
+        if (!showFallback) {
+          if (platform === 'instagram') {
+            const html = buildInstagramEmbed(urlForEmbed);
+            setEmbedHtml(html);
+            console.log('[UniversalMetaEmbed] Built Instagram embed');
+          } else if (platform === 'facebook') {
+            const html = buildFacebookEmbed(urlForEmbed);
+            setEmbedHtml(html);
+            console.log('[FB EMBED] Built Facebook SDK embed');
+          } else if (platform === 'spotify') {
+            const html = buildSpotifyEmbed(urlForEmbed);
+            setEmbedHtml(html);
+            console.log('[UniversalMetaEmbed] Built Spotify embed');
+          }
         }
-      } else {
-        // If we're skipping embed, set fallback immediately
-        setShowFallback(true);
-      }
 
       } catch (error) {
         console.error('[UniversalMetaEmbed] Error processing URL:', error);
