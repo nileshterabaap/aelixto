@@ -90,22 +90,18 @@ const normalizeFacebookUrl = (raw: string): string => {
   return url;
 };
 
-// Build Facebook embed using direct iframe approach (more reliable)
+// Build Facebook embed using SDK approach (XFBML)
 const buildFacebookEmbed = (url: string): string => {
   const canonical = normalizeFacebookUrl(url);
   
   console.log('[FB EMBED] Building embed:', {
     originalUrl: url,
     normalizedUrl: canonical,
-    embedType: 'iframe-plugins-post'
+    embedType: 'sdk-xfbml-div'
   });
   
-  // Use Facebook's plugins/post.php iframe - works for posts, videos, and reels
-  const embedSrc = `https://www.facebook.com/v19.0/plugins/post.php?href=${encodeURIComponent(
-    canonical
-  )}&show_text=true&width=500`;
-  
-  return `<iframe src="${embedSrc}" style="border:none;overflow:hidden;width:100%;min-height:500px;" scrolling="no" frameborder="0" allow="encrypted-media; clipboard-write; picture-in-picture; web-share" allowfullscreen="true"></iframe>`;
+  // Use Facebook SDK approach with <div class="fb-post"> - this is what works!
+  return `<div class="fb-post" data-href="${canonical}" data-width="500" data-show-text="true"></div>`;
 };
 
 // Build Spotify embed HTML
@@ -231,11 +227,10 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   if (embedHtml && !showFallback) {
     console.log('[UniversalMetaEmbed] Rendering embed, showFallback:', showFallback);
     
-    // For Facebook iframes and Spotify, render directly without RawEmbedRenderer
-    const isFacebookIframe = embedHtml.includes('facebook.com/v19.0/plugins/post.php');
+    // For Spotify only, render directly without RawEmbedRenderer
     const isSpotifyIframe = embedHtml.includes('open.spotify.com/embed');
     
-    if (isFacebookIframe || isSpotifyIframe) {
+    if (isSpotifyIframe) {
       return (
         <div 
           className="relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block"
@@ -244,7 +239,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       );
     }
     
-    // For Instagram, use RawEmbedRenderer for SDK processing
+    // For Instagram AND Facebook, use RawEmbedRenderer for SDK processing
     return (
       <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
         <RawEmbedRenderer 
