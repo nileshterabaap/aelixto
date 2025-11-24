@@ -228,14 +228,17 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {post.isRealPost && (post as any).user_id === userId && (
+                  {post.isRealPost && userId && (post as any).user_id === userId && (
                     <DropdownMenuItem 
-                      onClick={() => deletePost()}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        deletePost();
+                      }}
                       disabled={isDeleting}
                       className="text-destructive focus:text-destructive cursor-pointer"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
+                      {isDeleting ? 'Deleting...' : 'Delete'}
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -345,14 +348,17 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {post.isRealPost && (post as any).user_id === userId && (
+                {post.isRealPost && userId && (post as any).user_id === userId && (
                   <DropdownMenuItem 
-                    onClick={() => deletePost()}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      deletePost();
+                    }}
                     disabled={isDeleting}
                     className="text-destructive focus:text-destructive cursor-pointer"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
+                    {isDeleting ? 'Deleting...' : 'Delete'}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
