@@ -54,7 +54,19 @@ const normalizeFacebookUrl = (raw: string): string => {
     .replace(/^https?:\/\/lm\.facebook\.com\//, 'https://www.facebook.com/')
     .replace(/^https?:\/\/l\.facebook\.com\//, 'https://www.facebook.com/');
 
-  // 2) If it's an l.facebook.com redirect, extract the "u" param
+  // 2) If it's a login redirect, extract the actual post URL from "next" parameter
+  try {
+    const u = new URL(url);
+    if (u.hostname.endsWith('facebook.com') && u.pathname.includes('/login') && u.searchParams.get('next')) {
+      const actualUrl = decodeURIComponent(u.searchParams.get('next')!);
+      console.log('[FB EMBED] Extracted URL from login redirect:', actualUrl);
+      url = actualUrl;
+    }
+  } catch (e) {
+    console.warn('[FB EMBED] Failed to parse login redirect:', e);
+  }
+
+  // 3) If it's an l.facebook.com redirect, extract the "u" param
   try {
     const u = new URL(url);
     if (u.hostname.endsWith('facebook.com') && u.pathname === '/l.php' && u.searchParams.get('u')) {
@@ -66,7 +78,7 @@ const normalizeFacebookUrl = (raw: string): string => {
     console.warn('[FB EMBED] Failed to parse redirect URL:', e);
   }
 
-  // 3) Strip tracking / share junk that shouldn't affect the canonical post
+  // 4) Strip tracking / share junk that shouldn't affect the canonical post
   const stripParams = [
     'mibextid',
     'ref',
@@ -74,6 +86,7 @@ const normalizeFacebookUrl = (raw: string): string => {
     'sfnsn',
     'app',
     'paipv',
+    'rdid', // Remove rdid as it causes login redirects on mobile
   ];
   
   try {
