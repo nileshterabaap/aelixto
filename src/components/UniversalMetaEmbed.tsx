@@ -165,19 +165,12 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
             if (!expandError && expandData?.finalUrl) {
               finalUrl = expandData.finalUrl;
+              urlForEmbed = finalUrl;
               console.log('[UniversalMetaEmbed] Expanded to:', finalUrl);
               
-              // CRITICAL: Normalize Facebook URLs after expansion (they often become login redirects)
-              if (platform === 'facebook') {
-                urlForEmbed = normalizeFacebookUrl(finalUrl);
-                console.log('[UniversalMetaEmbed] Normalized expanded URL for embedding:', urlForEmbed);
-              } else {
-                urlForEmbed = finalUrl;
-              }
-              
-              // If still a login URL after normalization, use fallback
-              if (urlForEmbed.includes('/login/')) {
-                console.log('[UniversalMetaEmbed] Still a login redirect after normalization, will use fallback');
+              // If expanded URL is a login redirect, use fallback
+              if (finalUrl.includes('/login/') && platform === 'facebook') {
+                console.log('[UniversalMetaEmbed] Expanded URL is login redirect, will use fallback');
                 setShowFallback(true);
               }
             } else {
