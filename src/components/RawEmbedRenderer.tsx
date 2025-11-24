@@ -31,10 +31,10 @@ const transformFacebookEmbed = (html: string): string => {
       const postUrl = decodeURIComponent(hrefMatch[1]);
       // Detect if it's a video/reel based on URL
       if (postUrl.includes('/videos/') || postUrl.includes('/watch/') || postUrl.includes('/reel/')) {
-        return `<div class="fb-video" data-href="${postUrl}" data-width="500" data-show-text="true"></div>`;
+        return `<div class="fb-video" data-href="${postUrl}" data-show-text="true"></div>`;
       }
       // Return SDK-compatible format for posts
-      return `<div class="fb-post" data-href="${postUrl}" data-width="500" data-show-text="true"></div>`;
+      return `<div class="fb-post" data-href="${postUrl}" data-show-text="true"></div>`;
     }
   }
   
