@@ -74,7 +74,7 @@ function PostCard({ post, onClick, currentUserId, onDelete }: {
         src={src}
         alt=""
         onError={() => setImageError(true)}
-        className="w-full h-full object-cover"
+        className="w-full h-full object-contain object-center bg-background/5"
         loading="lazy"
         crossOrigin="anonymous"
         referrerPolicy="no-referrer"
@@ -89,13 +89,13 @@ function PostCard({ post, onClick, currentUserId, onDelete }: {
         </div>
       )}
 
-      {/* Delete button for owner */}
+      {/* Delete button for owner - always visible on mobile */}
       {isOwner && (
-        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-2 right-2">
           <Button
             variant="destructive"
             size="icon"
-            className="h-8 w-8 rounded-full shadow-lg"
+            className="h-8 w-8 rounded-full shadow-lg bg-destructive/90 backdrop-blur-sm"
             onClick={handleDelete}
             disabled={isDeleting}
           >
