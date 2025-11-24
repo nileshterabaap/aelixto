@@ -100,8 +100,9 @@ const buildFacebookEmbed = (url: string): string => {
     embedType: 'sdk-xfbml-div'
   });
   
-  // Use Facebook SDK approach with <div class="fb-post"> - this is what works!
-  return `<div class="fb-post" data-href="${canonical}" data-width="500" data-show-text="true"></div>`;
+  // Use Facebook SDK approach with <div class="fb-post">
+  // Remove fixed width to make it responsive on mobile
+  return `<div class="fb-post" data-href="${canonical}" data-show-text="true"></div>`;
 };
 
 // Build Spotify embed HTML
