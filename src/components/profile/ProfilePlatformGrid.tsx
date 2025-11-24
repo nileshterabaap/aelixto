@@ -3,11 +3,17 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
-import { Trash2 } from "lucide-react";
+import { MoreVertical, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 function decodeHtml(html: string) {
   const txt = document.createElement("textarea");
@@ -89,18 +95,30 @@ function PostCard({ post, onClick, currentUserId, onDelete }: {
         </div>
       )}
 
-      {/* Delete button for owner - always visible on mobile */}
+      {/* 3-dot menu for owner */}
       {isOwner && (
-        <div className="absolute top-2 right-2">
-          <Button
-            variant="destructive"
-            size="icon"
-            className="h-8 w-8 rounded-full shadow-lg bg-destructive/90 backdrop-blur-sm"
-            onClick={handleDelete}
-            disabled={isDeleting}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+        <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background shadow-lg"
+              >
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-background z-50">
+              <DropdownMenuItem
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="text-destructive focus:text-destructive cursor-pointer"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )}
     </button>
