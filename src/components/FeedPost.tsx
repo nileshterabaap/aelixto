@@ -1,12 +1,6 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreHorizontal, Trash2 } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
 import { useState, memo } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
@@ -221,25 +215,17 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 className={`object-contain ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="h-6 w-6" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {post.isRealPost && (post as any).user_id === userId && (
-                    <DropdownMenuItem 
-                      onClick={() => deletePost()}
-                      disabled={isDeleting}
-                      className="text-destructive focus:text-destructive cursor-pointer"
-                    >
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+            {post.isRealPost && (post as any).user_id === userId && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-destructive hover:text-destructive"
+                onClick={() => deletePost()}
+                disabled={isDeleting}
+              >
+                <Trash2 className="h-5 w-5" />
+              </Button>
+            )}
             </div>
           </div>
 
@@ -338,25 +324,17 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 className={`object-contain ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-6 w-6" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {post.isRealPost && (post as any).user_id === userId && (
-                  <DropdownMenuItem 
-                    onClick={() => deletePost()}
-                    disabled={isDeleting}
-                    className="text-destructive focus:text-destructive cursor-pointer"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {post.isRealPost && (post as any).user_id === userId && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8 text-destructive hover:text-destructive"
+                onClick={() => deletePost()}
+                disabled={isDeleting}
+              >
+                <Trash2 className="h-5 w-5" />
+              </Button>
+            )}
           </div>
         </div>
 
