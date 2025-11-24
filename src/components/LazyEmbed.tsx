@@ -87,11 +87,6 @@ export const LazyEmbed = ({
                   <Play className="h-8 w-8" fill="currentColor" />
                 </div>
               </div>
-              {platform && (
-                <div className="absolute top-3 left-3 px-2 py-1 bg-background/90 backdrop-blur-sm rounded-full text-xs font-medium border border-border capitalize">
-                  {platform}
-                </div>
-              )}
             </div>
           ) : (
             // Article/link preview card
