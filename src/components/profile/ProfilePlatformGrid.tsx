@@ -3,17 +3,6 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
-import { MoreVertical, Trash2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useSession } from "@/hooks/useSession";
-import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 function decodeHtml(html: string) {
   const txt = document.createElement("textarea");
@@ -21,34 +10,13 @@ function decodeHtml(html: string) {
   return txt.value;
 }
 
-function PostCard({ post, onClick, currentUserId, onDelete }: { 
+function PostCard({ post, onClick }: { 
   post: PlatformPost; 
   onClick: () => void;
-  currentUserId?: string;
-  onDelete: () => void;
 }) {
   const [imageError, setImageError] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const rawThumb = getPostThumb(post);
   const src = imageError ? "/placeholder.svg" : maybeProxy(rawThumb, 480);
-  
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!window.confirm("Delete this post?")) return;
-    
-    setIsDeleting(true);
-    try {
-      const { error } = await supabase.from("posts").delete().eq("id", post.id);
-      if (error) throw error;
-      toast.success("Post deleted");
-      onDelete();
-    } catch (error) {
-      console.error("Delete error:", error);
-      toast.error("Failed to delete post");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
   
   // Debug logging for all platforms
   if (post.thumbnail_url) {
@@ -68,8 +36,6 @@ function PostCard({ post, onClick, currentUserId, onDelete }: {
     if (post.platform === "reddit" || post.platform === "quora" || post.platform === "medium") return "aspect-[4/3]";
     return "aspect-[4/5]"; // Default for other platforms
   };
-
-  const isOwner = currentUserId && post.user_id === currentUserId;
 
   return (
     <button
@@ -94,33 +60,6 @@ function PostCard({ post, onClick, currentUserId, onDelete }: {
           </div>
         </div>
       )}
-
-      {/* 3-dot menu for owner */}
-      {isOwner && (
-        <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm hover:bg-background shadow-lg"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-background z-50">
-              <DropdownMenuItem
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="text-destructive focus:text-destructive cursor-pointer"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      )}
     </button>
   );
 }
@@ -139,12 +78,6 @@ export const ProfilePlatformGrid = ({
     activeTab
   );
   const navigate = useNavigate();
-  const { user } = useSession();
-  const queryClient = useQueryClient();
-
-  const handlePostDelete = () => {
-    queryClient.invalidateQueries({ queryKey: ["platform-posts", userId, activeTab] });
-  };
 
   if (loading && items.length === 0) {
     return (
@@ -170,8 +103,6 @@ export const ProfilePlatformGrid = ({
             key={post.id}
             post={post}
             onClick={() => navigate(`/post/${post.id}`)}
-            currentUserId={user?.id}
-            onDelete={handlePostDelete}
           />
         ))}
       </div>
