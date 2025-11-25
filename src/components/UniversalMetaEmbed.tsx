@@ -169,9 +169,15 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               urlForEmbed = finalUrl;
               console.log('[UniversalMetaEmbed] Expanded to:', finalUrl);
               
-              // If expanded URL is a login redirect, use fallback
+              // If expanded URL is a login redirect or has login in title, use fallback
               if (finalUrl.includes('/login/') && platform === 'facebook') {
                 console.log('[UniversalMetaEmbed] Expanded URL is login redirect, will use fallback');
+                shouldShowFallback = true;
+              }
+              
+              // Also check if the page title indicates login requirement
+              if (expandData?.title?.toLowerCase().includes('log in to facebook')) {
+                console.log('[UniversalMetaEmbed] Title indicates login required, will use fallback');
                 shouldShowFallback = true;
               }
             } else {
@@ -192,8 +198,17 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           body: { url: finalUrl }
         }).then(({ data: ogData, error: ogError }) => {
           if (!ogError && ogData) {
+            const ogTitle = ogData.meta?.title || ogData.title;
+            
+            // Check if the OG data indicates a login page
+            if (ogTitle?.toLowerCase().includes('log in to facebook') && platform === 'facebook') {
+              console.log('[UniversalMetaEmbed] OG title indicates login page, showing fallback');
+              shouldShowFallback = true;
+              setShowFallback(true);
+            }
+            
             setFallbackData({
-              title: ogData.meta?.title || ogData.title,
+              title: ogTitle,
               image: ogData.meta?.image || ogData.image,
               description: ogData.meta?.description || ogData.description
             });
@@ -257,7 +272,9 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     
     return (
       <div className={`relative w-full overflow-hidden [&>*]:block [&>*]:!m-0 ${
-        isFacebookEmbed ? 'max-w-full [&_.fb-post]:!max-w-full [&_.fb-post]:!w-full [&_iframe]:!max-w-full [&_iframe]:!w-full' : ''
+        isFacebookEmbed 
+          ? 'max-w-full max-h-[600px] [&_.fb-post]:!max-w-full [&_.fb-post]:!w-full [&_.fb-post]:!max-h-[600px] [&_iframe]:!max-w-full [&_iframe]:!w-full [&_iframe]:!max-h-[600px] [&>div]:!max-h-[600px] overflow-y-auto' 
+          : ''
       }`}>
         <RawEmbedRenderer 
           embedHtml={embedHtml} 
