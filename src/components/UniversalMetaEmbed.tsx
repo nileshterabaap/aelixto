@@ -114,8 +114,8 @@ const buildFacebookEmbed = (url: string): string => {
   });
   
   // Use Facebook SDK approach with <div class="fb-post">
-  // Remove fixed width to make it responsive on mobile
-  return `<div class="fb-post" data-href="${canonical}" data-show-text="true"></div>`;
+  // Add data-width to constrain the embed on mobile
+  return `<div class="fb-post" data-href="${canonical}" data-show-text="true" data-width="500"></div>`;
 };
 
 // Build Spotify embed HTML
@@ -253,8 +253,12 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     }
     
     // For Instagram AND Facebook, use RawEmbedRenderer for SDK processing
+    const isFacebookEmbed = embedHtml.includes('fb-post');
+    
     return (
-      <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
+      <div className={`relative w-full overflow-hidden [&>*]:block [&>*]:!m-0 ${
+        isFacebookEmbed ? 'max-w-full [&_.fb-post]:!max-w-full [&_.fb-post]:!w-full [&_iframe]:!max-w-full [&_iframe]:!w-full' : ''
+      }`}>
         <RawEmbedRenderer 
           embedHtml={embedHtml} 
           onError={() => {
