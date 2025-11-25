@@ -27,6 +27,7 @@ import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
 import { RawEmbedRenderer } from "@/components/RawEmbedRenderer";
 import { UniversalMetaEmbed } from "@/components/UniversalMetaEmbed";
+import { OgCardFallback } from "@/components/OgCardFallback";
 import { isEmbedEnabled, type EmbedPlatform, EMBED_FEATURE_FLAGS } from "@/config/embedFeatureFlags";
 import { ArticleEmbed } from "@/features/article-embeds";
 import RedditEmbed from "@/components/embeds/RedditEmbed";
@@ -308,8 +309,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
     );
   }
 
+  // Check if this is a Facebook login redirect based on stored metadata
+  const isFacebookLoginPage = post.platform === 'facebook' && (
+    (post as any).title?.toLowerCase().includes('log in to facebook') ||
+    (post as any).preview_title?.toLowerCase().includes('log in to facebook') ||
+    post.mediaUrl?.includes('/login/')
+  );
+
   const r = resolveRenderer(post);
-  console.log('renderer', post.id, post.platform, post.mediaUrl, r.kind);
+  console.log('renderer', post.id, post.platform, post.mediaUrl, r.kind, 'isLoginPage:', isFacebookLoginPage);
 
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
@@ -434,12 +442,21 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               </ImageViewTracker>
             )}
             {r.kind === 'article' && !post.isRealPost && <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />}
-            {r.kind === 'universal' && post.isRealPost && (
+            {r.kind === 'universal' && !isFacebookLoginPage && post.isRealPost && (
               <ImageViewTracker postId={post.id}>
                 <UniversalMetaEmbed url={r.url} />
               </ImageViewTracker>
             )}
-            {r.kind === 'universal' && !post.isRealPost && <UniversalMetaEmbed url={r.url} />}
+            {r.kind === 'universal' && !isFacebookLoginPage && !post.isRealPost && <UniversalMetaEmbed url={r.url} />}
+            {r.kind === 'universal' && isFacebookLoginPage && (
+              <OgCardFallback
+                url={r.url}
+                title={(post as any).preview_title || (post as any).title || "Post not available"}
+                image={(post as any).thumbnail_url || (post as any).preview_image_url}
+                description={(post as any).preview_text || "This Facebook post may no longer be available or requires login to view."}
+                platform="Facebook"
+              />
+            )}
             {r.kind === 'image' && post.isRealPost && (
               <ImageViewTracker postId={post.id}>
                 <div className="rounded-2xl overflow-hidden">
