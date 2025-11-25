@@ -145,7 +145,12 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
                     text.includes('post is no longer') ||
                     text.includes('may have changed') ||
                     text.includes('help center') ||
-                    // If there's text but no iframe after 3 seconds, it's likely an error
+                    text.includes('facebook post is no longer') ||
+                    text.includes('or the privacy') ||
+                    // Check for login-related errors
+                    text.includes('log in to facebook') ||
+                    text.includes('login to facebook') ||
+                    // If there's text but no iframe after checking, it's likely an error
                     (text.length > 30 && !containerRef.current.querySelector('iframe'));
                   
                   if (hasError) {
