@@ -66,8 +66,9 @@ const PostDetail = () => {
       const supabasePost = data as unknown as SupabasePost;
       
       // Transform Supabase post to match FeedPost expected format
-      const transformedPost: Post & { isRealPost: boolean } = {
+      const transformedPost: Post & { isRealPost: boolean; user_id: string } = {
         id: supabasePost.id,
+        user_id: supabasePost.user_id,
         author: {
           name: supabasePost.profiles.display_name || supabasePost.profiles.username,
           username: supabasePost.profiles.username,
