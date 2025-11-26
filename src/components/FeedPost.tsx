@@ -309,12 +309,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
     );
   }
 
-  // Check if this is a Facebook post without embed_html (unavailable/private)
-  const isFacebookUnavailable = post.platform === 'facebook' && !post.embed_html && (
+  // Check if this is a Facebook post that explicitly requires login
+  const isFacebookUnavailable = post.platform === 'facebook' && (
     (post as any).title?.toLowerCase().includes('log in to facebook') ||
     (post as any).preview_title?.toLowerCase().includes('log in to facebook') ||
-    post.mediaUrl?.includes('/login/') ||
-    !post.embed_html  // No embed_html usually means unavailable
+    post.mediaUrl?.includes('/login/')
   );
 
   const r = resolveRenderer(post);
