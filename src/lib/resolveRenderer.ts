@@ -30,6 +30,13 @@ export function resolveRenderer(post: any): Renderer {
   // 3) platform-specific embeds next
   if (post?.platform === 'twitter') return { kind: 'twitter', url };
   if (post?.platform === 'pinterest') return { kind: 'pinterest', url };
+  
+  // 3b) Facebook posts without embed_html - construct iframe embed
+  if (post?.platform === 'facebook' && url) {
+    const encodedUrl = encodeURIComponent(url);
+    const embedHtml = `<iframe src="https://www.facebook.com/plugins/post.php?href=${encodedUrl}&show_text=true&width=500" width="500" height="589" style="border:none;overflow:hidden" scrolling="no" frameborder="0" allowfullscreen="true" allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"></iframe>`;
+    return { kind: 'raw', html: embedHtml };
+  }
 
   // 4) article extractor for blogs/quora/medium/etc (never reddit)
   const blocked = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','twitter.com','x.com','pinterest.com','youtube.com','youtu.be','tiktok.com','reddit.com','redd.it'];
