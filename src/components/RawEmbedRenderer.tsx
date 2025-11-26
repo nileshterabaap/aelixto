@@ -195,8 +195,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   return (
     <div 
       ref={containerRef}
-      className="embed-container w-full max-h-[700px] overflow-auto [&>*]:!m-0 [&>iframe]:w-full [&>iframe]:block"
-      style={{ minHeight: 0, lineHeight: 0 }}
+      className="embed-container w-full [&>*]:!m-0 [&>iframe]:w-full [&>iframe]:block [&_.fb-post]:w-full [&_.fb-video]:w-full"
       dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );
