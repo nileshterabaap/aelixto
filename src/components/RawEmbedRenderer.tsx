@@ -14,8 +14,12 @@ const sanitizeEmbedHtml = (html: string): string => {
 
 // Convert Facebook iframe embed to SDK-compatible format
 const transformFacebookEmbed = (html: string): string => {
-  // If already in SDK format (fb-post, fb-video), return as is
+  // If already in SDK format (fb-post, fb-video), check if it has proper attributes
   if (html.includes('fb-post') || html.includes('fb-video')) {
+    // Ensure it has data-width="auto" for responsive sizing
+    if (!html.includes('data-width')) {
+      html = html.replace(/class="fb-(post|video)"/, 'class="fb-$1" data-width="auto"');
+    }
     return html;
   }
   
@@ -31,10 +35,10 @@ const transformFacebookEmbed = (html: string): string => {
       const postUrl = decodeURIComponent(hrefMatch[1]);
       // Detect if it's a video/reel based on URL
       if (postUrl.includes('/videos/') || postUrl.includes('/watch/') || postUrl.includes('/reel/')) {
-        return `<div class="fb-video" data-href="${postUrl}" data-show-text="true"></div>`;
+        return `<div class="fb-video" data-href="${postUrl}" data-width="auto" data-show-text="true"></div>`;
       }
-      // Return SDK-compatible format for posts
-      return `<div class="fb-post" data-href="${postUrl}" data-show-text="true"></div>`;
+      // Return SDK-compatible format for posts with auto width
+      return `<div class="fb-post" data-href="${postUrl}" data-width="auto" data-show-text="true"></div>`;
     }
   }
   
@@ -195,7 +199,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   return (
     <div 
       ref={containerRef}
-      className="embed-container w-full [&>*]:!m-0 [&>iframe]:w-full [&>iframe]:block [&_.fb-post]:w-full [&_.fb-video]:w-full"
+      className="embed-container w-full [&>*]:!m-0 [&>iframe]:w-full [&>iframe]:block [&_.fb-post]:!w-auto [&_.fb-video]:!w-auto"
       dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );
