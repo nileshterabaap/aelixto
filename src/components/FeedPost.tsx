@@ -309,15 +309,16 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
     );
   }
 
-  // Check if this is a Facebook login redirect based on stored metadata
-  const isFacebookLoginPage = post.platform === 'facebook' && (
+  // Check if this is a Facebook post without embed_html (unavailable/private)
+  const isFacebookUnavailable = post.platform === 'facebook' && !post.embed_html && (
     (post as any).title?.toLowerCase().includes('log in to facebook') ||
     (post as any).preview_title?.toLowerCase().includes('log in to facebook') ||
-    post.mediaUrl?.includes('/login/')
+    post.mediaUrl?.includes('/login/') ||
+    !post.embed_html  // No embed_html usually means unavailable
   );
 
   const r = resolveRenderer(post);
-  console.log('renderer', post.id, post.platform, post.mediaUrl, r.kind, 'isLoginPage:', isFacebookLoginPage);
+  console.log('renderer', post.id, post.platform, post.mediaUrl, r.kind, 'isFBUnavailable:', isFacebookUnavailable);
 
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
@@ -442,18 +443,18 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               </ImageViewTracker>
             )}
             {r.kind === 'article' && !post.isRealPost && <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />}
-            {r.kind === 'universal' && !isFacebookLoginPage && post.isRealPost && (
+            {r.kind === 'universal' && !isFacebookUnavailable && post.isRealPost && (
               <ImageViewTracker postId={post.id}>
                 <UniversalMetaEmbed url={r.url} />
               </ImageViewTracker>
             )}
-            {r.kind === 'universal' && !isFacebookLoginPage && !post.isRealPost && <UniversalMetaEmbed url={r.url} />}
-            {r.kind === 'universal' && isFacebookLoginPage && (
+            {r.kind === 'universal' && !isFacebookUnavailable && !post.isRealPost && <UniversalMetaEmbed url={r.url} />}
+            {r.kind === 'universal' && isFacebookUnavailable && (
               <OgCardFallback
                 url={r.url}
-                title={(post as any).preview_title || (post as any).title || "Post not available"}
+                title={(post as any).preview_title || (post as any).title || "Facebook Post"}
                 image={(post as any).thumbnail_url || (post as any).preview_image_url}
-                description={(post as any).preview_text || "This Facebook post may no longer be available or requires login to view."}
+                description={(post as any).preview_text || "This Facebook post is no longer available, has been removed, or the privacy settings have changed."}
                 platform="Facebook"
               />
             )}
