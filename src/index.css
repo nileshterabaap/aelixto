@@ -142,11 +142,13 @@ span[data-pin-href] button {
   border-radius: 1rem !important;
 }
 
-/* Facebook embed styles */
+/* Facebook embed styles - Let SDK handle sizing */
 .embed-container .fb-post,
-.embed-container .fb-video,
+.embed-container .fb-video {
+  margin: 0 auto !important;
+}
+
 .embed-container iframe[src*="facebook.com"] {
   max-width: 100% !important;
-  width: 100% !important;
   margin: 0 auto !important;
 }
