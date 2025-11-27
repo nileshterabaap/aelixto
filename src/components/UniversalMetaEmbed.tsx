@@ -271,11 +271,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     const isFacebookEmbed = embedHtml.includes('fb-post');
     
     return (
-      <div className={`relative w-full overflow-hidden [&>*]:block [&>*]:!m-0 ${
-        isFacebookEmbed 
-          ? 'max-w-full max-h-[600px] [&_.fb-post]:!max-w-full [&_.fb-post]:!w-full [&_.fb-post]:!max-h-[600px] [&_iframe]:!max-w-full [&_iframe]:!w-full [&_iframe]:!max-h-[600px] [&>div]:!max-h-[600px] overflow-y-auto' 
-          : ''
-      }`}>
+      <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
         <RawEmbedRenderer 
           embedHtml={embedHtml} 
           onError={() => {
