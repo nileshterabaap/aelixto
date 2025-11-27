@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadInstagramEmbed, loadFacebookSDK } from '@/lib/ScriptLoader';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface RawEmbedRendererProps {
   embedHtml: string;
@@ -60,6 +61,7 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
 export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [embedFailed, setEmbedFailed] = useState(false);
+  const isMobile = useIsMobile();
   const platform = detectPlatform(embedHtml);
   let sanitizedHtml = sanitizeEmbedHtml(embedHtml);
   
@@ -199,7 +201,11 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   return (
     <div 
       ref={containerRef}
-      className="embed-container w-full [&>*]:!m-0 [&>iframe]:w-full [&>iframe]:block [&_.fb-post]:!w-auto [&_.fb-video]:!w-auto"
+      className="embed-container w-full [&>*]:!m-0 [&>iframe]:w-full [&>iframe]:block"
+      style={isMobile && platform === 'facebook' ? { 
+        maxWidth: '100%',
+        overflow: 'hidden'
+      } : undefined}
       dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );
