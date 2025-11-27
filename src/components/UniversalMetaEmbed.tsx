@@ -86,7 +86,8 @@ const normalizeFacebookUrl = (raw: string): string => {
     'sfnsn',
     'app',
     'paipv',
-    'rdid', // Remove rdid as it causes login redirects on mobile
+    'rdid', // Remove rdid as it causes sizing issues
+    'share_url', // Remove share_url wrapper
   ];
   
   try {
@@ -113,9 +114,8 @@ const buildFacebookEmbed = (url: string): string => {
     embedType: 'sdk-xfbml-div'
   });
   
-  // Use Facebook SDK approach with <div class="fb-post">
-  // Use data-width="auto" to let SDK size based on container
-  return `<div class="fb-post" data-href="${canonical}" data-show-text="true" data-width="auto"></div>`;
+  // Use Facebook SDK approach with explicit width for mobile
+  return `<div class="fb-post" data-href="${canonical}" data-show-text="true" data-width="350"></div>`;
 };
 
 // Build Spotify embed HTML
@@ -271,7 +271,11 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     const isFacebookEmbed = embedHtml.includes('fb-post');
     
     return (
-      <div className="relative w-full overflow-hidden [&>*]:block [&>*]:!m-0">
+      <div className={`relative w-full overflow-hidden ${
+        isFacebookEmbed 
+          ? 'max-h-[500px] [&_.fb-post]:max-w-full [&_iframe]:max-w-full [&_iframe]:max-h-[500px]' 
+          : ''
+      }`}>
         <RawEmbedRenderer 
           embedHtml={embedHtml} 
           onError={() => {
