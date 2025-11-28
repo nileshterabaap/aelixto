@@ -35,7 +35,6 @@ import { resolveRenderer } from "@/lib/resolveRenderer";
 import { QuoraPreviewCard } from "@/features/article-embeds/QuoraPreviewCard";
 import { useVideoPlayTracking } from "@/hooks/useViewTracking";
 import { ImageViewTracker } from "@/components/ImageViewTracker";
-import { cn } from "@/lib/utils";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -320,15 +319,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const r = resolveRenderer(post);
   console.log('renderer', post.id, post.platform, post.mediaUrl, r.kind, 'isFBUnavailable:', isFacebookUnavailable);
 
-  // Detect if this is a Facebook universal embed
-  const isUniversalFacebook = 
-    r.kind === 'universal' && post.mediaUrl?.toLowerCase().includes('facebook.com');
-
   return (
-    <Card className={cn(
-      'border-2 border-foreground rounded-[2rem]',
-      !isUniversalFacebook && 'overflow-hidden'
-    )}>
+    <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
       <div className="p-5">
         {/* Repost Indicator */}
         {post.isRepost && post.repostedByUsername && (

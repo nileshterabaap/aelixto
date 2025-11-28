@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
-import { cn } from '@/lib/utils';
 
 interface UniversalMetaEmbedProps {
   url: string;
@@ -115,8 +114,8 @@ const buildFacebookEmbed = (url: string): string => {
     embedType: 'sdk-xfbml-div'
   });
   
-  // Use Facebook SDK approach with full width
-  return `<div class="fb-post" data-href="${canonical}" data-show-text="true" data-width="100%"></div>`;
+  // Use Facebook SDK approach with explicit width for mobile
+  return `<div class="fb-post" data-href="${canonical}" data-show-text="true" data-width="350"></div>`;
 };
 
 // Build Spotify embed HTML
@@ -270,15 +269,13 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     
     // For Instagram AND Facebook, use RawEmbedRenderer for SDK processing
     const isFacebookEmbed = embedHtml.includes('fb-post');
-    const isFacebook = expandedUrl?.toLowerCase().includes('facebook.com');
     
     return (
-      <div className={cn(
-        'relative w-full',
-        isFacebook ? 'overflow-visible' : 'overflow-hidden',
-        !isFacebook && 'max-h-[500px]',
-        isFacebook ? '[&_.fb-post]:w-full [&_.fb-post]:max-w-full [&_iframe]:w-full [&_iframe]:max-w-full' : '[&_iframe]:max-h-[500px]'
-      )}>
+      <div className={`relative w-full overflow-hidden ${
+        isFacebookEmbed 
+          ? 'max-h-[500px] [&_.fb-post]:max-w-full [&_iframe]:max-w-full [&_iframe]:max-h-[500px]' 
+          : ''
+      }`}>
         <RawEmbedRenderer 
           embedHtml={embedHtml} 
           onError={() => {

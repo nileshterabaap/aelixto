@@ -142,7 +142,7 @@ span[data-pin-href] button {
   border-radius: 1rem !important;
 }
 
-/* Facebook embed styles - no height constraints */
+/* Facebook embed styles */
 .embed-container .fb-post,
 .embed-container .fb-video {
   max-width: 100% !important;
@@ -151,33 +151,6 @@ span[data-pin-href] button {
 }
 
 .embed-container iframe[src*="facebook.com"] {
-  max-width: 100% !important;
-  width: 100% !important;
-  /* No max-height for Facebook - let SDK control natural height */
-  margin: 0 auto !important;
-}
-
-/* Facebook iframes: remove ALL height constraints globally */
-.fb-post,
-.fb-post iframe,
-iframe[src*="facebook.com/plugins/post.php"],
-iframe[src*="facebook.com/plugins/video.php"],
-iframe[src*="facebook.com/plugins"] {
-  width: 100% !important;
-  max-width: 100% !important;
-  height: auto !important;
-  max-height: none !important;
-  min-height: 0 !important;
-}
-
-/* Other platform embeds - keep 500px max height */
-.embed-container iframe[src*="youtube.com"],
-.embed-container iframe[src*="youtu.be"],
-.embed-container iframe[src*="reddit.com"],
-.embed-container iframe[src*="twitter.com"],
-.embed-container iframe[src*="x.com"],
-.embed-container iframe[src*="instagram.com"],
-.embed-container iframe[src*="tiktok.com"] {
   max-width: 100% !important;
   width: 100% !important;
   max-height: 500px !important;
