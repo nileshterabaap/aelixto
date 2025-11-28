@@ -157,6 +157,19 @@ span[data-pin-href] button {
   margin: 0 auto !important;
 }
 
+/* Facebook iframes: remove ALL height constraints globally */
+.fb-post,
+.fb-post iframe,
+iframe[src*="facebook.com/plugins/post.php"],
+iframe[src*="facebook.com/plugins/video.php"],
+iframe[src*="facebook.com/plugins"] {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  min-height: 0 !important;
+}
+
 /* Other platform embeds - keep 500px max height */
 .embed-container iframe[src*="youtube.com"],
 .embed-container iframe[src*="youtu.be"],
