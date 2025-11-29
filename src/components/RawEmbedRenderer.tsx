@@ -200,7 +200,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   return (
     <div 
       ref={containerRef}
-      className="embed-container w-full max-w-full min-h-[350px] [&>*]:!m-0 [&_.fb-post]:!max-w-full [&_.fb-video]:!max-w-full"
+      className="embed-container w-full max-w-full min-h-[500px] [&>*]:!m-0 [&_.fb-post]:!max-w-full [&_.fb-video]:!max-w-full"
       dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );

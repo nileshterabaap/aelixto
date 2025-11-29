@@ -150,7 +150,7 @@ span[data-pin-href] button {
   max-width: 100% !important;
   width: 100% !important;
   height: auto !important;
-  min-height: 350px !important;
+  min-height: 500px !important;
 }
 
 .fb-post > span,
@@ -166,5 +166,5 @@ span[data-pin-href] button {
   max-width: 100% !important;
   width: 100% !important;
   height: auto !important;
-  min-height: 350px !important;
+  min-height: 500px !important;
 }
