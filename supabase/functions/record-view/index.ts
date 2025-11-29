@@ -82,6 +82,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Prevent self-view tracking to avoid Aelix score manipulation
+    if (viewer_id && viewer_id === post.user_id) {
+      return new Response(
+        JSON.stringify({ ok: false, reason: 'Cannot track views on your own posts' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Hash IP server-side
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0] || 
                      req.headers.get('x-real-ip') || 
