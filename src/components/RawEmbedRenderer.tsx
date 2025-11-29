@@ -200,7 +200,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   return (
     <div 
       ref={containerRef}
-      className="embed-container w-full [&>*]:!m-0 [&>iframe]:w-full [&>iframe]:block"
+      className="embed-container w-full overflow-hidden [&>*]:!m-0"
       dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );
