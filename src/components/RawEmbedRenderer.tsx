@@ -129,13 +129,40 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
               console.log('[RawEmbedRenderer] Parsing Facebook embed');
               window.FB.XFBML.parse(containerRef.current);
               
+              // Apply responsive sizing after Facebook renders
+              const applyResponsiveSizing = () => {
+                if (containerRef.current) {
+                  const fbPost = containerRef.current.querySelector('.fb-post, .fb-video');
+                  const iframe = containerRef.current.querySelector('iframe');
+                  
+                  if (fbPost) {
+                    (fbPost as HTMLElement).style.width = '100%';
+                    (fbPost as HTMLElement).style.maxWidth = '100%';
+                  }
+                  
+                  if (iframe) {
+                    console.log('[RawEmbedRenderer] Applying responsive sizing to Facebook iframe');
+                    (iframe as HTMLElement).style.width = '100%';
+                    (iframe as HTMLElement).style.maxWidth = '100%';
+                    (iframe as HTMLElement).style.height = 'auto';
+                    (iframe as HTMLElement).style.aspectRatio = '9 / 16';
+                  }
+                }
+              };
+              
               // Check for errors multiple times with more aggressive detection
               const checkForError = () => {
                 if (containerRef.current) {
                   const text = (containerRef.current.textContent || '').toLowerCase();
                   const fbError = containerRef.current.querySelector('.fb-error');
+                  const iframe = containerRef.current.querySelector('iframe');
                   
                   console.log('[RawEmbedRenderer] Checking for FB errors. Text length:', text.length, 'Text:', text.substring(0, 200));
+                  
+                  // If iframe exists, apply sizing
+                  if (iframe) {
+                    applyResponsiveSizing();
+                  }
                   
                   // Aggressive error detection - check for ANY Facebook error indicators
                   const hasError = fbError ||
@@ -155,7 +182,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
                     text.includes('log in to facebook') ||
                     text.includes('login to facebook') ||
                     // If there's text but no iframe after checking, it's likely an error
-                    (text.length > 30 && !containerRef.current.querySelector('iframe'));
+                    (text.length > 30 && !iframe);
                   
                   if (hasError) {
                     console.log('[RawEmbedRenderer] Facebook embed error detected! Text:', text.substring(0, 200));
