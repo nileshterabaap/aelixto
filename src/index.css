@@ -149,15 +149,12 @@ span[data-pin-href] button {
   margin: 0 auto !important;
   max-width: 100% !important;
   width: 100% !important;
-  height: auto !important;
-  min-height: 500px !important;
 }
 
 .fb-post > span,
 .fb-video > span {
   max-width: 100% !important;
   width: 100% !important;
-  height: auto !important;
   display: block !important;
 }
 
@@ -165,6 +162,4 @@ span[data-pin-href] button {
 .fb-video iframe {
   max-width: 100% !important;
   width: 100% !important;
-  height: auto !important;
-  min-height: 500px !important;
 }
