@@ -147,7 +147,7 @@ span[data-pin-href] button {
 .fb-video {
   width: 100% !important;
   max-width: 100% !important;
-  margin: 0 auto !important;
+  margin: 0 !important;
 }
 
 .fb-post iframe,
@@ -155,7 +155,5 @@ span[data-pin-href] button {
 iframe[src*="facebook.com"] {
   width: 100% !important;
   max-width: 100% !important;
-  height: auto !important;
-  aspect-ratio: 9 / 16 !important;
-  margin: 0 auto !important;
+  margin: 0 !important;
 }
