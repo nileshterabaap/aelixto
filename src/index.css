@@ -142,17 +142,20 @@ span[data-pin-href] button {
   border-radius: 1rem !important;
 }
 
-/* Facebook embed styles */
-.embed-container .fb-post,
-.embed-container .fb-video {
-  max-width: 100% !important;
+/* Facebook embed responsive sizing */
+.fb-post,
+.fb-video {
   width: 100% !important;
+  max-width: 100% !important;
   margin: 0 auto !important;
 }
 
-.embed-container iframe[src*="facebook.com"] {
-  max-width: 100% !important;
+.fb-post iframe,
+.fb-video iframe,
+iframe[src*="facebook.com"] {
   width: 100% !important;
-  max-height: 500px !important;
+  max-width: 100% !important;
+  height: auto !important;
+  aspect-ratio: 9 / 16 !important;
   margin: 0 auto !important;
 }
