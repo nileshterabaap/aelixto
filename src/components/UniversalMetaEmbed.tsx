@@ -114,8 +114,8 @@ const buildFacebookEmbed = (url: string): string => {
     embedType: 'sdk-xfbml-div'
   });
   
-  // Use Facebook SDK without width constraint - let it render naturally
-  return `<div class="fb-post" data-href="${canonical}" data-show-text="true"></div>`;
+  // Use responsive width for mobile compatibility
+  return `<div class="fb-post" data-href="${canonical}" data-width="500" data-show-text="true"></div>`;
 };
 
 // Build Spotify embed HTML
