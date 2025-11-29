@@ -271,19 +271,13 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     const isFacebookEmbed = embedHtml.includes('fb-post');
     
     return (
-      <div className={`relative w-full ${
-        isFacebookEmbed 
-          ? '[&_.fb-post]:!w-full [&_iframe]:!w-full [&_iframe]:!max-w-full [&_iframe]:aspect-[9/16]' 
-          : ''
-      }`}>
-        <RawEmbedRenderer 
-          embedHtml={embedHtml} 
-          onError={() => {
-            console.log('[UniversalMetaEmbed] onError called, setting showFallback to true');
-            setShowFallback(true);
-          }}
-        />
-      </div>
+      <RawEmbedRenderer 
+        embedHtml={embedHtml} 
+        onError={() => {
+          console.log('[UniversalMetaEmbed] onError called, setting showFallback to true');
+          setShowFallback(true);
+        }}
+      />
     );
   }
   
