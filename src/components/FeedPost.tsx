@@ -97,6 +97,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [blogFavicon, setBlogFavicon] = useState<string | null>(null);
   const trackVideoPlay = useVideoPlayTracking();
+  const lastTapRef = useState(0);
   
   // Try to get platform from post.platform or detect from URL
   const detectedPlatform = post.platform || detectPlatformFromUrl(post.mediaUrl);
@@ -166,6 +167,20 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
       }
       setIsPlayingVideo(true);
     }
+  };
+
+  const handleYouTubeDoubleTap = () => {
+    const now = Date.now();
+    const timeSinceLastTap = now - lastTapRef[0];
+    
+    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+      // Double tap detected - redirect to YouTube
+      if (post.mediaUrl) {
+        window.open(post.mediaUrl, '_blank', 'noopener,noreferrer');
+      }
+    }
+    
+    lastTapRef[1](now);
   };
 
   const handleNonYouTubeVideoPlay = async () => {
@@ -497,7 +512,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                   ) : (
                     <div 
                       className="w-full h-full cursor-pointer group"
-                      onClick={handleVideoClick}
+                      onClick={(e) => {
+                        handleYouTubeDoubleTap();
+                        handleVideoClick();
+                      }}
                     >
                       <img
                         src={getYouTubeThumbnail(r.url)}

@@ -59,6 +59,7 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
 
 export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastTapRef = useRef<number>(0);
   const [embedFailed, setEmbedFailed] = useState(false);
   const platform = detectPlatform(embedHtml);
   let sanitizedHtml = sanitizeEmbedHtml(embedHtml);
@@ -67,6 +68,34 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   if (platform === 'facebook') {
     sanitizedHtml = transformFacebookEmbed(sanitizedHtml);
   }
+
+  // Extract URL from embed HTML for double-tap redirection
+  const getEmbedUrl = () => {
+    if (platform === 'instagram') {
+      const match = embedHtml.match(/https:\/\/www\.instagram\.com\/[^\s"]+/);
+      return match?.[0] || null;
+    }
+    if (platform === 'facebook') {
+      const match = embedHtml.match(/data-href="([^"]+)"/);
+      return match?.[1] || null;
+    }
+    return null;
+  };
+
+  const handleDoubleTap = () => {
+    const now = Date.now();
+    const timeSinceLastTap = now - lastTapRef.current;
+    
+    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+      // Double tap detected
+      const url = getEmbedUrl();
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+    }
+    
+    lastTapRef.current = now;
+  };
 
   console.log('[RawEmbedRenderer] Platform detected:', platform);
   console.log('[RawEmbedRenderer] Embed HTML:', embedHtml);
@@ -200,7 +229,8 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   return (
     <div 
       ref={containerRef}
-      className="embed-container w-full max-w-full min-h-[500px] [&>*]:!m-0 [&_.fb-post]:!max-w-full [&_.fb-video]:!max-w-full"
+      onClick={handleDoubleTap}
+      className="embed-container w-full max-w-full min-h-[500px] [&>*]:!m-0 [&_.fb-post]:!max-w-full [&_.fb-video]:!max-w-full cursor-pointer"
       dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );

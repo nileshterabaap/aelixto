@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
@@ -139,6 +139,19 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   const [expandedUrl, setExpandedUrl] = useState(url);
   const [embedUrl, setEmbedUrl] = useState(url); // Separate URL for embedding
   const [showFallback, setShowFallback] = useState(false);
+  const lastTapRef = useRef<number>(0);
+
+  const handleDoubleTap = () => {
+    const now = Date.now();
+    const timeSinceLastTap = now - lastTapRef.current;
+    
+    if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
+      // Double tap detected
+      window.open(embedUrl, '_blank', 'noopener,noreferrer');
+    }
+    
+    lastTapRef.current = now;
+  };
 
   useEffect(() => {
     const processUrl = async () => {
@@ -271,13 +284,15 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     const isFacebookEmbed = embedHtml.includes('fb-post');
     
     return (
-      <RawEmbedRenderer 
-        embedHtml={embedHtml} 
-        onError={() => {
-          console.log('[UniversalMetaEmbed] onError called, setting showFallback to true');
-          setShowFallback(true);
-        }}
-      />
+      <div onClick={handleDoubleTap}>
+        <RawEmbedRenderer 
+          embedHtml={embedHtml} 
+          onError={() => {
+            console.log('[UniversalMetaEmbed] onError called, setting showFallback to true');
+            setShowFallback(true);
+          }}
+        />
+      </div>
     );
   }
   
