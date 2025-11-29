@@ -65,8 +65,61 @@ const UserProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="min-h-screen bg-background pb-20">
+        <main className="mx-auto max-w-2xl">
+          {/* Cover Skeleton */}
+          <div className="relative h-[400px] bg-gradient-to-r from-purple-500/20 to-pink-500/20 animate-shimmer" />
+          
+          {/* Profile Content */}
+          <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
+            {/* Avatar and Stats Container */}
+            <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
+              {/* Left Stats */}
+              <div className="text-center flex-shrink-0 w-20 -ml-2">
+                <div className="h-7 w-14 bg-muted rounded-md mb-1 mx-auto animate-shimmer" />
+                <div className="h-3 w-16 bg-muted rounded-md mx-auto animate-shimmer" />
+              </div>
+              
+              {/* Avatar - Centered */}
+              <div className="absolute left-1/2 -translate-x-1/2 -mt-20">
+                <div className="h-[140px] w-[140px] rounded-full bg-muted border-[8px] border-background animate-shimmer" />
+              </div>
+              
+              {/* Right Stats */}
+              <div className="text-center flex-shrink-0 w-20 -mr-2">
+                <div className="h-7 w-14 bg-muted rounded-md mb-1 mx-auto animate-shimmer" />
+                <div className="h-3 w-16 bg-muted rounded-md mx-auto animate-shimmer" />
+              </div>
+            </div>
+
+            {/* Aelix Score */}
+            <div className="flex justify-center mt-4 mb-4">
+              <div className="border-2 border-muted rounded-[16px] px-10 py-2">
+                <div className="h-7 w-16 bg-muted rounded-md mb-1 mx-auto animate-shimmer" />
+                <div className="h-2 w-20 bg-muted rounded-md mx-auto animate-shimmer" />
+              </div>
+            </div>
+
+            {/* Bio Skeleton */}
+            <div className="text-center px-4 mb-6">
+              <div className="h-4 w-3/4 bg-muted rounded-md mx-auto mb-2 animate-shimmer" />
+              <div className="h-4 w-1/2 bg-muted rounded-md mx-auto animate-shimmer" />
+            </div>
+
+            {/* Button Skeleton */}
+            <div className="h-12 w-full bg-muted rounded-full mb-6 animate-shimmer" />
+
+            {/* Platform Buttons Skeleton */}
+            <div className="overflow-x-auto no-scrollbar mb-8">
+              <div className="flex gap-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="min-w-[80px] h-16 bg-muted rounded-full animate-shimmer" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </main>
+        <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
       </div>
     );
   }
