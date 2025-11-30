@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { OgCardFallback } from '@/components/OgCardFallback';
+import { InstagramCaptionDisplay } from '@/components/InstagramCaptionDisplay';
 import { supabase } from '@/integrations/supabase/client';
 
 interface UniversalMetaEmbedProps {
@@ -139,6 +140,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   const [expandedUrl, setExpandedUrl] = useState(url);
   const [embedUrl, setEmbedUrl] = useState(url); // Separate URL for embedding
   const [showFallback, setShowFallback] = useState(false);
+  const [caption, setCaption] = useState<string>('');
   const lastTapRef = useRef<number>(0);
 
   const handleDoubleTap = () => {
@@ -212,6 +214,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         }).then(({ data: ogData, error: ogError }) => {
           if (!ogError && ogData) {
             const ogTitle = ogData.meta?.title || ogData.title;
+            const ogDescription = ogData.meta?.description || ogData.description;
             
             // Check if the OG data indicates a login page
             if (ogTitle?.toLowerCase().includes('log in to facebook') && platform === 'facebook') {
@@ -220,10 +223,15 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               setShowFallback(true);
             }
             
+            // Extract caption for Instagram posts
+            if (platform === 'instagram' && ogDescription) {
+              setCaption(ogDescription);
+            }
+            
             setFallbackData({
               title: ogTitle,
               image: ogData.meta?.image || ogData.image,
-              description: ogData.meta?.description || ogData.description
+              description: ogDescription
             });
           }
         }).catch(err => console.warn('[UniversalMetaEmbed] OG fetch failed:', err));
@@ -270,6 +278,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     
     // For Spotify only, render directly without RawEmbedRenderer
     const isSpotifyIframe = embedHtml.includes('open.spotify.com/embed');
+    const isInstagramEmbed = embedHtml.includes('instagram-media');
     
     if (isSpotifyIframe) {
       return (
@@ -284,14 +293,19 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     const isFacebookEmbed = embedHtml.includes('fb-post');
     
     return (
-      <div onClick={handleDoubleTap}>
-        <RawEmbedRenderer 
-          embedHtml={embedHtml} 
-          onError={() => {
-            console.log('[UniversalMetaEmbed] onError called, setting showFallback to true');
-            setShowFallback(true);
-          }}
-        />
+      <div>
+        <div onClick={handleDoubleTap}>
+          <RawEmbedRenderer 
+            embedHtml={embedHtml} 
+            onError={() => {
+              console.log('[UniversalMetaEmbed] onError called, setting showFallback to true');
+              setShowFallback(true);
+            }}
+          />
+        </div>
+        {isInstagramEmbed && caption && (
+          <InstagramCaptionDisplay caption={caption} />
+        )}
       </div>
     );
   }
