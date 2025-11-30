@@ -510,9 +510,9 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                   {isPlayingVideo ? (
                     <iframe
                       className="w-full h-full"
-                      src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=1`}
+                      src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=1&mute=1&playsinline=1&rel=0`}
                       title="YouTube video player"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                       allowFullScreen
                     />
                   ) : (
