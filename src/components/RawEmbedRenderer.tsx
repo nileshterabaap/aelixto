@@ -46,16 +46,6 @@ const transformFacebookEmbed = (html: string): string => {
   return html;
 };
 
-// Add caption truncation for Instagram embeds
-// Note: Due to CORS, we cannot access Instagram iframe content directly.
-// The Instagram SDK should handle caption display with native "more" functionality.
-// If captions aren't showing, ensure data-instgrm-captioned attribute is set in the blockquote.
-const addInstagramCaptionTruncation = (container: HTMLElement) => {
-  // This function is kept for potential future enhancement
-  // Currently, Instagram SDK handles caption display natively
-  console.log('[Instagram] Caption display is handled by Instagram SDK');
-};
-
 // Detect platform from embed HTML
 const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
   if (html.includes('instagram.com') || html.includes('instagram-media')) {
@@ -158,13 +148,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           };
           
           await processWithRetry();
-          
-          // Add caption truncation logic for Instagram
-          setTimeout(() => {
-            if (containerRef.current) {
-              addInstagramCaptionTruncation(containerRef.current);
-            }
-          }, 2000);
         } else if (platform === 'facebook') {
           console.log('[RawEmbedRenderer] Loading Facebook SDK...');
           await loadFacebookSDK();
