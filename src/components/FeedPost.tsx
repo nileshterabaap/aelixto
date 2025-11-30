@@ -159,28 +159,33 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
     return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : url;
   };
 
-  const handleVideoClick = async () => {
-    if (post.mediaType === 'video' && post.platform === 'youtube' && post.mediaUrl) {
-      // Track video play event before starting playback
-      if (post.isRealPost) {
-        await trackVideoPlay(post.id);
-      }
-      setIsPlayingVideo(true);
-    }
-  };
-
-  const handleYouTubeDoubleTap = () => {
+  const handleYouTubeClick = async () => {
     const now = Date.now();
     const timeSinceLastTap = now - lastTapRef.current;
     
+    // Check if this is a double tap
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
-      // Double tap detected - redirect to YouTube
+      // Double tap detected - redirect to YouTube instead of playing
       if (post.mediaUrl) {
         window.open(post.mediaUrl, '_blank', 'noopener,noreferrer');
       }
+      lastTapRef.current = 0; // Reset to prevent triple-tap issues
+      return;
     }
     
+    // Single tap - play video immediately
     lastTapRef.current = now;
+    
+    if (post.isRealPost) {
+      trackVideoPlay(post.id); // Don't await to avoid delay
+    }
+    setIsPlayingVideo(true);
+  };
+
+  const handleVideoClick = async () => {
+    if (post.mediaType === 'video' && post.platform === 'youtube' && post.mediaUrl) {
+      await handleYouTubeClick();
+    }
   };
 
   const handleNonYouTubeVideoPlay = async () => {
@@ -512,10 +517,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                   ) : (
                     <div 
                       className="w-full h-full cursor-pointer group"
-                      onClick={(e) => {
-                        handleYouTubeDoubleTap();
-                        handleVideoClick();
-                      }}
+                      onClick={handleVideoClick}
                     >
                       <img
                         src={getYouTubeThumbnail(r.url)}
