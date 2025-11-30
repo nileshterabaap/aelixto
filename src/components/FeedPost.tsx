@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
-import { useState, memo } from "react";
+import { useState, useRef, memo } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
@@ -97,7 +97,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [blogFavicon, setBlogFavicon] = useState<string | null>(null);
   const trackVideoPlay = useVideoPlayTracking();
-  const lastTapRef = useState(0);
+  const lastTapRef = useRef<number>(0);
   
   // Try to get platform from post.platform or detect from URL
   const detectedPlatform = post.platform || detectPlatformFromUrl(post.mediaUrl);
@@ -171,7 +171,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
 
   const handleYouTubeDoubleTap = () => {
     const now = Date.now();
-    const timeSinceLastTap = now - lastTapRef[0];
+    const timeSinceLastTap = now - lastTapRef.current;
     
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
       // Double tap detected - redirect to YouTube
@@ -180,7 +180,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
       }
     }
     
-    lastTapRef[1](now);
+    lastTapRef.current = now;
   };
 
   const handleNonYouTubeVideoPlay = async () => {
