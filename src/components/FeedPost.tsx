@@ -159,9 +159,17 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
     return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : url;
   };
 
-  const handleYouTubeClick = async () => {
+  const playTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleYouTubeClick = () => {
     const now = Date.now();
     const timeSinceLastTap = now - lastTapRef.current;
+    
+    // Clear any pending play timeout
+    if (playTimeoutRef.current) {
+      clearTimeout(playTimeoutRef.current);
+      playTimeoutRef.current = null;
+    }
     
     // Check if this is a double tap
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
@@ -173,18 +181,20 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
       return;
     }
     
-    // Single tap - play video immediately
+    // Single tap - delay video play to allow for double-tap detection
     lastTapRef.current = now;
     
-    if (post.isRealPost) {
-      trackVideoPlay(post.id); // Don't await to avoid delay
-    }
-    setIsPlayingVideo(true);
+    playTimeoutRef.current = setTimeout(() => {
+      if (post.isRealPost) {
+        trackVideoPlay(post.id);
+      }
+      setIsPlayingVideo(true);
+    }, 300);
   };
 
-  const handleVideoClick = async () => {
+  const handleVideoClick = () => {
     if (post.mediaType === 'video' && post.platform === 'youtube' && post.mediaUrl) {
-      await handleYouTubeClick();
+      handleYouTubeClick();
     }
   };
 
