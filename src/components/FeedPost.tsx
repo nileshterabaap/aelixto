@@ -440,35 +440,119 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               </LazyEmbed>
             )}
             {r.kind === 'reddit' && post.isRealPost && (
-              <ImageViewTracker postId={post.id}>
+              <LazyEmbed
+                thumbnailUrl={(post as any).thumbnail_url}
+                previewTitle={(post as any).preview_title}
+                previewText={(post as any).preview_text}
+                platform={post.platform || undefined}
+                mediaUrl={post.mediaUrl}
+              >
+                <ImageViewTracker postId={post.id}>
+                  <RedditEmbed url={r.url} />
+                </ImageViewTracker>
+              </LazyEmbed>
+            )}
+            {r.kind === 'reddit' && !post.isRealPost && (
+              <LazyEmbed
+                thumbnailUrl={(post as any).thumbnail_url}
+                platform={post.platform || undefined}
+                mediaUrl={post.mediaUrl}
+              >
                 <RedditEmbed url={r.url} />
-              </ImageViewTracker>
+              </LazyEmbed>
             )}
-            {r.kind === 'reddit' && !post.isRealPost && <RedditEmbed url={r.url} />}
             {r.kind === 'twitter' && post.isRealPost && (
-              <ImageViewTracker postId={post.id}>
+              <LazyEmbed
+                thumbnailUrl={(post as any).thumbnail_url}
+                previewTitle={(post as any).preview_title}
+                previewText={(post as any).preview_text}
+                platform={post.platform || undefined}
+                mediaUrl={post.mediaUrl}
+              >
+                <ImageViewTracker postId={post.id}>
+                  <TwitterEmbed url={r.url} />
+                </ImageViewTracker>
+              </LazyEmbed>
+            )}
+            {r.kind === 'twitter' && !post.isRealPost && (
+              <LazyEmbed
+                thumbnailUrl={(post as any).thumbnail_url}
+                platform={post.platform || undefined}
+                mediaUrl={post.mediaUrl}
+              >
                 <TwitterEmbed url={r.url} />
-              </ImageViewTracker>
+              </LazyEmbed>
             )}
-            {r.kind === 'twitter' && !post.isRealPost && <TwitterEmbed url={r.url} />}
             {r.kind === 'pinterest' && post.isRealPost && (
-              <ImageViewTracker postId={post.id}>
+              <LazyEmbed
+                thumbnailUrl={(post as any).thumbnail_url}
+                previewTitle={(post as any).preview_title}
+                previewText={(post as any).preview_text}
+                platform={post.platform || undefined}
+                mediaUrl={post.mediaUrl}
+              >
+                <ImageViewTracker postId={post.id}>
+                  <PinterestEmbed url={r.url} />
+                </ImageViewTracker>
+              </LazyEmbed>
+            )}
+            {r.kind === 'pinterest' && !post.isRealPost && (
+              <LazyEmbed
+                thumbnailUrl={(post as any).thumbnail_url}
+                platform={post.platform || undefined}
+                mediaUrl={post.mediaUrl}
+              >
                 <PinterestEmbed url={r.url} />
-              </ImageViewTracker>
+              </LazyEmbed>
             )}
-            {r.kind === 'pinterest' && !post.isRealPost && <PinterestEmbed url={r.url} />}
             {r.kind === 'article' && post.isRealPost && (
-              <ImageViewTracker postId={post.id}>
+              <LazyEmbed
+                thumbnailUrl={(post as any).thumbnail_url}
+                previewTitle={(post as any).preview_title}
+                previewText={(post as any).preview_text}
+                platform={post.platform || undefined}
+                mediaUrl={post.mediaUrl}
+                autoLoad={false}
+              >
+                <ImageViewTracker postId={post.id}>
+                  <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
+                </ImageViewTracker>
+              </LazyEmbed>
+            )}
+            {r.kind === 'article' && !post.isRealPost && (
+              <LazyEmbed
+                thumbnailUrl={(post as any).thumbnail_url}
+                previewTitle={(post as any).preview_title}
+                previewText={(post as any).preview_text}
+                platform={post.platform || undefined}
+                mediaUrl={post.mediaUrl}
+                autoLoad={false}
+              >
                 <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
-              </ImageViewTracker>
+              </LazyEmbed>
             )}
-            {r.kind === 'article' && !post.isRealPost && <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />}
             {r.kind === 'universal' && !isFacebookUnavailable && post.isRealPost && (
-              <ImageViewTracker postId={post.id}>
-                <UniversalMetaEmbed url={r.url} />
-              </ImageViewTracker>
+              <LazyEmbed
+                thumbnailUrl={(post as any).thumbnail_url}
+                previewTitle={(post as any).preview_title}
+                previewText={(post as any).preview_text}
+                platform={post.platform || undefined}
+                mediaUrl={post.mediaUrl}
+              >
+                <ImageViewTracker postId={post.id}>
+                  <UniversalMetaEmbed url={r.url} />
+                </ImageViewTracker>
+              </LazyEmbed>
             )}
-            {r.kind === 'universal' && !isFacebookUnavailable && !post.isRealPost && <UniversalMetaEmbed url={r.url} />}
+            {r.kind === 'universal' && !isFacebookUnavailable && !post.isRealPost && (
+              <LazyEmbed
+                thumbnailUrl={(post as any).thumbnail_url}
+                platform={post.platform || undefined}
+                mediaUrl={post.mediaUrl}
+              >
+                <UniversalMetaEmbed url={r.url} />
+              </LazyEmbed>
+            )}
             {r.kind === 'universal' && isFacebookUnavailable && (
               <OgCardFallback
                 url={r.url}
