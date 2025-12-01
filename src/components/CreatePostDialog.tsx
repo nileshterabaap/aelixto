@@ -54,8 +54,40 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
           console.error("Failed to fetch video title:", error);
         }
       }
-    } else {
-      // Fetch OG data for all platforms (Instagram, Twitter, Reddit, Facebook, etc.)
+    } else if (linkUrl.includes("reddit.com") || linkUrl.includes("redd.it")) {
+      // Try Reddit JSON API for better thumbnail extraction
+      try {
+        const redditUrl = linkUrl.endsWith('.json') ? linkUrl : `${linkUrl}.json`;
+        const response = await fetch(redditUrl);
+        if (response.ok) {
+          const data = await response.json();
+          const post = data[0]?.data?.children?.[0]?.data;
+          if (post) {
+            videoTitle = post.title || "";
+            // Try to get the best thumbnail from Reddit
+            thumbnail = post.preview?.images?.[0]?.source?.url?.replace(/&amp;/g, '&') || 
+                       post.thumbnail || "";
+          }
+        }
+      } catch (error) {
+        console.error('[CreatePostDialog] Reddit API failed, falling back to OG:', error);
+      }
+    } else if (linkUrl.includes("instagram.com")) {
+      // Instagram oEmbed API
+      try {
+        const response = await fetch(`https://api.instagram.com/oembed?url=${encodeURIComponent(linkUrl)}`);
+        if (response.ok) {
+          const data = await response.json();
+          videoTitle = data.title || "";
+          thumbnail = data.thumbnail_url || "";
+        }
+      } catch (error) {
+        console.error('[CreatePostDialog] Instagram oEmbed failed:', error);
+      }
+    }
+    
+    // If no thumbnail yet, fetch OG data for all platforms
+    if (!thumbnail) {
       console.log('[CreatePostDialog] Fetching OG data for:', linkUrl);
       try {
         const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
@@ -64,7 +96,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
 
         if (!error && ogData) {
           console.log('[CreatePostDialog] OG data received:', ogData);
-          if (ogData.title) videoTitle = ogData.title;
+          if (!videoTitle && ogData.title) videoTitle = ogData.title;
           if (ogData.image) thumbnail = ogData.image;
         } else {
           console.error('[CreatePostDialog] OG fetch error:', error);
