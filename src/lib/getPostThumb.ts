@@ -62,6 +62,7 @@ export function maybeProxy(url?: string | null, w = 480) {
   }
   
   // For other external URLs, use proxy if available
+  // URL is already properly decoded at this point, just encode it once for the query param
   const hasProxy = true;
   return hasProxy ? `/api/img-proxy?u=${encodeURIComponent(url)}&w=${w}` : url;
 }

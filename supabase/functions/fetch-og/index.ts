@@ -77,6 +77,17 @@ serve(async (req) => {
     const html = await response.text();
     const finalUrl = response.url;
 
+    // Helper to decode HTML entities
+    const decodeHtmlEntities = (text: string): string => {
+      return text
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, ' ');
+    };
+
     // Extract Open Graph metadata with multiple fallbacks
     const titleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i);
     const titleFallback = titleMatch ? null : html.match(/<meta\s+name=["']twitter:title["']\s+content=["']([^"']+)["']/i);
@@ -90,9 +101,9 @@ serve(async (req) => {
     const descriptionFallback = descriptionMatch ? null : html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
     const descriptionFallback2 = (descriptionMatch || descriptionFallback) ? null : html.match(/<meta\s+name=["']twitter:description["']\s+content=["']([^"']+)["']/i);
     
-    const title = titleMatch ? titleMatch[1] : (titleFallback ? titleFallback[1] : (titleFallback2 ? titleFallback2[1] : null));
-    const image = imageMatch ? imageMatch[1] : (imageFallback ? imageFallback[1] : (imageFallback2 ? imageFallback2[1] : null));
-    const description = descriptionMatch ? descriptionMatch[1] : (descriptionFallback ? descriptionFallback[1] : (descriptionFallback2 ? descriptionFallback2[1] : null));
+    const title = titleMatch ? decodeHtmlEntities(titleMatch[1]) : (titleFallback ? decodeHtmlEntities(titleFallback[1]) : (titleFallback2 ? decodeHtmlEntities(titleFallback2[1]) : null));
+    const image = imageMatch ? decodeHtmlEntities(imageMatch[1]) : (imageFallback ? decodeHtmlEntities(imageFallback[1]) : (imageFallback2 ? decodeHtmlEntities(imageFallback2[1]) : null));
+    const description = descriptionMatch ? decodeHtmlEntities(descriptionMatch[1]) : (descriptionFallback ? decodeHtmlEntities(descriptionFallback[1]) : (descriptionFallback2 ? decodeHtmlEntities(descriptionFallback2[1]) : null));
 
     console.log('[fetch-og] Extracted OG data:', { title, image, description, finalUrl });
 
