@@ -9,7 +9,12 @@ export interface Post {
   content: string;
   mediaType?: 'image' | 'video' | 'none';
   mediaUrl?: string;
+  media_url?: string | null;
   thumbnailUrl?: string;
+  thumbnail_url?: string | null;
+  preview_image_url?: string | null;
+  preview_title?: string | null;
+  preview_text?: string | null;
   platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest' | 'facebook' | 'spotify' | 'quora' | 'medium';
   embed_html?: string | null;
   timestamp: Date;
