@@ -35,6 +35,7 @@ import { resolveRenderer } from "@/lib/resolveRenderer";
 import { QuoraPreviewCard } from "@/features/article-embeds/QuoraPreviewCard";
 import { useVideoPlayTracking } from "@/hooks/useViewTracking";
 import { ImageViewTracker } from "@/components/ImageViewTracker";
+import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -419,8 +420,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <div className="mb-2">
             {r.kind === 'raw' && post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
-                previewTitle={post.preview_title}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform)}
+                previewTitle={post.preview_title || post.title}
                 previewText={post.preview_text}
                 platform={post.platform || undefined}
                 mediaUrl={post.media_url}
@@ -432,7 +433,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'raw' && !post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform)}
+                previewTitle={post.title}
                 platform={post.platform || undefined}
                 mediaUrl={post.media_url}
               >
@@ -441,8 +443,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'reddit' && post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
-                previewTitle={post.preview_title}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform)}
+                previewTitle={post.preview_title || post.title}
                 previewText={post.preview_text}
                 platform={post.platform || undefined}
                 mediaUrl={post.media_url}
@@ -454,7 +456,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'reddit' && !post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform)}
+                previewTitle={post.title}
                 platform={post.platform || undefined}
                 mediaUrl={post.media_url}
               >
@@ -463,8 +466,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'twitter' && post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
-                previewTitle={post.preview_title}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform)}
+                previewTitle={post.preview_title || post.title}
                 previewText={post.preview_text}
                 platform={post.platform || undefined}
                 mediaUrl={post.media_url}
@@ -476,7 +479,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'twitter' && !post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform)}
+                previewTitle={post.title}
                 platform={post.platform || undefined}
                 mediaUrl={post.media_url}
               >
@@ -485,8 +489,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'pinterest' && post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
-                previewTitle={post.preview_title}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform)}
+                previewTitle={post.preview_title || post.title}
                 previewText={post.preview_text}
                 platform={post.platform || undefined}
                 mediaUrl={post.media_url}
@@ -498,7 +502,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'pinterest' && !post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform)}
+                previewTitle={post.title}
                 platform={post.platform || undefined}
                 mediaUrl={post.media_url}
               >
@@ -507,8 +512,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'article' && post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
-                previewTitle={post.preview_title}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform)}
+                previewTitle={post.preview_title || post.title}
                 previewText={post.preview_text}
                 platform={post.platform || undefined}
                 mediaUrl={post.media_url}
@@ -521,8 +526,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'article' && !post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
-                previewTitle={post.preview_title}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform)}
+                previewTitle={post.preview_title || post.title}
                 previewText={post.preview_text}
                 platform={post.platform || undefined}
                 mediaUrl={post.media_url}
@@ -533,8 +538,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'universal' && !isFacebookUnavailable && post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
-                previewTitle={post.preview_title}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform)}
+                previewTitle={post.preview_title || post.title}
                 previewText={post.preview_text}
                 platform={post.platform || undefined}
                 mediaUrl={post.media_url}
@@ -546,7 +551,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'universal' && !isFacebookUnavailable && !post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform)}
+                previewTitle={post.title}
                 platform={post.platform || undefined}
                 mediaUrl={post.mediaUrl}
               >
