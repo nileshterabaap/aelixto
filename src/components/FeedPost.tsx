@@ -419,11 +419,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <div className="mb-2">
             {r.kind === 'raw' && post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={(post as any).thumbnail_url}
-                previewTitle={(post as any).preview_title}
-                previewText={(post as any).preview_text}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
+                previewTitle={post.preview_title}
+                previewText={post.preview_text}
                 platform={post.platform || undefined}
-                mediaUrl={post.mediaUrl}
+                mediaUrl={post.media_url}
               >
                 <ImageViewTracker postId={post.id}>
                   <RawEmbedRenderer embedHtml={r.html} />
@@ -432,20 +432,20 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'raw' && !post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={(post as any).thumbnail_url}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
                 platform={post.platform || undefined}
-                mediaUrl={post.mediaUrl}
+                mediaUrl={post.media_url}
               >
                 <RawEmbedRenderer embedHtml={r.html} />
               </LazyEmbed>
             )}
             {r.kind === 'reddit' && post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={(post as any).thumbnail_url}
-                previewTitle={(post as any).preview_title}
-                previewText={(post as any).preview_text}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
+                previewTitle={post.preview_title}
+                previewText={post.preview_text}
                 platform={post.platform || undefined}
-                mediaUrl={post.mediaUrl}
+                mediaUrl={post.media_url}
               >
                 <ImageViewTracker postId={post.id}>
                   <RedditEmbed url={r.url} />
@@ -454,20 +454,20 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'reddit' && !post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={(post as any).thumbnail_url}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
                 platform={post.platform || undefined}
-                mediaUrl={post.mediaUrl}
+                mediaUrl={post.media_url}
               >
                 <RedditEmbed url={r.url} />
               </LazyEmbed>
             )}
             {r.kind === 'twitter' && post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={(post as any).thumbnail_url}
-                previewTitle={(post as any).preview_title}
-                previewText={(post as any).preview_text}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
+                previewTitle={post.preview_title}
+                previewText={post.preview_text}
                 platform={post.platform || undefined}
-                mediaUrl={post.mediaUrl}
+                mediaUrl={post.media_url}
               >
                 <ImageViewTracker postId={post.id}>
                   <TwitterEmbed url={r.url} />
@@ -476,20 +476,20 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'twitter' && !post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={(post as any).thumbnail_url}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
                 platform={post.platform || undefined}
-                mediaUrl={post.mediaUrl}
+                mediaUrl={post.media_url}
               >
                 <TwitterEmbed url={r.url} />
               </LazyEmbed>
             )}
             {r.kind === 'pinterest' && post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={(post as any).thumbnail_url}
-                previewTitle={(post as any).preview_title}
-                previewText={(post as any).preview_text}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
+                previewTitle={post.preview_title}
+                previewText={post.preview_text}
                 platform={post.platform || undefined}
-                mediaUrl={post.mediaUrl}
+                mediaUrl={post.media_url}
               >
                 <ImageViewTracker postId={post.id}>
                   <PinterestEmbed url={r.url} />
@@ -498,20 +498,20 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'pinterest' && !post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={(post as any).thumbnail_url}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
                 platform={post.platform || undefined}
-                mediaUrl={post.mediaUrl}
+                mediaUrl={post.media_url}
               >
                 <PinterestEmbed url={r.url} />
               </LazyEmbed>
             )}
             {r.kind === 'article' && post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={(post as any).thumbnail_url}
-                previewTitle={(post as any).preview_title}
-                previewText={(post as any).preview_text}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
+                previewTitle={post.preview_title}
+                previewText={post.preview_text}
                 platform={post.platform || undefined}
-                mediaUrl={post.mediaUrl}
+                mediaUrl={post.media_url}
                 autoLoad={false}
               >
                 <ImageViewTracker postId={post.id}>
@@ -521,11 +521,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'article' && !post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={(post as any).thumbnail_url}
-                previewTitle={(post as any).preview_title}
-                previewText={(post as any).preview_text}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
+                previewTitle={post.preview_title}
+                previewText={post.preview_text}
                 platform={post.platform || undefined}
-                mediaUrl={post.mediaUrl}
+                mediaUrl={post.media_url}
                 autoLoad={false}
               >
                 <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
@@ -533,11 +533,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'universal' && !isFacebookUnavailable && post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={(post as any).thumbnail_url}
-                previewTitle={(post as any).preview_title}
-                previewText={(post as any).preview_text}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
+                previewTitle={post.preview_title}
+                previewText={post.preview_text}
                 platform={post.platform || undefined}
-                mediaUrl={post.mediaUrl}
+                mediaUrl={post.media_url}
               >
                 <ImageViewTracker postId={post.id}>
                   <UniversalMetaEmbed url={r.url} />
@@ -546,7 +546,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
             {r.kind === 'universal' && !isFacebookUnavailable && !post.isRealPost && (
               <LazyEmbed
-                thumbnailUrl={(post as any).thumbnail_url}
+                thumbnailUrl={post.thumbnail_url || post.preview_image_url}
                 platform={post.platform || undefined}
                 mediaUrl={post.mediaUrl}
               >

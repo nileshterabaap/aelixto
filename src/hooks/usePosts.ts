@@ -12,6 +12,9 @@ export interface Post {
   platform: string | null;
   embed_html?: string | null;
   thumbnail_url?: string | null;
+  preview_image_url?: string | null;
+  preview_title?: string | null;
+  preview_text?: string | null;
   saves_count: number;
   created_at: string;
   profiles: {
