@@ -18,14 +18,13 @@ function PostCard({ post, onClick }: {
   const rawThumb = getPostThumb(post);
   const src = imageError ? "/placeholder.svg" : maybeProxy(rawThumb, 480);
   
-  // Debug logging for all platforms
-  if (post.thumbnail_url) {
-    console.log(`${post.platform} thumb:`, {
-      original: post.thumbnail_url.substring(0, 100),
-      decoded: rawThumb.substring(0, 100),
-      final: src.substring(0, 100)
-    });
-  }
+  // Debug logging for all posts
+  console.log(`[PostCard] ${post.platform} post ${post.id.slice(0,8)}:`, {
+    hasThumb: !!post.thumbnail_url,
+    rawThumb: rawThumb?.substring(0, 80),
+    proxySrc: src?.substring(0, 100),
+    imageError
+  });
   
   const cleanTitle = decodeHtml(post.content || post.title || "Post");
 
