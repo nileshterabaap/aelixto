@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.refresh-thumbnails]
 verify_jwt = false
+
+[functions.store-thumbnail]
+verify_jwt = false
