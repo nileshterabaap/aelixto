@@ -108,6 +108,18 @@ async function fetchRedditThumbnail(url: string): Promise<string | null> {
   return ogData.image;
 }
 
+// Helper to decode HTML entities
+function decodeHtmlEntities(text: string): string {
+  if (!text) return text;
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+}
+
 async function scrapeOgData(url: string): Promise<{ image: string | null; title: string | null; description: string | null }> {
   try {
     const response = await fetch(url, {
@@ -129,16 +141,18 @@ async function scrapeOgData(url: string): Promise<{ image: string | null; title:
                          html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
     const twitterImageMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
     
-    const image = ogImageMatch?.[1] || twitterImageMatch?.[1] || null;
+    // Decode HTML entities from extracted URLs
+    const image = ogImageMatch?.[1] ? decodeHtmlEntities(ogImageMatch[1]) : 
+                  (twitterImageMatch?.[1] ? decodeHtmlEntities(twitterImageMatch[1]) : null);
 
     // Extract OG title
     const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
-    const title = ogTitleMatch?.[1] || null;
+    const title = ogTitleMatch?.[1] ? decodeHtmlEntities(ogTitleMatch[1]) : null;
 
     // Extract OG description
     const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
                         html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
-    const description = ogDescMatch?.[1] || null;
+    const description = ogDescMatch?.[1] ? decodeHtmlEntities(ogDescMatch[1]) : null;
 
     return { image, title, description };
   } catch (error) {
