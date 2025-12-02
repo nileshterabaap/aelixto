@@ -32,37 +32,36 @@ export function getPostThumb(p: {
   return "/placeholder.svg";
 }
 
-/** Optional proxy helper; if /api/img-proxy exists use it, else return original. */
+/** 
+ * Proxy ALL external images through our edge function to:
+ * 1. Avoid CORS issues
+ * 2. Handle expired CDN tokens (Instagram/Facebook URLs expire)
+ * 3. Provide caching
+ */
 export function maybeProxy(url?: string | null, w = 480) {
   if (!url) return "/placeholder.svg";
-  // Don't proxy local/relative paths
+  
+  // Don't proxy local/relative paths or placeholders
   if (url.startsWith("/")) return url;
   
+  // Validate URL
   try { 
     new URL(url); 
   } catch { 
     return "/placeholder.svg"; 
   }
   
-  // Don't proxy CDN URLs that work fine directly
-  const cdnDomains = [
-    'cdninstagram.com',
-    'fbcdn.net', 
-    'ytimg.com',
-    'googleusercontent.com',
-    'twimg.com',
-    'unsplash.com',
-    'pbs.twimg.com',
-    'i.redd.it',
-    'preview.redd.it'
-  ];
-  
-  if (cdnDomains.some(domain => url.includes(domain))) {
-    return url; // Use CDN URLs directly
+  // Only allow HTTPS URLs through proxy
+  if (!url.startsWith("https://")) {
+    return "/placeholder.svg";
   }
   
-  // For other external URLs, use proxy if available
-  // URL is already properly decoded at this point, just encode it once for the query param
-  const hasProxy = true;
-  return hasProxy ? `/api/img-proxy?u=${encodeURIComponent(url)}&w=${w}` : url;
+  // YouTube thumbnails are stable and don't expire - use directly
+  if (url.includes('ytimg.com') || url.includes('img.youtube.com')) {
+    return url;
+  }
+  
+  // Proxy ALL other external URLs (including Instagram/Facebook CDN which expire)
+  const proxyBaseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/img-proxy`;
+  return `${proxyBaseUrl}?u=${encodeURIComponent(url)}&w=${w}`;
 }
