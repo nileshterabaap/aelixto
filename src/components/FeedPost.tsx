@@ -107,6 +107,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const previewTitle = (post as any).preview_title;
   const previewText = (post as any).preview_text;
   
+  // DEBUG: Log thumbnail data
+  console.log('[FeedPost] Thumbnail debug:', {
+    postId: post.id,
+    thumbnailUrl,
+    rawThumbnailUrl: post.thumbnailUrl,
+    rawThumbnailUrlSnake: (post as any).thumbnail_url,
+    previewImageUrl
+  });
+  
   // Try to get platform from post.platform or detect from URL
   const detectedPlatform = post.platform || detectPlatformFromUrl(mediaUrl);
   const platform = getPlatformIcon(detectedPlatform);
