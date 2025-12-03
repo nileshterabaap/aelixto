@@ -32,41 +32,37 @@ export function getPostThumb(p: {
   return "/placeholder.svg";
 }
 
-/** 
- * Proxy ALL external images through our edge function to:
- * 1. Avoid CORS issues
- * 2. Handle expired CDN tokens (Instagram/Facebook URLs expire)
- * 3. Provide caching
- */
+/** Optional proxy helper; if /api/img-proxy exists use it, else return original. */
 export function maybeProxy(url?: string | null, w = 480) {
   if (!url) return "/placeholder.svg";
-  
-  // Don't proxy local/relative paths or placeholders
+  // Don't proxy local/relative paths
   if (url.startsWith("/")) return url;
   
-  // Validate URL
   try { 
     new URL(url); 
   } catch { 
     return "/placeholder.svg"; 
   }
   
-  // Only allow HTTPS URLs through proxy
-  if (!url.startsWith("https://")) {
-    return "/placeholder.svg";
+  // Don't proxy CDN URLs that work fine directly
+  const cdnDomains = [
+    'cdninstagram.com',
+    'fbcdn.net', 
+    'ytimg.com',
+    'googleusercontent.com',
+    'twimg.com',
+    'unsplash.com',
+    'pbs.twimg.com',
+    'i.redd.it',
+    'preview.redd.it'
+  ];
+  
+  if (cdnDomains.some(domain => url.includes(domain))) {
+    return url; // Use CDN URLs directly
   }
   
-  // YouTube thumbnails are stable and don't expire - use directly
-  if (url.includes('ytimg.com') || url.includes('img.youtube.com')) {
-    return url;
-  }
-  
-  // Supabase storage URLs are permanent and don't need proxying
-  if (url.includes('supabase.co/storage/')) {
-    return url;
-  }
-  
-  // Proxy external CDN URLs (Instagram/Facebook which expire)
-  const proxyBaseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/img-proxy`;
-  return `${proxyBaseUrl}?u=${encodeURIComponent(url)}&w=${w}`;
+  // For other external URLs, use proxy if available
+  // URL is already properly decoded at this point, just encode it once for the query param
+  const hasProxy = true;
+  return hasProxy ? `/api/img-proxy?u=${encodeURIComponent(url)}&w=${w}` : url;
 }
