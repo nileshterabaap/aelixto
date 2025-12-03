@@ -47,8 +47,6 @@ function PostCard({ post, onClick }: {
         onError={() => setImageError(true)}
         className="w-full h-full object-contain object-center bg-background/5"
         loading="lazy"
-        crossOrigin="anonymous"
-        referrerPolicy="no-referrer"
       />
 
       {/* Play button overlay for videos */}
