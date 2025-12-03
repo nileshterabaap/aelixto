@@ -61,12 +61,7 @@ export function maybeProxy(url?: string | null, w = 480) {
     return url;
   }
   
-  // Supabase storage URLs are permanent and don't need proxying
-  if (url.includes('supabase.co/storage/')) {
-    return url;
-  }
-  
-  // Proxy external CDN URLs (Instagram/Facebook which expire)
+  // Proxy ALL other external URLs (including Instagram/Facebook CDN which expire)
   const proxyBaseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/img-proxy`;
   return `${proxyBaseUrl}?u=${encodeURIComponent(url)}&w=${w}`;
 }
