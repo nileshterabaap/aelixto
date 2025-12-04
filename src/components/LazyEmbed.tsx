@@ -66,6 +66,20 @@ export const LazyEmbed = ({
   const isVideoPlatform = platform === 'youtube' || platform === 'tiktok' || 
                           platform === 'instagram' || platform === 'facebook';
 
+  // DEBUG: Log lazy embed state
+  console.log('[LazyEmbed] State:', {
+    platform,
+    thumbnailUrl: thumbnailUrl?.substring(0, 50),
+    previewTitle: previewTitle?.substring(0, 30),
+    hasPreview,
+    shouldLoad,
+    isInView,
+    autoLoad,
+    isVideoPlatform,
+    willShowPreview: !shouldLoad && hasPreview,
+    willShowChildren: (shouldLoad || isInView) && !(!shouldLoad && hasPreview)
+  });
+
   return (
     <div ref={containerRef}>
       {!shouldLoad && hasPreview ? (
