@@ -118,8 +118,25 @@ const buildFacebookEmbed = (url: string): string => {
   return `<div class="fb-post" data-href="${canonical}" data-width="500" data-show-text="true"></div>`;
 };
 
+// Check if Spotify URL is embeddable (not wrapped-share or other special pages)
+const isEmbeddableSpotifyUrl = (url: string): boolean => {
+  // Wrapped share URLs and other special pages can't be embedded
+  if (url.includes('/wrapped-share/') || url.includes('/wrapped/')) {
+    return false;
+  }
+  // Standard embeddable content types
+  return url.includes('/track/') || url.includes('/album/') || 
+         url.includes('/playlist/') || url.includes('/artist/') ||
+         url.includes('/episode/') || url.includes('/show/');
+};
+
 // Build Spotify embed HTML
-const buildSpotifyEmbed = (url: string): string => {
+const buildSpotifyEmbed = (url: string): string | null => {
+  // Check if this URL can be embedded
+  if (!isEmbeddableSpotifyUrl(url)) {
+    return null; // Return null to trigger fallback
+  }
+  
   // Convert regular Spotify URL to embed URL
   // e.g., https://open.spotify.com/track/xyz -> https://open.spotify.com/embed/track/xyz
   let embedUrl = url.replace('open.spotify.com/', 'open.spotify.com/embed/');
@@ -240,8 +257,14 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
             console.log('[FB EMBED] Built Facebook SDK embed');
           } else if (platform === 'spotify') {
             const html = buildSpotifyEmbed(urlForEmbed);
-            setEmbedHtml(html);
-            console.log('[UniversalMetaEmbed] Built Spotify embed');
+            if (html) {
+              setEmbedHtml(html);
+              console.log('[UniversalMetaEmbed] Built Spotify embed');
+            } else {
+              console.log('[UniversalMetaEmbed] Spotify URL not embeddable, using fallback');
+              shouldShowFallback = true;
+              setShowFallback(true);
+            }
           }
         } else {
           setShowFallback(true);
