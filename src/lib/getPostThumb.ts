@@ -51,28 +51,14 @@ export function maybeProxy(url?: string | null, w = 480) {
     return "/placeholder.svg"; 
   }
   
-  // Only allow HTTPS URLs through proxy
+  // Only allow HTTPS URLs
   if (!url.startsWith("https://")) {
     return "/placeholder.svg";
   }
   
-  // YouTube thumbnails are stable and don't expire - use directly
-  if (url.includes('ytimg.com') || url.includes('img.youtube.com')) {
-    return url;
-  }
-  
-  // Supabase storage URLs are permanent and don't need proxying
-  // Check for both patterns: supabase.co/storage and .supabase.co/storage
-  if (url.includes('.supabase.co/storage') || url.includes('supabase.co/storage/')) {
-    return url;
-  }
-  
-  // Unsplash URLs are stable and don't need proxying
-  if (url.includes('unsplash.com')) {
-    return url;
-  }
-  
-  // For now, return URLs directly without proxying to avoid auth-bridge redirect issues
-  // The img-proxy edge function can be used in production when properly deployed
+  // Return ALL URLs directly - no proxying needed
+  // Supabase storage URLs are permanent and public
+  // YouTube thumbnails are stable
+  // Other URLs will work directly or show placeholder on error
   return url;
 }
