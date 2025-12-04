@@ -15,22 +15,20 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('Starting thumbnail refresh and permanent storage...');
+    console.log('Starting thumbnail refresh for CDN URLs...');
 
-    // Get posts with CDN thumbnails that need to be stored permanently
-    // OR posts without any thumbnail that have a media_url
+    // Get posts with Instagram/Facebook CDN URLs that likely expired
     const { data: posts, error: fetchError } = await supabase
       .from('posts')
       .select('id, platform, media_url, thumbnail_url, title')
-      .or('thumbnail_url.ilike.%cdninstagram.com%,thumbnail_url.ilike.%fbcdn.net%,thumbnail_url.ilike.%scontent%,thumbnail_url.is.null')
-      .not('media_url', 'is', null)
-      .limit(30);
+      .or('thumbnail_url.ilike.%cdninstagram.com%,thumbnail_url.ilike.%fbcdn.net%,thumbnail_url.ilike.%scontent%')
+      .limit(50);
 
     if (fetchError) {
       throw fetchError;
     }
 
-    console.log(`Found ${posts?.length || 0} posts to process`);
+    console.log(`Found ${posts?.length || 0} posts with CDN thumbnails to refresh`);
 
     let updated = 0;
     let failed = 0;
@@ -38,99 +36,55 @@ Deno.serve(async (req) => {
     for (const post of posts || []) {
       if (!post.media_url) continue;
 
-      // Skip if already stored in our storage
-      if (post.thumbnail_url?.includes('supabase.co/storage')) {
-        console.log(`Post ${post.id} already has permanent thumbnail, skipping`);
-        continue;
-      }
-
       try {
-        console.log(`Processing post ${post.id} (${post.platform})`);
+        console.log(`Refreshing thumbnail for post ${post.id} (${post.platform}): ${post.media_url}`);
         
-        // First get fresh OG data
+        // Call fetch-og to get fresh thumbnail
         const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
           body: { url: post.media_url }
         });
 
-        if (ogError || !ogData?.image) {
+        if (ogError) {
+          console.log(`OG fetch error for post ${post.id}:`, ogError);
+          failed++;
+          continue;
+        }
+
+        if (ogData?.image) {
+          console.log(`Got fresh thumbnail for post ${post.id}: ${ogData.image.substring(0, 80)}...`);
+          
+          const updateData: Record<string, string> = { 
+            thumbnail_url: ogData.image 
+          };
+          
+          // Also update title if we got one and it's better
+          if (ogData.title && (!post.title || post.title.includes('&#'))) {
+            updateData.title = ogData.title;
+          }
+
+          const { error: updateError } = await supabase
+            .from('posts')
+            .update(updateData)
+            .eq('id', post.id);
+
+          if (updateError) {
+            console.log(`Update error for post ${post.id}:`, updateError);
+            failed++;
+          } else {
+            console.log(`Successfully updated post ${post.id}`);
+            updated++;
+          }
+        } else {
           console.log(`No image found for post ${post.id}`);
           failed++;
-          continue;
-        }
-
-        const imageUrl = ogData.image;
-        console.log(`Got fresh image URL for post ${post.id}: ${imageUrl.substring(0, 60)}...`);
-
-        // Now download and store the image permanently
-        const imageResponse = await fetch(imageUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          },
-        });
-
-        if (!imageResponse.ok) {
-          console.log(`Failed to fetch image for post ${post.id}: ${imageResponse.status}`);
-          failed++;
-          continue;
-        }
-
-        const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
-        const imageData = await imageResponse.arrayBuffer();
-        
-        // Determine file extension
-        let ext = 'jpg';
-        if (contentType.includes('png')) ext = 'png';
-        else if (contentType.includes('webp')) ext = 'webp';
-        else if (contentType.includes('gif')) ext = 'gif';
-
-        const filePath = `thumbnails/${post.id}.${ext}`;
-
-        // Upload to storage
-        const { error: uploadError } = await supabase.storage
-          .from('post-thumbnails')
-          .upload(filePath, imageData, {
-            contentType: contentType.includes('heic') ? 'image/jpeg' : contentType,
-            upsert: true,
-          });
-
-        if (uploadError) {
-          console.error(`Upload error for post ${post.id}:`, uploadError);
-          failed++;
-          continue;
-        }
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from('post-thumbnails')
-          .getPublicUrl(filePath);
-
-        const permanentUrl = urlData.publicUrl;
-
-        // Update post with permanent URL and title if available
-        const updateData: Record<string, string> = { thumbnail_url: permanentUrl };
-        if (ogData.title && (!post.title || post.title.includes('&#'))) {
-          updateData.title = ogData.title;
-        }
-
-        const { error: updateError } = await supabase
-          .from('posts')
-          .update(updateData)
-          .eq('id', post.id);
-
-        if (updateError) {
-          console.error(`DB update error for post ${post.id}:`, updateError);
-          failed++;
-        } else {
-          console.log(`Successfully stored permanent thumbnail for post ${post.id}: ${permanentUrl}`);
-          updated++;
         }
       } catch (err) {
-        console.error(`Error processing post ${post.id}:`, err);
+        console.log(`Error processing post ${post.id}:`, err);
         failed++;
       }
     }
 
-    console.log(`Refresh complete: ${updated} stored permanently, ${failed} failed`);
+    console.log(`Refresh complete: ${updated} updated, ${failed} failed`);
 
     return new Response(
       JSON.stringify({
