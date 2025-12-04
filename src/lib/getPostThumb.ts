@@ -62,11 +62,17 @@ export function maybeProxy(url?: string | null, w = 480) {
   }
   
   // Supabase storage URLs are permanent and don't need proxying
-  if (url.includes('supabase.co/storage/')) {
+  // Check for both patterns: supabase.co/storage and .supabase.co/storage
+  if (url.includes('.supabase.co/storage') || url.includes('supabase.co/storage/')) {
     return url;
   }
   
-  // Proxy external CDN URLs (Instagram/Facebook which expire)
-  const proxyBaseUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/img-proxy`;
-  return `${proxyBaseUrl}?u=${encodeURIComponent(url)}&w=${w}`;
+  // Unsplash URLs are stable and don't need proxying
+  if (url.includes('unsplash.com')) {
+    return url;
+  }
+  
+  // For now, return URLs directly without proxying to avoid auth-bridge redirect issues
+  // The img-proxy edge function can be used in production when properly deployed
+  return url;
 }
