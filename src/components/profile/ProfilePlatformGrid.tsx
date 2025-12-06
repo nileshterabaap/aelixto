@@ -15,25 +15,44 @@ function PostCard({ post, onClick }: {
   onClick: () => void;
 }) {
   const [imageError, setImageError] = useState(false);
-  const rawThumb = getPostThumb(post);
-  const src = imageError ? "/placeholder.svg" : maybeProxy(rawThumb, 480);
   
-  // Debug logging for all posts
-  console.log(`[PostCard] ${post.platform} post ${post.id.slice(0,8)}:`, {
-    hasThumb: !!post.thumbnail_url,
-    rawThumb: rawThumb?.substring(0, 80),
-    proxySrc: src?.substring(0, 100),
-    imageError
-  });
+  // For Instagram/Facebook, use a simple colored placeholder since CDN thumbnails expire
+  // and stored thumbnails may be empty. Users click to see the actual embed.
+  const isExpirablePlatform = post.platform === 'instagram' || post.platform === 'facebook';
   
-  const cleanTitle = decodeHtml(post.content || post.title || "Post");
+  // Get thumbnail - skip proxy entirely, use direct URLs
+  const getThumbnailSrc = () => {
+    if (imageError) return "/placeholder.svg";
+    
+    // For expirable platforms, check if we have a valid non-supabase thumbnail
+    if (isExpirablePlatform) {
+      // Don't trust stored supabase thumbnails for Instagram/Facebook - they're likely empty
+      if (post.thumbnail_url?.includes('supabase.co/storage')) {
+        return null; // Will show platform icon instead
+      }
+    }
+    
+    const rawThumb = getPostThumb(post);
+    return maybeProxy(rawThumb, 480);
+  };
+  
+  const src = getThumbnailSrc();
 
   const getAspectRatio = () => {
-    // Match Feed styling
-    if (post.platform === "youtube") return "aspect-video"; // 16:9
-    if (post.platform === "instagram" || post.platform === "tiktok") return "aspect-square"; // 1:1
+    if (post.platform === "youtube") return "aspect-video";
+    if (post.platform === "instagram" || post.platform === "tiktok") return "aspect-square";
     if (post.platform === "reddit" || post.platform === "quora" || post.platform === "medium") return "aspect-[4/3]";
-    return "aspect-[4/5]"; // Default for other platforms
+    return "aspect-[4/5]";
+  };
+
+  const getPlatformGradient = () => {
+    switch (post.platform) {
+      case 'instagram': return 'bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400';
+      case 'facebook': return 'bg-gradient-to-br from-blue-600 to-blue-400';
+      case 'youtube': return 'bg-gradient-to-br from-red-600 to-red-400';
+      case 'tiktok': return 'bg-gradient-to-br from-black to-gray-800';
+      default: return 'bg-gradient-to-br from-muted to-muted-foreground/20';
+    }
   };
 
   return (
@@ -41,16 +60,25 @@ function PostCard({ post, onClick }: {
       onClick={onClick}
       className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} bg-muted/50 group`}
     >
-      <img
-        src={src}
-        alt=""
-        onError={() => setImageError(true)}
-        className="w-full h-full object-contain object-center bg-background/5"
-        loading="lazy"
-      />
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          onError={() => setImageError(true)}
+          className="w-full h-full object-contain object-center bg-background/5"
+          loading="lazy"
+        />
+      ) : (
+        // Platform-colored placeholder for Instagram/Facebook
+        <div className={`w-full h-full ${getPlatformGradient()} flex items-center justify-center`}>
+          <span className="text-white/80 text-sm font-medium capitalize">
+            {post.platform}
+          </span>
+        </div>
+      )}
 
       {/* Play button overlay for videos */}
-      {post.media_type === "video" && !imageError && (
+      {post.media_type === "video" && src && !imageError && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <div className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm grid place-items-center">
             <div className="w-0 h-0 border-l-[14px] border-l-white border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent ml-1" />
