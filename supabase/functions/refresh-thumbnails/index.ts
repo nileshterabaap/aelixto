@@ -13,137 +13,110 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const metaToken = Deno.env.get('META_APP_TOKEN');
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('Starting thumbnail refresh and permanent storage...');
+    console.log('[refresh-thumbnails] Starting thumbnail refresh with Meta oEmbed API...');
 
-    // Get posts with CDN thumbnails that need to be stored permanently
-    // OR posts without any thumbnail that have a media_url
+    // Get Instagram/Facebook posts
     const { data: posts, error: fetchError } = await supabase
       .from('posts')
-      .select('id, platform, media_url, thumbnail_url, title')
-      .or('thumbnail_url.ilike.%cdninstagram.com%,thumbnail_url.ilike.%fbcdn.net%,thumbnail_url.ilike.%scontent%,thumbnail_url.is.null')
-      .not('media_url', 'is', null)
-      .limit(30);
+      .select('id, platform, content, thumbnail_url')
+      .in('platform', ['instagram', 'facebook'])
+      .order('created_at', { ascending: false })
+      .limit(50);
 
     if (fetchError) {
       throw fetchError;
     }
 
-    console.log(`Found ${posts?.length || 0} posts to process`);
+    console.log(`[refresh-thumbnails] Found ${posts?.length || 0} posts to process`);
 
     let updated = 0;
     let failed = 0;
+    let skipped = 0;
 
     for (const post of posts || []) {
-      if (!post.media_url) continue;
+      // Force re-download all Instagram/Facebook thumbnails since existing ones may be corrupted
 
-      // Skip if already stored in our storage
-      if (post.thumbnail_url?.includes('supabase.co/storage')) {
-        console.log(`Post ${post.id} already has permanent thumbnail, skipping`);
+      // Extract URL from post content
+      const urlMatch = post.content.match(/https?:\/\/[^\s]+/);
+      if (!urlMatch) {
+        console.log(`[refresh-thumbnails] No URL found in post ${post.id}`);
+        failed++;
         continue;
       }
 
+      const url = urlMatch[0];
+      let thumbnailUrl: string | null = null;
+
       try {
-        console.log(`Processing post ${post.id} (${post.platform})`);
-        
-        // First get fresh OG data
-        const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
-          body: { url: post.media_url }
-        });
-
-        if (ogError || !ogData?.image) {
-          console.log(`No image found for post ${post.id}`);
-          failed++;
-          continue;
+        if (post.platform === 'instagram' && metaToken) {
+          const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
+          const response = await fetch(oembedUrl);
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.thumbnail_url) {
+              thumbnailUrl = await storeThumbnailPermanently(supabase, post.id, data.thumbnail_url);
+              console.log(`[refresh-thumbnails] Got Instagram thumbnail for ${post.id}`);
+            }
+          } else {
+            const errorText = await response.text();
+            console.log(`[refresh-thumbnails] Instagram oEmbed failed for ${post.id}: ${response.status} - ${errorText.substring(0, 100)}`);
+          }
+        } else if (post.platform === 'facebook' && metaToken) {
+          const oembedUrl = `https://graph.facebook.com/v18.0/oembed_post?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
+          const response = await fetch(oembedUrl);
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.thumbnail_url) {
+              thumbnailUrl = await storeThumbnailPermanently(supabase, post.id, data.thumbnail_url);
+            }
+          }
         }
 
-        const imageUrl = ogData.image;
-        console.log(`Got fresh image URL for post ${post.id}: ${imageUrl.substring(0, 60)}...`);
+        if (thumbnailUrl) {
+          const { error: updateError } = await supabase
+            .from('posts')
+            .update({ thumbnail_url: thumbnailUrl })
+            .eq('id', post.id);
 
-        // Now download and store the image permanently
-        const imageResponse = await fetch(imageUrl, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          },
-        });
-
-        if (!imageResponse.ok) {
-          console.log(`Failed to fetch image for post ${post.id}: ${imageResponse.status}`);
-          failed++;
-          continue;
-        }
-
-        const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
-        const imageData = await imageResponse.arrayBuffer();
-        
-        // Determine file extension
-        let ext = 'jpg';
-        if (contentType.includes('png')) ext = 'png';
-        else if (contentType.includes('webp')) ext = 'webp';
-        else if (contentType.includes('gif')) ext = 'gif';
-
-        const filePath = `thumbnails/${post.id}.${ext}`;
-
-        // Upload to storage
-        const { error: uploadError } = await supabase.storage
-          .from('post-thumbnails')
-          .upload(filePath, imageData, {
-            contentType: contentType.includes('heic') ? 'image/jpeg' : contentType,
-            upsert: true,
-          });
-
-        if (uploadError) {
-          console.error(`Upload error for post ${post.id}:`, uploadError);
-          failed++;
-          continue;
-        }
-
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from('post-thumbnails')
-          .getPublicUrl(filePath);
-
-        const permanentUrl = urlData.publicUrl;
-
-        // Update post with permanent URL and title if available
-        const updateData: Record<string, string> = { thumbnail_url: permanentUrl };
-        if (ogData.title && (!post.title || post.title.includes('&#'))) {
-          updateData.title = ogData.title;
-        }
-
-        const { error: updateError } = await supabase
-          .from('posts')
-          .update(updateData)
-          .eq('id', post.id);
-
-        if (updateError) {
-          console.error(`DB update error for post ${post.id}:`, updateError);
-          failed++;
+          if (!updateError) {
+            updated++;
+            console.log(`[refresh-thumbnails] Updated post ${post.id} with thumbnail`);
+          } else {
+            failed++;
+          }
         } else {
-          console.log(`Successfully stored permanent thumbnail for post ${post.id}: ${permanentUrl}`);
-          updated++;
+          failed++;
         }
-      } catch (err) {
-        console.error(`Error processing post ${post.id}:`, err);
+
+        // Rate limiting
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+      } catch (error) {
+        console.error(`[refresh-thumbnails] Error processing post ${post.id}:`, error);
         failed++;
       }
     }
 
-    console.log(`Refresh complete: ${updated} stored permanently, ${failed} failed`);
+    console.log(`[refresh-thumbnails] Complete: ${updated} updated, ${failed} failed, ${skipped} skipped`);
 
     return new Response(
       JSON.stringify({
         success: true,
         total: posts?.length || 0,
         updated,
-        failed
+        failed,
+        skipped
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Refresh error:', error);
+    console.error('[refresh-thumbnails] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
       JSON.stringify({ error: errorMessage }),
@@ -154,3 +127,57 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+async function storeThumbnailPermanently(supabase: any, postId: string, imageUrl: string): Promise<string | null> {
+  try {
+    const imageResponse = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+
+    if (!imageResponse.ok) {
+      console.log(`[refresh-thumbnails] Failed to download image: ${imageResponse.status}`);
+      return null;
+    }
+
+    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    const imageData = await imageResponse.arrayBuffer();
+    
+    // Validate image size
+    if (imageData.byteLength < 1000) {
+      console.log(`[refresh-thumbnails] Image too small (${imageData.byteLength} bytes) for ${postId}`);
+      return null;
+    }
+
+    console.log(`[refresh-thumbnails] Downloaded ${imageData.byteLength} bytes for ${postId}`);
+
+    let ext = 'jpg';
+    if (contentType.includes('png')) ext = 'png';
+    else if (contentType.includes('webp')) ext = 'webp';
+
+    const filePath = `thumbnails/${postId}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('post-thumbnails')
+      .upload(filePath, imageData, {
+        contentType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('[refresh-thumbnails] Upload error:', uploadError);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('post-thumbnails')
+      .getPublicUrl(filePath);
+
+    console.log(`[refresh-thumbnails] Stored: ${urlData.publicUrl}`);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('[refresh-thumbnails] Store error:', error);
+    return null;
+  }
+}
