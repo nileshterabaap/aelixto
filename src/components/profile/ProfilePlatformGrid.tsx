@@ -21,9 +21,6 @@ function PostCard({ post, onClick }: {
 }) {
   const [imageError, setImageError] = useState(false);
   
-  // Instagram/Facebook CDN thumbnails expire - use icon placeholder
-  const isExpirablePlatform = post.platform === 'instagram' || post.platform === 'facebook';
-  
   const getAspectRatio = () => {
     if (post.platform === "youtube") return "aspect-video";
     if (post.platform === "instagram" || post.platform === "tiktok") return "aspect-square";
@@ -53,22 +50,7 @@ function PostCard({ post, onClick }: {
     }
   };
 
-  // For expirable platforms, always show icon placeholder
-  if (isExpirablePlatform) {
-    const Icon = getPlatformIcon();
-    return (
-      <button
-        onClick={onClick}
-        className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} ${getPlatformGradient()} flex items-center justify-center`}
-      >
-        {Icon && (
-          <img src={Icon} alt={post.platform} className="w-12 h-12 opacity-90 invert" />
-        )}
-      </button>
-    );
-  }
-
-  // For other platforms, try to load thumbnail
+  // Try to get thumbnail - prioritize stored thumbnails
   const rawThumb = getPostThumb(post);
   const src = imageError ? null : maybeProxy(rawThumb, 480);
   const Icon = getPlatformIcon();
@@ -83,7 +65,7 @@ function PostCard({ post, onClick }: {
           src={src}
           alt=""
           onError={() => setImageError(true)}
-          className="w-full h-full object-contain object-center bg-background/5"
+          className="w-full h-full object-cover object-center"
           loading="lazy"
         />
       ) : (

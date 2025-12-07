@@ -26,22 +26,34 @@ serve(async (req) => {
     let thumbnailUrl: string | null = null;
     let previewText: string | null = null;
 
-    // YouTube special handling
+    // YouTube special handling - reliable thumbnails
     if (platform === 'youtube') {
       const videoId = extractYouTubeId(url);
       if (videoId) {
         thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
       }
     }
+    // Instagram - use official oEmbed API with Meta token
+    else if (platform === 'instagram') {
+      const oembedData = await fetchInstagramOembed(url);
+      if (oembedData?.thumbnail_url) {
+        // Store thumbnail permanently
+        thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
+      }
+      if (oembedData?.title) {
+        previewText = oembedData.title;
+      }
+    }
+    // Facebook - use official oEmbed API with Meta token
+    else if (platform === 'facebook') {
+      const oembedData = await fetchFacebookOembed(url);
+      if (oembedData?.thumbnail_url) {
+        thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
+      }
+    }
     // Reddit special handling
     else if (platform === 'reddit') {
       thumbnailUrl = await fetchRedditThumbnail(url);
-    }
-    // Instagram/Facebook - try OG scrape
-    else if (platform === 'instagram' || platform === 'facebook') {
-      const ogData = await scrapeOgData(url);
-      thumbnailUrl = ogData.image;
-      previewText = ogData.description;
     }
     // Generic scraping for other platforms
     else {
@@ -63,7 +75,7 @@ serve(async (req) => {
     if (updateError) {
       console.error('[fetch-post-preview] DB update error:', updateError);
     } else {
-      console.log(`[fetch-post-preview] Updated post ${postId} with thumbnail`);
+      console.log(`[fetch-post-preview] Updated post ${postId} with thumbnail: ${thumbnailUrl}`);
     }
 
     return new Response(
@@ -87,9 +99,151 @@ function extractYouTubeId(url: string): string | null {
   return match?.[1] ?? null;
 }
 
+// Fetch Instagram thumbnail using official oEmbed API
+async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null } | null> {
+  const metaToken = Deno.env.get('META_APP_TOKEN');
+  
+  if (!metaToken) {
+    console.log('[fetch-post-preview] No META_APP_TOKEN, cannot fetch Instagram oEmbed');
+    return null;
+  }
+
+  try {
+    const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
+    
+    console.log('[fetch-post-preview] Fetching Instagram oEmbed...');
+    
+    const response = await fetch(oembedUrl);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[fetch-post-preview] Instagram oEmbed failed: ${response.status} - ${errorText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('[fetch-post-preview] Instagram oEmbed success:', { 
+      has_thumbnail: !!data.thumbnail_url,
+      author: data.author_name 
+    });
+
+    return {
+      thumbnail_url: data.thumbnail_url || null,
+      title: data.title || data.author_name || null
+    };
+  } catch (error) {
+    console.error('[fetch-post-preview] Instagram oEmbed error:', error);
+    return null;
+  }
+}
+
+// Fetch Facebook thumbnail using official oEmbed API
+async function fetchFacebookOembed(url: string): Promise<{ thumbnail_url: string | null } | null> {
+  const metaToken = Deno.env.get('META_APP_TOKEN');
+  
+  if (!metaToken) {
+    console.log('[fetch-post-preview] No META_APP_TOKEN, cannot fetch Facebook oEmbed');
+    return null;
+  }
+
+  try {
+    const oembedUrl = `https://graph.facebook.com/v18.0/oembed_post?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
+    
+    console.log('[fetch-post-preview] Fetching Facebook oEmbed...');
+    
+    const response = await fetch(oembedUrl);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[fetch-post-preview] Facebook oEmbed failed: ${response.status} - ${errorText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    console.log('[fetch-post-preview] Facebook oEmbed success');
+
+    // Facebook oEmbed doesn't always return thumbnail_url
+    // Try to extract from html if available
+    let thumbnailUrl = data.thumbnail_url || null;
+    
+    if (!thumbnailUrl && data.html) {
+      const imgMatch = data.html.match(/src="([^"]+)"/);
+      if (imgMatch && imgMatch[1].includes('scontent')) {
+        thumbnailUrl = imgMatch[1].replace(/&amp;/g, '&');
+      }
+    }
+
+    return { thumbnail_url: thumbnailUrl };
+  } catch (error) {
+    console.error('[fetch-post-preview] Facebook oEmbed error:', error);
+    return null;
+  }
+}
+
+// Store thumbnail permanently to avoid CDN expiration
+async function storeThumbnailPermanently(postId: string, imageUrl: string): Promise<string | null> {
+  try {
+    console.log(`[fetch-post-preview] Downloading and storing thumbnail for ${postId}`);
+    
+    const imageResponse = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+
+    if (!imageResponse.ok) {
+      console.error(`[fetch-post-preview] Failed to download image: ${imageResponse.status}`);
+      return imageUrl; // Return original URL as fallback
+    }
+
+    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    const imageData = await imageResponse.arrayBuffer();
+    
+    // Check if we got actual image data
+    if (imageData.byteLength < 1000) {
+      console.error(`[fetch-post-preview] Image too small (${imageData.byteLength} bytes), likely empty`);
+      return null;
+    }
+
+    // Determine file extension
+    let ext = 'jpg';
+    if (contentType.includes('png')) ext = 'png';
+    else if (contentType.includes('webp')) ext = 'webp';
+
+    const filePath = `thumbnails/${postId}.${ext}`;
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Upload to storage
+    const { error: uploadError } = await supabase.storage
+      .from('post-thumbnails')
+      .upload(filePath, imageData, {
+        contentType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('[fetch-post-preview] Storage upload error:', uploadError);
+      return imageUrl; // Return original as fallback
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('post-thumbnails')
+      .getPublicUrl(filePath);
+
+    console.log(`[fetch-post-preview] Stored thumbnail: ${urlData.publicUrl}`);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('[fetch-post-preview] Store thumbnail error:', error);
+    return imageUrl; // Return original as fallback
+  }
+}
+
 async function fetchRedditThumbnail(url: string): Promise<string | null> {
   try {
-    // Try JSON endpoint
     const jsonUrl = url.replace(/\/$/, '') + '.json';
     const res = await fetch(jsonUrl, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -101,14 +255,13 @@ async function fetchRedditThumbnail(url: string): Promise<string | null> {
       return post?.thumbnail?.startsWith('http') ? post.thumbnail : null;
     }
   } catch (e) {
-    console.log('[fetch-post-preview] Reddit JSON fetch failed, trying OG scrape');
+    console.log('[fetch-post-preview] Reddit JSON fetch failed');
   }
   
   const ogData = await scrapeOgData(url);
   return ogData.image;
 }
 
-// Helper to decode HTML entities
 function decodeHtmlEntities(text: string): string {
   if (!text) return text;
   return text
@@ -130,28 +283,22 @@ async function scrapeOgData(url: string): Promise<{ image: string | null; title:
     });
 
     if (!response.ok) {
-      console.log(`[fetch-post-preview] Fetch failed with status ${response.status}`);
       return { image: null, title: null, description: null };
     }
 
     const html = await response.text();
 
-    // Extract OG image
     const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
                          html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
     const twitterImageMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
     
-    // Decode HTML entities from extracted URLs
     const image = ogImageMatch?.[1] ? decodeHtmlEntities(ogImageMatch[1]) : 
                   (twitterImageMatch?.[1] ? decodeHtmlEntities(twitterImageMatch[1]) : null);
 
-    // Extract OG title
     const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
     const title = ogTitleMatch?.[1] ? decodeHtmlEntities(ogTitleMatch[1]) : null;
 
-    // Extract OG description
-    const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i) ||
-                        html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/i);
+    const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
     const description = ogDescMatch?.[1] ? decodeHtmlEntities(ogDescMatch[1]) : null;
 
     return { image, title, description };
