@@ -3,6 +3,11 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
+import InstagramIcon from "@/assets/platforms/instagram.svg";
+import FacebookIcon from "@/assets/platforms/facebook.svg";
+import YoutubeIcon from "@/assets/platforms/youtube.svg";
+import TiktokIcon from "@/assets/platforms/tiktok.svg";
+import XIcon from "@/assets/platforms/x.svg";
 
 function decodeHtml(html: string) {
   const txt = document.createElement("textarea");
@@ -16,7 +21,7 @@ function PostCard({ post, onClick }: {
 }) {
   const [imageError, setImageError] = useState(false);
   
-  // ALWAYS use gradient placeholder for Instagram/Facebook - their CDN thumbnails expire
+  // Instagram/Facebook CDN thumbnails expire - use icon placeholder
   const isExpirablePlatform = post.platform === 'instagram' || post.platform === 'facebook';
   
   const getAspectRatio = () => {
@@ -32,22 +37,33 @@ function PostCard({ post, onClick }: {
       case 'facebook': return 'bg-gradient-to-br from-blue-600 to-blue-400';
       case 'youtube': return 'bg-gradient-to-br from-red-600 to-red-400';
       case 'tiktok': return 'bg-gradient-to-br from-black to-gray-800';
-      default: return 'bg-gradient-to-br from-muted to-muted-foreground/20';
+      case 'x': return 'bg-black';
+      default: return 'bg-muted';
     }
   };
 
-  // For expirable platforms, always show gradient - don't even try to load thumbnails
+  const getPlatformIcon = () => {
+    switch (post.platform) {
+      case 'instagram': return InstagramIcon;
+      case 'facebook': return FacebookIcon;
+      case 'youtube': return YoutubeIcon;
+      case 'tiktok': return TiktokIcon;
+      case 'x': return XIcon;
+      default: return null;
+    }
+  };
+
+  // For expirable platforms, always show icon placeholder
   if (isExpirablePlatform) {
+    const Icon = getPlatformIcon();
     return (
       <button
         onClick={onClick}
-        className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} group`}
+        className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} ${getPlatformGradient()} flex items-center justify-center`}
       >
-        <div className={`w-full h-full ${getPlatformGradient()} flex items-center justify-center`}>
-          <span className="text-white/90 text-sm font-medium capitalize">
-            {post.platform}
-          </span>
-        </div>
+        {Icon && (
+          <img src={Icon} alt={post.platform} className="w-12 h-12 opacity-90 invert" />
+        )}
       </button>
     );
   }
@@ -55,6 +71,7 @@ function PostCard({ post, onClick }: {
   // For other platforms, try to load thumbnail
   const rawThumb = getPostThumb(post);
   const src = imageError ? null : maybeProxy(rawThumb, 480);
+  const Icon = getPlatformIcon();
 
   return (
     <button
@@ -71,9 +88,9 @@ function PostCard({ post, onClick }: {
         />
       ) : (
         <div className={`w-full h-full ${getPlatformGradient()} flex items-center justify-center`}>
-          <span className="text-white/90 text-sm font-medium capitalize">
-            {post.platform}
-          </span>
+          {Icon && (
+            <img src={Icon} alt={post.platform} className="w-12 h-12 opacity-90 invert" />
+          )}
         </div>
       )}
 
