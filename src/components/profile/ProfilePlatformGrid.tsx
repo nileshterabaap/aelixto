@@ -16,28 +16,9 @@ function PostCard({ post, onClick }: {
 }) {
   const [imageError, setImageError] = useState(false);
   
-  // For Instagram/Facebook, use a simple colored placeholder since CDN thumbnails expire
-  // and stored thumbnails may be empty. Users click to see the actual embed.
+  // ALWAYS use gradient placeholder for Instagram/Facebook - their CDN thumbnails expire
   const isExpirablePlatform = post.platform === 'instagram' || post.platform === 'facebook';
   
-  // Get thumbnail - skip proxy entirely, use direct URLs
-  const getThumbnailSrc = () => {
-    if (imageError) return "/placeholder.svg";
-    
-    // For expirable platforms, check if we have a valid non-supabase thumbnail
-    if (isExpirablePlatform) {
-      // Don't trust stored supabase thumbnails for Instagram/Facebook - they're likely empty
-      if (post.thumbnail_url?.includes('supabase.co/storage')) {
-        return null; // Will show platform icon instead
-      }
-    }
-    
-    const rawThumb = getPostThumb(post);
-    return maybeProxy(rawThumb, 480);
-  };
-  
-  const src = getThumbnailSrc();
-
   const getAspectRatio = () => {
     if (post.platform === "youtube") return "aspect-video";
     if (post.platform === "instagram" || post.platform === "tiktok") return "aspect-square";
@@ -55,6 +36,26 @@ function PostCard({ post, onClick }: {
     }
   };
 
+  // For expirable platforms, always show gradient - don't even try to load thumbnails
+  if (isExpirablePlatform) {
+    return (
+      <button
+        onClick={onClick}
+        className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} group`}
+      >
+        <div className={`w-full h-full ${getPlatformGradient()} flex items-center justify-center`}>
+          <span className="text-white/90 text-sm font-medium capitalize">
+            {post.platform}
+          </span>
+        </div>
+      </button>
+    );
+  }
+
+  // For other platforms, try to load thumbnail
+  const rawThumb = getPostThumb(post);
+  const src = imageError ? null : maybeProxy(rawThumb, 480);
+
   return (
     <button
       onClick={onClick}
@@ -69,9 +70,8 @@ function PostCard({ post, onClick }: {
           loading="lazy"
         />
       ) : (
-        // Platform-colored placeholder for Instagram/Facebook
         <div className={`w-full h-full ${getPlatformGradient()} flex items-center justify-center`}>
-          <span className="text-white/80 text-sm font-medium capitalize">
+          <span className="text-white/90 text-sm font-medium capitalize">
             {post.platform}
           </span>
         </div>
