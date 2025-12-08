@@ -21,14 +21,15 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Origin validation
+    // Origin validation - allow empty origin (same-origin requests) and known domains
     const origin = req.headers.get('origin') || '';
-    const allowedOrigins = ['aelixto.com', '.lovable.dev', '.lovable.app', 'localhost'];
-    const isAllowed = allowedOrigins.some(domain => 
-      origin.includes(domain) || origin.includes('localhost')
-    );
+    const allowedPatterns = ['aelixto.com', 'lovable.dev', 'lovable.app', 'localhost', '127.0.0.1', 'webcontainer'];
     
-    if (!isAllowed && !origin.includes('127.0.0.1')) {
+    // Allow if origin is empty (same-origin) or matches any allowed pattern
+    const isAllowed = origin === '' || allowedPatterns.some(pattern => origin.includes(pattern));
+    
+    if (!isAllowed) {
+      console.log('[record-view] Origin rejected:', origin);
       return new Response(
         JSON.stringify({ ok: false, reason: 'Origin not allowed' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
