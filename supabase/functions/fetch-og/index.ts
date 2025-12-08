@@ -23,6 +23,80 @@ serve(async (req) => {
 
     console.log('[fetch-og] Fetching OG data for:', targetUrl);
 
+    const urlLower = targetUrl.toLowerCase();
+    
+    // Try oEmbed APIs first for specific platforms (more reliable)
+    if (urlLower.includes('spotify.com') || urlLower.includes('open.spotify.com')) {
+      try {
+        const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(targetUrl)}`;
+        const oembedRes = await fetch(oembedUrl);
+        if (oembedRes.ok) {
+          const oembed = await oembedRes.json();
+          console.log('[fetch-og] Spotify oEmbed success:', oembed.thumbnail_url?.substring(0, 60));
+          return new Response(
+            JSON.stringify({ 
+              title: oembed.title || 'Spotify', 
+              image: oembed.thumbnail_url || null, 
+              description: oembed.provider_name || 'Listen on Spotify',
+              finalUrl: targetUrl 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } catch (e) {
+        console.log('[fetch-og] Spotify oEmbed failed, falling back to HTML');
+      }
+    }
+    
+    if (urlLower.includes('pinterest.com') || urlLower.includes('pin.it')) {
+      // For Pinterest short URLs, first expand them
+      let expandedUrl = targetUrl;
+      if (urlLower.includes('pin.it')) {
+        try {
+          const expandRes = await fetch(targetUrl, { method: 'HEAD', redirect: 'follow' });
+          expandedUrl = expandRes.url;
+          console.log('[fetch-og] Pinterest expanded URL:', expandedUrl);
+        } catch (e) {
+          console.log('[fetch-og] Pinterest URL expansion failed');
+        }
+      }
+      
+      // Extract pin ID and try to get image
+      const pinIdMatch = expandedUrl.match(/\/pin\/(\d+)/);
+      if (pinIdMatch) {
+        // Pinterest doesn't have public oEmbed, but we can construct image URL
+        console.log('[fetch-og] Pinterest pin ID:', pinIdMatch[1]);
+      }
+    }
+    
+    if (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) {
+      // Reddit has an oEmbed API
+      try {
+        const oembedUrl = `https://www.reddit.com/oembed?url=${encodeURIComponent(targetUrl)}`;
+        const oembedRes = await fetch(oembedUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0' }
+        });
+        if (oembedRes.ok) {
+          const oembed = await oembedRes.json();
+          // Extract image from HTML if present
+          const imgMatch = oembed.html?.match(/src=["']([^"']+)["']/);
+          const thumbnail = oembed.thumbnail_url || (imgMatch ? imgMatch[1] : null);
+          console.log('[fetch-og] Reddit oEmbed success:', thumbnail?.substring(0, 60));
+          return new Response(
+            JSON.stringify({ 
+              title: oembed.title || 'Reddit Post', 
+              image: thumbnail, 
+              description: oembed.author_name ? `Posted by ${oembed.author_name}` : 'View on Reddit',
+              finalUrl: targetUrl 
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } catch (e) {
+        console.log('[fetch-og] Reddit oEmbed failed, falling back to HTML');
+      }
+    }
+
     // Fetch the HTML with better headers to avoid 403 blocks
     const response = await fetch(targetUrl, {
       headers: {
@@ -88,22 +162,34 @@ serve(async (req) => {
         .replace(/&nbsp;/g, ' ');
     };
 
-    // Extract Open Graph metadata with multiple fallbacks
-    const titleMatch = html.match(/<meta\s+property=["']og:title["']\s+content=["']([^"']+)["']/i);
-    const titleFallback = titleMatch ? null : html.match(/<meta\s+name=["']twitter:title["']\s+content=["']([^"']+)["']/i);
-    const titleFallback2 = (titleMatch || titleFallback) ? null : html.match(/<title[^>]*>([^<]+)<\/title>/i);
+    // Extract Open Graph metadata with multiple fallbacks (handle both attribute orders)
+    // Pattern 1: property="og:X" content="Y"
+    // Pattern 2: content="Y" property="og:X"
+    const extractMeta = (propName: string): string | null => {
+      // Try property first, then name
+      const patterns = [
+        new RegExp(`<meta[^>]+property=["']${propName}["'][^>]+content=["']([^"']+)["']`, 'i'),
+        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${propName}["']`, 'i'),
+        new RegExp(`<meta[^>]+name=["']${propName}["'][^>]+content=["']([^"']+)["']`, 'i'),
+        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${propName}["']`, 'i'),
+      ];
+      for (const pattern of patterns) {
+        const match = html.match(pattern);
+        if (match) return decodeHtmlEntities(match[1]);
+      }
+      return null;
+    };
     
-    const imageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["']([^"']+)["']/i);
-    const imageFallback = imageMatch ? null : html.match(/<meta\s+name=["']twitter:image["']\s+content=["']([^"']+)["']/i);
-    const imageFallback2 = (imageMatch || imageFallback) ? null : html.match(/<meta\s+property=["']og:image:url["']\s+content=["']([^"']+)["']/i);
+    // Try multiple property names for each field
+    const title = extractMeta('og:title') || extractMeta('twitter:title') || 
+                  (html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ? decodeHtmlEntities(html.match(/<title[^>]*>([^<]+)<\/title>/i)![1]) : null);
     
-    const descriptionMatch = html.match(/<meta\s+property=["']og:description["']\s+content=["']([^"']+)["']/i);
-    const descriptionFallback = descriptionMatch ? null : html.match(/<meta\s+name=["']description["']\s+content=["']([^"']+)["']/i);
-    const descriptionFallback2 = (descriptionMatch || descriptionFallback) ? null : html.match(/<meta\s+name=["']twitter:description["']\s+content=["']([^"']+)["']/i);
+    const image = extractMeta('og:image') || extractMeta('og:image:url') || 
+                  extractMeta('og:image:secure_url') || extractMeta('twitter:image') ||
+                  extractMeta('twitter:image:src');
     
-    const title = titleMatch ? decodeHtmlEntities(titleMatch[1]) : (titleFallback ? decodeHtmlEntities(titleFallback[1]) : (titleFallback2 ? decodeHtmlEntities(titleFallback2[1]) : null));
-    const image = imageMatch ? decodeHtmlEntities(imageMatch[1]) : (imageFallback ? decodeHtmlEntities(imageFallback[1]) : (imageFallback2 ? decodeHtmlEntities(imageFallback2[1]) : null));
-    const description = descriptionMatch ? decodeHtmlEntities(descriptionMatch[1]) : (descriptionFallback ? decodeHtmlEntities(descriptionFallback[1]) : (descriptionFallback2 ? decodeHtmlEntities(descriptionFallback2[1]) : null));
+    const description = extractMeta('og:description') || extractMeta('twitter:description') || 
+                        extractMeta('description');
 
     console.log('[fetch-og] Extracted OG data:', { title, image, description, finalUrl });
 
