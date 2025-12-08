@@ -1,6 +1,5 @@
 import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import InstagramIcon from "@/assets/platforms/instagram.svg";
@@ -8,12 +7,9 @@ import FacebookIcon from "@/assets/platforms/facebook.svg";
 import YoutubeIcon from "@/assets/platforms/youtube.svg";
 import TiktokIcon from "@/assets/platforms/tiktok.svg";
 import XIcon from "@/assets/platforms/x.svg";
-
-function decodeHtml(html: string) {
-  const txt = document.createElement("textarea");
-  txt.innerHTML = html;
-  return txt.value;
-}
+import BlogIcon from "@/assets/platforms/blog.svg";
+import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
+import { PlatformPostViewer } from "./PlatformPostViewer";
 
 function PostCard({ post, onClick }: { 
   post: PlatformPost; 
@@ -24,7 +20,7 @@ function PostCard({ post, onClick }: {
   const getAspectRatio = () => {
     if (post.platform === "youtube") return "aspect-video";
     if (post.platform === "instagram" || post.platform === "tiktok") return "aspect-square";
-    if (post.platform === "reddit" || post.platform === "quora" || post.platform === "medium") return "aspect-[4/3]";
+    if (post.platform === "reddit" || post.platform === "quora" || post.platform === "medium" || post.platform === "article") return "aspect-[4/3]";
     return "aspect-[4/5]";
   };
 
@@ -35,6 +31,7 @@ function PostCard({ post, onClick }: {
       case 'youtube': return 'bg-gradient-to-br from-red-600 to-red-400';
       case 'tiktok': return 'bg-gradient-to-br from-black to-gray-800';
       case 'x': return 'bg-black';
+      case 'article': return 'bg-gradient-to-br from-emerald-600 to-teal-400';
       default: return 'bg-muted';
     }
   };
@@ -46,6 +43,7 @@ function PostCard({ post, onClick }: {
       case 'youtube': return YoutubeIcon;
       case 'tiktok': return TiktokIcon;
       case 'x': return XIcon;
+      case 'article': return BlogIcon;
       default: return null;
     }
   };
@@ -91,17 +89,27 @@ function PostCard({ post, onClick }: {
 interface ProfilePlatformGridProps {
   userId: string;
   activeTab: string;
+  tabs: PlatformTab[];
+  onTabChange: (tab: string) => void;
 }
 
 export const ProfilePlatformGrid = ({
   userId,
   activeTab,
+  tabs,
+  onTabChange,
 }: ProfilePlatformGridProps) => {
   const { items, loading, hasMore, loadMore } = useUserPlatformPosts(
     userId,
     activeTab
   );
-  const navigate = useNavigate();
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+
+  const handlePostClick = (postId: string) => {
+    setSelectedPostId(postId);
+    setViewerOpen(true);
+  };
 
   if (loading && items.length === 0) {
     return (
@@ -120,29 +128,44 @@ export const ProfilePlatformGrid = ({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
-        {items.map((post) => (
-          <PostCard
-            key={post.id}
-            post={post}
-            onClick={() => navigate(`/post/${post.id}`)}
-          />
-        ))}
+    <>
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+          {items.map((post) => (
+            <PostCard
+              key={post.id}
+              post={post}
+              onClick={() => handlePostClick(post.id)}
+            />
+          ))}
+        </div>
+
+        {hasMore && (
+          <div className="flex justify-center pt-4">
+            <Button
+              onClick={loadMore}
+              disabled={loading}
+              variant="outline"
+              className="rounded-full"
+            >
+              {loading ? "Loading..." : "Load more"}
+            </Button>
+          </div>
+        )}
       </div>
 
-      {hasMore && (
-        <div className="flex justify-center pt-4">
-          <Button
-            onClick={loadMore}
-            disabled={loading}
-            variant="outline"
-            className="rounded-full"
-          >
-            {loading ? "Loading..." : "Load more"}
-          </Button>
-        </div>
+      {viewerOpen && selectedPostId && (
+        <PlatformPostViewer
+          userId={userId}
+          initialPostId={selectedPostId}
+          tabs={tabs}
+          activeTab={activeTab}
+          onClose={() => setViewerOpen(false)}
+          onTabChange={(tab) => {
+            onTabChange(tab);
+          }}
+        />
       )}
-    </div>
+    </>
   );
 };
