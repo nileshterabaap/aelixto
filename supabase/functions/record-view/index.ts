@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   try {
     // Origin validation - allow empty origin (same-origin requests) and known domains
     const origin = req.headers.get('origin') || '';
-    const allowedPatterns = ['aelixto.com', 'lovable.dev', 'lovable.app', 'localhost', '127.0.0.1', 'webcontainer'];
+    const allowedPatterns = ['aelixto.com', 'lovable', 'localhost', '127.0.0.1', 'webcontainer'];
     
     // Allow if origin is empty (same-origin) or matches any allowed pattern
     const isAllowed = origin === '' || allowedPatterns.some(pattern => origin.includes(pattern));
