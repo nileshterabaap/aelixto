@@ -88,20 +88,50 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       } catch (error) {
         console.error(`[CreatePostDialog] ${platform} thumbnail fetch failed:`, error);
       }
-    } else if (linkUrl.includes("twitter.com") || linkUrl.includes("x.com")) {
-      // Twitter/X - use server-side API for thumbnails
+    } else if (linkUrl.includes("pinterest.com") || linkUrl.includes("pin.it")) {
+      // Pinterest - fetch OG data for thumbnail
+      console.log('[CreatePostDialog] Fetching Pinterest thumbnail via OG');
       try {
-        console.log('[CreatePostDialog] Fetching Twitter thumbnail via edge function');
-        const { data, error } = await supabase.functions.invoke('fetch-meta-thumbnail', {
-          body: { url: linkUrl, platform: 'twitter' }
+        const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
+          body: { url: linkUrl }
         });
-        if (!error && data) {
-          videoTitle = data.title || "";
-          thumbnail = data.thumbnail || "";
+        if (!error && ogData) {
+          videoTitle = ogData.title || "";
+          thumbnail = ogData.image || "";
+          console.log('[CreatePostDialog] Got Pinterest thumbnail:', thumbnail?.substring(0, 60));
+        }
+      } catch (error) {
+        console.error('[CreatePostDialog] Pinterest OG fetch failed:', error);
+      }
+    } else if (linkUrl.includes("spotify.com") || linkUrl.includes("open.spotify.com")) {
+      // Spotify - fetch OG data for thumbnail
+      console.log('[CreatePostDialog] Fetching Spotify thumbnail via OG');
+      try {
+        const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
+          body: { url: linkUrl }
+        });
+        if (!error && ogData) {
+          videoTitle = ogData.title || "";
+          thumbnail = ogData.image || "";
+          console.log('[CreatePostDialog] Got Spotify thumbnail:', thumbnail?.substring(0, 60));
+        }
+      } catch (error) {
+        console.error('[CreatePostDialog] Spotify OG fetch failed:', error);
+      }
+    } else if (linkUrl.includes("twitter.com") || linkUrl.includes("x.com")) {
+      // Twitter/X - try OG data (Twitter oEmbed doesn't provide images)
+      console.log('[CreatePostDialog] Fetching Twitter thumbnail via OG');
+      try {
+        const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
+          body: { url: linkUrl }
+        });
+        if (!error && ogData) {
+          videoTitle = ogData.title || "";
+          thumbnail = ogData.image || "";
           console.log('[CreatePostDialog] Got Twitter thumbnail:', thumbnail?.substring(0, 60));
         }
       } catch (error) {
-        console.error('[CreatePostDialog] Twitter thumbnail fetch failed:', error);
+        console.error('[CreatePostDialog] Twitter OG fetch failed:', error);
       }
     }
     
