@@ -70,30 +70,90 @@ serve(async (req) => {
     }
     
     if (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) {
-      // Reddit has an oEmbed API
+      // Use Reddit's JSON API - append .json to get post data
       try {
-        const oembedUrl = `https://www.reddit.com/oembed?url=${encodeURIComponent(targetUrl)}`;
-        const oembedRes = await fetch(oembedUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0' }
+        // Clean URL and append .json
+        let jsonUrl = targetUrl.split('?')[0]; // Remove query params
+        if (!jsonUrl.endsWith('/')) jsonUrl += '/';
+        jsonUrl += '.json';
+        
+        const redditRes = await fetch(jsonUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ThumbnailBot/1.0)' }
         });
-        if (oembedRes.ok) {
-          const oembed = await oembedRes.json();
-          // Extract image from HTML if present
-          const imgMatch = oembed.html?.match(/src=["']([^"']+)["']/);
-          const thumbnail = oembed.thumbnail_url || (imgMatch ? imgMatch[1] : null);
-          console.log('[fetch-og] Reddit oEmbed success:', thumbnail?.substring(0, 60));
-          return new Response(
-            JSON.stringify({ 
-              title: oembed.title || 'Reddit Post', 
-              image: thumbnail, 
-              description: oembed.author_name ? `Posted by ${oembed.author_name}` : 'View on Reddit',
-              finalUrl: targetUrl 
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+        
+        if (redditRes.ok) {
+          const data = await redditRes.json();
+          const post = data?.[0]?.data?.children?.[0]?.data;
+          if (post) {
+            // Reddit provides thumbnail or preview images
+            let thumbnail = null;
+            if (post.preview?.images?.[0]?.source?.url) {
+              thumbnail = post.preview.images[0].source.url.replace(/&amp;/g, '&');
+            } else if (post.thumbnail && post.thumbnail !== 'self' && post.thumbnail !== 'default' && post.thumbnail !== 'nsfw') {
+              thumbnail = post.thumbnail;
+            }
+            
+            console.log('[fetch-og] Reddit JSON API success:', thumbnail?.substring(0, 60));
+            return new Response(
+              JSON.stringify({ 
+                title: post.title || 'Reddit Post', 
+                image: thumbnail, 
+                description: post.author ? `Posted by u/${post.author}` : 'View on Reddit',
+                finalUrl: targetUrl 
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
         }
       } catch (e) {
-        console.log('[fetch-og] Reddit oEmbed failed, falling back to HTML');
+        console.log('[fetch-og] Reddit JSON API failed, falling back to HTML:', e);
+      }
+    }
+    
+    // Twitter/X - use syndication API for thumbnails
+    if (urlLower.includes('twitter.com') || urlLower.includes('x.com')) {
+      try {
+        // Extract tweet ID
+        const tweetIdMatch = targetUrl.match(/status\/(\d+)/);
+        if (tweetIdMatch) {
+          const tweetId = tweetIdMatch[1];
+          // Use Twitter's syndication API
+          const syndicationUrl = `https://cdn.syndication.twimg.com/tweet-result?id=${tweetId}&token=0`;
+          
+          const twitterRes = await fetch(syndicationUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0' }
+          });
+          
+          if (twitterRes.ok) {
+            const tweet = await twitterRes.json();
+            let thumbnail = null;
+            
+            // Check for media in tweet
+            if (tweet.mediaDetails?.[0]?.media_url_https) {
+              thumbnail = tweet.mediaDetails[0].media_url_https;
+            } else if (tweet.photos?.[0]?.url) {
+              thumbnail = tweet.photos[0].url;
+            } else if (tweet.video?.poster) {
+              thumbnail = tweet.video.poster;
+            } else if (tweet.user?.profile_image_url_https) {
+              // Fallback to profile image (get larger version)
+              thumbnail = tweet.user.profile_image_url_https.replace('_normal', '_400x400');
+            }
+            
+            console.log('[fetch-og] Twitter syndication success:', thumbnail?.substring(0, 60));
+            return new Response(
+              JSON.stringify({ 
+                title: tweet.text?.substring(0, 100) || 'Tweet', 
+                image: thumbnail, 
+                description: tweet.user?.name ? `@${tweet.user.screen_name}` : 'View on X',
+                finalUrl: targetUrl 
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        }
+      } catch (e) {
+        console.log('[fetch-og] Twitter syndication failed:', e);
       }
     }
 
