@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.store-thumbnail]
 verify_jwt = false
+
+[functions.fetch-meta-thumbnail]
+verify_jwt = false
