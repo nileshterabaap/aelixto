@@ -72,17 +72,36 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       } catch (error) {
         console.error('[CreatePostDialog] Reddit API failed, falling back to OG:', error);
       }
-    } else if (linkUrl.includes("instagram.com")) {
-      // Instagram oEmbed API
+    } else if (linkUrl.includes("instagram.com") || linkUrl.includes("facebook.com") || linkUrl.includes("fb.watch") || linkUrl.includes("fb.me")) {
+      // Instagram/Facebook - use server-side Meta API for reliable thumbnails
+      const platform = linkUrl.includes("instagram.com") ? "instagram" : "facebook";
       try {
-        const response = await fetch(`https://api.instagram.com/oembed?url=${encodeURIComponent(linkUrl)}`);
-        if (response.ok) {
-          const data = await response.json();
+        console.log(`[CreatePostDialog] Fetching ${platform} thumbnail via edge function`);
+        const { data, error } = await supabase.functions.invoke('fetch-meta-thumbnail', {
+          body: { url: linkUrl, platform }
+        });
+        if (!error && data) {
           videoTitle = data.title || "";
-          thumbnail = data.thumbnail_url || "";
+          thumbnail = data.thumbnail || "";
+          console.log(`[CreatePostDialog] Got ${platform} thumbnail:`, thumbnail?.substring(0, 60));
         }
       } catch (error) {
-        console.error('[CreatePostDialog] Instagram oEmbed failed:', error);
+        console.error(`[CreatePostDialog] ${platform} thumbnail fetch failed:`, error);
+      }
+    } else if (linkUrl.includes("twitter.com") || linkUrl.includes("x.com")) {
+      // Twitter/X - use server-side API for thumbnails
+      try {
+        console.log('[CreatePostDialog] Fetching Twitter thumbnail via edge function');
+        const { data, error } = await supabase.functions.invoke('fetch-meta-thumbnail', {
+          body: { url: linkUrl, platform: 'twitter' }
+        });
+        if (!error && data) {
+          videoTitle = data.title || "";
+          thumbnail = data.thumbnail || "";
+          console.log('[CreatePostDialog] Got Twitter thumbnail:', thumbnail?.substring(0, 60));
+        }
+      } catch (error) {
+        console.error('[CreatePostDialog] Twitter thumbnail fetch failed:', error);
       }
     }
     
