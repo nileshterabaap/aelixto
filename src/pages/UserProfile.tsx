@@ -301,9 +301,8 @@ const UserProfile = () => {
             </div>
           )}
 
-          {/* Platform Posts Grid */}
           {!tabsLoading && tabs.length > 0 ? (
-            <ProfilePlatformGrid userId={profile.user_id} activeTab={activeTab} />
+            <ProfilePlatformGrid userId={profile.user_id} activeTab={activeTab} tabs={tabs} onTabChange={setActiveTab} />
           ) : !tabsLoading ? (
             <p className="text-center text-muted-foreground py-12 text-base">
               No posts yet

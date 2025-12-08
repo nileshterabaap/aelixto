@@ -33,6 +33,7 @@ const PLATFORM_META: Record<string, { label: string; icon: string }> = {
   medium: { label: "Medium", icon: mediumIcon },
   blog: { label: "Blogs", icon: blogIcon },
   spotify: { label: "Spotify", icon: spotifyIcon },
+  article: { label: "Articles", icon: blogIcon },
 };
 
 export const useUserPlatformTabs = (userId: string | undefined) => {
