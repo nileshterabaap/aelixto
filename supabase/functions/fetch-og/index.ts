@@ -70,16 +70,24 @@ serve(async (req) => {
     }
     
     if (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) {
-      // Use Reddit's JSON API - append .json to get post data
+      // Use Reddit's JSON API via old.reddit.com - more reliable
       try {
-        // Clean URL and append .json
+        // Convert to old.reddit.com and append .json
         let jsonUrl = targetUrl.split('?')[0]; // Remove query params
+        jsonUrl = jsonUrl.replace('www.reddit.com', 'old.reddit.com');
         if (!jsonUrl.endsWith('/')) jsonUrl += '/';
         jsonUrl += '.json';
         
+        console.log('[fetch-og] Trying Reddit JSON:', jsonUrl);
+        
         const redditRes = await fetch(jsonUrl, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ThumbnailBot/1.0)' }
+          headers: { 
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+          }
         });
+        
+        console.log('[fetch-og] Reddit response status:', redditRes.status);
         
         if (redditRes.ok) {
           const data = await redditRes.json();
@@ -89,11 +97,11 @@ serve(async (req) => {
             let thumbnail = null;
             if (post.preview?.images?.[0]?.source?.url) {
               thumbnail = post.preview.images[0].source.url.replace(/&amp;/g, '&');
-            } else if (post.thumbnail && post.thumbnail !== 'self' && post.thumbnail !== 'default' && post.thumbnail !== 'nsfw') {
+            } else if (post.thumbnail && post.thumbnail !== 'self' && post.thumbnail !== 'default' && post.thumbnail !== 'nsfw' && post.thumbnail !== 'spoiler') {
               thumbnail = post.thumbnail;
             }
             
-            console.log('[fetch-og] Reddit JSON API success:', thumbnail?.substring(0, 60));
+            console.log('[fetch-og] Reddit JSON API success:', thumbnail?.substring(0, 60) || 'no image');
             return new Response(
               JSON.stringify({ 
                 title: post.title || 'Reddit Post', 
