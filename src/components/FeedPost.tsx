@@ -212,9 +212,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
     }
   };
   
-  // Only use post actions for real posts
-  const postActions = post.isRealPost && userId 
-    ? usePostActions(post.id, userId)
+  // Always call hooks unconditionally (React rules of hooks)
+  const postActionsResult = usePostActions(post.id, userId || '');
+  const repostActionsResult = useRepost(post.id, userId || '');
+  
+  // Only use actions for real posts with a user
+  const canUseActions = post.isRealPost && !!userId;
+  
+  const postActions = canUseActions 
+    ? postActionsResult
     : { 
         isLiked: false, 
         isSaved: false, 
@@ -225,8 +231,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         isDeleting: false 
       };
 
-  const repostActions = post.isRealPost && userId
-    ? useRepost(post.id, userId)
+  const repostActions = canUseActions
+    ? repostActionsResult
     : { isReposted: false, toggleRepost: () => {}, isReposting: false };
 
   const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost, isDeleting } = postActions;
