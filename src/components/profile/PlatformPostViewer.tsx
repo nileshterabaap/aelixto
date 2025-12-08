@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FeedPost } from "@/components/FeedPost";
@@ -17,10 +16,17 @@ interface PlatformPostViewerProps {
   onTabChange: (tab: string) => void;
 }
 
-function transformPost(post: PlatformPost, profileData?: { username: string; display_name: string | null; avatar_url: string | null }): Post & { isRealPost: boolean; user_id: string } {
+interface ProfileData {
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
+function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { isRealPost: boolean; user_id: string } {
+  const postUserId = post.original_user_id || post.user_id;
   return {
     id: post.id,
-    user_id: post.user_id,
+    user_id: postUserId,
     author: {
       name: profileData?.display_name || profileData?.username || "Unknown",
       username: profileData?.username || "unknown",
@@ -36,7 +42,7 @@ function transformPost(post: PlatformPost, profileData?: { username: string; dis
     timestamp: new Date(post.created_at),
     saves: post.saves_count,
     isRealPost: true,
-  };
+  } as Post & { isRealPost: boolean; user_id: string };
 }
 
 export const PlatformPostViewer = ({
@@ -47,10 +53,9 @@ export const PlatformPostViewer = ({
   onClose,
   onTabChange,
 }: PlatformPostViewerProps) => {
-  const navigate = useNavigate();
   const { user } = useSession();
   const { items, loading } = useUserPlatformPosts(userId, activeTab);
-  const [profileData, setProfileData] = useState<{ username: string; display_name: string | null; avatar_url: string | null } | null>(null);
+  const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   
@@ -60,14 +65,25 @@ export const PlatformPostViewer = ({
 
   // Fetch profile data for post author info
   useEffect(() => {
+    if (!userId) return;
+    
     const fetchProfile = async () => {
-      const { supabase } = await import("@/integrations/supabase/client");
-      const { data } = await supabase
-        .from("profiles")
-        .select("username, display_name, avatar_url")
-        .eq("user_id", userId)
-        .single();
-      if (data) setProfileData(data);
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("username, display_name, avatar_url")
+          .eq("user_id", userId)
+          .single();
+        
+        if (error) {
+          console.error("[PlatformPostViewer] Error fetching profile:", error);
+          return;
+        }
+        if (data) setProfileData(data);
+      } catch (err) {
+        console.error("[PlatformPostViewer] Failed to fetch profile:", err);
+      }
     };
     fetchProfile();
   }, [userId]);
@@ -75,10 +91,13 @@ export const PlatformPostViewer = ({
   // Scroll to initial post when items load
   useEffect(() => {
     if (items.length > 0 && initialPostId) {
-      const targetRef = postRefs.current.get(initialPostId);
-      if (targetRef) {
-        targetRef.scrollIntoView({ behavior: "auto", block: "start" });
-      }
+      // Small delay to ensure refs are set
+      setTimeout(() => {
+        const targetRef = postRefs.current.get(initialPostId);
+        if (targetRef) {
+          targetRef.scrollIntoView({ behavior: "auto", block: "start" });
+        }
+      }, 100);
     }
   }, [items, initialPostId, activeTab]);
 
