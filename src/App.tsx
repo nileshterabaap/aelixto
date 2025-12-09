@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { preloadEmbedSDKs } from "@/lib/ScriptLoader";
 import Index from "./pages/Index";
 import Discover from "./pages/Discover";
 import Notifications from "./pages/Notifications";
@@ -17,6 +19,9 @@ import NotFound from "./pages/NotFound";
 import SavedPosts from "./pages/SavedPosts";
 
 const queryClient = new QueryClient();
+
+// Preload embed SDKs early
+preloadEmbedSDKs();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
