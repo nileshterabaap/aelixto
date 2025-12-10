@@ -97,11 +97,6 @@ export const LazyEmbed = ({
                 className="w-full h-full object-cover"
                 loading="eager"
               />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center animate-pulse">
-                  <div className="w-6 h-6 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
-                </div>
-              </div>
             </div>
           ) : (
             <Skeleton className="w-full min-h-[300px] rounded-2xl" />
