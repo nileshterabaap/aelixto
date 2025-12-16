@@ -1,32 +1,57 @@
 import { motion } from "framer-motion";
-import { ReactNode } from "react";
+import { ReactNode, useRef, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 
 interface PageTransitionProps {
   children: ReactNode;
 }
 
-const pageVariants = {
-  initial: {
-    opacity: 0,
-    x: 50,
-  },
-  in: {
-    opacity: 1,
-    x: 0,
-  },
-  out: {
-    opacity: 0,
-    x: -50,
-  },
-};
+// Define route order from left to right (based on bottom nav)
+const routeOrder = ["/", "/discover", "/notifications", "/profile", "/messages", "/saved", "/settings"];
 
-const pageTransition = {
-  type: "tween" as const,
-  ease: [0.4, 0, 0.2, 1] as const,
-  duration: 0.25,
+// Store previous route index globally
+let previousRouteIndex = 0;
+
+const getRouteIndex = (pathname: string): number => {
+  // Handle dynamic routes
+  if (pathname.startsWith("/u/")) return 4; // User profiles after main nav
+  if (pathname.startsWith("/post/")) return 4;
+  if (pathname.startsWith("/conversation/")) return 5;
+  
+  const index = routeOrder.indexOf(pathname);
+  return index >= 0 ? index : routeOrder.length;
 };
 
 export const PageTransition = ({ children }: PageTransitionProps) => {
+  const location = useLocation();
+  const currentIndex = getRouteIndex(location.pathname);
+  const direction = currentIndex >= previousRouteIndex ? 1 : -1;
+  
+  useEffect(() => {
+    previousRouteIndex = currentIndex;
+  }, [currentIndex]);
+
+  const pageVariants = {
+    initial: {
+      opacity: 0,
+      x: direction * 50,
+    },
+    in: {
+      opacity: 1,
+      x: 0,
+    },
+    out: {
+      opacity: 0,
+      x: direction * -50,
+    },
+  };
+
+  const pageTransition = {
+    type: "tween" as const,
+    ease: [0.4, 0, 0.2, 1] as const,
+    duration: 0.25,
+  };
+
   return (
     <motion.div
       initial="initial"
