@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface FeedPost {
@@ -34,123 +34,100 @@ interface UseFollowingFeedResult {
   hasMore: boolean;
 }
 
+const fetchFollowingCount = async () => {
+  const { data, error } = await supabase.rpc('get_following_count');
+  if (error) throw error;
+  return data as number;
+};
+
+const fetchFeedPage = async (cursor?: string) => {
+  const { data, error } = await supabase.rpc('get_following_feed', {
+    limit_count: 20,
+    cursor: cursor || null,
+  });
+
+  if (error) throw error;
+
+  if (!data || data.length === 0) {
+    return { posts: [], nextCursor: undefined };
+  }
+
+  // Map RPC response to FeedPost format
+  const mappedPosts: FeedPost[] = data.map((item: any) => ({
+    id: item.id,
+    user_id: item.user_id,
+    content: item.content,
+    created_at: item.created_at,
+    likes_count: item.likes_count,
+    saves_count: item.saves_count,
+    media_type: item.media_type,
+    media_url: item.media_url,
+    platform: item.platform,
+    embed_html: item.embed_html,
+    thumbnail_url: item.thumbnail_url,
+    title: item.title,
+    is_public: item.is_public,
+    is_repost: item.is_repost,
+    reposted_by_user_id: item.reposted_by_user_id,
+    reposted_by_username: item.reposted_by_username,
+    profiles: {
+      username: item.profile_username,
+      display_name: item.profile_display_name,
+      avatar_url: item.profile_avatar_url,
+    },
+  }));
+
+  const nextCursor = data.length < 20 ? undefined : mappedPosts[mappedPosts.length - 1]?.created_at;
+
+  return { posts: mappedPosts, nextCursor };
+};
+
 export const useFollowingFeed = (): UseFollowingFeedResult => {
-  const [items, setItems] = useState<FeedPost[]>([]);
-  const [empty, setEmpty] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  // Check following count first
+  const { data: followingCount, isLoading: countLoading } = useQuery({
+    queryKey: ['following-count'],
+    queryFn: fetchFollowingCount,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+  });
 
-  const checkFollowingCount = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.rpc('get_following_count');
-      
-      if (error) throw error;
-      
-      if (data === 0) {
-        setEmpty(true);
-        setLoading(false);
-        return false;
-      }
-      
-      return true;
-    } catch (err) {
-      console.error('Error checking following count:', err);
-      setError(err instanceof Error ? err.message : 'Failed to check following count');
-      setLoading(false);
-      return false;
+  const hasFollowing = (followingCount ?? 0) > 0;
+
+  // Fetch feed with infinite query for pagination
+  const {
+    data,
+    isLoading: feedLoading,
+    error: feedError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['following-feed'],
+    queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: hasFollowing,
+    staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
+    gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: false, // Don't refetch on mount if data exists
+  });
+
+  // Flatten all pages into single array
+  const items = data?.pages.flatMap(page => page.posts) ?? [];
+
+  const loadMore = () => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
     }
-  }, []);
-
-  const fetchFeed = useCallback(async (cursor?: string) => {
-    try {
-      const { data, error } = await supabase.rpc('get_following_feed', {
-        limit_count: 20,
-        cursor: cursor || null,
-      });
-
-      if (error) throw error;
-
-      if (!data || data.length === 0) {
-        setHasMore(false);
-        return [];
-      }
-
-      if (data.length < 20) {
-        setHasMore(false);
-      }
-
-      // Map RPC response to FeedPost format
-      const mappedPosts: FeedPost[] = data.map((item: any) => ({
-        id: item.id,
-        user_id: item.user_id,
-        content: item.content,
-        created_at: item.created_at,
-        likes_count: item.likes_count,
-        saves_count: item.saves_count,
-        media_type: item.media_type,
-        media_url: item.media_url,
-        platform: item.platform,
-        embed_html: item.embed_html,
-        thumbnail_url: item.thumbnail_url,
-        title: item.title,
-        is_public: item.is_public,
-        is_repost: item.is_repost,
-        reposted_by_user_id: item.reposted_by_user_id,
-        reposted_by_username: item.reposted_by_username,
-        profiles: {
-          username: item.profile_username,
-          display_name: item.profile_display_name,
-          avatar_url: item.profile_avatar_url,
-        },
-      }));
-
-      return mappedPosts;
-    } catch (err) {
-      console.error('Error fetching following feed:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch feed');
-      return [];
-    }
-  }, []);
-
-  const loadInitialFeed = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    const hasFollowing = await checkFollowingCount();
-    
-    if (!hasFollowing) {
-      return;
-    }
-
-    const posts = await fetchFeed();
-    setItems(posts);
-    setLoading(false);
-  }, [checkFollowingCount, fetchFeed]);
-
-  const loadMore = useCallback(async () => {
-    if (isLoadingMore || !hasMore || items.length === 0) return;
-
-    setIsLoadingMore(true);
-    const lastItem = items[items.length - 1];
-    const cursor = lastItem.created_at;
-
-    const newPosts = await fetchFeed(cursor);
-    setItems(prev => [...prev, ...newPosts]);
-    setIsLoadingMore(false);
-  }, [isLoadingMore, hasMore, items, fetchFeed]);
-
-  useEffect(() => {
-    loadInitialFeed();
-  }, [loadInitialFeed]);
+  };
 
   return {
     items,
-    empty,
-    loading,
-    error,
+    empty: !countLoading && !hasFollowing,
+    loading: countLoading || (hasFollowing && feedLoading),
+    error: feedError?.message ?? null,
     loadMore,
-    hasMore,
+    hasMore: hasNextPage ?? false,
   };
 };
