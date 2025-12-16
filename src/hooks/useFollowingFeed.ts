@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 interface FeedPost {
@@ -83,12 +83,18 @@ const fetchFeedPage = async (cursor?: string) => {
 };
 
 export const useFollowingFeed = (): UseFollowingFeedResult => {
+  const queryClient = useQueryClient();
+
   // Check following count first
   const { data: followingCount, isLoading: countLoading } = useQuery({
     queryKey: ['following-count'],
     queryFn: fetchFollowingCount,
+    // prevent a "blank" first render on navigation by seeding from cache
+    initialData: () => queryClient.getQueryData(['following-count']) as number | undefined,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const hasFollowing = (followingCount ?? 0) > 0;
@@ -114,7 +120,7 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
   });
 
   // Flatten all pages into single array
-  const items = data?.pages.flatMap(page => page.posts) ?? [];
+  const items = data?.pages.flatMap((page) => page.posts) ?? [];
 
   const loadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -131,3 +137,4 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     hasMore: hasNextPage ?? false,
   };
 };
+

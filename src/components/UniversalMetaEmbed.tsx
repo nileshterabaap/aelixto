@@ -7,6 +7,18 @@ interface UniversalMetaEmbedProps {
   url: string;
 }
 
+// Cache resolved embeds to avoid re-processing when navigating between tabs/pages
+// (keeps embeds feeling “instant” like Instagram).
+type CachedEmbed = {
+  embedHtml: string | null;
+  fallbackData: { title?: string; image?: string; description?: string } | null;
+  expandedUrl: string;
+  embedUrl: string;
+  showFallback: boolean;
+};
+
+const embedCache = new Map<string, CachedEmbed>();
+
 // Detect platform from URL
 const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 'reddit' | 'quora' | 'medium' | 'blog' | 'unknown' => {
   const urlLower = url.toLowerCase();
@@ -29,8 +41,13 @@ const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 're
   if (urlLower.includes('medium.com')) {
     return 'medium';
   }
-  if (urlLower.includes('blog') || urlLower.includes('.wordpress.com') || urlLower.includes('blogger.com') || 
-      urlLower.includes('ghost.io') || urlLower.includes('substack.com')) {
+  if (
+    urlLower.includes('blog') ||
+    urlLower.includes('.wordpress.com') ||
+    urlLower.includes('blogger.com') ||
+    urlLower.includes('ghost.io') ||
+    urlLower.includes('substack.com')
+  ) {
     return 'blog';
   }
   return 'unknown';
@@ -45,7 +62,7 @@ const buildInstagramEmbed = (url: string): string => {
 // Normalize Facebook URLs for reliable embedding
 const normalizeFacebookUrl = (raw: string): string => {
   let url = raw.trim();
-  
+
   console.log('[FB EMBED] Starting normalization for:', url);
 
   // 1) Always use www. instead of mobile variants
@@ -79,20 +96,11 @@ const normalizeFacebookUrl = (raw: string): string => {
   }
 
   // 4) Strip tracking / share junk that shouldn't affect the canonical post
-  const stripParams = [
-    'mibextid',
-    'ref',
-    'refid',
-    'sfnsn',
-    'app',
-    'paipv',
-    'rdid', // Remove rdid as it causes sizing issues
-    'share_url', // Remove share_url wrapper
-  ];
-  
+  const stripParams = ['mibextid', 'ref', 'refid', 'sfnsn', 'app', 'paipv', 'rdid', 'share_url'];
+
   try {
     const u2 = new URL(url);
-    stripParams.forEach(p => u2.searchParams.delete(p));
+    stripParams.forEach((p) => u2.searchParams.delete(p));
     // Also drop hash fragments that aren't part of the post identity
     u2.hash = '';
     url = u2.toString();
@@ -107,15 +115,15 @@ const normalizeFacebookUrl = (raw: string): string => {
 // Build Facebook embed using SDK approach (XFBML)
 const buildFacebookEmbed = (url: string): string => {
   const canonical = normalizeFacebookUrl(url);
-  
+
   console.log('[FB EMBED] Building embed:', {
     originalUrl: url,
     normalizedUrl: canonical,
-    embedType: 'sdk-xfbml-div'
+    embedType: 'sdk-xfbml-div',
   });
-  
-  // Use responsive width for mobile compatibility
-  return `<div class="fb-post" data-href="${canonical}" data-width="500" data-show-text="true"></div>`;
+
+  // IMPORTANT: do not hardcode data-width (breaks mobile sizing). Let CSS control width.
+  return `<div class="fb-post" data-href="${canonical}" data-show-text="true"></div>`;
 };
 
 // Check if Spotify URL is embeddable (not wrapped-share or other special pages)
@@ -125,9 +133,14 @@ const isEmbeddableSpotifyUrl = (url: string): boolean => {
     return false;
   }
   // Standard embeddable content types
-  return url.includes('/track/') || url.includes('/album/') || 
-         url.includes('/playlist/') || url.includes('/artist/') ||
-         url.includes('/episode/') || url.includes('/show/');
+  return (
+    url.includes('/track/') ||
+    url.includes('/album/') ||
+    url.includes('/playlist/') ||
+    url.includes('/artist/') ||
+    url.includes('/episode/') ||
+    url.includes('/show/')
+  );
 };
 
 // Build Spotify embed HTML
@@ -136,76 +149,92 @@ const buildSpotifyEmbed = (url: string): string | null => {
   if (!isEmbeddableSpotifyUrl(url)) {
     return null; // Return null to trigger fallback
   }
-  
+
   // Convert regular Spotify URL to embed URL
   // e.g., https://open.spotify.com/track/xyz -> https://open.spotify.com/embed/track/xyz
   let embedUrl = url.replace('open.spotify.com/', 'open.spotify.com/embed/');
-  
+
   // If it already has /embed/, don't add it again
   if (url.includes('/embed/')) {
     embedUrl = url;
   }
-  
+
   return `<iframe style="border-radius:12px;display:block;" src="${embedUrl}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
 };
 
 export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
-  const [embedHtml, setEmbedHtml] = useState<string | null>(null);
-  const [fallbackData, setFallbackData] = useState<{ title?: string; image?: string; description?: string } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [expandedUrl, setExpandedUrl] = useState(url);
-  const [embedUrl, setEmbedUrl] = useState(url); // Separate URL for embedding
-  const [showFallback, setShowFallback] = useState(false);
+  const cached = embedCache.get(url);
+
+  const [embedHtml, setEmbedHtml] = useState<string | null>(cached?.embedHtml ?? null);
+  const [fallbackData, setFallbackData] = useState<{ title?: string; image?: string; description?: string } | null>(
+    cached?.fallbackData ?? null
+  );
+  const [expandedUrl, setExpandedUrl] = useState(cached?.expandedUrl ?? url);
+  const [embedUrl, setEmbedUrl] = useState(cached?.embedUrl ?? url); // Separate URL for embedding
+  const [showFallback, setShowFallback] = useState(cached?.showFallback ?? false);
   const lastTapRef = useRef<number>(0);
 
   const handleDoubleTap = () => {
     const now = Date.now();
     const timeSinceLastTap = now - lastTapRef.current;
-    
+
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
       // Double tap detected
       window.open(embedUrl, '_blank', 'noopener,noreferrer');
     }
-    
+
     lastTapRef.current = now;
   };
 
   useEffect(() => {
-    const processUrl = async () => {
-      setIsLoading(true);
-      setShowFallback(false);
-      setEmbedHtml(null);
-      
-      try {
-        const platform = detectPlatform(url);
-        let finalUrl = url;
-        let urlForEmbed = url;
-        let shouldShowFallback = false;
+    // Instant first paint: build an embed immediately (no "Loading embed" flash).
+    // Then enhance in background (expand URLs + fetch OG + cache result).
+    const platform = detectPlatform(url);
+    const immediateHtml =
+      platform === 'instagram'
+        ? buildInstagramEmbed(url)
+        : platform === 'facebook'
+          ? buildFacebookEmbed(url)
+          : platform === 'spotify'
+            ? buildSpotifyEmbed(url)
+            : null;
 
+    if (immediateHtml && !showFallback) {
+      setEmbedHtml(immediateHtml);
+    }
+
+    const processUrl = async () => {
+      let finalUrl = url;
+      let urlForEmbed = url;
+      let shouldShowFallback = false;
+
+      try {
         // Step 1: Expand short URLs and Facebook share URLs
-        const needsExpansion = url.includes('fb.watch') || url.includes('fb.me') || 
-                               url.includes('bit.ly') || url.includes('pin.it') ||
-                               (url.includes('facebook.com') && url.includes('/share/'));
-        
+        const needsExpansion =
+          url.includes('fb.watch') ||
+          url.includes('fb.me') ||
+          url.includes('bit.ly') ||
+          url.includes('pin.it') ||
+          (url.includes('facebook.com') && url.includes('/share/'));
+
         if (needsExpansion) {
           console.log('[UniversalMetaEmbed] Expanding URL:', url);
           try {
             const { data: expandData, error: expandError } = await supabase.functions.invoke('expand-url', {
-              body: { url }
+              body: { url },
             });
 
             if (!expandError && expandData?.finalUrl) {
               finalUrl = expandData.finalUrl;
               urlForEmbed = finalUrl;
               console.log('[UniversalMetaEmbed] Expanded to:', finalUrl);
-              
+
               // If expanded URL is a login redirect or has login in title, use fallback
               if (finalUrl.includes('/login/') && platform === 'facebook') {
                 console.log('[UniversalMetaEmbed] Expanded URL is login redirect, will use fallback');
                 shouldShowFallback = true;
               }
-              
-              // Also check if the page title indicates login requirement
+
               if (expandData?.title?.toLowerCase().includes('log in to facebook')) {
                 console.log('[UniversalMetaEmbed] Title indicates login required, will use fallback');
                 shouldShowFallback = true;
@@ -224,44 +253,41 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         setEmbedUrl(urlForEmbed);
 
         // Step 2: Fetch OG data for fallback (non-blocking)
-        supabase.functions.invoke('fetch-og', {
-          body: { url: finalUrl }
-        }).then(({ data: ogData, error: ogError }) => {
-          if (!ogError && ogData) {
-            const ogTitle = ogData.meta?.title || ogData.title;
-            
-            // Check if the OG data indicates a login page
-            if (ogTitle?.toLowerCase().includes('log in to facebook') && platform === 'facebook') {
-              console.log('[UniversalMetaEmbed] OG title indicates login page, showing fallback');
-              shouldShowFallback = true;
-              setShowFallback(true);
+        supabase.functions
+          .invoke('fetch-og', {
+            body: { url: finalUrl },
+          })
+          .then(({ data: ogData, error: ogError }) => {
+            if (!ogError && ogData) {
+              const ogTitle = ogData.meta?.title || ogData.title;
+
+              // Check if the OG data indicates a login page
+              if (ogTitle?.toLowerCase().includes('log in to facebook') && platform === 'facebook') {
+                console.log('[UniversalMetaEmbed] OG title indicates login page, showing fallback');
+                shouldShowFallback = true;
+                setShowFallback(true);
+              }
+
+              setFallbackData({
+                title: ogTitle,
+                image: ogData.meta?.image || ogData.image,
+                description: ogData.meta?.description || ogData.description,
+              });
             }
-            
-            setFallbackData({
-              title: ogTitle,
-              image: ogData.meta?.image || ogData.image,
-              description: ogData.meta?.description || ogData.description
-            });
-          }
-        }).catch(err => console.warn('[UniversalMetaEmbed] OG fetch failed:', err));
+          })
+          .catch((err) => console.warn('[UniversalMetaEmbed] OG fetch failed:', err));
 
         // Step 3: Build embed HTML based on platform (skip if we should show fallback)
         if (!shouldShowFallback) {
           if (platform === 'instagram') {
-            const html = buildInstagramEmbed(urlForEmbed);
-            setEmbedHtml(html);
-            console.log('[UniversalMetaEmbed] Built Instagram embed');
+            setEmbedHtml(buildInstagramEmbed(urlForEmbed));
           } else if (platform === 'facebook') {
-            const html = buildFacebookEmbed(urlForEmbed);
-            setEmbedHtml(html);
-            console.log('[FB EMBED] Built Facebook SDK embed');
+            setEmbedHtml(buildFacebookEmbed(urlForEmbed));
           } else if (platform === 'spotify') {
             const html = buildSpotifyEmbed(urlForEmbed);
             if (html) {
               setEmbedHtml(html);
-              console.log('[UniversalMetaEmbed] Built Spotify embed');
             } else {
-              console.log('[UniversalMetaEmbed] Spotify URL not embeddable, using fallback');
               shouldShowFallback = true;
               setShowFallback(true);
             }
@@ -269,47 +295,45 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         } else {
           setShowFallback(true);
         }
-
       } catch (error) {
         console.error('[UniversalMetaEmbed] Error processing URL:', error);
       } finally {
-        setIsLoading(false);
+        // Write the most recent state to cache (prevents flicker on navigation back)
+        const next: CachedEmbed = {
+          embedHtml: shouldShowFallback ? null : embedHtml,
+          fallbackData,
+          expandedUrl: finalUrl,
+          embedUrl: urlForEmbed,
+          showFallback: shouldShowFallback || showFallback,
+        };
+        embedCache.set(url, next);
       }
     };
 
-    processUrl();
+    // If we already have a cached resolved version, don't redo network work.
+    if (!cached) {
+      processUrl();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url]);
 
-  if (isLoading) {
-    return (
-      <div className="rounded-2xl border-2 border-border bg-muted/30 p-8 text-center">
-        <p className="text-sm text-muted-foreground">Loading embed...</p>
-      </div>
-    );
-  }
-
   if (embedHtml && !showFallback) {
-    console.log('[UniversalMetaEmbed] Rendering embed, showFallback:', showFallback);
-    
     // For Spotify only, render directly without RawEmbedRenderer
     const isSpotifyIframe = embedHtml.includes('open.spotify.com/embed');
-    
+
     if (isSpotifyIframe) {
       return (
-        <div 
+        <div
           className="relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block"
           dangerouslySetInnerHTML={{ __html: embedHtml }}
         />
       );
     }
-    
-    // For Instagram AND Facebook, use RawEmbedRenderer for SDK processing
-    const isFacebookEmbed = embedHtml.includes('fb-post');
-    
+
     return (
       <div onClick={handleDoubleTap}>
-        <RawEmbedRenderer 
-          embedHtml={embedHtml} 
+        <RawEmbedRenderer
+          embedHtml={embedHtml}
           onError={() => {
             console.log('[UniversalMetaEmbed] onError called, setting showFallback to true');
             setShowFallback(true);
@@ -318,21 +342,28 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       </div>
     );
   }
-  
-  console.log('[UniversalMetaEmbed] Showing fallback, showFallback:', showFallback, 'embedHtml exists:', !!embedHtml);
 
   // Show fallback if no embed HTML or if embed failed
   const platform = detectPlatform(expandedUrl);
-  const platformName = platform === 'instagram' ? 'Instagram' : 
-                       platform === 'facebook' ? 'Facebook' :
-                       platform === 'spotify' ? 'Spotify' :
-                       platform === 'reddit' ? 'Reddit' :
-                       platform === 'quora' ? 'Quora' :
-                       platform === 'medium' ? 'Medium' :
-                       platform === 'blog' ? 'Blog' : 'Web';
+  const platformName =
+    platform === 'instagram'
+      ? 'Instagram'
+      : platform === 'facebook'
+        ? 'Facebook'
+        : platform === 'spotify'
+          ? 'Spotify'
+          : platform === 'reddit'
+            ? 'Reddit'
+            : platform === 'quora'
+              ? 'Quora'
+              : platform === 'medium'
+                ? 'Medium'
+                : platform === 'blog'
+                  ? 'Blog'
+                  : 'Web';
 
   return (
-    <OgCardFallback 
+    <OgCardFallback
       url={expandedUrl}
       title={fallbackData?.title}
       image={fallbackData?.image}
@@ -341,3 +372,4 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     />
   );
 };
+
