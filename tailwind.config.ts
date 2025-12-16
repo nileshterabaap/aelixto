@@ -114,6 +114,16 @@ export default {
             opacity: "0",
           },
         },
+        "underline-slide": {
+          "0%": {
+            transform: "scaleX(0)",
+            opacity: "0",
+          },
+          "100%": {
+            transform: "scaleX(1)",
+            opacity: "1",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -121,6 +131,7 @@ export default {
         shimmer: "shimmer 2s infinite linear",
         "bounce-in": "bounce-in 0.5s ease-out both",
         ripple: "ripple 0.6s linear",
+        "underline-slide": "underline-slide 0.2s ease-out",
       },
     },
   },
