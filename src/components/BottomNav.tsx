@@ -16,7 +16,12 @@ interface Ripple {
 export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => {
+    if (path === "/profile") {
+      return location.pathname === "/profile" || location.pathname.startsWith("/u/");
+    }
+    return location.pathname === path;
+  };
   const [ripples, setRipples] = useState<Record<string, Ripple[]>>({});
 
   const baseIcon = "text-black transition-all duration-200";
