@@ -88,11 +88,28 @@ export default {
             backgroundPosition: "1000px 0",
           },
         },
+        "bounce-in": {
+          "0%": {
+            transform: "translateX(-50%) scale(0)",
+            opacity: "0",
+          },
+          "50%": {
+            transform: "translateX(-50%) scale(1.15)",
+          },
+          "70%": {
+            transform: "translateX(-50%) scale(0.9)",
+          },
+          "100%": {
+            transform: "translateX(-50%) scale(1)",
+            opacity: "1",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         shimmer: "shimmer 2s infinite linear",
+        "bounce-in": "bounce-in 0.5s ease-out both",
       },
     },
   },
