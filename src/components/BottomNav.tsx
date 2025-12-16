@@ -144,6 +144,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             ))}
             <User
               strokeWidth={2.5}
+              fill={isActive("/profile") ? "currentColor" : "none"}
               className={`${baseIcon} ${isActive("/profile") ? activeIcon : inactiveIcon}`}
             />
             {isActive("/profile") && <span className="absolute bottom-2 w-5 h-0.5 bg-black rounded-full animate-underline-slide" />}
