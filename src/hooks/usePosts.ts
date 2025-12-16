@@ -41,6 +41,10 @@ export const usePosts = () => {
       if (error) throw error;
       return data as unknown as Post[];
     },
+    staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
+    gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache
+    refetchOnWindowFocus: false,
+    refetchOnMount: false, // Don't refetch if cached data exists
   });
 };
 
