@@ -26,13 +26,14 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Home"
             variant="ghost"
             size="icon"
-            className="h-14 w-14 active:scale-90 transition-transform"
+            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1"
             onClick={() => navigate("/")}
           >
             <Home
               fill="currentColor"
               className={`${baseIcon} ${isActive("/") ? activeIcon : inactiveIcon}`}
             />
+            {isActive("/") && <span className="w-1 h-1 rounded-full bg-black" />}
           </Button>
 
           {/* Discover */}
@@ -40,13 +41,14 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Explore"
             variant="ghost"
             size="icon"
-            className="h-14 w-14 active:scale-90 transition-transform"
+            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1"
             onClick={() => navigate("/discover")}
           >
             <Compass
               strokeWidth={2.5}
               className={`${baseIcon} ${isActive("/discover") ? activeIcon : inactiveIcon}`}
             />
+            {isActive("/discover") && <span className="w-1 h-1 rounded-full bg-black" />}
           </Button>
 
           {/* spacer for center FAB */}
@@ -57,13 +59,14 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Notifications"
             variant="ghost"
             size="icon"
-            className="relative h-14 w-14 active:scale-90 transition-transform"
+            className="relative h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1"
             onClick={() => navigate("/notifications")}
           >
             <Bell
               fill="currentColor"
               className={`${baseIcon} ${isActive("/notifications") ? activeIcon : inactiveIcon}`}
             />
+            {isActive("/notifications") && <span className="w-1 h-1 rounded-full bg-black" />}
             {/* red badge */}
             <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white ring-2 ring-white">
               7
@@ -75,13 +78,14 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Profile"
             variant="ghost"
             size="icon"
-            className="h-14 w-14 active:scale-90 transition-transform"
+            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1"
             onClick={() => navigate("/profile")}
           >
             <User
               strokeWidth={2.5}
               className={`${baseIcon} ${isActive("/profile") ? activeIcon : inactiveIcon}`}
             />
+            {isActive("/profile") && <span className="w-1 h-1 rounded-full bg-black" />}
           </Button>
         </div>
 
