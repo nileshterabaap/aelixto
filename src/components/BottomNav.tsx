@@ -73,7 +73,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               fill="currentColor"
               className={`${baseIcon} ${isActive("/") ? activeIcon : inactiveIcon}`}
             />
-            {isActive("/") && <span className="w-1 h-1 rounded-full bg-black" />}
+            {isActive("/") && <span className="absolute bottom-2 w-5 h-0.5 bg-black rounded-full" />}
           </Button>
 
           {/* Discover */}
@@ -95,7 +95,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               strokeWidth={2.5}
               className={`${baseIcon} ${isActive("/discover") ? activeIcon : inactiveIcon}`}
             />
-            {isActive("/discover") && <span className="w-1 h-1 rounded-full bg-black" />}
+            {isActive("/discover") && <span className="absolute bottom-2 w-5 h-0.5 bg-black rounded-full" />}
           </Button>
 
           {/* spacer for center FAB */}
@@ -120,7 +120,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               fill="currentColor"
               className={`${baseIcon} ${isActive("/notifications") ? activeIcon : inactiveIcon}`}
             />
-            {isActive("/notifications") && <span className="w-1 h-1 rounded-full bg-black" />}
+            {isActive("/notifications") && <span className="absolute bottom-2 w-5 h-0.5 bg-black rounded-full" />}
             {/* red badge */}
             <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white ring-2 ring-white z-10">
               7
@@ -146,7 +146,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               strokeWidth={2.5}
               className={`${baseIcon} ${isActive("/profile") ? activeIcon : inactiveIcon}`}
             />
-            {isActive("/profile") && <span className="w-1 h-1 rounded-full bg-black" />}
+            {isActive("/profile") && <span className="absolute bottom-2 w-5 h-0.5 bg-black rounded-full" />}
           </Button>
         </div>
 
@@ -161,8 +161,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
           aria-label="Create post"
           onClick={onCreatePost}
           className="absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-2xl bg-black text-white 
-                     hover:scale-105 active:scale-95 transition-transform
-                     animate-[bounce-in_0.5s_ease-out_0.2s_both]"
+                     hover:scale-105 active:scale-95 transition-transform"
         >
           <Plus className="mx-auto h-5 w-5 stroke-[3] text-white" />
         </button>
