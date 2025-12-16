@@ -53,29 +53,31 @@ function PostCard({ post, onClick }: {
   const src = imageError ? null : maybeProxy(rawThumb, 480);
   const Icon = getPlatformIcon();
 
+  // Instagram-style: only show if we have a thumbnail, otherwise blank
+  if (!src) {
+    return (
+      <button
+        onClick={onClick}
+        className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} bg-muted/30`}
+      />
+    );
+  }
+
   return (
     <button
       onClick={onClick}
       className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} bg-muted/50 group`}
     >
-      {src ? (
-        <img
-          src={src}
-          alt=""
-          onError={() => setImageError(true)}
-          className="w-full h-full object-cover object-center"
-          loading="lazy"
-        />
-      ) : (
-        <div className={`w-full h-full ${getPlatformGradient()} flex items-center justify-center`}>
-          {Icon && (
-            <img src={Icon} alt={post.platform} className="w-12 h-12 opacity-90 invert" />
-          )}
-        </div>
-      )}
+      <img
+        src={src}
+        alt=""
+        onError={() => setImageError(true)}
+        className="w-full h-full object-cover object-center"
+        loading="lazy"
+      />
 
       {/* Play button overlay for videos */}
-      {post.media_type === "video" && src && !imageError && (
+      {post.media_type === "video" && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <div className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm grid place-items-center">
             <div className="w-0 h-0 border-l-[14px] border-l-white border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent ml-1" />
