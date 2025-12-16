@@ -1,19 +1,52 @@
 import { Home, Compass, Plus, Bell, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useState, useCallback, MouseEvent } from "react";
 
 interface BottomNavProps {
   onCreatePost: () => void;
+}
+
+interface Ripple {
+  x: number;
+  y: number;
+  id: number;
 }
 
 export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
+  const [ripples, setRipples] = useState<Record<string, Ripple[]>>({});
 
   const baseIcon = "text-black transition-all duration-200";
   const activeIcon = "h-9 w-9 opacity-100";
   const inactiveIcon = "h-7 w-7 opacity-50 hover:opacity-80";
+
+  const createRipple = useCallback((e: MouseEvent<HTMLButtonElement>, key: string) => {
+    const button = e.currentTarget;
+    const rect = button.getBoundingClientRect();
+    const x = e.clientX - rect.left - 12;
+    const y = e.clientY - rect.top - 12;
+    const id = Date.now();
+
+    setRipples(prev => ({
+      ...prev,
+      [key]: [...(prev[key] || []), { x, y, id }]
+    }));
+
+    setTimeout(() => {
+      setRipples(prev => ({
+        ...prev,
+        [key]: (prev[key] || []).filter(r => r.id !== id)
+      }));
+    }, 600);
+  }, []);
+
+  const handleClick = (e: MouseEvent<HTMLButtonElement>, path: string, key: string) => {
+    createRipple(e, key);
+    navigate(path);
+  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-t border-white pb-[env(safe-area-inset-bottom)]">
@@ -26,9 +59,16 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Home"
             variant="ghost"
             size="icon"
-            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1"
-            onClick={() => navigate("/")}
+            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
+            onClick={(e) => handleClick(e, "/", "home")}
           >
+            {ripples.home?.map(ripple => (
+              <span
+                key={ripple.id}
+                className="absolute w-6 h-6 bg-black/20 rounded-full animate-ripple pointer-events-none"
+                style={{ left: ripple.x, top: ripple.y }}
+              />
+            ))}
             <Home
               fill="currentColor"
               className={`${baseIcon} ${isActive("/") ? activeIcon : inactiveIcon}`}
@@ -41,9 +81,16 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Explore"
             variant="ghost"
             size="icon"
-            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1"
-            onClick={() => navigate("/discover")}
+            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
+            onClick={(e) => handleClick(e, "/discover", "discover")}
           >
+            {ripples.discover?.map(ripple => (
+              <span
+                key={ripple.id}
+                className="absolute w-6 h-6 bg-black/20 rounded-full animate-ripple pointer-events-none"
+                style={{ left: ripple.x, top: ripple.y }}
+              />
+            ))}
             <Compass
               strokeWidth={2.5}
               className={`${baseIcon} ${isActive("/discover") ? activeIcon : inactiveIcon}`}
@@ -59,16 +106,23 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Notifications"
             variant="ghost"
             size="icon"
-            className="relative h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1"
-            onClick={() => navigate("/notifications")}
+            className="relative h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden"
+            onClick={(e) => handleClick(e, "/notifications", "notifications")}
           >
+            {ripples.notifications?.map(ripple => (
+              <span
+                key={ripple.id}
+                className="absolute w-6 h-6 bg-black/20 rounded-full animate-ripple pointer-events-none"
+                style={{ left: ripple.x, top: ripple.y }}
+              />
+            ))}
             <Bell
               fill="currentColor"
               className={`${baseIcon} ${isActive("/notifications") ? activeIcon : inactiveIcon}`}
             />
             {isActive("/notifications") && <span className="w-1 h-1 rounded-full bg-black" />}
             {/* red badge */}
-            <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white ring-2 ring-white">
+            <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-[5px] text-[10px] font-bold leading-none text-white ring-2 ring-white z-10">
               7
             </span>
           </Button>
@@ -78,9 +132,16 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Profile"
             variant="ghost"
             size="icon"
-            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1"
-            onClick={() => navigate("/profile")}
+            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
+            onClick={(e) => handleClick(e, "/profile", "profile")}
           >
+            {ripples.profile?.map(ripple => (
+              <span
+                key={ripple.id}
+                className="absolute w-6 h-6 bg-black/20 rounded-full animate-ripple pointer-events-none"
+                style={{ left: ripple.x, top: ripple.y }}
+              />
+            ))}
             <User
               strokeWidth={2.5}
               className={`${baseIcon} ${isActive("/profile") ? activeIcon : inactiveIcon}`}
