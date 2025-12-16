@@ -11,9 +11,9 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const location = useLocation();
   const isActive = (path: string) => location.pathname === path;
 
-  const baseIcon = "h-8 w-8 text-black";
-  const activeIcon = "opacity-100";
-  const inactiveIcon = "opacity-60 hover:opacity-100 transition-opacity";
+  const baseIcon = "text-black transition-all duration-200";
+  const activeIcon = "h-9 w-9 opacity-100";
+  const inactiveIcon = "h-7 w-7 opacity-50 hover:opacity-80";
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-t border-white pb-[env(safe-area-inset-bottom)]">
