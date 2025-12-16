@@ -42,7 +42,7 @@ export const PageTransition = ({ children }: PageTransitionProps) => {
     },
     out: {
       opacity: 0,
-      x: direction * -50,
+      x: direction * 50,
     },
   };
 
