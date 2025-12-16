@@ -26,7 +26,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Home"
             variant="ghost"
             size="icon"
-            className="h-14 w-14"
+            className="h-14 w-14 active:scale-90 transition-transform"
             onClick={() => navigate("/")}
           >
             <Home
@@ -40,7 +40,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Explore"
             variant="ghost"
             size="icon"
-            className="h-14 w-14"
+            className="h-14 w-14 active:scale-90 transition-transform"
             onClick={() => navigate("/discover")}
           >
             <Compass
@@ -57,7 +57,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Notifications"
             variant="ghost"
             size="icon"
-            className="relative h-14 w-14"
+            className="relative h-14 w-14 active:scale-90 transition-transform"
             onClick={() => navigate("/notifications")}
           >
             <Bell
@@ -75,7 +75,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Profile"
             variant="ghost"
             size="icon"
-            className="h-14 w-14"
+            className="h-14 w-14 active:scale-90 transition-transform"
             onClick={() => navigate("/profile")}
           >
             <User
