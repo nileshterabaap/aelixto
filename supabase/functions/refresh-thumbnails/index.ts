@@ -18,61 +18,81 @@ Deno.serve(async (req) => {
 
     console.log('[refresh-thumbnails] Starting thumbnail refresh with Meta oEmbed API...');
 
-    // Get Instagram/Facebook posts
+    // Get Instagram/Facebook posts that have CDN URLs (not Supabase storage)
     const { data: posts, error: fetchError } = await supabase
       .from('posts')
-      .select('id, platform, content, thumbnail_url')
+      .select('id, platform, content, thumbnail_url, media_url')
       .in('platform', ['instagram', 'facebook'])
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(100);
 
     if (fetchError) {
       throw fetchError;
     }
 
-    console.log(`[refresh-thumbnails] Found ${posts?.length || 0} posts to process`);
+    // Filter to only posts with CDN URLs (not already stored in Supabase)
+    const postsNeedingRefresh = (posts || []).filter(p => 
+      p.thumbnail_url && 
+      !p.thumbnail_url.includes('supabase.co/storage') &&
+      (p.thumbnail_url.includes('cdninstagram.com') || 
+       p.thumbnail_url.includes('fbcdn.net') ||
+       p.thumbnail_url.includes('scontent'))
+    );
+
+    console.log(`[refresh-thumbnails] Found ${posts?.length || 0} total posts, ${postsNeedingRefresh.length} need refresh`);
 
     let updated = 0;
     let failed = 0;
     let skipped = 0;
 
-    for (const post of posts || []) {
-      // Force re-download all Instagram/Facebook thumbnails since existing ones may be corrupted
-
-      // Extract URL from post content
-      const urlMatch = post.content.match(/https?:\/\/[^\s]+/);
-      if (!urlMatch) {
+    for (const post of postsNeedingRefresh) {
+      // Get URL from media_url first, then fall back to content
+      let url = post.media_url;
+      if (!url) {
+        const urlMatch = post.content?.match(/https?:\/\/[^\s]+/);
+        url = urlMatch?.[0];
+      }
+      
+      if (!url) {
         console.log(`[refresh-thumbnails] No URL found in post ${post.id}`);
         failed++;
         continue;
       }
 
-      const url = urlMatch[0];
       let thumbnailUrl: string | null = null;
 
       try {
-        if (post.platform === 'instagram' && metaToken) {
-          const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
-          const response = await fetch(oembedUrl);
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.thumbnail_url) {
-              thumbnailUrl = await storeThumbnailPermanently(supabase, post.id, data.thumbnail_url);
-              console.log(`[refresh-thumbnails] Got Instagram thumbnail for ${post.id}`);
+        // First, try to download and store the existing thumbnail_url if it's still valid
+        if (post.thumbnail_url) {
+          console.log(`[refresh-thumbnails] Trying to store existing CDN thumbnail for ${post.id}`);
+          thumbnailUrl = await storeThumbnailPermanently(supabase, post.id, post.thumbnail_url);
+        }
+        
+        // If that failed and we have Meta token, try oEmbed API as fallback
+        if (!thumbnailUrl && metaToken) {
+          if (post.platform === 'instagram') {
+            const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
+            const response = await fetch(oembedUrl);
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.thumbnail_url) {
+                thumbnailUrl = await storeThumbnailPermanently(supabase, post.id, data.thumbnail_url);
+                console.log(`[refresh-thumbnails] Got Instagram thumbnail for ${post.id}`);
+              }
+            } else {
+              const errorText = await response.text();
+              console.log(`[refresh-thumbnails] Instagram oEmbed failed for ${post.id}: ${response.status} - ${errorText.substring(0, 100)}`);
             }
-          } else {
-            const errorText = await response.text();
-            console.log(`[refresh-thumbnails] Instagram oEmbed failed for ${post.id}: ${response.status} - ${errorText.substring(0, 100)}`);
-          }
-        } else if (post.platform === 'facebook' && metaToken) {
-          const oembedUrl = `https://graph.facebook.com/v18.0/oembed_post?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
-          const response = await fetch(oembedUrl);
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.thumbnail_url) {
-              thumbnailUrl = await storeThumbnailPermanently(supabase, post.id, data.thumbnail_url);
+          } else if (post.platform === 'facebook') {
+            const oembedUrl = `https://graph.facebook.com/v18.0/oembed_post?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
+            const response = await fetch(oembedUrl);
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.thumbnail_url) {
+                thumbnailUrl = await storeThumbnailPermanently(supabase, post.id, data.thumbnail_url);
+              }
             }
           }
         }
@@ -85,7 +105,7 @@ Deno.serve(async (req) => {
 
           if (!updateError) {
             updated++;
-            console.log(`[refresh-thumbnails] Updated post ${post.id} with thumbnail`);
+            console.log(`[refresh-thumbnails] Updated post ${post.id} with stored thumbnail`);
           } else {
             failed++;
           }
@@ -94,7 +114,7 @@ Deno.serve(async (req) => {
         }
 
         // Rate limiting
-        await new Promise(resolve => setTimeout(resolve, 300));
+        await new Promise(resolve => setTimeout(resolve, 200));
 
       } catch (error) {
         console.error(`[refresh-thumbnails] Error processing post ${post.id}:`, error);

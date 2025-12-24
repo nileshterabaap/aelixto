@@ -53,13 +53,17 @@ function PostCard({ post, onClick }: {
   const src = imageError ? null : maybeProxy(rawThumb, 480);
   const Icon = getPlatformIcon();
 
-  // Instagram-style: only show if we have a thumbnail, otherwise blank
-  if (!src) {
+  // Show platform-branded fallback when no thumbnail or image error
+  if (!src || src === "/placeholder.svg") {
     return (
       <button
         onClick={onClick}
-        className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} bg-muted/30`}
-      />
+        className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} ${getPlatformGradient()} flex items-center justify-center`}
+      >
+        {Icon && (
+          <img src={Icon} alt="" className="w-12 h-12 opacity-60 invert" />
+        )}
+      </button>
     );
   }
 
