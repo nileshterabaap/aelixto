@@ -1,7 +1,8 @@
+// Safely decode HTML entities using DOMParser (XSS-safe)
 function decodeHtmlEntities(text: string): string {
-  const txt = document.createElement("textarea");
-  txt.innerHTML = text;
-  return txt.value;
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(text, 'text/html');
+  return doc.body.textContent || '';
 }
 
 export function getPostThumb(p: {
