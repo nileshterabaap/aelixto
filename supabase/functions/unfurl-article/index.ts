@@ -8,6 +8,61 @@ const corsHeaders = {
 
 const TTL_HOURS = 24;
 
+// SSRF Protection: Validate URLs to prevent internal network access
+function isValidExternalUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    
+    // Only allow HTTP/HTTPS protocols
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      console.log('[unfurl-article] Rejected non-HTTP protocol:', parsed.protocol);
+      return false;
+    }
+    
+    const hostname = parsed.hostname.toLowerCase();
+    
+    // Block localhost and common internal hostnames
+    const blockedHostnames = [
+      'localhost', 
+      'metadata.google.internal',
+      'metadata.google',
+      '169.254.169.254',
+      'instance-data',
+    ];
+    
+    if (blockedHostnames.includes(hostname)) {
+      console.log('[unfurl-article] Rejected blocked hostname:', hostname);
+      return false;
+    }
+    
+    // Block private IP ranges
+    const privateIpPatterns = [
+      /^127\./, // Loopback
+      /^10\./, // Class A private
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // Class B private
+      /^192\.168\./, // Class C private
+      /^169\.254\./, // Link-local
+      /^0\./, // Current network
+      /^::1$/, // IPv6 loopback
+      /^fc00:/, // IPv6 unique local
+      /^fe80:/, // IPv6 link-local
+      /^fd/, // IPv6 private
+    ];
+    
+    for (const pattern of privateIpPatterns) {
+      if (pattern.test(hostname)) {
+        console.log('[unfurl-article] Rejected private IP:', hostname);
+        return false;
+      }
+    }
+    
+    return true;
+  } catch {
+    console.log('[unfurl-article] Failed to parse URL');
+    return false;
+  }
+}
+
 // Decode HTML entities
 const decodeHtmlEntities = (text: string): string => {
   const entities: Record<string, string> = {
@@ -198,6 +253,15 @@ serve(async (req) => {
 
     // Clean the URL before processing
     const targetUrl = cleanUrl(rawUrl);
+    
+    // SSRF Protection: Validate URL before fetching
+    if (!isValidExternalUrl(targetUrl)) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or blocked URL' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     console.log('[unfurl-article] Processing URL:', targetUrl);
 
     // Initialize Supabase client
