@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'assets/**'],
+      includeAssets: ['favicon.ico', 'robots.txt', 'logo.png', 'assets/**'],
       manifest: {
         name: 'Aelixto',
         short_name: 'Aelixto',
@@ -27,13 +27,13 @@ export default defineConfig(({ mode }) => ({
         icons: [
           {
             src: '/logo.png',
-            sizes: '512x512',
+            sizes: '192x192',
             type: 'image/png',
             purpose: 'any maskable'
           },
           {
             src: '/logo.png',
-            sizes: '192x192',
+            sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable'
           }

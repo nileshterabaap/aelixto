@@ -99,13 +99,16 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Use Meta Graph API oEmbed endpoint
-      const oembedUrl = `https://graph.facebook.com/v18.0/oembed_${platform === 'instagram' ? 'post' : 'page'}?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
-      
-      console.log(`[fetch-meta-thumbnail] Calling Meta oEmbed API`);
-      
+      // Use Meta Graph API oEmbed endpoints
+      const oembedUrl =
+        platform === 'instagram'
+          ? `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${metaToken}`
+          : `https://graph.facebook.com/v18.0/oembed_post?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
+
+      console.log(`[fetch-meta-thumbnail] Calling Meta oEmbed API: ${platform}`);
+
       const response = await fetch(oembedUrl);
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log(`[fetch-meta-thumbnail] Meta response:`, JSON.stringify(data).substring(0, 200));
@@ -114,7 +117,7 @@ Deno.serve(async (req) => {
       } else {
         const errorText = await response.text();
         console.error(`[fetch-meta-thumbnail] Meta API error: ${response.status} - ${errorText}`);
-        
+
         // Fallback for Instagram - try public oEmbed
         if (platform === 'instagram') {
           try {
