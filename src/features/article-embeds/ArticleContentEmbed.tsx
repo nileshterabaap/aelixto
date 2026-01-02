@@ -2,10 +2,11 @@ import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 // --- Helpers: safe DOM parsing on reader HTML (r.jina.ai result) ---
-function decodeEntities(s: string) {
-  const el = document.createElement("textarea");
-  el.innerHTML = s;
-  return el.value.replace(/\s+/g, " ").trim();
+// Safe entity decoding using DOMParser instead of innerHTML assignment
+function decodeEntities(s: string): string {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(s, 'text/html');
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
 function resolveUrlMaybeRelative(src: string, baseUrl: string): string {
