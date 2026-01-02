@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadInstagramEmbed, loadFacebookSDK } from '@/lib/ScriptLoader';
+import DOMPurify from 'dompurify';
 
 interface RawEmbedRendererProps {
   embedHtml: string;
   onError?: () => void;
 }
 
-// Strip script tags for security while preserving the embed HTML
+// Sanitize embed HTML using DOMPurify to prevent XSS attacks
 const sanitizeEmbedHtml = (html: string): string => {
-  // Remove <script> tags but keep blockquote/div content
-  return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img'],
+    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-captioned', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt'],
+    ALLOW_DATA_ATTR: true
+  });
 };
 
 // Convert Facebook iframe embed to SDK-compatible format

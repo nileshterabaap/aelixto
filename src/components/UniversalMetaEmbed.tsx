@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
+import DOMPurify from 'dompurify';
 
 interface UniversalMetaEmbedProps {
   url: string;
@@ -322,10 +323,14 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     const isSpotifyIframe = embedHtml.includes('open.spotify.com/embed');
 
     if (isSpotifyIframe) {
+      const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
+        ALLOWED_TAGS: ['iframe'],
+        ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading']
+      });
       return (
         <div
           className="relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block"
-          dangerouslySetInnerHTML={{ __html: embedHtml }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       );
     }
