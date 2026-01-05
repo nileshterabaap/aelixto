@@ -17,8 +17,8 @@ function PostCard({ post, onClick }: {
 }) {
   const [imageError, setImageError] = useState(false);
   
-  // YouTube uses 16:9, all others use 1:1 (Instagram-style grid)
-  const getAspectRatio = () => post.platform === "youtube" ? "aspect-video" : "aspect-square";
+  // YouTube uses 16:9, all others use 3:4 portrait
+  const getAspectRatio = () => post.platform === "youtube" ? "aspect-video" : "aspect-[3/4]";
 
   const getPlatformGradient = () => {
     switch (post.platform) {
