@@ -15,6 +15,7 @@ import Profile from "./pages/Profile";
 import UserProfile from "./pages/UserProfile";
 import PostDetail from "./pages/PostDetail";
 import Settings from "./pages/Settings";
+import EditProfile from "./pages/EditProfile";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import SavedPosts from "./pages/SavedPosts";
@@ -39,6 +40,7 @@ const AnimatedRoutes = () => {
         <Route path="/u/:username" element={<PageTransition><UserProfile /></PageTransition>} />
         <Route path="/post/:postId" element={<PageTransition><PostDetail /></PageTransition>} />
         <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
+        <Route path="/edit-profile" element={<PageTransition><EditProfile /></PageTransition>} />
         <Route path="/saved" element={<PageTransition><SavedPosts /></PageTransition>} />
         <Route path="/auth" element={<PageTransition><Auth /></PageTransition>} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
