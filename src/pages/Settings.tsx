@@ -4,85 +4,174 @@ import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { 
+  ArrowLeft, 
+  User, 
+  Shield, 
+  Rss, 
+  Bell, 
+  Palette, 
+  HelpCircle,
+  ChevronRight,
+  LogOut,
+  Trash2,
+  Mail,
+  Lock,
+  Eye,
+  MessageSquare,
+  Play,
+  Loader2,
+  ExternalLink,
+  Ban
+} from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
-import { ImageUploadButton } from "@/components/ImageUploadButton";
-import { useImageUpload } from "@/hooks/useImageUpload";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+
+type Theme = 'system' | 'light' | 'dark';
 
 const Settings = () => {
   const navigate = useNavigate();
   const { user } = useSession();
   const { profile, loading, upsertProfile } = useCurrentProfile();
-  const { uploadImage, uploading } = useImageUpload();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    username: '',
-    display_name: '',
-    bio: '',
-    avatar_url: '',
-    cover_url: '',
+  
+  // Settings state
+  const [settings, setSettings] = useState({
+    // Privacy
+    profilePublic: true,
+    allowInteractions: true,
+    // Content & Feed
+    autoplayEmbeds: true,
+    loadEmbedsOnTap: false,
+    defaultFeedTab: 'following' as 'following' | 'discover',
+    // Notifications
+    notifyFollowers: true,
+    notifySaves: true,
+    notifyUpdates: true,
+    // Appearance
+    theme: 'system' as Theme,
   });
-  const [aelixScoreEnabled, setAelixScoreEnabled] = useState(true);
 
-  // Check ownership and redirect if not owner
-  useEffect(() => {
-    if (!loading && profile && user && user.id !== profile.user_id) {
-      navigate(`/u/${profile.username}`);
-    }
-  }, [loading, profile, user, navigate]);
+  // Dialogs
+  const [changeEmailOpen, setChangeEmailOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Initialize form when profile loads
+  // Load settings from profile
   useEffect(() => {
-    if (profile) {
-      setFormData({
-        username: profile.username,
-        display_name: profile.display_name || '',
-        bio: profile.bio || '',
-        avatar_url: profile.avatar_url || '',
-        cover_url: profile.cover_url || '',
-      });
-      // Load Aelix Score preference from settings
-      const settings = profile.settings as any;
-      setAelixScoreEnabled(settings?.aelix_score_enabled !== false);
+    if (profile?.settings) {
+      const s = profile.settings as any;
+      setSettings(prev => ({
+        ...prev,
+        profilePublic: s.profile_public !== false,
+        allowInteractions: s.allow_interactions !== false,
+        autoplayEmbeds: s.autoplay_embeds !== false,
+        loadEmbedsOnTap: s.load_embeds_on_tap === true,
+        defaultFeedTab: s.default_feed_tab || 'following',
+        notifyFollowers: s.notify_followers !== false,
+        notifySaves: s.notify_saves !== false,
+        notifyUpdates: s.notify_updates !== false,
+        theme: s.theme || 'system',
+      }));
     }
   }, [profile]);
 
-  const handleAvatarUpload = async (file: File) => {
-    if (!user) return;
-    const url = await uploadImage(file, "avatars", user.id);
-    if (url) {
-      setFormData({ ...formData, avatar_url: url });
+  // Apply theme
+  useEffect(() => {
+    const root = document.documentElement;
+    if (settings.theme === 'dark') {
+      root.classList.add('dark');
+    } else if (settings.theme === 'light') {
+      root.classList.remove('dark');
+    } else {
+      // System preference
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        root.classList.add('dark');
+      } else {
+        root.classList.remove('dark');
+      }
     }
-  };
+  }, [settings.theme]);
 
-  const handleCoverUpload = async (file: File) => {
-    if (!user) return;
-    const url = await uploadImage(file, "covers", user.id);
-    if (url) {
-      setFormData({ ...formData, cover_url: url });
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const saveSettings = async (newSettings: typeof settings) => {
+    setSettings(newSettings);
     await upsertProfile({
-      ...formData,
       settings: {
-        aelix_score_enabled: aelixScoreEnabled,
+        ...((profile?.settings as any) || {}),
+        profile_public: newSettings.profilePublic,
+        allow_interactions: newSettings.allowInteractions,
+        autoplay_embeds: newSettings.autoplayEmbeds,
+        load_embeds_on_tap: newSettings.loadEmbedsOnTap,
+        default_feed_tab: newSettings.defaultFeedTab,
+        notify_followers: newSettings.notifyFollowers,
+        notify_saves: newSettings.notifySaves,
+        notify_updates: newSettings.notifyUpdates,
+        theme: newSettings.theme,
       },
     });
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate('/auth');
+  };
+
+  const handleDeleteAccount = async () => {
+    toast({
+      title: "Account deletion requested",
+      description: "Please contact support to complete account deletion.",
+    });
+  };
+
+  const handleChangeEmail = async () => {
+    if (!newEmail) return;
+    setIsSubmitting(true);
+    const { error } = await supabase.auth.updateUser({ email: newEmail });
+    setIsSubmitting(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Verification sent", description: "Check your new email for confirmation." });
+      setChangeEmailOpen(false);
+      setNewEmail('');
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast({ title: "Error", description: "Passwords don't match", variant: "destructive" });
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
+    setIsSubmitting(true);
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    setIsSubmitting(false);
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: "Password updated successfully." });
+      setChangePasswordOpen(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      setCurrentPassword('');
+    }
   };
 
   if (!user) {
@@ -99,10 +188,73 @@ const Settings = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
+
+  const SettingRow = ({ 
+    icon: Icon, 
+    label, 
+    description,
+    onClick,
+    rightElement,
+    danger = false,
+  }: { 
+    icon: any; 
+    label: string; 
+    description?: string;
+    onClick?: () => void;
+    rightElement?: React.ReactNode;
+    danger?: boolean;
+  }) => (
+    <button
+      onClick={onClick}
+      disabled={!onClick && !rightElement}
+      className={`w-full flex items-center gap-4 p-4 text-left transition-colors ${
+        onClick ? 'hover:bg-muted/50 active:bg-muted cursor-pointer' : ''
+      } ${danger ? 'text-destructive' : ''}`}
+    >
+      <Icon className={`h-5 w-5 flex-shrink-0 ${danger ? '' : 'text-muted-foreground'}`} />
+      <div className="flex-1 min-w-0">
+        <p className="font-medium">{label}</p>
+        {description && <p className="text-sm text-muted-foreground truncate">{description}</p>}
+      </div>
+      {rightElement || (onClick && <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />)}
+    </button>
+  );
+
+  const SettingToggle = ({ 
+    icon: Icon, 
+    label, 
+    description,
+    checked,
+    onCheckedChange,
+  }: { 
+    icon: any; 
+    label: string; 
+    description?: string;
+    checked: boolean;
+    onCheckedChange: (checked: boolean) => void;
+  }) => (
+    <div className="flex items-center gap-4 p-4">
+      <Icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="font-medium">{label}</p>
+        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      </div>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
+  );
+
+  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div className="mb-6">
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-4 mb-2">{title}</h2>
+      <div className="bg-card rounded-xl border divide-y divide-border">
+        {children}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -110,159 +262,207 @@ const Settings = () => {
       
       <main className="mx-auto max-w-2xl px-4 py-6">
         <div className="flex items-center gap-4 mb-6">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-          >
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-2xl font-bold">Settings</h1>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              placeholder="your_username"
-              pattern="^[a-zA-Z0-9_.]{3,30}$"
-              required
-            />
-            <p className="text-sm text-muted-foreground">
-              3-30 characters, letters, numbers, dots and underscores only
-            </p>
-          </div>
+        {/* Profile Section */}
+        <Section title="Profile">
+          <SettingRow
+            icon={User}
+            label="Edit Profile"
+            description="Username, name, bio, avatar, cover"
+            onClick={() => navigate('/edit-profile')}
+          />
+        </Section>
 
-          <div className="space-y-2">
-            <Label htmlFor="display_name">Display Name</Label>
-            <Input
-              id="display_name"
-              value={formData.display_name}
-              onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-              placeholder="Your Name"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="bio">Bio</Label>
-            <Textarea
-              id="bio"
-              value={formData.bio}
-              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-              placeholder="Tell us about yourself..."
-              rows={4}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Avatar</Label>
-            <div className="flex items-center gap-4">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={formData.avatar_url || undefined} />
-                <AvatarFallback className="text-2xl">
-                  {formData.display_name?.[0] || formData.username[0] || "?"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <ImageUploadButton
-                  onFileSelect={handleAvatarUpload}
-                  uploading={uploading}
-                >
-                  Upload Avatar
-                </ImageUploadButton>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Cover Image</Label>
-            {formData.cover_url && (
-              <div className="rounded-lg overflow-hidden border h-32 mb-2">
-                <img 
-                  src={formData.cover_url} 
-                  alt="Cover preview" 
-                  className="w-full h-full object-cover"
+        {/* Account Section */}
+        <Section title="Account">
+          <SettingRow
+            icon={Mail}
+            label="Email"
+            description={user.email}
+            onClick={() => setChangeEmailOpen(true)}
+          />
+          <SettingRow
+            icon={Lock}
+            label="Change Password"
+            onClick={() => setChangePasswordOpen(true)}
+          />
+          <SettingRow
+            icon={LogOut}
+            label="Log Out"
+            onClick={handleLogout}
+          />
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <div>
+                <SettingRow
+                  icon={Trash2}
+                  label="Delete Account"
+                  danger
+                  onClick={() => {}}
                 />
               </div>
-            )}
-            <ImageUploadButton
-              onFileSelect={handleCoverUpload}
-              uploading={uploading}
-            >
-              Upload Cover Image
-            </ImageUploadButton>
-          </div>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Account?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete your account and all your data. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  Delete Account
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </Section>
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="aelix-score">Aelix Score</Label>
-                <p className="text-sm text-muted-foreground">
-                  Display your Aelix Score on your profile
-                </p>
-              </div>
-              <Switch
-                id="aelix-score"
-                checked={aelixScoreEnabled}
-                onCheckedChange={setAelixScoreEnabled}
-              />
+        {/* Privacy Section */}
+        <Section title="Privacy">
+          <SettingToggle
+            icon={Eye}
+            label="Public Profile"
+            description="Anyone can view your profile"
+            checked={settings.profilePublic}
+            onCheckedChange={(checked) => saveSettings({ ...settings, profilePublic: checked })}
+          />
+          <SettingToggle
+            icon={MessageSquare}
+            label="Allow Interactions"
+            description="Others can comment and message you"
+            checked={settings.allowInteractions}
+            onCheckedChange={(checked) => saveSettings({ ...settings, allowInteractions: checked })}
+          />
+        </Section>
+
+        {/* Content & Feed Section */}
+        <Section title="Content & Feed">
+          <SettingToggle
+            icon={Play}
+            label="Autoplay Embeds"
+            description="Videos and media play automatically"
+            checked={settings.autoplayEmbeds}
+            onCheckedChange={(checked) => saveSettings({ ...settings, autoplayEmbeds: checked })}
+          />
+          <SettingToggle
+            icon={Rss}
+            label="Load Embeds on Tap"
+            description="Load media only when tapped"
+            checked={settings.loadEmbedsOnTap}
+            onCheckedChange={(checked) => saveSettings({ ...settings, loadEmbedsOnTap: checked })}
+          />
+          <div className="flex items-center gap-4 p-4">
+            <Rss className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium">Default Feed Tab</p>
+              <p className="text-sm text-muted-foreground">Choose your home feed default</p>
+            </div>
+            <div className="flex gap-1 bg-muted rounded-lg p-1">
+              <button
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  settings.defaultFeedTab === 'following' 
+                    ? 'bg-background shadow-sm font-medium' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                onClick={() => saveSettings({ ...settings, defaultFeedTab: 'following' })}
+              >
+                Following
+              </button>
+              <button
+                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                  settings.defaultFeedTab === 'discover' 
+                    ? 'bg-background shadow-sm font-medium' 
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                onClick={() => saveSettings({ ...settings, defaultFeedTab: 'discover' })}
+              >
+                Discover
+              </button>
             </div>
           </div>
+        </Section>
 
-          <div className="space-y-2">
-            <Label>Reset Aelix Score</Label>
-            <p className="text-sm text-muted-foreground mb-2">
-              Reset your Aelix Score back to 0. This action cannot be undone.
-            </p>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" type="button" className="w-full">
-                  Reset Aelix Score
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will reset your Aelix Score to 0. This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={async () => {
-                    const { error } = await supabase
-                      .from('profiles')
-                      .update({ aelix_score: 0 })
-                      .eq('user_id', user?.id);
-                    
-                    if (error) {
-                      toast({
-                        title: "Error",
-                        description: "Failed to reset Aelix Score",
-                        variant: "destructive",
-                      });
-                    } else {
-                      toast({
-                        title: "Success",
-                        description: "Aelix Score has been reset to 0",
-                      });
-                      queryClient.invalidateQueries({ queryKey: ['profile'] });
-                    }
-                  }}>
-                    Reset Score
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+        {/* Notifications Section */}
+        <Section title="Notifications">
+          <SettingToggle
+            icon={Bell}
+            label="New Followers"
+            description="When someone follows you"
+            checked={settings.notifyFollowers}
+            onCheckedChange={(checked) => saveSettings({ ...settings, notifyFollowers: checked })}
+          />
+          <SettingToggle
+            icon={Bell}
+            label="Saves"
+            description="When someone saves your post"
+            checked={settings.notifySaves}
+            onCheckedChange={(checked) => saveSettings({ ...settings, notifySaves: checked })}
+          />
+          <SettingToggle
+            icon={Bell}
+            label="Platform Updates"
+            description="News and feature announcements"
+            checked={settings.notifyUpdates}
+            onCheckedChange={(checked) => saveSettings({ ...settings, notifyUpdates: checked })}
+          />
+        </Section>
+
+        {/* Appearance Section */}
+        <Section title="Appearance">
+          <div className="flex items-center gap-4 p-4">
+            <Palette className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium">Theme</p>
+            </div>
+            <div className="flex gap-1 bg-muted rounded-lg p-1">
+              {(['system', 'light', 'dark'] as Theme[]).map((t) => (
+                <button
+                  key={t}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors capitalize ${
+                    settings.theme === t 
+                      ? 'bg-background shadow-sm font-medium' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => saveSettings({ ...settings, theme: t })}
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
           </div>
+        </Section>
 
-          <Button type="submit" className="w-full">
-            Save Changes
-          </Button>
-        </form>
+        {/* Help & Legal Section */}
+        <Section title="Help & Legal">
+          <SettingRow
+            icon={HelpCircle}
+            label="Report a Problem"
+            onClick={() => window.open('mailto:support@aelixto.com', '_blank')}
+          />
+          <SettingRow
+            icon={Ban}
+            label="Blocked Users"
+            description="Manage blocked accounts"
+            onClick={() => toast({ title: "Coming soon", description: "Blocked users management is coming soon." })}
+          />
+          <SettingRow
+            icon={ExternalLink}
+            label="Terms of Service"
+            onClick={() => window.open('/terms', '_blank')}
+          />
+          <SettingRow
+            icon={Shield}
+            label="Privacy Policy"
+            onClick={() => window.open('/privacy', '_blank')}
+          />
+        </Section>
       </main>
 
       <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
@@ -271,6 +471,76 @@ const Settings = () => {
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen}
       />
+
+      {/* Change Email Dialog */}
+      <Dialog open={changeEmailOpen} onOpenChange={setChangeEmailOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Email</DialogTitle>
+            <DialogDescription>
+              Enter your new email address. You'll receive a verification email.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-email">New Email</Label>
+              <Input
+                id="new-email"
+                type="email"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                placeholder="your@email.com"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangeEmailOpen(false)}>Cancel</Button>
+            <Button onClick={handleChangeEmail} disabled={isSubmitting || !newEmail}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update Email'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>
+              Enter your new password below.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New Password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangePasswordOpen(false)}>Cancel</Button>
+            <Button onClick={handleChangePassword} disabled={isSubmitting || !newPassword || !confirmPassword}>
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update Password'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
