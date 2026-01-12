@@ -6,14 +6,7 @@ import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ArrowLeft, Menu, Settings as SettingsIcon, LogOut, MessageCircle } from "lucide-react";
+import { ArrowLeft, Menu, MessageCircle } from "lucide-react";
 import { Profile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { useFollow } from "@/hooks/useFollow";
@@ -56,11 +49,6 @@ const UserProfile = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/auth');
   };
 
   if (loading) {
@@ -165,38 +153,16 @@ const UserProfile = () => {
                   <p className="text-white/95 text-sm truncate drop-shadow-lg">@{profile.username}</p>
                 </div>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="bg-black/20 hover:bg-black/30 text-white rounded-full h-9 w-9 shadow-lg flex-shrink-0"
-                  >
-                    <Menu className="h-4 w-4 stroke-[2.5]" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {isMe && (
-                    <>
-                      <DropdownMenuItem onClick={() => navigate('/settings')}>
-                        <SettingsIcon className="mr-2 h-4 w-4" />
-                        Settings
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={handleSignOut}>
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Sign Out
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  {!isMe && user && (
-                    <DropdownMenuItem onClick={() => navigate('/')}>
-                      <ArrowLeft className="mr-2 h-4 w-4" />
-                      Back to Home
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {isMe && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="bg-black/20 hover:bg-black/30 text-white rounded-full h-9 w-9 shadow-lg flex-shrink-0"
+                  onClick={() => navigate('/settings')}
+                >
+                  <Menu className="h-4 w-4 stroke-[2.5]" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
