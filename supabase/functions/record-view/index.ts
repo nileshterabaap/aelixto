@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
     ];
     
     // Development patterns (Lovable preview, webcontainer)
-    const isDev = origin.includes('.lovable.app') || origin.includes('webcontainer');
+    const isDev = origin.includes('.lovable.app') || origin.includes('.lovableproject.com') || origin.includes('webcontainer');
     
     // Allow if origin is empty (same-origin), exact match, or dev environment
     const isAllowed = origin === '' || allowedOrigins.includes(origin) || isDev;
