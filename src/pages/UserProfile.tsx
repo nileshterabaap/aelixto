@@ -227,7 +227,7 @@ const UserProfile = () => {
           </div>
 
           {/* Aelix Score - only show if user enabled it */}
-          {(profile.settings as { showAelixScore?: boolean })?.showAelixScore && (
+          {(profile.settings as { aelix_score_enabled?: boolean })?.aelix_score_enabled && (
             <div className="flex justify-center mt-4 mb-4">
               <div className="border-2 border-foreground rounded-[16px] px-10 py-2">
                 <div className="text-2xl font-bold text-center leading-none mb-0.5">{profile.aelix_score.toLocaleString()}</div>
