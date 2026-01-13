@@ -258,7 +258,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             <div className="flex-1 min-w-0">
               <p className="font-bold text-base">{post.author.username}</p>
             </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 text-foreground">
             {displayIcon && post.platform !== 'twitter' && (
               <img 
                 src={displayIcon} 
@@ -386,7 +386,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <div className="flex-1 min-w-0">
             <p className="font-bold text-base">{post.author.username}</p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 text-foreground">
             {displayIcon && post.platform !== 'twitter' && (
               <img 
                 src={displayIcon} 
