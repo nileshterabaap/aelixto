@@ -263,7 +263,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <img 
                 src={displayIcon} 
                 alt={displayName || 'Platform'}
-                className={`object-contain ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
+                className={`object-contain dark:invert ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
             {post.isRealPost && (post as any).user_id === userId && (
@@ -391,7 +391,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <img 
                 src={displayIcon} 
                 alt={displayName || 'Platform'}
-                className={`object-contain ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
+                className={`object-contain dark:invert ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
             {post.isRealPost && (post as any).user_id === userId && (
