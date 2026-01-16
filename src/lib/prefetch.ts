@@ -43,9 +43,35 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
         limit_count: 10,
       });
       if (error) throw error;
+      
+      // Map to the same format useFollowingFeed expects
+      const mappedPosts = (data || []).map((item: any) => ({
+        id: item.id,
+        user_id: item.user_id,
+        content: item.content,
+        created_at: item.created_at,
+        likes_count: item.likes_count,
+        saves_count: item.saves_count,
+        media_type: item.media_type,
+        media_url: item.media_url,
+        platform: item.platform,
+        embed_html: item.embed_html,
+        thumbnail_url: item.thumbnail_url,
+        title: item.title,
+        is_public: item.is_public,
+        is_repost: item.is_repost,
+        reposted_by_user_id: item.reposted_by_user_id,
+        reposted_by_username: item.reposted_by_username,
+        profiles: {
+          username: item.profile_username,
+          display_name: item.profile_display_name,
+          avatar_url: item.profile_avatar_url,
+        },
+      }));
+      
       return {
-        posts: data || [],
-        nextCursor: data && data.length === 10 ? data[data.length - 1].created_at : null,
+        posts: mappedPosts,
+        nextCursor: mappedPosts.length === 10 ? mappedPosts[mappedPosts.length - 1].created_at : undefined,
       };
     },
     initialPageParam: undefined,
