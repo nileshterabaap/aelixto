@@ -142,20 +142,6 @@ span[data-pin-href] button {
   border-radius: 1rem !important;
 }
 
-/* Instagram embed dark mode - invert the white background */
-.dark .embed-container .instagram-media,
-.dark .instagram-media,
-.dark .embed-container iframe[src*="instagram.com"],
-.dark blockquote.instagram-media {
-  filter: invert(1) hue-rotate(180deg);
-}
-
-/* Preserve image colors inside Instagram embed in dark mode */
-.dark .embed-container .instagram-media img,
-.dark .instagram-media img,
-.dark blockquote.instagram-media img {
-  filter: invert(1) hue-rotate(180deg);
-}
 
 /* Facebook embed responsive sizing for mobile */
 .fb-post,
