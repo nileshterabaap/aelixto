@@ -142,6 +142,29 @@ span[data-pin-href] button {
   border-radius: 1rem !important;
 }
 
+/* Instagram embed dark mode - invert the white background */
+.dark .embed-container .instagram-media,
+.dark .instagram-media,
+.dark .embed-container iframe[src*="instagram.com"],
+.dark blockquote.instagram-media {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Preserve colors inside Instagram embed in dark mode - target all visual elements */
+.dark .embed-container .instagram-media img,
+.dark .embed-container .instagram-media video,
+.dark .embed-container .instagram-media svg,
+.dark .embed-container .instagram-media picture,
+.dark .embed-container .instagram-media [style*="background-image"],
+.dark .instagram-media img,
+.dark .instagram-media video,
+.dark .instagram-media svg,
+.dark .instagram-media picture,
+.dark blockquote.instagram-media img,
+.dark blockquote.instagram-media video,
+.dark blockquote.instagram-media svg {
+  filter: invert(1) hue-rotate(180deg);
+}
 
 /* Facebook embed responsive sizing for mobile */
 .fb-post,
