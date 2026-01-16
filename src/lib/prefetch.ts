@@ -1,5 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { preloadFeedImages, preloadProfileImages } from "./preloadImages";
 
 // Centralized prefetch functions for instant navigation
 
@@ -69,6 +70,9 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
         },
       }));
       
+      // Preload images for instant display
+      preloadFeedImages(mappedPosts);
+      
       return {
         posts: mappedPosts,
         nextCursor: mappedPosts.length === 10 ? mappedPosts[mappedPosts.length - 1].created_at : undefined,
@@ -93,6 +97,10 @@ export const prefetchProfile = async (queryClient: QueryClient) => {
         .eq('user_id', session.user!.id)
         .single();
       if (error && error.code !== 'PGRST116') throw error;
+      
+      // Preload profile images
+      preloadProfileImages(data);
+      
       return data;
     },
     staleTime: 5 * 60 * 1000,
