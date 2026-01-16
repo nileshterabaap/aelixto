@@ -95,11 +95,12 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Prevent self-view tracking to avoid Aelix score manipulation
+    // Silently skip self-view tracking (not an error, just don't count it)
     if (viewer_id && viewer_id === post.user_id) {
+      console.log('[record-view] Skipping self-view', { post_id, viewer_id });
       return new Response(
-        JSON.stringify({ ok: false, reason: 'Cannot track views on your own posts' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ ok: true, skipped: true, reason: 'Self-view not counted' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
