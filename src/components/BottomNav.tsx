@@ -2,6 +2,8 @@ import { Home, Compass, Plus, Bell, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useCallback, MouseEvent } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { prefetchRoute } from "@/lib/prefetch";
 
 interface BottomNavProps {
   onCreatePost: () => void;
@@ -16,6 +18,7 @@ interface Ripple {
 export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const queryClient = useQueryClient();
   const isActive = (path: string) => {
     if (path === "/profile") {
       return location.pathname === "/profile" || location.pathname.startsWith("/u/");
@@ -48,9 +51,19 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     }, 600);
   }, []);
 
+  // Prefetch on hover (desktop) or touch start (mobile)
+  const handlePrefetch = useCallback((path: string) => {
+    prefetchRoute(path, queryClient);
+  }, [queryClient]);
+
   const handleClick = (e: MouseEvent<HTMLButtonElement>, path: string, key: string) => {
     createRipple(e, key);
     navigate(path);
+  };
+
+  const handleTouchStart = (path: string) => {
+    // Prefetch immediately on touch for instant navigation
+    handlePrefetch(path);
   };
 
   return (
@@ -66,6 +79,8 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             size="icon"
             className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
             onClick={(e) => handleClick(e, "/", "home")}
+            onMouseEnter={() => handlePrefetch("/")}
+            onTouchStart={() => handleTouchStart("/")}
           >
             {ripples.home?.map(ripple => (
               <span
@@ -88,6 +103,8 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             size="icon"
             className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
             onClick={(e) => handleClick(e, "/discover", "discover")}
+            onMouseEnter={() => handlePrefetch("/discover")}
+            onTouchStart={() => handleTouchStart("/discover")}
           >
             {ripples.discover?.map(ripple => (
               <span
@@ -132,13 +149,14 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             </span>
           </Button>
 
-          {/* Profile */}
           <Button
             aria-label="Profile"
             variant="ghost"
             size="icon"
             className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
             onClick={(e) => handleClick(e, "/profile", "profile")}
+            onMouseEnter={() => handlePrefetch("/profile")}
+            onTouchStart={() => handleTouchStart("/profile")}
           >
             {ripples.profile?.map(ripple => (
               <span
