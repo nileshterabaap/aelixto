@@ -253,6 +253,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 src={post.author.avatar} 
                 alt={post.author.username}
                 className="w-full h-full object-cover"
+                loading="eager"
+                decoding="async"
               />
             </div>
             <div className="flex-1 min-w-0">
@@ -381,6 +383,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               src={post.author.avatar} 
               alt={post.author.username}
               className="w-full h-full object-cover"
+              loading="eager"
+              decoding="async"
             />
           </div>
           <div className="flex-1 min-w-0">
