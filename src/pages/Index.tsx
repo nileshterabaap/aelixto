@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
@@ -8,6 +8,7 @@ import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
+import { useScrollAheadPreload } from "@/hooks/useScrollAheadPreload";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -98,6 +99,21 @@ const Index = () => {
     }));
   }, [followingPosts, showDemoFeed]);
 
+  // Prepare posts for scroll-ahead preloading
+  const postsForPreload = useMemo(() => {
+    return (showDemoFeed ? mappedDemoPosts : feedPosts).map(post => ({
+      profiles: { avatar_url: post.author.avatar },
+      thumbnail_url: post.thumbnailUrl,
+      media_url: post.mediaUrl,
+    }));
+  }, [showDemoFeed, mappedDemoPosts, feedPosts]);
+
+  // Scroll-ahead image preloading
+  const { registerTrigger } = useScrollAheadPreload(postsForPreload, {
+    preloadCount: 5,
+    triggerThreshold: 3,
+  });
+
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
 
   useEffect(() => {
@@ -150,8 +166,13 @@ const Index = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {allPosts.map((post) => (
-              <FeedPost key={post.id} post={post} userId={user?.id} />
+            {allPosts.map((post, index) => (
+              <div 
+                key={post.id} 
+                ref={(el) => registerTrigger(index, el)}
+              >
+                <FeedPost post={post} userId={user?.id} />
+              </div>
             ))}
           </div>
         )}
