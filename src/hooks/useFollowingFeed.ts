@@ -1,5 +1,6 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { preloadFeedImages } from '@/lib/preloadImages';
 
 interface FeedPost {
   id: string;
@@ -76,6 +77,9 @@ const fetchFeedPage = async (cursor?: string) => {
       avatar_url: item.profile_avatar_url,
     },
   }));
+
+  // Preload images for instant display
+  preloadFeedImages(mappedPosts);
 
   const nextCursor = data.length < 20 ? undefined : mappedPosts[mappedPosts.length - 1]?.created_at;
 
