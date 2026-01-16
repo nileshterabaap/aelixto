@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { preloadEmbedSDKs } from "@/lib/ScriptLoader";
+import { prefetchCoreData } from "@/lib/prefetch";
 import { PageTransition } from "@/components/PageTransition";
 import Index from "./pages/Index";
 import Discover from "./pages/Discover";
@@ -20,10 +21,23 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import SavedPosts from "./pages/SavedPosts";
 
-const queryClient = new QueryClient();
+// Configure QueryClient with aggressive caching for instant navigation
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
+      gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
+      retry: 1, // Fast fail, don't retry multiple times
+    },
+  },
+});
 
-// Preload embed SDKs early
+// Preload embed SDKs and core data immediately
 preloadEmbedSDKs();
+prefetchCoreData(queryClient);
 
 const AnimatedRoutes = () => {
   const location = useLocation();
