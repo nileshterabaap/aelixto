@@ -30,7 +30,7 @@ export const LazyEmbed = ({
         });
       },
       {
-        rootMargin: '400px', // Start loading earlier
+        rootMargin: '2000px', // Preload ~5-6 posts ahead (~350px per post)
         threshold: 0.01
       }
     );
