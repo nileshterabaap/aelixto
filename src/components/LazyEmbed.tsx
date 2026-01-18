@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, ReactNode } from 'react';
+import { useState, useEffect, useRef, ReactNode, useCallback } from 'react';
+import { useScrollVelocity } from '@/hooks/useScrollVelocity';
 
 interface LazyEmbedProps {
   children: ReactNode;
@@ -16,8 +17,32 @@ export const LazyEmbed = ({
 }: LazyEmbedProps) => {
   const [shouldLoad, setShouldLoad] = useState(autoLoad);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { velocity, isScrollingFast } = useScrollVelocity();
+  
+  // Calculate adaptive preload distance based on scroll speed
+  // Normal: 2000px (~5-6 posts), Fast: up to 5000px (~12-15 posts)
+  const getPreloadDistance = useCallback(() => {
+    if (isScrollingFast) {
+      return Math.min(2000 + velocity * 2, 5000);
+    }
+    return 2000;
+  }, [velocity, isScrollingFast]);
 
-  // Auto-load embeds when they come into view
+  // Check if element is within preload range
+  const checkShouldLoad = useCallback(() => {
+    if (!containerRef.current || shouldLoad) return;
+    
+    const rect = containerRef.current.getBoundingClientRect();
+    const preloadDistance = getPreloadDistance();
+    const viewportHeight = window.innerHeight;
+    
+    // Element is within preload distance from viewport
+    if (rect.top < viewportHeight + preloadDistance && rect.bottom > -preloadDistance) {
+      setShouldLoad(true);
+    }
+  }, [shouldLoad, getPreloadDistance]);
+
+  // Base intersection observer for normal loading
   useEffect(() => {
     if (!containerRef.current || autoLoad || shouldLoad) return;
 
@@ -30,7 +55,7 @@ export const LazyEmbed = ({
         });
       },
       {
-        rootMargin: '2000px', // Preload ~5-6 posts ahead (~350px per post)
+        rootMargin: '2000px', // Base preload distance
         threshold: 0.01
       }
     );
@@ -44,6 +69,11 @@ export const LazyEmbed = ({
     };
   }, [autoLoad, shouldLoad]);
 
+  // Additional check when scrolling fast - extend preload range
+  useEffect(() => {
+    if (!isScrollingFast || shouldLoad) return;
+    checkShouldLoad();
+  }, [isScrollingFast, velocity, checkShouldLoad, shouldLoad]);
 
   return (
     <div ref={containerRef}>
