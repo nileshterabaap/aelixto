@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useLayoutEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 // Store scroll positions for each route
@@ -8,6 +8,7 @@ export const useScrollRestoration = (key?: string) => {
   const location = useLocation();
   const routeKey = key || location.pathname;
   const isRestoring = useRef(false);
+  const hasRestored = useRef(false);
   
   // Save scroll position on unmount or route change
   useEffect(() => {
@@ -27,20 +28,45 @@ export const useScrollRestoration = (key?: string) => {
     };
   }, [routeKey]);
 
-  // Restore scroll position on mount
-  useEffect(() => {
+  // Restore scroll position - use layoutEffect for synchronous restoration
+  useLayoutEffect(() => {
     const savedPosition = scrollPositions.get(routeKey);
-    if (savedPosition !== undefined && savedPosition > 0) {
+    
+    if (savedPosition !== undefined && savedPosition > 0 && !hasRestored.current) {
       isRestoring.current = true;
-      // Use requestAnimationFrame to ensure DOM is ready
-      requestAnimationFrame(() => {
-        window.scrollTo(0, savedPosition);
-        // Reset flag after a short delay to allow scroll event to fire
-        setTimeout(() => {
+      hasRestored.current = true;
+      
+      // Try immediate restoration first
+      window.scrollTo(0, savedPosition);
+      
+      // If page height isn't ready yet, retry after content loads
+      const attemptRestore = (attempts = 0) => {
+        if (attempts > 10) {
           isRestoring.current = false;
-        }, 100);
-      });
+          return;
+        }
+        
+        // Check if we can actually scroll to that position
+        const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+        if (savedPosition <= maxScroll) {
+          window.scrollTo(0, savedPosition);
+          setTimeout(() => {
+            isRestoring.current = false;
+          }, 50);
+        } else {
+          // Content not loaded yet, retry
+          requestAnimationFrame(() => attemptRestore(attempts + 1));
+        }
+      };
+      
+      // Give initial render time, then verify
+      requestAnimationFrame(() => attemptRestore(0));
     }
+    
+    // Reset hasRestored when route changes
+    return () => {
+      hasRestored.current = false;
+    };
   }, [routeKey]);
 
   // Clear a specific route's scroll position (for manual refresh)
