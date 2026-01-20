@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useCallback, MouseEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchRoute } from "@/lib/prefetch";
+import { setScrollPosition } from "@/hooks/useScrollRestoration";
 
 interface BottomNavProps {
   onCreatePost: () => void;
@@ -58,6 +59,10 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
 
   const handleClick = (e: MouseEvent<HTMLButtonElement>, path: string, key: string) => {
     createRipple(e, key);
+    // Snapshot scroll position for the current route BEFORE navigation.
+    // (React Router may reset scroll to top during route change, which can
+    // otherwise overwrite our saved value.)
+    setScrollPosition(location.pathname, window.scrollY);
     navigate(path);
   };
 

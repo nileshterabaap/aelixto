@@ -4,6 +4,11 @@ import { useLocation } from 'react-router-dom';
 // Store scroll positions for each route - persisted across component lifecycles
 const scrollPositions = new Map<string, number>();
 
+// Allow other modules (e.g., navigation) to snapshot scroll before route change
+export const setScrollPosition = (routeKey: string, position: number) => {
+  scrollPositions.set(routeKey, position);
+};
+
 // Debug logging
 const DEBUG = false;
 const log = (...args: unknown[]) => DEBUG && console.log('[ScrollRestoration]', ...args);
@@ -31,10 +36,13 @@ export const useScrollRestoration = (key?: string) => {
     return () => {
       mounted.current = false;
       window.removeEventListener('scroll', saveScrollPosition);
-      // Save final position
+      // Save final position, but don't overwrite a good saved value with 0
       if (!isRestoring.current) {
-        scrollPositions.set(routeKey, window.scrollY);
-        log('Saved on unmount:', routeKey, window.scrollY);
+        const currentY = window.scrollY;
+        const existing = scrollPositions.get(routeKey) ?? 0;
+        const next = currentY === 0 && existing > 0 ? existing : currentY;
+        scrollPositions.set(routeKey, next);
+        log('Saved on unmount:', routeKey, { currentY, existing, next });
       }
     };
   }, [routeKey]);
