@@ -60,6 +60,72 @@ function isValidExternalUrl(url: string): boolean {
   }
 }
 
+// Store thumbnail permanently in Supabase storage to avoid CDN expiration
+async function storeThumbnailPermanently(imageUrl: string): Promise<string | null> {
+  try {
+    // Generate a unique ID for this thumbnail
+    const thumbnailId = crypto.randomUUID();
+    
+    console.log(`[fetch-meta-thumbnail] Downloading and storing thumbnail: ${imageUrl.substring(0, 60)}...`);
+    
+    const imageResponse = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    });
+
+    if (!imageResponse.ok) {
+      console.error(`[fetch-meta-thumbnail] Failed to download image: ${imageResponse.status}`);
+      return null;
+    }
+
+    const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+    const imageData = await imageResponse.arrayBuffer();
+    
+    // Check if we got actual image data
+    if (imageData.byteLength < 1000) {
+      console.error(`[fetch-meta-thumbnail] Image too small (${imageData.byteLength} bytes), likely empty`);
+      return null;
+    }
+
+    // Determine file extension
+    let ext = 'jpg';
+    if (contentType.includes('png')) ext = 'png';
+    else if (contentType.includes('webp')) ext = 'webp';
+    else if (contentType.includes('heic')) ext = 'jpg'; // Convert HEIC to jpg extension
+
+    const filePath = `thumbnails/${thumbnailId}.${ext}`;
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Upload to storage
+    const { error: uploadError } = await supabase.storage
+      .from('post-thumbnails')
+      .upload(filePath, imageData, {
+        contentType: contentType.includes('heic') ? 'image/jpeg' : contentType,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error('[fetch-meta-thumbnail] Storage upload error:', uploadError);
+      return null;
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('post-thumbnails')
+      .getPublicUrl(filePath);
+
+    console.log(`[fetch-meta-thumbnail] Stored thumbnail permanently: ${urlData.publicUrl}`);
+    return urlData.publicUrl;
+  } catch (error) {
+    console.error('[fetch-meta-thumbnail] Store thumbnail error:', error);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -112,8 +178,15 @@ Deno.serve(async (req) => {
       if (response.ok) {
         const data = await response.json();
         console.log(`[fetch-meta-thumbnail] Meta response:`, JSON.stringify(data).substring(0, 200));
-        thumbnail = data.thumbnail_url || '';
+        
+        const rawThumbnail = data.thumbnail_url || '';
         title = data.title || '';
+        
+        // CRITICAL: Store thumbnail permanently to avoid CDN expiration
+        if (rawThumbnail) {
+          const permanentUrl = await storeThumbnailPermanently(rawThumbnail);
+          thumbnail = permanentUrl || rawThumbnail; // Fallback to raw if storage fails
+        }
       } else {
         const errorText = await response.text();
         console.error(`[fetch-meta-thumbnail] Meta API error: ${response.status} - ${errorText}`);
@@ -124,9 +197,15 @@ Deno.serve(async (req) => {
             const publicResponse = await fetch(`https://api.instagram.com/oembed?url=${encodeURIComponent(url)}`);
             if (publicResponse.ok) {
               const publicData = await publicResponse.json();
-              thumbnail = publicData.thumbnail_url || '';
+              const rawThumbnail = publicData.thumbnail_url || '';
               title = publicData.title || '';
-              console.log(`[fetch-meta-thumbnail] Instagram public oEmbed worked:`, thumbnail.substring(0, 80));
+              
+              // Store permanently
+              if (rawThumbnail) {
+                const permanentUrl = await storeThumbnailPermanently(rawThumbnail);
+                thumbnail = permanentUrl || rawThumbnail;
+              }
+              console.log(`[fetch-meta-thumbnail] Instagram public oEmbed worked, stored permanently`);
             }
           } catch (e) {
             console.error(`[fetch-meta-thumbnail] Instagram public oEmbed failed:`, e);
