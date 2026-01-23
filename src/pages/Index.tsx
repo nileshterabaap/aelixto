@@ -9,15 +9,14 @@ import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
 import { useScrollAheadPreload } from "@/hooks/useScrollAheadPreload";
-import { useScrollRestoration } from "@/hooks/useScrollRestoration";
+import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
   
-  // Restore scroll position when navigating back
-  useScrollRestoration('/');
+  // Instagram-style restoration: restore by the top visible post anchor (not raw scrollY)
 
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
@@ -120,6 +119,11 @@ const Index = () => {
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
 
+  const { registerItem } = useFeedAnchorRestoration(
+    "/",
+    useMemo(() => allPosts.map((p) => p.id), [allPosts])
+  );
+
   useEffect(() => {
     if (!sessionLoading && !user && !isDemoMode) {
       navigate("/auth");
@@ -173,7 +177,11 @@ const Index = () => {
             {allPosts.map((post, index) => (
               <div 
                 key={post.id} 
-                ref={(el) => registerTrigger(index, el)}
+                ref={(el) => {
+                  registerTrigger(index, el);
+                  registerItem(post.id)(el as unknown as HTMLElement | null);
+                }}
+                data-feed-item-id={post.id}
               >
                 <FeedPost post={post} userId={user?.id} />
               </div>
