@@ -1,7 +1,7 @@
 import { Home, Compass, Plus, Bell, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useCallback, MouseEvent } from "react";
+import { useState, useCallback, MouseEvent, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchRoute } from "@/lib/prefetch";
 import { setScrollPosition } from "@/hooks/useScrollRestoration";
@@ -27,6 +27,9 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     return location.pathname === path;
   };
   const [ripples, setRipples] = useState<Record<string, Ripple[]>>({});
+  
+  // Track last home tap time to detect double-tap for refresh
+  const lastHomeTapRef = useRef<number>(0);
 
   const baseIcon = "text-foreground transition-all duration-200";
   const activeIcon = "h-9 w-9 opacity-100";
@@ -57,6 +60,30 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     prefetchRoute(path, queryClient);
   }, [queryClient]);
 
+  const handleHomeClick = (e: MouseEvent<HTMLButtonElement>) => {
+    createRipple(e, "home");
+    
+    const now = Date.now();
+    const isAlreadyOnHome = location.pathname === "/";
+    const isAtTop = window.scrollY < 50;
+    
+    if (isAlreadyOnHome) {
+      if (isAtTop) {
+        // Already at top - refresh the feed
+        queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+        queryClient.invalidateQueries({ queryKey: ["posts"] });
+      } else {
+        // Not at top - scroll to top smoothly
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      lastHomeTapRef.current = now;
+    } else {
+      // Navigate to home
+      setScrollPosition(location.pathname, window.scrollY);
+      navigate("/");
+    }
+  };
+
   const handleClick = (e: MouseEvent<HTMLButtonElement>, path: string, key: string) => {
     createRipple(e, key);
     // Snapshot scroll position for the current route BEFORE navigation.
@@ -83,7 +110,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             variant="ghost"
             size="icon"
             className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
-            onClick={(e) => handleClick(e, "/", "home")}
+            onClick={handleHomeClick}
             onMouseEnter={() => handlePrefetch("/")}
             onTouchStart={() => handleTouchStart("/")}
           >
