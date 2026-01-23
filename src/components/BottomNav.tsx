@@ -69,9 +69,9 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     
     if (isAlreadyOnHome) {
       if (isAtTop) {
-        // Already at top - refresh the feed
-        queryClient.invalidateQueries({ queryKey: ["following-feed"] });
-        queryClient.invalidateQueries({ queryKey: ["posts"] });
+        // Already at top - force refresh the feed (refetchQueries actually refetches, invalidate just marks stale)
+        queryClient.refetchQueries({ queryKey: ["following-feed"] });
+        queryClient.refetchQueries({ queryKey: ["posts"] });
       } else {
         // Not at top - scroll to top smoothly
         window.scrollTo({ top: 0, behavior: "smooth" });
