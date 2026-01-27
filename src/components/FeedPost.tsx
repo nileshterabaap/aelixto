@@ -13,6 +13,7 @@ import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
 import { LazyEmbed } from "@/components/LazyEmbed";
+import { CollapsibleCaption } from "@/components/CollapsibleCaption";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
 import instagramIcon from "@/assets/platforms/instagram.svg";
 import tiktokIcon from "@/assets/platforms/tiktok.svg";
@@ -294,9 +295,9 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             </div>
           </div>
 
-          {/* Caption */}
+          {/* Caption with see more/less */}
           {post.content && (
-            <p className="text-sm mb-3">{post.content}</p>
+            <CollapsibleCaption content={post.content} />
           )}
 
           {/* Quora Preview Card */}
@@ -424,9 +425,9 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         </div>
 
-        {/* Caption */}
+        {/* Caption with see more/less */}
         {post.content && (
-          <p className="text-sm mb-3">{post.content}</p>
+          <CollapsibleCaption content={post.content} />
         )}
 
         {/* Feature flag check - show disabled message if embed is disabled */}
