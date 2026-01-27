@@ -1,47 +1,55 @@
-import { useState, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface CollapsibleCaptionProps {
   content: string;
-  maxLength?: number;
+  maxLines?: number;
   className?: string;
 }
 
 export const CollapsibleCaption = ({ 
   content, 
-  maxLength = 150,
+  maxLines = 2,
   className = "text-sm mb-3"
 }: CollapsibleCaptionProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  
-  const shouldTruncate = content.length > maxLength;
-  
-  const displayedContent = useMemo(() => {
-    if (!shouldTruncate || isExpanded) {
-      return content;
+  const [isTruncated, setIsTruncated] = useState(false);
+  const textRef = useRef<HTMLSpanElement>(null);
+
+  // Check if text overflows after 2 lines
+  useEffect(() => {
+    const el = textRef.current;
+    if (el) {
+      // Compare scrollHeight vs clientHeight to detect overflow
+      setIsTruncated(el.scrollHeight > el.clientHeight);
     }
-    // Find the last space before maxLength to avoid cutting words
-    const truncateAt = content.lastIndexOf(' ', maxLength);
-    return content.slice(0, truncateAt > 0 ? truncateAt : maxLength);
-  }, [content, maxLength, isExpanded, shouldTruncate]);
+  }, [content]);
 
   if (!content) return null;
 
   return (
     <p className={className}>
-      {displayedContent}
-      {shouldTruncate && (
-        <>
-          {!isExpanded && '... '}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsExpanded(!isExpanded);
-            }}
-            className="text-muted-foreground hover:text-foreground transition-colors font-medium"
-          >
-            {isExpanded ? 'less' : 'more'}
-          </button>
-        </>
+      <span
+        ref={textRef}
+        className={isExpanded ? '' : 'line-clamp-2'}
+        style={!isExpanded ? { 
+          display: '-webkit-box',
+          WebkitLineClamp: maxLines,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden'
+        } : undefined}
+      >
+        {content}
+      </span>
+      {isTruncated && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded(!isExpanded);
+          }}
+          className="text-muted-foreground hover:text-foreground transition-colors font-medium ml-1"
+        >
+          {isExpanded ? 'less' : '... more'}
+        </button>
       )}
     </p>
   );
