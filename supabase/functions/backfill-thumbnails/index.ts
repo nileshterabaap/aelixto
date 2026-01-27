@@ -5,6 +5,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Check if a thumbnail URL is a temporary CDN URL that will expire
+function isExpiredCdnUrl(url: string | null): boolean {
+  if (!url) return false;
+  // Instagram/Facebook CDN URLs contain these patterns and expire
+  return url.includes('cdninstagram.com') || 
+         url.includes('fbcdn.net') ||
+         url.includes('scontent');
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -17,12 +26,17 @@ Deno.serve(async (req) => {
 
     console.log('Starting thumbnail backfill...');
 
-    // Get posts without thumbnails
-    const { data: posts, error: fetchError } = await supabase
+    // Get posts that either have no thumbnail OR have expired CDN URLs
+    const { data: allPosts, error: fetchError } = await supabase
       .from('posts')
       .select('id, platform, media_url, media_type, thumbnail_url, title')
-      .is('thumbnail_url', null)
-      .limit(100); // Process in batches
+      .in('platform', ['instagram', 'facebook'])
+      .limit(100);
+    
+    // Filter to posts needing thumbnail refresh
+    const posts = (allPosts || []).filter(p => 
+      !p.thumbnail_url || isExpiredCdnUrl(p.thumbnail_url)
+    );
 
     if (fetchError) {
       throw fetchError;
@@ -51,20 +65,36 @@ Deno.serve(async (req) => {
         }
       }
       
-      // 2) For images/videos with media_url that's a direct image
-      else if (post.media_type === 'image' && post.media_url && 
-               !post.media_url.includes('instagram.com') &&
-               !post.media_url.includes('facebook.com')) {
-        thumbnailUrl = post.media_url;
+      // Instagram/Facebook - use fetch-meta-thumbnail for permanent storage
+      else if (post.media_url && (post.platform === 'instagram' || post.platform === 'facebook')) {
+        try {
+          console.log(`Calling fetch-meta-thumbnail for ${post.platform} post ${post.id}`);
+          const { data: metaData, error: metaError } = await supabase.functions.invoke('fetch-meta-thumbnail', {
+            body: { url: post.media_url, platform: post.platform }
+          });
+          
+          if (metaError) {
+            console.log(`fetch-meta-thumbnail error for post ${post.id}:`, metaError);
+          } else if (metaData?.thumbnail) {
+            // Only use if it's a permanent Supabase URL
+            if (metaData.thumbnail.includes('supabase') || !isExpiredCdnUrl(metaData.thumbnail)) {
+              thumbnailUrl = metaData.thumbnail;
+              console.log(`Got permanent thumbnail for post ${post.id}: ${metaData.thumbnail.substring(0, 60)}...`);
+            }
+          }
+          if (metaData?.title && !post.title) {
+            titleToSave = metaData.title;
+          }
+        } catch (err) {
+          console.log(`Failed to fetch meta thumbnail for post ${post.id}:`, err);
+        }
       }
       
-      // 3) Social platforms (including Instagram) - use fetch-og
+      // Other social platforms - use fetch-og
       else if (post.media_url && (
-        post.platform === 'instagram' ||
         post.platform === 'reddit' ||
         post.platform === 'twitter' ||
         post.platform === 'x' ||
-        post.platform === 'facebook' ||
         post.platform === 'quora' ||
         post.platform === 'medium' ||
         post.platform === 'linkedin' ||
@@ -80,7 +110,6 @@ Deno.serve(async (req) => {
           if (ogData?.image) {
             thumbnailUrl = ogData.image;
           }
-          // Also save title if we don't have one
           if (ogData?.title && !post.title) {
             titleToSave = ogData.title;
           }
