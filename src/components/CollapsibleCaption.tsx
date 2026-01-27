@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 
 interface CollapsibleCaptionProps {
   content: string;
@@ -15,14 +15,19 @@ export const CollapsibleCaption = ({
   const [isTruncated, setIsTruncated] = useState(false);
   const textRef = useRef<HTMLSpanElement>(null);
 
-  // Check if text overflows after 2 lines
-  useEffect(() => {
+  // Check if text overflows after 2 lines - use useLayoutEffect for accurate measurement
+  useLayoutEffect(() => {
     const el = textRef.current;
-    if (el) {
-      // Compare scrollHeight vs clientHeight to detect overflow
-      setIsTruncated(el.scrollHeight > el.clientHeight);
-    }
-  }, [content]);
+    if (!el || isExpanded) return;
+    
+    // Force a reflow to ensure accurate measurement
+    requestAnimationFrame(() => {
+      if (el) {
+        const isOverflowing = el.scrollHeight > el.clientHeight + 1; // +1 for rounding
+        setIsTruncated(isOverflowing);
+      }
+    });
+  }, [content, isExpanded]);
 
   if (!content) return null;
 
@@ -30,7 +35,6 @@ export const CollapsibleCaption = ({
     <p className={className}>
       <span
         ref={textRef}
-        className={isExpanded ? '' : 'line-clamp-2'}
         style={!isExpanded ? { 
           display: '-webkit-box',
           WebkitLineClamp: maxLines,
@@ -40,15 +44,26 @@ export const CollapsibleCaption = ({
       >
         {content}
       </span>
-      {isTruncated && (
+      {isTruncated && !isExpanded && (
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setIsExpanded(!isExpanded);
+            setIsExpanded(true);
           }}
           className="text-muted-foreground hover:text-foreground transition-colors font-medium ml-1"
         >
-          {isExpanded ? 'less' : '... more'}
+          ... more
+        </button>
+      )}
+      {isExpanded && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded(false);
+          }}
+          className="text-muted-foreground hover:text-foreground transition-colors font-medium ml-1"
+        >
+          less
         </button>
       )}
     </p>
