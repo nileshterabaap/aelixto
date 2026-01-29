@@ -23,6 +23,20 @@ export interface PlatformPost {
 const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook"]);
 const inflightBackfills = new Set<string>();
 
+const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
+  if (!url) return false;
+  // Already permanent (our storage)
+  if (url.includes("/storage/v1/object/public/post-thumbnails/") || url.includes("post-thumbnails")) {
+    return false;
+  }
+  // Meta CDNs that commonly rotate/expire tokens
+  return (
+    url.includes("fbcdn.net") ||
+    url.includes("cdninstagram.com") ||
+    url.includes("scontent-")
+  );
+};
+
 async function backfillThumbnail(post: PlatformPost) {
   if (!post.media_url || !post.platform) return;
   const platform = post.platform.toLowerCase();
@@ -43,6 +57,30 @@ async function backfillThumbnail(post: PlatformPost) {
     });
   } catch {
     // silent: this is a best-effort background improvement
+  } finally {
+    inflightBackfills.delete(key);
+  }
+}
+
+async function persistExistingThumbnail(post: PlatformPost) {
+  if (!post.thumbnail_url) return;
+  const platform = (post.platform || "").toLowerCase();
+  if (!THUMB_BACKFILL_PLATFORMS.has(platform)) return;
+  if (!isLikelyExpiringMetaCdnUrl(post.thumbnail_url)) return;
+
+  const key = `${post.id}:persist:${platform}`;
+  if (inflightBackfills.has(key)) return;
+  inflightBackfills.add(key);
+
+  try {
+    await supabase.functions.invoke("store-thumbnail", {
+      body: {
+        postId: post.id,
+        imageUrl: post.thumbnail_url,
+      },
+    });
+  } catch {
+    // silent: best-effort background improvement
   } finally {
     inflightBackfills.delete(key);
   }
@@ -82,7 +120,8 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
     if (!THUMB_BACKFILL_PLATFORMS.has(platformLower)) return;
 
     const missing = items.filter((p) => !p.thumbnail_url && !!p.media_url);
-    if (!missing.length) return;
+    const expiring = items.filter((p) => isLikelyExpiringMetaCdnUrl(p.thumbnail_url));
+    if (!missing.length && !expiring.length) return;
 
     let cancelled = false;
 
@@ -91,6 +130,12 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       for (const p of missing.slice(0, 6)) {
         if (cancelled) return;
         await backfillThumbnail(p);
+      }
+
+      // Also persist any currently-visible Meta CDN thumbnails so they don't break weeks later
+      for (const p of expiring.slice(0, 6)) {
+        if (cancelled) return;
+        await persistExistingThumbnail(p);
       }
 
       if (cancelled) return;
