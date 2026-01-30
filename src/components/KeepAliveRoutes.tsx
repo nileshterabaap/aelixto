@@ -107,15 +107,28 @@ export const KeepAliveRoutes = ({ keepAliveRoutes, children }: KeepAliveRoutesPr
       if (savedPosition !== undefined && savedPosition > 0) {
         isRestoringScroll.current = true;
         
+        // Restore function with validation
+        const doRestore = () => {
+          const target = keepAliveScrollPositions.get(currentPath) ?? savedPosition;
+          if (target > 0) {
+            window.scrollTo(0, target);
+          }
+        };
+        
+        // Immediate attempt
+        doRestore();
+        
         // Use requestAnimationFrame for better timing with display:none toggle
         requestAnimationFrame(() => {
-          window.scrollTo(0, savedPosition);
+          doRestore();
           
           // Multiple retry attempts with increasing delays
-          const delays = [16, 32, 50, 100, 150, 250];
+          const delays = [16, 32, 50, 100, 150, 250, 400];
           delays.forEach((delay, index) => {
             setTimeout(() => {
-              window.scrollTo(0, savedPosition);
+              if (isRestoringScroll.current) {
+                doRestore();
+              }
               if (index === delays.length - 1) {
                 isRestoringScroll.current = false;
               }
@@ -123,11 +136,8 @@ export const KeepAliveRoutes = ({ keepAliveRoutes, children }: KeepAliveRoutesPr
           });
         });
       } else {
-        // First visit - don't scroll to top, let the page render naturally
-        // Only scroll to top if we're navigating here fresh
-        if (!mountedPaths.has(currentPath)) {
-          window.scrollTo(0, 0);
-        }
+        // First visit to this path - scroll to top
+        window.scrollTo(0, 0);
       }
     } else {
       // Entering a non-keep-alive route - scroll to top

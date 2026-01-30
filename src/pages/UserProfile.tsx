@@ -15,8 +15,13 @@ import { useStartConversation } from "@/hooks/useStartConversation";
 import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
 import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
 
-const UserProfile = () => {
-  const { username } = useParams<{ username: string }>();
+interface UserProfileProps {
+  usernameOverride?: string;
+}
+
+const UserProfile = ({ usernameOverride }: UserProfileProps) => {
+  const { username: urlUsername } = useParams<{ username: string }>();
+  const username = usernameOverride || urlUsername;
   const navigate = useNavigate();
   const { user } = useSession();
   const [profile, setProfile] = useState<Profile | null>(null);
