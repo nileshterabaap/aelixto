@@ -1,14 +1,18 @@
 import { ReactNode, useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, matchPath } from "react-router-dom";
 import { KeepAlive } from "./KeepAlive";
 import { setScrollPosition } from "@/hooks/useScrollRestoration";
 
+interface KeepAliveRoute {
+  /** Route pattern (supports dynamic segments like /u/:username) */
+  pattern: string;
+  /** Function to render the element for a given path */
+  element: (path: string) => ReactNode;
+}
+
 interface KeepAliveRoutesProps {
   /** Routes to keep alive (won't unmount) */
-  keepAliveRoutes: {
-    path: string;
-    element: ReactNode;
-  }[];
+  keepAliveRoutes: KeepAliveRoute[];
   /** Fallback content for non-keep-alive routes */
   children: ReactNode;
 }
@@ -17,37 +21,46 @@ interface KeepAliveRoutesProps {
 // This is separate from useScrollRestoration to avoid conflicts
 const keepAliveScrollPositions = new Map<string, number>();
 
+// Helper to check if a path matches any keep-alive pattern
+const findMatchingPattern = (path: string, routes: KeepAliveRoute[]): KeepAliveRoute | undefined => {
+  return routes.find(route => matchPath(route.pattern, path));
+};
+
 /**
  * Manages keep-alive routes alongside normal React Router routes.
  * Keep-alive routes stay mounted (hidden with display:none) while
  * other routes use normal React Router unmount behavior.
+ * 
+ * Supports dynamic routes like /u/:username - each unique path gets its own instance.
  */
 export const KeepAliveRoutes = ({ keepAliveRoutes, children }: KeepAliveRoutesProps) => {
   const location = useLocation();
   const currentPath = location.pathname;
   
-  // Track which keep-alive routes have been visited (lazy mount)
-  const [mountedRoutes, setMountedRoutes] = useState<Set<string>>(() => {
-    // Initialize with current route if it's a keep-alive route
+  // Track which keep-alive paths have been visited (lazy mount)
+  // This stores actual paths like "/u/john", not patterns
+  const [mountedPaths, setMountedPaths] = useState<Set<string>>(() => {
     const initial = new Set<string>();
-    if (keepAliveRoutes.some(r => r.path === currentPath)) {
+    if (findMatchingPattern(currentPath, keepAliveRoutes)) {
       initial.add(currentPath);
     }
     return initial;
   });
   
-  // Check if current route is a keep-alive route
-  const isKeepAliveRoute = useMemo(() => 
-    keepAliveRoutes.some(r => r.path === currentPath),
+  // Check if current route matches a keep-alive pattern
+  const matchingRoute = useMemo(() => 
+    findMatchingPattern(currentPath, keepAliveRoutes),
     [keepAliveRoutes, currentPath]
   );
   
-  // Mount keep-alive routes lazily when first visited
+  const isKeepAliveRoute = !!matchingRoute;
+  
+  // Mount keep-alive paths lazily when first visited
   useEffect(() => {
-    if (isKeepAliveRoute && !mountedRoutes.has(currentPath)) {
-      setMountedRoutes(prev => new Set(prev).add(currentPath));
+    if (isKeepAliveRoute && !mountedPaths.has(currentPath)) {
+      setMountedPaths(prev => new Set(prev).add(currentPath));
     }
-  }, [currentPath, isKeepAliveRoute, mountedRoutes]);
+  }, [currentPath, isKeepAliveRoute, mountedPaths]);
   
   // Track previous path for scroll save/restore
   const previousPath = useRef(currentPath);
@@ -74,7 +87,7 @@ export const KeepAliveRoutes = ({ keepAliveRoutes, children }: KeepAliveRoutesPr
   useLayoutEffect(() => {
     if (previousPath.current === currentPath) return;
     
-    const wasKeepAlive = keepAliveRoutes.some(r => r.path === previousPath.current);
+    const wasKeepAlive = !!findMatchingPattern(previousPath.current, keepAliveRoutes);
     
     // Save scroll position when LEAVING a keep-alive route
     if (wasKeepAlive) {
@@ -112,7 +125,7 @@ export const KeepAliveRoutes = ({ keepAliveRoutes, children }: KeepAliveRoutesPr
       } else {
         // First visit - don't scroll to top, let the page render naturally
         // Only scroll to top if we're navigating here fresh
-        if (!mountedRoutes.has(currentPath)) {
+        if (!mountedPaths.has(currentPath)) {
           window.scrollTo(0, 0);
         }
       }
@@ -122,24 +135,36 @@ export const KeepAliveRoutes = ({ keepAliveRoutes, children }: KeepAliveRoutesPr
     }
     
     previousPath.current = currentPath;
-  }, [currentPath, isKeepAliveRoute, keepAliveRoutes, mountedRoutes]);
+  }, [currentPath, isKeepAliveRoute, keepAliveRoutes, mountedPaths]);
+  
+  // Group mounted paths by their matching route pattern
+  const pathsByPattern = useMemo(() => {
+    const map = new Map<string, string[]>();
+    mountedPaths.forEach(path => {
+      const route = findMatchingPattern(path, keepAliveRoutes);
+      if (route) {
+        const existing = map.get(route.pattern) || [];
+        existing.push(path);
+        map.set(route.pattern, existing);
+      }
+    });
+    return map;
+  }, [mountedPaths, keepAliveRoutes]);
   
   return (
     <>
-      {/* Render all mounted keep-alive routes (hidden when not active) */}
+      {/* Render all mounted keep-alive paths (hidden when not active) */}
       {keepAliveRoutes.map(route => {
-        // Only render if this route has been visited
-        if (!mountedRoutes.has(route.path)) return null;
-        
-        return (
+        const paths = pathsByPattern.get(route.pattern) || [];
+        return paths.map(path => (
           <KeepAlive
-            key={route.path}
-            route={route.path}
+            key={path}
+            route={path}
             currentRoute={currentPath}
           >
-            {route.element}
+            {route.element(path)}
           </KeepAlive>
-        );
+        ));
       })}
       
       {/* Render normal routes only when not on a keep-alive route */}

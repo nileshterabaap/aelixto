@@ -54,13 +54,17 @@ const AnimatedRoutes = () => {
   }, []);
   
   // Define routes to keep alive (won't unmount when navigating away)
-  // Only Home feed for now to conserve memory
+  // Supports dynamic routes - each unique path gets its own cached instance
   const keepAliveRoutes = useMemo(() => [
-    { path: "/", element: <Index /> }
+    { 
+      pattern: "/", 
+      element: () => <Index /> 
+    },
+    { 
+      pattern: "/u/:username", 
+      element: () => <UserProfile /> 
+    }
   ], []);
-  
-  // Check if current route is a keep-alive route
-  const isKeepAliveRoute = keepAliveRoutes.some(r => r.path === location.pathname);
   
   return (
     <>
