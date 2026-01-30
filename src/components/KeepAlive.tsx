@@ -21,11 +21,9 @@ export const KeepAlive = memo(({ route, currentRoute, children }: KeepAliveProps
   
   return (
     <div
-      className="w-full h-full"
       style={{ 
+        // Only use display:none - avoid visibility:hidden as it can cause scroll issues
         display: isActive ? "block" : "none",
-        // Prevent any layout shifts when hidden
-        visibility: isActive ? "visible" : "hidden",
       }}
       // Hint to browser that this content may be hidden
       aria-hidden={!isActive}
