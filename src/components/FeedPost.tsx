@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
-import { useState, useRef, memo } from "react";
+import { useState, useRef, memo, useCallback } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
@@ -98,6 +98,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [blogFavicon, setBlogFavicon] = useState<string | null>(null);
+  const [likeAnimating, setLikeAnimating] = useState(false);
+  const [repostAnimating, setRepostAnimating] = useState(false);
   const trackVideoPlay = useVideoPlayTracking();
   const lastTapRef = useRef<number>(0);
   
@@ -239,6 +241,21 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost, isDeleting } = postActions;
   const { isReposted, toggleRepost } = repostActions;
 
+  // Animated action handlers
+  const handleLikeClick = useCallback(() => {
+    if (!canUseActions) return;
+    setLikeAnimating(true);
+    toggleLike();
+    setTimeout(() => setLikeAnimating(false), 400);
+  }, [canUseActions, toggleLike]);
+
+  const handleRepostClick = useCallback(() => {
+    if (!canUseActions) return;
+    setRepostAnimating(true);
+    toggleRepost();
+    setTimeout(() => setRepostAnimating(false), 500);
+  }, [canUseActions, toggleRepost]);
+
   // Quora preview is fully isolated and optional.
   // If the flag is OFF, nothing changes.
   // If ON and URL is Quora, render the preview and RETURN early.
@@ -313,34 +330,42 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           {/* Actions */}
           <div className="flex items-center justify-around px-2 py-4 mt-1">
             <button
-              onClick={() => toggleLike()}
-              className="p-2 hover:opacity-60 transition-opacity"
+              onClick={handleLikeClick}
+              className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
             >
-              <Heart className={`h-7 w-7 stroke-[1.5] ${isLiked ? 'fill-red-500 text-red-500' : 'fill-none'}`} />
+              <Heart 
+                className={`h-7 w-7 stroke-[1.5] transition-colors duration-150 ${
+                  likeAnimating ? 'animate-like-pop' : ''
+                } ${isLiked ? 'fill-[#ef4444] text-[#ef4444]' : 'fill-none'}`} 
+              />
             </button>
             <button 
               onClick={() => setCommentsOpen(true)}
-              className="p-2 hover:opacity-60 transition-opacity"
+              className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
             >
               <MessageCircle className="h-7 w-7 stroke-[1.5] fill-none" />
             </button>
             <button 
-              onClick={() => toggleRepost()}
-              className="p-2 hover:opacity-60 transition-opacity"
+              onClick={handleRepostClick}
+              className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
             >
-              <Repeat2 className={`h-8 w-8 stroke-[2.5] ${isReposted ? 'text-green-500' : ''}`} />
+              <Repeat2 
+                className={`h-8 w-8 stroke-[2.5] transition-colors duration-150 ${
+                  repostAnimating ? 'animate-repost-spin' : ''
+                } ${isReposted ? 'text-[#22c55e]' : ''}`} 
+              />
             </button>
             <button 
               onClick={handleShare}
-              className="p-2 hover:opacity-60 transition-opacity"
+              className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
             >
               <Share className="h-7 w-7 stroke-[1.5]" />
             </button>
             <button
               onClick={() => toggleSave()}
-              className="p-2 hover:opacity-60 transition-opacity"
+              className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
             >
-              <Bookmark className={`h-7 w-7 stroke-[1.5] ${isSaved ? 'fill-current' : 'fill-none'}`} />
+              <Bookmark className={`h-7 w-7 stroke-[1.5] transition-colors duration-150 ${isSaved ? 'fill-current' : 'fill-none'}`} />
             </button>
           </div>
         </div>
@@ -678,34 +703,42 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {/* Actions */}
         <div className="flex items-center justify-around px-2 py-4 mt-1">
           <button
-            onClick={() => toggleLike()}
-            className="p-2 hover:opacity-60 transition-opacity"
+            onClick={handleLikeClick}
+            className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
           >
-            <Heart className={`h-7 w-7 stroke-[1.5] ${isLiked ? 'fill-red-500 text-red-500' : 'fill-none'}`} />
+            <Heart 
+              className={`h-7 w-7 stroke-[1.5] transition-colors duration-150 ${
+                likeAnimating ? 'animate-like-pop' : ''
+              } ${isLiked ? 'fill-[#ef4444] text-[#ef4444]' : 'fill-none'}`} 
+            />
           </button>
           <button 
             onClick={() => setCommentsOpen(true)}
-            className="p-2 hover:opacity-60 transition-opacity"
+            className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
           >
             <MessageCircle className="h-7 w-7 stroke-[1.5] fill-none" />
           </button>
           <button 
-            onClick={() => toggleRepost()}
-            className="p-2 hover:opacity-60 transition-opacity"
+            onClick={handleRepostClick}
+            className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
           >
-            <Repeat2 className={`h-8 w-8 stroke-[2.5] ${isReposted ? 'text-green-500' : ''}`} />
+            <Repeat2 
+              className={`h-8 w-8 stroke-[2.5] transition-colors duration-150 ${
+                repostAnimating ? 'animate-repost-spin' : ''
+              } ${isReposted ? 'text-[#22c55e]' : ''}`} 
+            />
           </button>
           <button 
             onClick={handleShare}
-            className="p-2 hover:opacity-60 transition-opacity"
+            className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
           >
             <Share className="h-7 w-7 stroke-[1.5]" />
           </button>
           <button
             onClick={() => toggleSave()}
-            className="p-2 hover:opacity-60 transition-opacity"
+            className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
           >
-            <Bookmark className={`h-7 w-7 stroke-[1.5] ${isSaved ? 'fill-current' : 'fill-none'}`} />
+            <Bookmark className={`h-7 w-7 stroke-[1.5] transition-colors duration-150 ${isSaved ? 'fill-current' : 'fill-none'}`} />
           </button>
         </div>
       </div>
@@ -721,10 +754,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   );
 };
 
-// Memoize the component to prevent unnecessary re-renders
-export const MemoizedFeedPost = memo(FeedPost, (prevProps, nextProps) => {
-  return (
-    prevProps.post.id === nextProps.post.id &&
-    prevProps.userId === nextProps.userId
-  );
-});
+// Memoize the component - since like/repost states come from hooks internally,
+// we don't need to include them in props comparison. The hooks will trigger re-renders.
+export const MemoizedFeedPost = memo(FeedPost);
