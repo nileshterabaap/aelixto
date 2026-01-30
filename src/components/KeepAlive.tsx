@@ -1,0 +1,38 @@
+import { ReactNode, memo } from "react";
+
+interface KeepAliveProps {
+  /** Route path this component represents */
+  route: string;
+  /** Current active route */
+  currentRoute: string;
+  /** Content to keep alive */
+  children: ReactNode;
+}
+
+/**
+ * KeepAlive wrapper that uses CSS display:none instead of unmounting.
+ * This preserves scroll position, embed state, and React component state
+ * while hiding the content when navigating away.
+ * 
+ * Memory-conscious: Only used for heavy routes like Home feed.
+ */
+export const KeepAlive = memo(({ route, currentRoute, children }: KeepAliveProps) => {
+  const isActive = currentRoute === route;
+  
+  return (
+    <div
+      className="w-full h-full"
+      style={{ 
+        display: isActive ? "block" : "none",
+        // Prevent any layout shifts when hidden
+        visibility: isActive ? "visible" : "hidden",
+      }}
+      // Hint to browser that this content may be hidden
+      aria-hidden={!isActive}
+    >
+      {children}
+    </div>
+  );
+});
+
+KeepAlive.displayName = "KeepAlive";

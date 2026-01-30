@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,6 +9,7 @@ import { AnimatePresence } from "framer-motion";
 import { preloadEmbedSDKs } from "@/lib/ScriptLoader";
 import { prefetchCoreData } from "@/lib/prefetch";
 import { PageTransition } from "@/components/PageTransition";
+import { KeepAliveRoutes } from "@/components/KeepAliveRoutes";
 import { persistOptions } from "@/lib/queryPersister";
 import Index from "./pages/Index";
 import Discover from "./pages/Discover";
@@ -52,25 +53,39 @@ const AnimatedRoutes = () => {
     }
   }, []);
   
+  // Define routes to keep alive (won't unmount when navigating away)
+  // Only Home feed for now to conserve memory
+  const keepAliveRoutes = useMemo(() => [
+    { path: "/", element: <Index /> }
+  ], []);
+  
+  // Check if current route is a keep-alive route
+  const isKeepAliveRoute = keepAliveRoutes.some(r => r.path === location.pathname);
+  
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<PageTransition><Index /></PageTransition>} />
-        <Route path="/discover" element={<PageTransition><Discover /></PageTransition>} />
-        <Route path="/notifications" element={<PageTransition><Notifications /></PageTransition>} />
-        <Route path="/messages" element={<PageTransition><Messages /></PageTransition>} />
-        <Route path="/conversation/:conversationId" element={<PageTransition><Conversation /></PageTransition>} />
-        <Route path="/profile" element={<PageTransition><Profile /></PageTransition>} />
-        <Route path="/u/:username" element={<PageTransition><UserProfile /></PageTransition>} />
-        <Route path="/post/:postId" element={<PageTransition><PostDetail /></PageTransition>} />
-        <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
-        <Route path="/edit-profile" element={<PageTransition><EditProfile /></PageTransition>} />
-        <Route path="/saved" element={<PageTransition><SavedPosts /></PageTransition>} />
-        <Route path="/auth" element={<PageTransition><Auth /></PageTransition>} />
-        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
-      </Routes>
-    </AnimatePresence>
+    <>
+      {/* Keep-alive routes stay mounted, hidden with display:none */}
+      <KeepAliveRoutes keepAliveRoutes={keepAliveRoutes}>
+        {/* Non-keep-alive routes render here with animations */}
+        <AnimatePresence mode="wait" initial={false}>
+          <Routes location={location} key={location.pathname}>
+            <Route path="/discover" element={<PageTransition><Discover /></PageTransition>} />
+            <Route path="/notifications" element={<PageTransition><Notifications /></PageTransition>} />
+            <Route path="/messages" element={<PageTransition><Messages /></PageTransition>} />
+            <Route path="/conversation/:conversationId" element={<PageTransition><Conversation /></PageTransition>} />
+            <Route path="/profile" element={<PageTransition><Profile /></PageTransition>} />
+            <Route path="/u/:username" element={<PageTransition><UserProfile /></PageTransition>} />
+            <Route path="/post/:postId" element={<PageTransition><PostDetail /></PageTransition>} />
+            <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
+            <Route path="/edit-profile" element={<PageTransition><EditProfile /></PageTransition>} />
+            <Route path="/saved" element={<PageTransition><SavedPosts /></PageTransition>} />
+            <Route path="/auth" element={<PageTransition><Auth /></PageTransition>} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
+          </Routes>
+        </AnimatePresence>
+      </KeepAliveRoutes>
+    </>
   );
 };
 
