@@ -24,10 +24,12 @@ import {
   Play,
   Loader2,
   ExternalLink,
-  Ban
+  Ban,
+  BellRing
 } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -43,6 +45,7 @@ const Settings = () => {
   const { profile, loading, upsertProfile } = useCurrentProfile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isSupported: pushSupported, isSubscribed: pushSubscribed, isLoading: pushLoading, subscribe: subscribePush, unsubscribe: unsubscribePush } = usePushNotifications();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   
   // Settings state
@@ -391,6 +394,32 @@ const Settings = () => {
 
         {/* Notifications Section */}
         <Section title="Notifications">
+          {pushSupported && (
+            <div className="flex items-center gap-4 p-4">
+              <BellRing className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium">Push Notifications</p>
+                <p className="text-sm text-muted-foreground">Get notified even when app is closed</p>
+              </div>
+              <Switch 
+                checked={pushSubscribed} 
+                disabled={pushLoading}
+                onCheckedChange={async (checked) => {
+                  if (checked) {
+                    const success = await subscribePush();
+                    if (success) {
+                      toast({ title: "Push notifications enabled" });
+                    } else {
+                      toast({ title: "Failed to enable", description: "Please allow notifications in your browser settings", variant: "destructive" });
+                    }
+                  } else {
+                    await unsubscribePush();
+                    toast({ title: "Push notifications disabled" });
+                  }
+                }} 
+              />
+            </div>
+          )}
           <SettingToggle
             icon={Bell}
             label="New Followers"
