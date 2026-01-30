@@ -78,9 +78,13 @@ export const KeepAliveRoutes = ({ keepAliveRoutes, children }: KeepAliveRoutesPr
     
     // Save scroll position when LEAVING a keep-alive route
     if (wasKeepAlive) {
-      const pos = window.scrollY;
-      keepAliveScrollPositions.set(previousPath.current, pos);
-      setScrollPosition(previousPath.current, pos);
+      // IMPORTANT: During navigation, browsers (and/or route transitions) can briefly
+      // report scrollY=0. Never overwrite a good saved value with 0.
+      const currentY = window.scrollY;
+      const existing = keepAliveScrollPositions.get(previousPath.current) ?? 0;
+      const next = currentY === 0 && existing > 0 ? existing : currentY;
+      keepAliveScrollPositions.set(previousPath.current, next);
+      setScrollPosition(previousPath.current, next);
     }
     
     // Restore scroll position when RETURNING to a keep-alive route
