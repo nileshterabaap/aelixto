@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useState, useEffect, useRef } from "react";
+import { ReactNode, useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { KeepAlive } from "./KeepAlive";
 
@@ -11,6 +11,9 @@ interface KeepAliveRoutesProps {
   /** Fallback content for non-keep-alive routes */
   children: ReactNode;
 }
+
+// Persistent scroll positions across component lifecycles
+const scrollPositions = new Map<string, number>();
 
 /**
  * Manages keep-alive routes alongside normal React Router routes.
@@ -44,31 +47,65 @@ export const KeepAliveRoutes = ({ keepAliveRoutes, children }: KeepAliveRoutesPr
     }
   }, [currentPath, isKeepAliveRoute, mountedRoutes]);
   
-  // Scroll restoration for keep-alive routes
-  const scrollPositions = useRef<Map<string, number>>(new Map());
+  // Track previous path for scroll save/restore
   const previousPath = useRef(currentPath);
+  const isRestoringScroll = useRef(false);
   
+  // Save scroll position continuously while on a keep-alive route
   useEffect(() => {
-    // Save scroll position when leaving a keep-alive route
-    if (previousPath.current !== currentPath) {
-      const wasKeepAlive = keepAliveRoutes.some(r => r.path === previousPath.current);
-      if (wasKeepAlive) {
-        scrollPositions.current.set(previousPath.current, window.scrollY);
+    if (!isKeepAliveRoute) return;
+    
+    const saveScroll = () => {
+      if (!isRestoringScroll.current) {
+        scrollPositions.set(currentPath, window.scrollY);
       }
-      
-      // Restore scroll position when returning to a keep-alive route
-      if (isKeepAliveRoute) {
-        const savedPosition = scrollPositions.current.get(currentPath);
-        if (savedPosition !== undefined) {
-          // Use requestAnimationFrame to ensure DOM is ready
-          requestAnimationFrame(() => {
-            window.scrollTo(0, savedPosition);
-          });
-        }
-      }
-      
-      previousPath.current = currentPath;
+    };
+    
+    window.addEventListener('scroll', saveScroll, { passive: true });
+    return () => window.removeEventListener('scroll', saveScroll);
+  }, [currentPath, isKeepAliveRoute]);
+  
+  // Handle scroll save/restore on route change
+  useLayoutEffect(() => {
+    if (previousPath.current === currentPath) return;
+    
+    const wasKeepAlive = keepAliveRoutes.some(r => r.path === previousPath.current);
+    
+    // Save scroll position when LEAVING a keep-alive route
+    if (wasKeepAlive) {
+      scrollPositions.set(previousPath.current, window.scrollY);
     }
+    
+    // Restore scroll position when RETURNING to a keep-alive route
+    if (isKeepAliveRoute) {
+      const savedPosition = scrollPositions.get(currentPath);
+      
+      if (savedPosition !== undefined && savedPosition > 0) {
+        isRestoringScroll.current = true;
+        
+        // Immediate restore attempt
+        window.scrollTo(0, savedPosition);
+        
+        // Multiple retry attempts to handle any race conditions
+        const delays = [0, 16, 50, 100, 200];
+        delays.forEach(delay => {
+          setTimeout(() => {
+            window.scrollTo(0, savedPosition);
+            if (delay === delays[delays.length - 1]) {
+              isRestoringScroll.current = false;
+            }
+          }, delay);
+        });
+      } else {
+        // First visit or was at top - scroll to top
+        window.scrollTo(0, 0);
+      }
+    } else {
+      // Entering a non-keep-alive route - scroll to top
+      window.scrollTo(0, 0);
+    }
+    
+    previousPath.current = currentPath;
   }, [currentPath, isKeepAliveRoute, keepAliveRoutes]);
   
   return (
