@@ -62,7 +62,11 @@ const AnimatedRoutes = () => {
     },
     { 
       pattern: "/u/:username", 
-      element: () => <UserProfile /> 
+      // Extract username from path for the KeepAlive version
+      element: (path: string) => {
+        const username = path.split('/u/')[1];
+        return <UserProfile key={path} usernameOverride={username} />;
+      }
     }
   ], []);
   
@@ -78,7 +82,6 @@ const AnimatedRoutes = () => {
             <Route path="/messages" element={<PageTransition><Messages /></PageTransition>} />
             <Route path="/conversation/:conversationId" element={<PageTransition><Conversation /></PageTransition>} />
             <Route path="/profile" element={<PageTransition><Profile /></PageTransition>} />
-            <Route path="/u/:username" element={<PageTransition><UserProfile /></PageTransition>} />
             <Route path="/post/:postId" element={<PageTransition><PostDetail /></PageTransition>} />
             <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
             <Route path="/edit-profile" element={<PageTransition><EditProfile /></PageTransition>} />
