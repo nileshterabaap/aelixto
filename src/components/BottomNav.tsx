@@ -5,6 +5,7 @@ import { useState, useCallback, MouseEvent, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchRoute } from "@/lib/prefetch";
 import { setScrollPosition } from "@/hooks/useScrollRestoration";
+import { useNotificationCount } from "@/hooks/useNotifications";
 
 interface BottomNavProps {
   onCreatePost: () => void;
@@ -20,6 +21,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
+  const { count: notificationCount } = useNotificationCount();
   const isActive = (path: string) => {
     if (path === "/profile") {
       return location.pathname === "/profile" || location.pathname.startsWith("/u/");
@@ -175,10 +177,12 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               className={`${baseIcon} ${isActive("/notifications") ? activeIcon : inactiveIcon}`}
             />
             {isActive("/notifications") && <span className="absolute bottom-2 w-5 h-0.5 bg-foreground rounded-full animate-underline-slide" />}
-            {/* red badge */}
-            <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-[5px] text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-background z-10">
-              7
-            </span>
+            {/* red badge - only show if there are unread notifications */}
+            {notificationCount > 0 && (
+              <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-[5px] text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-background z-10 animate-scale-in">
+                {notificationCount > 99 ? '99+' : notificationCount}
+              </span>
+            )}
           </Button>
 
           <Button
