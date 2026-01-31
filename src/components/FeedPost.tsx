@@ -331,41 +331,46 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <div className="flex items-center justify-around px-2 py-4 mt-1">
             <button
               onClick={handleLikeClick}
-              className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
+              className="action-btn p-2 active:scale-90 transition-transform"
             >
               <Heart 
-                className={`h-7 w-7 stroke-[1.5] transition-colors duration-150 ${
+                className={`h-7 w-7 stroke-[1.5] ${
                   likeAnimating ? 'animate-like-pop' : ''
-                } ${isLiked ? 'fill-[#ef4444] text-[#ef4444]' : 'fill-none'}`} 
+                }`}
+                style={{ 
+                  fill: isLiked ? '#ef4444' : 'none',
+                  color: isLiked ? '#ef4444' : 'currentColor'
+                }}
               />
             </button>
             <button 
               onClick={() => setCommentsOpen(true)}
-              className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
+              className="action-btn p-2 active:scale-90 transition-transform"
             >
               <MessageCircle className="h-7 w-7 stroke-[1.5] fill-none" />
             </button>
             <button 
               onClick={handleRepostClick}
-              className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
+              className="action-btn p-2 active:scale-90 transition-transform"
             >
               <Repeat2 
-                className={`h-8 w-8 stroke-[2.5] transition-colors duration-150 ${
+                className={`h-8 w-8 stroke-[2.5] ${
                   repostAnimating ? 'animate-repost-spin' : ''
-                } ${isReposted ? 'text-[#22c55e]' : ''}`} 
+                }`}
+                style={{ color: isReposted ? '#22c55e' : 'currentColor' }}
               />
             </button>
             <button 
               onClick={handleShare}
-              className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
+              className="action-btn p-2 active:scale-90 transition-transform"
             >
               <Share className="h-7 w-7 stroke-[1.5]" />
             </button>
             <button
               onClick={() => toggleSave()}
-              className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
+              className="action-btn p-2 active:scale-90 transition-transform"
             >
-              <Bookmark className={`h-7 w-7 stroke-[1.5] transition-colors duration-150 ${isSaved ? 'fill-current' : 'fill-none'}`} />
+              <Bookmark className={`h-7 w-7 stroke-[1.5] ${isSaved ? 'fill-current' : 'fill-none'}`} />
             </button>
           </div>
         </div>
@@ -704,41 +709,46 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         <div className="flex items-center justify-around px-2 py-4 mt-1">
           <button
             onClick={handleLikeClick}
-            className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
+            className="action-btn p-2 active:scale-90 transition-transform"
           >
             <Heart 
-              className={`h-7 w-7 stroke-[1.5] transition-colors duration-150 ${
+              className={`h-7 w-7 stroke-[1.5] ${
                 likeAnimating ? 'animate-like-pop' : ''
-              } ${isLiked ? 'fill-[#ef4444] text-[#ef4444]' : 'fill-none'}`} 
+              }`}
+              style={{ 
+                fill: isLiked ? '#ef4444' : 'none',
+                color: isLiked ? '#ef4444' : 'currentColor'
+              }}
             />
           </button>
           <button 
             onClick={() => setCommentsOpen(true)}
-            className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
+            className="action-btn p-2 active:scale-90 transition-transform"
           >
             <MessageCircle className="h-7 w-7 stroke-[1.5] fill-none" />
           </button>
           <button 
             onClick={handleRepostClick}
-            className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
+            className="action-btn p-2 active:scale-90 transition-transform"
           >
             <Repeat2 
-              className={`h-8 w-8 stroke-[2.5] transition-colors duration-150 ${
+              className={`h-8 w-8 stroke-[2.5] ${
                 repostAnimating ? 'animate-repost-spin' : ''
-              } ${isReposted ? 'text-[#22c55e]' : ''}`} 
+              }`}
+              style={{ color: isReposted ? '#22c55e' : 'currentColor' }}
             />
           </button>
           <button 
             onClick={handleShare}
-            className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
+            className="action-btn p-2 active:scale-90 transition-transform"
           >
             <Share className="h-7 w-7 stroke-[1.5]" />
           </button>
           <button
             onClick={() => toggleSave()}
-            className="action-btn p-2 hover:opacity-60 transition-all active:scale-90"
+            className="action-btn p-2 active:scale-90 transition-transform"
           >
-            <Bookmark className={`h-7 w-7 stroke-[1.5] transition-colors duration-150 ${isSaved ? 'fill-current' : 'fill-none'}`} />
+            <Bookmark className={`h-7 w-7 stroke-[1.5] ${isSaved ? 'fill-current' : 'fill-none'}`} />
           </button>
         </div>
       </div>
