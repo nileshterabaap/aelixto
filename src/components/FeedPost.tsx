@@ -109,6 +109,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const mediaUrl = post.mediaUrl || (post as any).media_url;
   const previewTitle = (post as any).preview_title;
   const previewText = (post as any).preview_text;
+
+  // Caption priority:
+  // 1) Manual caption the user typed (post.content)
+  // 2) Extracted platform caption stored as preview_text (Instagram/Facebook/etc)
+  const captionContent = (post.content || '').trim() || (previewText || '').trim();
   
   // DEBUG: Log thumbnail data
   console.log('[FeedPost] Thumbnail debug:', {
@@ -456,9 +461,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         </div>
 
         {/* Caption with see more/less */}
-        {post.content && (
-          <CollapsibleCaption content={post.content} />
-        )}
+        {!!captionContent && <CollapsibleCaption content={captionContent} />}
 
         {/* Feature flag check - show disabled message if embed is disabled */}
         {!embedEnabled && (
