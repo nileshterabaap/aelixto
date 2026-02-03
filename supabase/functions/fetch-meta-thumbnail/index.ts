@@ -155,6 +155,7 @@ Deno.serve(async (req) => {
     
     let thumbnail = '';
     let title = '';
+    let description = ''; // Instagram caption / post text
 
     if (platform === 'instagram' || platform === 'facebook') {
       if (!metaToken) {
@@ -177,10 +178,15 @@ Deno.serve(async (req) => {
 
       if (response.ok) {
         const data = await response.json();
-        console.log(`[fetch-meta-thumbnail] Meta response:`, JSON.stringify(data).substring(0, 200));
+        console.log(`[fetch-meta-thumbnail] Meta response:`, JSON.stringify(data).substring(0, 300));
         
         const rawThumbnail = data.thumbnail_url || '';
-        title = data.title || '';
+        // Instagram oEmbed returns the caption in the 'title' field
+        // We store it as description for our CollapsibleCaption
+        description = data.title || '';
+        
+        // Use author_name as the title if available
+        title = data.author_name || '';
         
         // CRITICAL: Store thumbnail permanently to avoid CDN expiration
         if (rawThumbnail) {
@@ -198,7 +204,9 @@ Deno.serve(async (req) => {
             if (publicResponse.ok) {
               const publicData = await publicResponse.json();
               const rawThumbnail = publicData.thumbnail_url || '';
-              title = publicData.title || '';
+              // Caption from public oEmbed
+              description = publicData.title || '';
+              title = publicData.author_name || '';
               
               // Store permanently
               if (rawThumbnail) {
@@ -240,10 +248,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`[fetch-meta-thumbnail] Result - thumbnail: ${thumbnail ? thumbnail.substring(0, 60) + '...' : 'none'}, title: ${title}`);
+    console.log(`[fetch-meta-thumbnail] Result - thumbnail: ${thumbnail ? thumbnail.substring(0, 60) + '...' : 'none'}, title: ${title}, description: ${description ? description.substring(0, 40) + '...' : 'none'}`);
 
     return new Response(
-      JSON.stringify({ thumbnail, title }),
+      JSON.stringify({ thumbnail, title, description }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
