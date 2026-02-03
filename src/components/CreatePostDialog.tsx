@@ -19,6 +19,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
+  const [previewText, setPreviewText] = useState(""); // Instagram/embed caption from metadata
   const [showThumbnailInput, setShowThumbnailInput] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const createPost = useCreatePost();
@@ -68,16 +69,21 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
           console.error('[CreatePostDialog] Reddit fetch failed:', error);
         }
       } else if (linkUrl.includes("instagram.com") || linkUrl.includes("facebook.com") || linkUrl.includes("fb.watch") || linkUrl.includes("fb.me")) {
-        // Instagram/Facebook - use server-side Meta API for reliable thumbnails
+        // Instagram/Facebook - use server-side Meta API for reliable thumbnails + caption
         const platform = linkUrl.includes("instagram.com") ? "instagram" : "facebook";
         try {
-          console.log(`[CreatePostDialog] Fetching ${platform} thumbnail via edge function`);
+          console.log(`[CreatePostDialog] Fetching ${platform} metadata via edge function`);
           const { data, error } = await supabase.functions.invoke('fetch-meta-thumbnail', {
             body: { url: linkUrl, platform }
           });
           if (!error && data) {
             videoTitle = data.title || "";
             thumbnail = data.thumbnail || "";
+            // Store the caption/description from the embed metadata
+            if (data.description) {
+              setPreviewText(data.description);
+              console.log(`[CreatePostDialog] Got ${platform} description:`, data.description.substring(0, 60));
+            }
             console.log(`[CreatePostDialog] Got ${platform} thumbnail:`, thumbnail?.substring(0, 60));
           }
         } catch (error) {
@@ -209,6 +215,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       media_url: linkUrl,
       platform: platform,
       thumbnail_url: thumbnailUrl,
+      preview_text: previewText,
     });
 
     createPost.mutate({
@@ -218,6 +225,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       media_url: linkUrl,
       platform: platform || undefined,
       thumbnail_url: thumbnailUrl || undefined,
+      preview_text: previewText || undefined, // Instagram/embed caption from metadata
     });
 
     // Reset form
@@ -226,6 +234,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setThumbnailUrl("");
     setTitle("");
     setCaption("");
+    setPreviewText("");
     setShowThumbnailInput(false);
     onOpenChange(false);
   };
@@ -241,11 +250,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setThumbnailUrl("");
     setTitle("");
     setCaption("");
-    setStep(1);
-    setLinkUrl("");
-    setThumbnailUrl("");
-    setTitle("");
-    setCaption("");
+    setPreviewText("");
     setShowThumbnailInput(false);
     setIsLoadingPreview(false);
     onOpenChange(false);

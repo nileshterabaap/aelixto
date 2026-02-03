@@ -61,6 +61,7 @@ export const useCreatePost = () => {
       platform?: string;
       embed_html?: string;
       thumbnail_url?: string;
+      preview_text?: string; // Caption/description from embed metadata
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -76,6 +77,7 @@ export const useCreatePost = () => {
           platform: newPost.platform || null,
           embed_html: newPost.embed_html || null,
           thumbnail_url: newPost.thumbnail_url || null,
+          preview_text: newPost.preview_text || null, // Store embed caption
         })
         .select()
         .single();
