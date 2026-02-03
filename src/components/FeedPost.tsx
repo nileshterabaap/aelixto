@@ -698,6 +698,12 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
+        {/* Embed metadata caption - rendered below embed with Framer Motion animation */}
+        {/* Only show for embeds that have previewText metadata (Instagram, Twitter, etc.) */}
+        {embedEnabled && previewText && (r.kind === 'raw' || r.kind === 'twitter' || r.kind === 'universal') && (
+          <CollapsibleCaption content={previewText} className="text-sm mt-3 mb-1" />
+        )}
+
         {/* Title - hide for embeds that contain their own title/caption */}
         {(r.kind === 'image' || (r.kind === 'video' && post.platform === 'youtube')) && (
           <div className="mt-3">
