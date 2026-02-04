@@ -1,80 +1,71 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useRef, useLayoutEffect } from 'react';
 
 interface CollapsibleCaptionProps {
   content: string;
-  maxChars?: number;
+  maxLines?: number;
   className?: string;
 }
 
-const TRUNCATE_THRESHOLD = 25;
-
 export const CollapsibleCaption = ({ 
   content, 
-  maxChars = TRUNCATE_THRESHOLD,
+  maxLines = 2,
   className = "text-sm mb-3"
 }: CollapsibleCaptionProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  
+  const [isTruncated, setIsTruncated] = useState(false);
+  const textRef = useRef<HTMLSpanElement>(null);
+
+  // Check if text overflows after 2 lines - use useLayoutEffect for accurate measurement
+  useLayoutEffect(() => {
+    const el = textRef.current;
+    if (!el || isExpanded) return;
+    
+    // Force a reflow to ensure accurate measurement
+    requestAnimationFrame(() => {
+      if (el) {
+        const isOverflowing = el.scrollHeight > el.clientHeight + 1; // +1 for rounding
+        setIsTruncated(isOverflowing);
+      }
+    });
+  }, [content, isExpanded]);
+
   if (!content) return null;
-  
-  const shouldTruncate = content.length > maxChars;
-  const truncatedText = shouldTruncate 
-    ? content.slice(0, maxChars).trimEnd() 
-    : content;
 
   return (
-    <div className={className}>
-      <AnimatePresence mode="wait" initial={false}>
-        {!isExpanded ? (
-          <motion.p
-            key="collapsed"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="leading-relaxed"
-          >
-            {truncatedText}
-            {shouldTruncate && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsExpanded(true);
-                }}
-                className="text-muted-foreground hover:text-foreground transition-colors font-medium"
-              >
-                ...more
-              </button>
-            )}
-          </motion.p>
-        ) : (
-          <motion.div
-            key="expanded"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ 
-              duration: 0.4, 
-              ease: [0.25, 0.1, 0.25, 1] // circOut approximation
-            }}
-            className="overflow-hidden"
-          >
-            <p className="leading-relaxed">
-              {content}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsExpanded(false);
-                }}
-                className="text-muted-foreground hover:text-foreground transition-colors font-medium ml-1"
-              >
-                show less
-              </button>
-            </p>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    <p className={className}>
+      <span
+        ref={textRef}
+        style={!isExpanded ? { 
+          display: '-webkit-box',
+          WebkitLineClamp: maxLines,
+          WebkitBoxOrient: 'vertical',
+          overflow: 'hidden'
+        } : undefined}
+      >
+        {content}
+      </span>
+      {isTruncated && !isExpanded && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded(true);
+          }}
+          className="text-muted-foreground hover:text-foreground transition-colors font-medium ml-1"
+        >
+          ... more
+        </button>
+      )}
+      {isExpanded && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsExpanded(false);
+          }}
+          className="text-muted-foreground hover:text-foreground transition-colors font-medium ml-1"
+        >
+          less
+        </button>
+      )}
+    </p>
   );
 };

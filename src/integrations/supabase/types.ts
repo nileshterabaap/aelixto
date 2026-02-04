@@ -569,9 +569,6 @@ export type Database = {
           media_type: string
           media_url: string
           platform: string
-          preview_image_url: string
-          preview_text: string
-          preview_title: string
           profile_avatar_url: string
           profile_display_name: string
           profile_id: string

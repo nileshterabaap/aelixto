@@ -109,13 +109,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const mediaUrl = post.mediaUrl || (post as any).media_url;
   const previewTitle = (post as any).preview_title;
   const previewText = (post as any).preview_text;
-
-  // Caption priority:
-  // 1) Extracted platform caption stored as preview_text (Instagram/Facebook/etc)
-  // 2) Manual caption the user typed (post.content) — but ignore if it's just a URL
-  const manualCaption = (post.content || '').trim();
-  const manualLooksLikeUrl = /^https?:\/\//i.test(manualCaption);
-  const captionContent = (previewText || '').trim() || (manualLooksLikeUrl ? '' : manualCaption);
   
   // DEBUG: Log thumbnail data
   console.log('[FeedPost] Thumbnail debug:', {
@@ -320,7 +313,9 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
 
           {/* Caption with see more/less */}
-          {!!captionContent && <CollapsibleCaption content={captionContent} />}
+          {post.content && (
+            <CollapsibleCaption content={post.content} />
+          )}
 
           {/* Quora Preview Card */}
           <div className="mb-2">
@@ -459,6 +454,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             )}
           </div>
         </div>
+
+        {/* Caption with see more/less */}
+        {post.content && (
+          <CollapsibleCaption content={post.content} />
+        )}
 
         {/* Feature flag check - show disabled message if embed is disabled */}
         {!embedEnabled && (
@@ -696,12 +696,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               </div>
             )}
           </div>
-        )}
-
-        {/* Embed metadata caption - rendered below embed with Framer Motion animation */}
-        {/* Only show below the embed (avoid rendering URL-only "captions" above). */}
-        {embedEnabled && !!captionContent && r.kind !== 'image' && r.kind !== 'video' && (
-          <CollapsibleCaption content={captionContent} className="text-sm mt-3 mb-1" />
         )}
 
         {/* Title - hide for embeds that contain their own title/caption */}

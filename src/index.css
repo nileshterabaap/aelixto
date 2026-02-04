@@ -187,20 +187,6 @@ span[data-pin-href] button {
   border-radius: 1rem !important;
 }
 
-/* Hide native embed captions - we render our own CollapsibleCaption */
-/* Instagram: hide caption text below the media */
-.embed-container .instagram-media .Caption,
-.embed-container .instagram-media .CaptionComments,
-.embed-container .instagram-media [class*="Caption"] {
-  display: none !important;
-}
-
-/* Twitter/X: hide tweet text, show only media */
-.twitter-embed-container .twitter-tweet p,
-.twitter-embed-container [data-testid="tweetText"] {
-  display: none !important;
-}
-
 /* Facebook embed responsive sizing for mobile */
 .fb-post,
 .fb-video {

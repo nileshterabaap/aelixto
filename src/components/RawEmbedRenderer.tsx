@@ -9,14 +9,9 @@ interface RawEmbedRendererProps {
 
 // Sanitize embed HTML using DOMPurify to prevent XSS attacks
 const sanitizeEmbedHtml = (html: string): string => {
-  // Remove data-instgrm-captioned attribute so Instagram renders media-only (no caption)
-  // We render our own CollapsibleCaption instead
-  let cleanedHtml = html.replace(/\s*data-instgrm-captioned\s*=?\s*["'][^"']*["']?/gi, '');
-  cleanedHtml = cleanedHtml.replace(/\s*data-instgrm-captioned\b/gi, '');
-  
-  return DOMPurify.sanitize(cleanedHtml, {
+  return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img'],
-    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt'],
+    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-captioned', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt'],
     ALLOW_DATA_ATTR: true
   });
 };
