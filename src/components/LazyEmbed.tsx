@@ -16,6 +16,7 @@ export const LazyEmbed = ({
   autoLoad = false
 }: LazyEmbedProps) => {
   const [shouldLoad, setShouldLoad] = useState(autoLoad);
+  const [isVisible, setIsVisible] = useState(autoLoad);
   const containerRef = useRef<HTMLDivElement>(null);
   const { velocity, isScrollingFast } = useScrollVelocity();
   
@@ -44,18 +45,22 @@ export const LazyEmbed = ({
 
   // Base intersection observer for normal loading
   useEffect(() => {
-    if (!containerRef.current || autoLoad || shouldLoad) return;
+    if (!containerRef.current || autoLoad) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
             setShouldLoad(true);
+            setIsVisible(true);
+          } else if (shouldLoad) {
+            // Only unload if we've already loaded once
+            setIsVisible(false);
           }
         });
       },
       {
-        rootMargin: '2000px', // Base preload distance
+        rootMargin: '2000px', // Base preload distance for loading
         threshold: 0.01
       }
     );
@@ -75,9 +80,12 @@ export const LazyEmbed = ({
     checkShouldLoad();
   }, [isScrollingFast, velocity, checkShouldLoad, shouldLoad]);
 
+  // Placeholder to maintain layout when content is unloaded
+  const minHeight = shouldLoad && !isVisible ? '300px' : undefined;
+
   return (
-    <div ref={containerRef}>
-      {shouldLoad && children}
+    <div ref={containerRef} style={{ minHeight }}>
+      {shouldLoad && isVisible && children}
     </div>
   );
 };
