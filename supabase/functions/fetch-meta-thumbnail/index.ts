@@ -157,68 +157,83 @@ Deno.serve(async (req) => {
     let title = '';
     let description = ''; // Instagram caption / post text
 
-    if (platform === 'instagram' || platform === 'facebook') {
+    if (platform === 'instagram') {
+      // Instagram: Use public oEmbed API first (most reliable), then try Meta Graph API
+      console.log(`[fetch-meta-thumbnail] Trying Instagram public oEmbed API`);
+      
+      try {
+        // Public oEmbed endpoint - works without token
+        const publicResponse = await fetch(`https://api.instagram.com/oembed?url=${encodeURIComponent(url)}&maxwidth=540`);
+        
+        if (publicResponse.ok) {
+          const publicData = await publicResponse.json();
+          console.log(`[fetch-meta-thumbnail] Public oEmbed response:`, JSON.stringify(publicData).substring(0, 400));
+          
+          const rawThumbnail = publicData.thumbnail_url || '';
+          // Instagram public oEmbed returns the caption in 'title' field
+          description = publicData.title || '';
+          title = publicData.author_name || '';
+          
+          console.log(`[fetch-meta-thumbnail] Got caption: ${description.substring(0, 60)}...`);
+          
+          // Store thumbnail permanently
+          if (rawThumbnail) {
+            const permanentUrl = await storeThumbnailPermanently(rawThumbnail);
+            thumbnail = permanentUrl || rawThumbnail;
+          }
+        } else {
+          console.log(`[fetch-meta-thumbnail] Public oEmbed returned ${publicResponse.status}`);
+          
+          // Fallback to Meta Graph API if available
+          if (metaToken) {
+            const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
+            console.log(`[fetch-meta-thumbnail] Trying Meta Graph API fallback`);
+            
+            const response = await fetch(oembedUrl);
+            if (response.ok) {
+              const data = await response.json();
+              const rawThumbnail = data.thumbnail_url || '';
+              description = data.title || '';
+              title = data.author_name || '';
+              
+              if (rawThumbnail) {
+                const permanentUrl = await storeThumbnailPermanently(rawThumbnail);
+                thumbnail = permanentUrl || rawThumbnail;
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error(`[fetch-meta-thumbnail] Instagram oEmbed error:`, e);
+      }
+    } else if (platform === 'facebook') {
       if (!metaToken) {
-        console.error('[fetch-meta-thumbnail] META_APP_TOKEN not configured');
+        console.error('[fetch-meta-thumbnail] META_APP_TOKEN not configured for Facebook');
         return new Response(
           JSON.stringify({ error: 'META_APP_TOKEN not configured' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-
-      // Use Meta Graph API oEmbed endpoints
-      const oembedUrl =
-        platform === 'instagram'
-          ? `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${metaToken}`
-          : `https://graph.facebook.com/v18.0/oembed_post?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
-
-      console.log(`[fetch-meta-thumbnail] Calling Meta oEmbed API: ${platform}`);
-
+      
+      const oembedUrl = `https://graph.facebook.com/v18.0/oembed_post?url=${encodeURIComponent(url)}&access_token=${metaToken}`;
+      console.log(`[fetch-meta-thumbnail] Calling Meta oEmbed API for Facebook`);
+      
       const response = await fetch(oembedUrl);
-
+      
       if (response.ok) {
         const data = await response.json();
-        console.log(`[fetch-meta-thumbnail] Meta response:`, JSON.stringify(data).substring(0, 300));
+        console.log(`[fetch-meta-thumbnail] Facebook response:`, JSON.stringify(data).substring(0, 300));
         
         const rawThumbnail = data.thumbnail_url || '';
-        // Instagram oEmbed returns the caption in the 'title' field
-        // We store it as description for our CollapsibleCaption
         description = data.title || '';
-        
-        // Use author_name as the title if available
         title = data.author_name || '';
         
-        // CRITICAL: Store thumbnail permanently to avoid CDN expiration
         if (rawThumbnail) {
           const permanentUrl = await storeThumbnailPermanently(rawThumbnail);
-          thumbnail = permanentUrl || rawThumbnail; // Fallback to raw if storage fails
+          thumbnail = permanentUrl || rawThumbnail;
         }
       } else {
-        const errorText = await response.text();
-        console.error(`[fetch-meta-thumbnail] Meta API error: ${response.status} - ${errorText}`);
-
-        // Fallback for Instagram - try public oEmbed
-        if (platform === 'instagram') {
-          try {
-            const publicResponse = await fetch(`https://api.instagram.com/oembed?url=${encodeURIComponent(url)}`);
-            if (publicResponse.ok) {
-              const publicData = await publicResponse.json();
-              const rawThumbnail = publicData.thumbnail_url || '';
-              // Caption from public oEmbed
-              description = publicData.title || '';
-              title = publicData.author_name || '';
-              
-              // Store permanently
-              if (rawThumbnail) {
-                const permanentUrl = await storeThumbnailPermanently(rawThumbnail);
-                thumbnail = permanentUrl || rawThumbnail;
-              }
-              console.log(`[fetch-meta-thumbnail] Instagram public oEmbed worked, stored permanently`);
-            }
-          } catch (e) {
-            console.error(`[fetch-meta-thumbnail] Instagram public oEmbed failed:`, e);
-          }
-        }
+        console.error(`[fetch-meta-thumbnail] Facebook API error: ${response.status}`);
       }
     } else if (platform === 'twitter') {
       // Twitter/X - use publish.twitter.com oEmbed
