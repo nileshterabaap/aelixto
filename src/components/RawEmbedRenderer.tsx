@@ -8,10 +8,19 @@ interface RawEmbedRendererProps {
 }
 
 // Sanitize embed HTML using DOMPurify to prevent XSS attacks
+// Strip Instagram caption attribute to render media-only embeds
+const stripInstagramCaption = (html: string): string => {
+  // Remove data-instgrm-captioned attribute so embed renders without native caption
+  return html.replace(/\s*data-instgrm-captioned\s*/gi, ' ');
+};
+
 const sanitizeEmbedHtml = (html: string): string => {
-  return DOMPurify.sanitize(html, {
+  // First strip Instagram caption attribute
+  let processedHtml = stripInstagramCaption(html);
+  
+  return DOMPurify.sanitize(processedHtml, {
     ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img'],
-    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-captioned', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt'],
+    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt'],
     ALLOW_DATA_ATTR: true
   });
 };
