@@ -14,6 +14,7 @@ import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
 import { LazyEmbed } from "@/components/LazyEmbed";
 import { CollapsibleCaption } from "@/components/CollapsibleCaption";
+import { UsernameLink } from "@/components/UsernameLink";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
 import instagramIcon from "@/assets/platforms/instagram.svg";
 import tiktokIcon from "@/assets/platforms/tiktok.svg";
@@ -276,7 +277,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-bold text-base">{post.author.username}</p>
+              <UsernameLink username={post.author.username} className="font-bold text-base block">{post.author.username}</UsernameLink>
             </div>
           <div className="flex items-center gap-2 shrink-0 text-foreground">
             {displayIcon && post.platform !== 'twitter' && (
@@ -403,7 +404,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {post.isRepost && post.repostedByUsername && (
           <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
             <Repeat2 className="w-4 h-4" />
-            <span>Reposted by <span className="font-semibold text-foreground">@{post.repostedByUsername}</span></span>
+            <span>Reposted by <UsernameLink username={post.repostedByUsername} className="font-semibold text-foreground">@{post.repostedByUsername}</UsernameLink></span>
           </div>
         )}
         
@@ -419,7 +420,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-base">{post.author.username}</p>
+            <UsernameLink username={post.author.username} className="font-bold text-base block">{post.author.username}</UsernameLink>
           </div>
           <div className="flex items-center gap-2 shrink-0 text-foreground">
             {displayIcon && post.platform !== 'twitter' && (

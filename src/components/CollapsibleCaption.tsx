@@ -1,4 +1,5 @@
 import { useState, useRef, useLayoutEffect } from 'react';
+import { parseTextWithMentions } from './UsernameLink';
 
 interface CollapsibleCaptionProps {
   content: string;
@@ -31,6 +32,9 @@ export const CollapsibleCaption = ({
 
   if (!content) return null;
 
+  // Parse content to convert @mentions to clickable links
+  const parsedContent = parseTextWithMentions(content);
+
   return (
     <p className={className}>
       <span
@@ -42,7 +46,7 @@ export const CollapsibleCaption = ({
           overflow: 'hidden'
         } : undefined}
       >
-        {content}
+        {parsedContent}
       </span>
       {isTruncated && !isExpanded && (
         <button
