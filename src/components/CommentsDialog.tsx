@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { useComments } from "@/hooks/useComments";
+import { UsernameLink, parseTextWithMentions } from "@/components/UsernameLink";
 
 interface CommentsDialogProps {
   open: boolean;
@@ -43,10 +44,13 @@ export const CommentsDialog = ({ open, onOpenChange, postId }: CommentsDialogPro
                       className="h-8 w-8 rounded-full object-cover"
                     />
                     <div className="flex-1">
-                      <p className="font-semibold text-sm">
+                      <UsernameLink 
+                        username={c.profiles?.username || "unknown"}
+                        className="font-semibold text-sm block"
+                      >
                         {c.profiles?.display_name || c.profiles?.username || "Unknown"}
-                      </p>
-                      <p className="text-sm">{c.content}</p>
+                      </UsernameLink>
+                      <p className="text-sm">{parseTextWithMentions(c.content)}</p>
                     </div>
                   </div>
                 ))}
