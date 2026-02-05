@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { useScrollVelocity } from '@/hooks/useScrollVelocity';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface LazyEmbedProps {
   children: ReactNode;
@@ -109,7 +110,19 @@ export const LazyEmbed = ({
 
   return (
     <div ref={containerRef} style={{ minHeight }}>
-      {shouldLoad && isVisible && children}
+      <AnimatePresence mode="wait">
+        {shouldLoad && isVisible && (
+          <motion.div
+            key="embed-content"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            {children}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
