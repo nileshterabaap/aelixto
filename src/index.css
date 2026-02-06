@@ -189,8 +189,11 @@ span[data-pin-href] button {
 
 /* Instagram dark mode fix - invert colors and rotate hue back */
 .dark .embed-container .instagram-media,
-.dark .embed-container iframe[src*="instagram.com"] {
-  filter: invert(1) hue-rotate(180deg);
+.dark .embed-container .instagram-media *,
+.dark .embed-container iframe[src*="instagram.com"],
+.dark .instagram-media,
+.dark blockquote.instagram-media {
+  filter: invert(1) hue-rotate(180deg) !important;
 }
 
 /* Facebook embed responsive sizing for mobile */
