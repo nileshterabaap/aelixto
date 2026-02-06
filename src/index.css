@@ -185,6 +185,7 @@ span[data-pin-href] button {
   width: 100% !important;
   margin: 0 auto !important;
   border-radius: 1rem !important;
+  color-scheme: auto !important;
 }
 
 /* Facebook embed responsive sizing for mobile */
