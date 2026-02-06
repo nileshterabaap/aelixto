@@ -187,10 +187,20 @@ span[data-pin-href] button {
   border-radius: 1rem !important;
 }
 
-/* Instagram dark mode fix - invert colors and rotate hue back */
+/* Instagram dark mode fix - try transparent background first */
+.dark .embed-container .instagram-media {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Fallback: wrap with dark background and blend mode to drop white */
+.dark .embed-container {
+  background-color: hsl(var(--background));
+}
+
 .dark .embed-container .instagram-media,
 .dark .embed-container iframe[src*="instagram.com"] {
-  filter: invert(1) hue-rotate(180deg);
+  mix-blend-mode: multiply;
 }
 
 /* Facebook embed responsive sizing for mobile */
