@@ -123,18 +123,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           if (window.instgrm?.Embeds?.process) {
             window.instgrm.Embeds.process();
             
-            // Apply color-scheme to iframe for dark mode support
-            const applyDarkModeStyle = () => {
-              if (containerRef.current) {
-                const iframe = containerRef.current.querySelector('iframe');
-                if (iframe) {
-                  iframe.style.colorScheme = 'auto';
-                  return true;
-                }
-              }
-              return false;
-            };
-            
             // Check if embed rendered successfully after a short delay
             setTimeout(() => {
               if (containerRef.current) {
@@ -142,9 +130,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
                 if (!hasIframe) {
                   setEmbedFailed(true);
                   onError?.();
-                } else {
-                  // Apply dark mode style to the iframe
-                  applyDarkModeStyle();
                 }
               }
             }, 2000);
