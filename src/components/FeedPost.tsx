@@ -753,6 +753,29 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   );
 };
 
-// Memoize the component - since like/repost states come from hooks internally,
-// we don't need to include them in props comparison. The hooks will trigger re-renders.
-export const MemoizedFeedPost = memo(FeedPost);
+// Memoize the component with deep comparison of critical post fields
+// This prevents re-renders when parent re-renders but post data hasn't changed
+const arePropsEqual = (prev: FeedPostProps, next: FeedPostProps) => {
+  // Quick bailout if post object reference changed but data is the same
+  if (prev.userId !== next.userId) return false;
+  if (prev.post.id !== next.post.id) return false;
+  
+  // Compare stable post fields that affect rendering
+  const p = prev.post;
+  const n = next.post;
+  
+  return (
+    p.content === n.content &&
+    p.title === n.title &&
+    p.mediaUrl === n.mediaUrl &&
+    p.thumbnailUrl === n.thumbnailUrl &&
+    p.platform === n.platform &&
+    p.saves === n.saves &&
+    p.isRepost === n.isRepost &&
+    p.repostedByUsername === n.repostedByUsername &&
+    p.author.username === n.author.username &&
+    p.author.avatar === n.author.avatar
+  );
+};
+
+export const MemoizedFeedPost = memo(FeedPost, arePropsEqual);
