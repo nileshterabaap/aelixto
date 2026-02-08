@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
@@ -25,7 +25,8 @@ import {
   Loader2,
   ExternalLink,
   Ban,
-  BellRing
+  BellRing,
+  Link2
 } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
@@ -36,6 +37,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { ConnectedSocialsSection } from "@/components/settings/ConnectedSocialsSection";
 
 type Theme = 'system' | 'light' | 'dark';
 
@@ -465,6 +467,13 @@ const Settings = () => {
                 </button>
               ))}
             </div>
+          </div>
+        </Section>
+
+        {/* Connected Socials Section */}
+        <Section title="Connected Socials">
+          <div className="p-0">
+            <ConnectedSocialsSection />
           </div>
         </Section>
 
