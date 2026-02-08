@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { useScrollVelocity } from '@/hooks/useScrollVelocity';
-import { motion, AnimatePresence } from 'framer-motion';
 
 interface LazyEmbedProps {
   children: ReactNode;
@@ -17,7 +16,7 @@ export const LazyEmbed = ({
   autoLoad = false
 }: LazyEmbedProps) => {
   const [shouldLoad, setShouldLoad] = useState(autoLoad);
-  const [isVisible, setIsVisible] = useState(autoLoad);
+  const [isNearViewport, setIsNearViewport] = useState(autoLoad);
   const containerRef = useRef<HTMLDivElement>(null);
   const { velocity, isScrollingFast } = useScrollVelocity();
   
@@ -71,21 +70,21 @@ export const LazyEmbed = ({
     };
   }, [autoLoad, shouldLoad]);
 
-  // Visibility observer - tight margin for auto-pause when off-screen
+  // Visibility observer - tracks if content is near viewport
+  // CRITICAL: We no longer unmount content, just track visibility for potential optimizations
   useEffect(() => {
     if (!containerRef.current || autoLoad) return;
 
     const visibilityObserver = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          // Only toggle visibility if content is loaded
           if (shouldLoad) {
-            setIsVisible(entry.isIntersecting);
+            setIsNearViewport(entry.isIntersecting);
           }
         });
       },
       {
-        rootMargin: '100px', // Small margin - unmount shortly after leaving viewport
+        rootMargin: '500px', // Generous margin - content stays "visible" when slightly off-screen
         threshold: 0
       }
     );
@@ -105,24 +104,12 @@ export const LazyEmbed = ({
     checkShouldLoad();
   }, [isScrollingFast, velocity, checkShouldLoad, shouldLoad]);
 
-  // Placeholder to maintain layout when content is unloaded
-  const minHeight = shouldLoad && !isVisible ? '300px' : undefined;
-
+  // CRITICAL FIX: Never unmount content once loaded!
+  // This prevents the white flash and reload when scrolling back up.
+  // Content stays in DOM, we just don't render until shouldLoad is true.
   return (
-    <div ref={containerRef} style={{ minHeight }}>
-      <AnimatePresence mode="wait">
-        {shouldLoad && isVisible && (
-          <motion.div
-            key="embed-content"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-          >
-            {children}
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div ref={containerRef}>
+      {shouldLoad && children}
     </div>
   );
 };
