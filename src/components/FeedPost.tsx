@@ -111,14 +111,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const previewTitle = (post as any).preview_title;
   const previewText = (post as any).preview_text;
   
-  // DEBUG: Log thumbnail data
-  console.log('[FeedPost] Thumbnail debug:', {
-    postId: post.id,
-    thumbnailUrl,
-    rawThumbnailUrl: post.thumbnailUrl,
-    rawThumbnailUrlSnake: (post as any).thumbnail_url,
-    previewImageUrl
-  });
   
   // Try to get platform from post.platform or detect from URL
   const detectedPlatform = post.platform || detectPlatformFromUrl(mediaUrl);
@@ -160,10 +152,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
       }
     })();
   
-  // Check if this embed type is enabled via feature flags
   const embedEnabled = post.platform ? isEmbedEnabled(post.platform.toLowerCase() as EmbedPlatform) : true;
-  
-  console.log("[FeedPost] Rendering post:", post.id, "Platform:", post.platform, "Enabled:", embedEnabled, "MediaURL:", mediaUrl, "MediaType:", post.mediaType, "EmbedHTML:", (post as any).embed_html);
   
   const getYouTubeVideoId = (url: string) => {
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/;
@@ -395,7 +384,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   );
 
   const r = resolveRenderer(post);
-  console.log('renderer', post.id, post.platform, post.mediaUrl, r.kind, 'isFBUnavailable:', isFacebookUnavailable);
 
   return (
     <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">

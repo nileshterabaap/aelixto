@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { preloadFeedImages } from '@/lib/preloadImages';
+import { preloadAllFeedImages } from '@/lib/preloadImages';
+import { useRef, useEffect } from 'react';
 
 interface FeedPost {
   id: string;
@@ -78,9 +79,6 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  // Preload images for instant display
-  preloadFeedImages(mappedPosts);
-
   const nextCursor = data.length < 20 ? undefined : mappedPosts[mappedPosts.length - 1]?.created_at;
 
   return { posts: mappedPosts, nextCursor };
@@ -88,6 +86,7 @@ const fetchFeedPage = async (cursor?: string) => {
 
 export const useFollowingFeed = (): UseFollowingFeedResult => {
   const queryClient = useQueryClient();
+  const preloadedRef = useRef(false);
 
   // Check following count first
   const { data: followingCount, isLoading: countLoading } = useQuery({
@@ -121,10 +120,39 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache
     refetchOnWindowFocus: false, // Don't refetch on window focus
     refetchOnMount: false, // Don't refetch on mount if data exists
+    refetchOnReconnect: false, // Don't refetch on reconnect
+    structuralSharing: true, // Prevent unnecessary re-renders
   });
 
-  // Flatten all pages into single array
+  // Flatten all pages into single array - stable reference
   const items = data?.pages.flatMap((page) => page.posts) ?? [];
+
+  // Aggressively preload ALL thumbnails once on data arrival
+  useEffect(() => {
+    if (items.length > 0 && !preloadedRef.current) {
+      preloadedRef.current = true;
+      // Preload all images immediately for instant scroll
+      preloadAllFeedImages(items.map(post => ({
+        profiles: { avatar_url: post.profiles?.avatar_url },
+        thumbnail_url: post.thumbnail_url,
+        media_url: post.media_url,
+      })));
+    }
+  }, [items]);
+
+  // Preload new pages as they arrive
+  useEffect(() => {
+    if (data?.pages && data.pages.length > 1) {
+      const latestPage = data.pages[data.pages.length - 1];
+      if (latestPage.posts.length > 0) {
+        preloadAllFeedImages(latestPage.posts.map(post => ({
+          profiles: { avatar_url: post.profiles?.avatar_url },
+          thumbnail_url: post.thumbnail_url,
+          media_url: post.media_url,
+        })));
+      }
+    }
+  }, [data?.pages?.length]);
 
   const loadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {

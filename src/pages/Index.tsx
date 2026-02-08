@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
@@ -8,16 +8,14 @@ import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
-import { useScrollAheadPreload } from "@/hooks/useScrollAheadPreload";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
+  const hasRenderedOnce = useRef(false);
   
-  // Instagram-style restoration: restore by the top visible post anchor (not raw scrollY)
-
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
 
@@ -32,11 +30,11 @@ const Index = () => {
   const isSignedOut = !user;
   const showDemoFeed = isSignedOut && isDemoMode;
 
-  // Map demo posts to feed format
+  // Map demo posts to feed format - stable memoization
   const mappedDemoPosts = useMemo(() => {
-    if (!showDemoFeed) return [];
+    if (!showDemoFeed || !demoPostsData) return [];
 
-    return (demoPostsData || [])
+    return demoPostsData
       .map((post) => ({
         id: post.id,
         user_id: post.user_id,
@@ -67,9 +65,9 @@ const Index = () => {
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }, [demoPostsData, showDemoFeed]);
 
-  // Map following posts to feed format
+  // Map following posts to feed format - stable memoization
   const feedPosts = useMemo(() => {
-    if (showDemoFeed) return [];
+    if (showDemoFeed || !followingPosts.length) return [];
 
     return followingPosts.map((post) => ({
       id: post.id,
@@ -102,21 +100,6 @@ const Index = () => {
     }));
   }, [followingPosts, showDemoFeed]);
 
-  // Prepare posts for scroll-ahead preloading
-  const postsForPreload = useMemo(() => {
-    return (showDemoFeed ? mappedDemoPosts : feedPosts).map(post => ({
-      profiles: { avatar_url: post.author.avatar },
-      thumbnail_url: post.thumbnailUrl,
-      media_url: post.mediaUrl,
-    }));
-  }, [showDemoFeed, mappedDemoPosts, feedPosts]);
-
-  // Scroll-ahead image preloading
-  const { registerTrigger } = useScrollAheadPreload(postsForPreload, {
-    preloadCount: 5,
-    triggerThreshold: 3,
-  });
-
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
 
   const { registerItem } = useFeedAnchorRestoration(
@@ -130,10 +113,16 @@ const Index = () => {
     }
   }, [user, sessionLoading, isDemoMode, navigate]);
 
-  // IMPORTANT: keep already-loaded posts visible during navigation.
-  // Only show skeleton when we truly have nothing to render yet.
+  // Mark first render complete to prevent flicker on subsequent renders
+  useEffect(() => {
+    if (allPosts.length > 0) {
+      hasRenderedOnce.current = true;
+    }
+  }, [allPosts.length]);
+
+  // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
-  const shouldShowSkeleton = (sessionLoading || loading) && allPosts.length === 0;
+  const shouldShowSkeleton = !hasRenderedOnce.current && (sessionLoading || loading) && allPosts.length === 0;
 
   if (shouldShowSkeleton) {
     return (
@@ -174,13 +163,10 @@ const Index = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {allPosts.map((post, index) => (
+            {allPosts.map((post) => (
               <div 
                 key={post.id} 
-                ref={(el) => {
-                  registerTrigger(index, el);
-                  registerItem(post.id)(el as unknown as HTMLElement | null);
-                }}
+                ref={registerItem(post.id)}
                 data-feed-item-id={post.id}
               >
                 <FeedPost post={post} userId={user?.id} />
