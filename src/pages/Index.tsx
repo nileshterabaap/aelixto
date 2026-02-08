@@ -2,14 +2,14 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
-import { MemoizedFeedPost as FeedPost } from "@/components/FeedPost";
+import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
 import { PostSkeleton } from "@/components/PostSkeleton";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
-
+import { useActivePostTracker } from "@/hooks/useActivePostTracker";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -101,6 +101,11 @@ const Index = () => {
   }, [followingPosts, showDemoFeed]);
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
+  
+  // Track which posts are near the viewport for smart hydration
+  const { registerPost, isActive } = useActivePostTracker(
+    useMemo(() => allPosts.map((p) => p.id), [allPosts])
+  );
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
@@ -166,10 +171,17 @@ const Index = () => {
             {allPosts.map((post) => (
               <div 
                 key={post.id} 
-                ref={registerItem(post.id)}
+                ref={(el) => {
+                  registerItem(post.id)(el);
+                  registerPost(post.id)(el);
+                }}
                 data-feed-item-id={post.id}
               >
-                <FeedPost post={post} userId={user?.id} />
+                <FeedPost 
+                  post={post} 
+                  userId={user?.id} 
+                  isActive={isActive(post.id)}
+                />
               </div>
             ))}
           </div>
