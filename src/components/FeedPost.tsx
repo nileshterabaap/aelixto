@@ -38,7 +38,6 @@ import { QuoraPreviewCard } from "@/features/article-embeds/QuoraPreviewCard";
 import { useVideoPlayTracking } from "@/hooks/useViewTracking";
 import { ImageViewTracker } from "@/components/ImageViewTracker";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
-import { NativeCardWrapper } from "@/components/NativeCardWrapper";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -594,23 +593,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               >
                 <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
               </LazyEmbed>
-            )}
-            {r.kind === 'native' && (
-              <NativeCardWrapper
-                url={r.url}
-                platform={r.platform}
-                postId={post.id}
-                cachedData={r.data}
-                isRealPost={post.isRealPost}
-                likesCount={(post as any).likes_count || 0}
-                commentsCount={(post as any).comments_count || 0}
-                isLikedByUser={isLiked}
-                onLike={handleLikeClick}
-                onComment={() => setCommentsOpen(true)}
-                thumbnailUrl={thumbnailUrl || previewImageUrl}
-                previewTitle={previewTitle || post.title}
-                previewText={previewText}
-              />
             )}
             {r.kind === 'universal' && !isFacebookUnavailable && post.isRealPost && (
               <LazyEmbed
