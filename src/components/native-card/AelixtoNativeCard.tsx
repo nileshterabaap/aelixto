@@ -3,6 +3,25 @@ import { NativeCardHeader } from './NativeCardHeader';
 import { NativeCardMedia } from './NativeCardMedia';
 import { NativeCardActions } from './NativeCardActions';
 import { ConnectPromptBanner } from './ConnectPromptBanner';
+import { CollapsibleCaption } from '@/components/CollapsibleCaption';
+
+// Platform icons
+import instagramIcon from '@/assets/platforms/instagram.svg';
+import xIcon from '@/assets/platforms/x.svg';
+import tiktokIcon from '@/assets/platforms/tiktok.svg';
+import youtubeIcon from '@/assets/platforms/youtube.svg';
+import facebookIcon from '@/assets/platforms/facebook.svg';
+import redditIcon from '@/assets/platforms/reddit.svg';
+
+const platformIcons: Record<string, string> = {
+  instagram: instagramIcon,
+  twitter: xIcon,
+  x: xIcon,
+  tiktok: tiktokIcon,
+  youtube: youtubeIcon,
+  facebook: facebookIcon,
+  reddit: redditIcon,
+};
 
 export interface NativeCardData {
   url: string;
@@ -78,8 +97,8 @@ export const AelixtoNativeCard = ({
   showConnectPrompt = false,
 }: AelixtoNativeCardProps) => {
   const caption = data.description || data.title || '';
-  const displayName = data.author_name || data.author_username;
   const platformName = data.platform.charAt(0).toUpperCase() + data.platform.slice(1);
+  const platformIcon = platformIcons[data.platform.toLowerCase()] || instagramIcon;
 
   return (
     <div className="w-full bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm">
@@ -140,12 +159,22 @@ export const AelixtoNativeCard = ({
         </div>
       )}
 
+      {/* Post Caption with collapsible "more/less" */}
+      {caption && (
+        <div className="px-4 pb-3">
+          <CollapsibleCaption 
+            content={caption} 
+            className="text-sm text-gray-900"
+          />
+        </div>
+      )}
+
       {/* Add a comment input (Instagram style) */}
       <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
         <span className="text-sm text-gray-400">Add a comment...</span>
         {/* Platform icon */}
         <img 
-          src={`/src/assets/platforms/${data.platform === 'twitter' ? 'x' : data.platform}.svg`}
+          src={platformIcon}
           alt={platformName}
           className="w-5 h-5 opacity-60"
         />

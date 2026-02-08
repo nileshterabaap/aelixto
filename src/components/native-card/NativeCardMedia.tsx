@@ -54,27 +54,34 @@ export const NativeCardMedia = ({
     );
   }
 
-  // Video posts
-  if (mediaType === 'video' && mediaUrl && mediaUrl.includes('.mp4')) {
+  // Video posts - always show thumbnail with play button, click opens in new tab
+  if (mediaType === 'video') {
+    const posterUrl = proxyFn(thumbnailUrl || mediaUrl);
+    
     return (
-      <div className="relative aspect-[9/16] max-h-[500px] bg-black">
-        <video
-          ref={videoRef}
-          src={mediaUrl}
-          poster={proxyFn(thumbnailUrl)}
-          className="w-full h-full object-contain cursor-pointer"
-          onClick={handleVideoClick}
-          loop
-          playsInline
-          muted
+      <div className="relative w-full bg-black">
+        {/* Shimmer loading skeleton */}
+        {!imageLoaded && (
+          <div className="absolute inset-0">
+            <Skeleton className="w-full h-full bg-zinc-800" />
+          </div>
+        )}
+        
+        <img
+          src={posterUrl}
+          alt={title || 'Video thumbnail'}
+          className={`w-full h-auto max-h-[600px] object-contain transition-opacity duration-300 ${
+            imageLoaded ? 'opacity-100' : 'opacity-0'
+          }`}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
         />
-        {!isVideoPlaying && (
-          <div 
-            className="absolute inset-0 flex items-center justify-center cursor-pointer"
-            onClick={handleVideoClick}
-          >
-            <div className="w-16 h-16 rounded-full bg-black/50 flex items-center justify-center">
-              <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1" />
+        
+        {/* Play button overlay */}
+        {imageLoaded && !imageError && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-16 h-16 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
+              <div className="w-0 h-0 border-l-[22px] border-l-white border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent ml-1.5" />
             </div>
           </div>
         )}
@@ -82,23 +89,24 @@ export const NativeCardMedia = ({
     );
   }
 
-  // Image posts (including video thumbnails)
+  // Image posts
   const imageUrl = proxyFn(mediaUrl || thumbnailUrl);
-  const isVideoThumbnail = mediaType === 'video';
 
   return (
-    <div className="relative aspect-[4/5] bg-gray-50 overflow-hidden">
+    <div className="relative w-full bg-gray-50">
       {/* Shimmer loading skeleton */}
       {!imageLoaded && (
-        <Skeleton className="absolute inset-0 w-full h-full bg-gray-100" />
+        <div className="absolute inset-0">
+          <Skeleton className="w-full h-full bg-gray-200" />
+        </div>
       )}
       
-      {/* Actual image */}
+      {/* Actual image - natural aspect ratio */}
       {!imageError ? (
         <img
           src={imageUrl}
           alt={title || 'Post media'}
-          className={`w-full h-full object-cover transition-opacity duration-300 ${
+          className={`w-full h-auto max-h-[600px] object-contain transition-opacity duration-300 ${
             imageLoaded ? 'opacity-100' : 'opacity-0'
           }`}
           loading="lazy"
@@ -106,18 +114,9 @@ export const NativeCardMedia = ({
           onError={handleImageError}
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+        <div className="w-full aspect-square flex items-center justify-center bg-gray-100">
           <div className="text-center text-gray-400">
             <p className="text-sm">Image unavailable</p>
-          </div>
-        </div>
-      )}
-
-      {/* Video indicator for video posts showing thumbnail */}
-      {isVideoThumbnail && imageLoaded && !imageError && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-16 h-16 rounded-full bg-black/50 flex items-center justify-center">
-            <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1" />
           </div>
         </div>
       )}
