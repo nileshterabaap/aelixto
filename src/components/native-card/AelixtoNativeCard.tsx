@@ -115,6 +115,8 @@ export const AelixtoNativeCard = ({
       {/* Media Content */}
       <NativeCardMedia
         mediaType={data.media_type}
+        platform={data.platform}
+        postUrl={data.url}
         mediaUrl={data.media_url}
         thumbnailUrl={data.thumbnail_url}
         caption={caption}
