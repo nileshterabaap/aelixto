@@ -1,8 +1,10 @@
-import { useState, useRef, useCallback } from 'react';
+import { useMemo, useState } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface NativeCardMediaProps {
   mediaType: 'video' | 'image' | 'text' | 'carousel';
+  platform?: string;
+  postUrl?: string;
   mediaUrl?: string;
   thumbnailUrl?: string;
   caption?: string;
@@ -10,82 +12,96 @@ interface NativeCardMediaProps {
   proxyFn: (url?: string) => string;
 }
 
+function getAspectClass(platform?: string) {
+  const p = (platform || '').toLowerCase();
+  // Match the most common “official embed” feeling: tall media for IG/TikTok.
+  if (p === 'instagram' || p === 'tiktok') return 'aspect-[4/5]';
+  if (p === 'youtube') return 'aspect-video';
+  return 'aspect-square';
+}
+
 export const NativeCardMedia = ({
   mediaType,
+  platform,
+  postUrl,
   mediaUrl,
   thumbnailUrl,
   caption,
   title,
   proxyFn,
 }: NativeCardMediaProps) => {
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const [imageError, setImageError] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  const [mediaLoaded, setMediaLoaded] = useState(false);
+  const [mediaError, setMediaError] = useState(false);
 
-  const handleVideoClick = useCallback(() => {
-    if (videoRef.current) {
-      if (isVideoPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsVideoPlaying(!isVideoPlaying);
-    }
-  }, [isVideoPlaying]);
+  const aspectClass = useMemo(() => getAspectClass(platform), [platform]);
 
-  const handleImageLoad = () => {
-    setImageLoaded(true);
+  const handleLoad = () => {
+    setMediaLoaded(true);
   };
 
-  const handleImageError = () => {
-    setImageError(true);
-    setImageLoaded(true);
+  const handleError = () => {
+    setMediaError(true);
+    setMediaLoaded(true);
   };
 
   // Text-only posts
   if (mediaType === 'text') {
     return (
-      <div className="w-full aspect-square flex items-center justify-center p-8 bg-gradient-to-br from-gray-50 to-gray-100">
-        <p className="text-gray-900 text-lg text-center leading-relaxed font-light">
+      <div className={`w-full ${aspectClass} flex items-center justify-center p-8 bg-muted`}>
+        <p className="text-foreground text-lg text-center leading-relaxed font-light">
           {caption || title}
         </p>
       </div>
     );
   }
 
-  // Video posts - always show thumbnail with play button, click opens in new tab
+  // Video posts
+  // Important: Outstand often returns the *post page URL* (not a direct mp4), so inline playback
+  // isn’t possible reliably. To match “tap to play” behavior, we open the original post URL.
   if (mediaType === 'video') {
     const posterUrl = proxyFn(thumbnailUrl || mediaUrl);
-    
+
     return (
-      <div className="relative w-full bg-black">
-        {/* Shimmer loading skeleton */}
-        {!imageLoaded && (
+      <button
+        type="button"
+        onClick={() => {
+          const href = postUrl || mediaUrl;
+          if (href) window.open(href, '_blank', 'noopener,noreferrer');
+        }}
+        className={`relative w-full ${aspectClass} overflow-hidden bg-muted block text-left`}
+        aria-label={title ? `Play video: ${title}` : 'Play video'}
+      >
+        {!mediaLoaded && (
           <div className="absolute inset-0">
-            <Skeleton className="w-full h-full bg-zinc-800" />
+            <Skeleton className="w-full h-full" />
           </div>
         )}
-        
-        <img
-          src={posterUrl}
-          alt={title || 'Video thumbnail'}
-          className={`w-full h-auto max-h-[600px] object-contain transition-opacity duration-300 ${
-            imageLoaded ? 'opacity-100' : 'opacity-0'
-          }`}
-          onLoad={handleImageLoad}
-          onError={handleImageError}
-        />
-        
+
+        {!mediaError ? (
+          <img
+            src={posterUrl}
+            alt={title || 'Video thumbnail'}
+            className={`w-full h-full object-cover transition-opacity duration-300 ${
+              mediaLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            onLoad={handleLoad}
+            onError={handleError}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <p className="text-muted-foreground text-sm">Video unavailable</p>
+          </div>
+        )}
+
         {/* Play button overlay */}
-        {imageLoaded && !imageError && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="w-16 h-16 rounded-full bg-black/60 flex items-center justify-center backdrop-blur-sm">
-              <div className="w-0 h-0 border-l-[22px] border-l-white border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent ml-1.5" />
+        {mediaLoaded && !mediaError && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-background/60 border border-border flex items-center justify-center backdrop-blur-sm">
+              <div className="w-0 h-0 border-l-[22px] border-l-foreground border-t-[14px] border-t-transparent border-b-[14px] border-b-transparent ml-1.5" />
             </div>
           </div>
         )}
-      </div>
+      </button>
     );
   }
 
@@ -93,31 +109,27 @@ export const NativeCardMedia = ({
   const imageUrl = proxyFn(mediaUrl || thumbnailUrl);
 
   return (
-    <div className="relative w-full bg-gray-50">
-      {/* Shimmer loading skeleton */}
-      {!imageLoaded && (
+    <div className={`relative w-full ${aspectClass} overflow-hidden bg-muted`}>
+      {!mediaLoaded && (
         <div className="absolute inset-0">
-          <Skeleton className="w-full h-full bg-gray-200" />
+          <Skeleton className="w-full h-full" />
         </div>
       )}
-      
-      {/* Actual image - natural aspect ratio */}
-      {!imageError ? (
+
+      {!mediaError ? (
         <img
           src={imageUrl}
           alt={title || 'Post media'}
-          className={`w-full h-auto max-h-[600px] object-contain transition-opacity duration-300 ${
-            imageLoaded ? 'opacity-100' : 'opacity-0'
+          className={`w-full h-full object-cover transition-opacity duration-300 ${
+            mediaLoaded ? 'opacity-100' : 'opacity-0'
           }`}
           loading="lazy"
-          onLoad={handleImageLoad}
-          onError={handleImageError}
+          onLoad={handleLoad}
+          onError={handleError}
         />
       ) : (
-        <div className="w-full aspect-square flex items-center justify-center bg-gray-100">
-          <div className="text-center text-gray-400">
-            <p className="text-sm">Image unavailable</p>
-          </div>
+        <div className="w-full h-full flex items-center justify-center">
+          <p className="text-muted-foreground text-sm">Image unavailable</p>
         </div>
       )}
     </div>
