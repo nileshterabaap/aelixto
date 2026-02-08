@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { ExternalLink } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -44,21 +43,23 @@ export const NativeCardHeader = ({
   const platformIcon = platformIcons[platform] || platformIcons.instagram;
   const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
 
-  // Display name priority: author_name > author_username > platform name
-  const displayName = authorName || authorUsername || platformName;
-  const displayUsername = authorUsername ? `@${authorUsername}` : null;
+  // Display name priority: author_username > author_name > platform name
+  const displayName = authorUsername || authorName || platformName;
+  const subtitle = authorName && authorUsername && authorName !== authorUsername 
+    ? authorName 
+    : null;
 
   // Get avatar initial
   const avatarInitial = displayName?.charAt(0).toUpperCase() || '?';
 
   return (
-    <div className="px-4 py-3 flex items-center justify-between">
+    <div className="px-4 py-3 flex items-center justify-between bg-white">
       <div className="flex items-center gap-3">
-        <Avatar className="h-10 w-10 border border-white/20 bg-zinc-800">
+        <Avatar className="h-8 w-8 border border-gray-200">
           {authorAvatar ? (
             <>
               {!avatarLoaded && (
-                <Skeleton className="absolute inset-0 rounded-full bg-zinc-700" />
+                <Skeleton className="absolute inset-0 rounded-full bg-gray-100" />
               )}
               <AvatarImage 
                 src={proxyFn(authorAvatar)} 
@@ -67,34 +68,29 @@ export const NativeCardHeader = ({
               />
             </>
           ) : null}
-          <AvatarFallback className="bg-zinc-700 text-white">
+          <AvatarFallback className="bg-gray-100 text-gray-600 text-xs">
             {avatarInitial}
           </AvatarFallback>
         </Avatar>
-        <div>
-          <p className="text-sm font-semibold text-white leading-tight">
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold text-gray-900 leading-tight">
             {displayName}
-          </p>
-          {displayUsername && displayUsername !== `@${displayName}` && (
-            <p className="text-xs text-white/50">{displayUsername}</p>
+          </span>
+          {subtitle && (
+            <span className="text-xs text-gray-500">{subtitle}</span>
           )}
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        <img 
-          src={platformIcon} 
-          alt={platformName} 
-          className="w-5 h-5 opacity-60" 
-        />
-        <a 
-          href={postUrl} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="text-white/40 hover:text-white/60 transition-colors"
-        >
-          <ExternalLink className="h-4 w-4" />
-        </a>
-      </div>
+      
+      {/* View Profile button styled like Instagram */}
+      <a
+        href={postUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="px-4 py-1.5 bg-[#0095f6] hover:bg-[#1877f2] text-white text-sm font-semibold rounded-md transition-colors"
+      >
+        View profile
+      </a>
     </div>
   );
 };

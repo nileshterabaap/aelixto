@@ -1,11 +1,5 @@
-import { MoreHorizontal, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 // Platform icons
 import InstagramIcon from '@/assets/platforms/instagram.svg';
@@ -42,38 +36,28 @@ export const ConnectPromptBanner = ({
   const platformName = platform.charAt(0).toUpperCase() + platform.slice(1);
 
   return (
-    <div className="px-4 py-3 bg-white/5 border-b border-white/10 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <img src={platformIcon} alt={platformName} className="w-4 h-4 opacity-70" />
-        <span className="text-sm text-white/70">
-          Connect {platformName} to interact on the platform
+    <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <img src={platformIcon} alt={platformName} className="w-5 h-5" />
+        <span className="text-sm text-gray-700">
+          Connect {platformName} to interact
         </span>
       </div>
       <div className="flex items-center gap-2">
         <Button
-          variant="ghost"
+          variant="default"
           size="sm"
           onClick={onConnect}
-          className="text-xs text-primary hover:text-primary/80"
+          className="bg-[#0095f6] hover:bg-[#1877f2] text-white text-sm font-semibold rounded-md px-4"
         >
           Connect
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-6 w-6">
-              <MoreHorizontal className="h-4 w-4 text-white/50" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-black/95 border-white/10">
-            <DropdownMenuItem 
-              onClick={onDismiss}
-              className="text-white/70 focus:text-white"
-            >
-              <X className="h-4 w-4 mr-2" />
-              Don't ask again
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <button 
+          onClick={onDismiss}
+          className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+        >
+          <X className="h-4 w-4 text-gray-500" />
+        </button>
       </div>
     </div>
   );

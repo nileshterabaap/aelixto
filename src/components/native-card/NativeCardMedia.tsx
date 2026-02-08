@@ -46,8 +46,8 @@ export const NativeCardMedia = ({
   // Text-only posts
   if (mediaType === 'text') {
     return (
-      <div className="w-full aspect-square flex items-center justify-center p-8 bg-gradient-to-br from-zinc-900 to-black">
-        <p className="text-white text-lg text-center leading-relaxed font-light">
+      <div className="w-full aspect-square flex items-center justify-center p-8 bg-gradient-to-br from-gray-50 to-gray-100">
+        <p className="text-gray-900 text-lg text-center leading-relaxed font-light">
           {caption || title}
         </p>
       </div>
@@ -57,12 +57,12 @@ export const NativeCardMedia = ({
   // Video posts
   if (mediaType === 'video' && mediaUrl && mediaUrl.includes('.mp4')) {
     return (
-      <div className="relative aspect-square bg-black">
+      <div className="relative aspect-[9/16] max-h-[500px] bg-black">
         <video
           ref={videoRef}
           src={mediaUrl}
           poster={proxyFn(thumbnailUrl)}
-          className="w-full h-full object-cover cursor-pointer"
+          className="w-full h-full object-contain cursor-pointer"
           onClick={handleVideoClick}
           loop
           playsInline
@@ -70,10 +70,10 @@ export const NativeCardMedia = ({
         />
         {!isVideoPlaying && (
           <div 
-            className="absolute inset-0 flex items-center justify-center bg-black/20 cursor-pointer"
+            className="absolute inset-0 flex items-center justify-center cursor-pointer"
             onClick={handleVideoClick}
           >
-            <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-black/50 flex items-center justify-center">
               <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1" />
             </div>
           </div>
@@ -84,12 +84,13 @@ export const NativeCardMedia = ({
 
   // Image posts (including video thumbnails)
   const imageUrl = proxyFn(mediaUrl || thumbnailUrl);
+  const isVideoThumbnail = mediaType === 'video';
 
   return (
-    <div className="relative aspect-square bg-black overflow-hidden">
+    <div className="relative aspect-[4/5] bg-gray-50 overflow-hidden">
       {/* Shimmer loading skeleton */}
       {!imageLoaded && (
-        <Skeleton className="absolute inset-0 w-full h-full bg-zinc-800" />
+        <Skeleton className="absolute inset-0 w-full h-full bg-gray-100" />
       )}
       
       {/* Actual image */}
@@ -105,17 +106,17 @@ export const NativeCardMedia = ({
           onError={handleImageError}
         />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
-          <div className="text-center text-white/40">
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+          <div className="text-center text-gray-400">
             <p className="text-sm">Image unavailable</p>
           </div>
         </div>
       )}
 
       {/* Video indicator for video posts showing thumbnail */}
-      {mediaType === 'video' && !isVideoPlaying && imageLoaded && !imageError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-          <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+      {isVideoThumbnail && imageLoaded && !imageError && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-16 h-16 rounded-full bg-black/50 flex items-center justify-center">
             <div className="w-0 h-0 border-l-[20px] border-l-white border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1" />
           </div>
         </div>

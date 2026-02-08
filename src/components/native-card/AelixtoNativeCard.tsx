@@ -57,6 +57,11 @@ function getProxiedUrl(url?: string): string {
   return `${supabaseUrl}/functions/v1/img-proxy?u=${encodeURIComponent(url)}`;
 }
 
+function formatCount(count?: number): string {
+  if (!count) return '0';
+  return count.toLocaleString();
+}
+
 export const AelixtoNativeCard = ({
   data,
   postId,
@@ -73,28 +78,12 @@ export const AelixtoNativeCard = ({
   showConnectPrompt = false,
 }: AelixtoNativeCardProps) => {
   const caption = data.description || data.title || '';
-  const truncateLength = 150;
-  const needsTruncation = caption.length > truncateLength;
-  const [showFullCaption, setShowFullCaption] = useState(false);
-  const truncatedCaption = needsTruncation 
-    ? caption.substring(0, truncateLength) + '...' 
-    : caption;
-
-  // Get display name - use author_username if no author_name
   const displayName = data.author_name || data.author_username;
+  const platformName = data.platform.charAt(0).toUpperCase() + data.platform.slice(1);
 
   return (
-    <div className="w-full bg-black rounded-xl overflow-hidden border border-white/10">
-      {/* Connect Platform Prompt */}
-      {showConnectPrompt && !isPlatformConnected && onConnectPlatform && onDismissConnectPrompt && (
-        <ConnectPromptBanner
-          platform={data.platform}
-          onConnect={onConnectPlatform}
-          onDismiss={onDismissConnectPrompt}
-        />
-      )}
-
-      {/* Author Header */}
+    <div className="w-full bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm">
+      {/* Instagram-style Header */}
       <NativeCardHeader
         platform={data.platform}
         authorName={data.author_name}
@@ -114,7 +103,19 @@ export const AelixtoNativeCard = ({
         proxyFn={getProxiedUrl}
       />
 
-      {/* Actions */}
+      {/* View more on Platform link */}
+      <div className="px-4 py-2 border-t border-gray-100">
+        <a 
+          href={data.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#0095f6] text-sm font-medium hover:text-[#00376b] transition-colors"
+        >
+          View more on {platformName}
+        </a>
+      </div>
+
+      {/* Platform-style Actions (Heart, Comment, Share, Bookmark) */}
       <NativeCardActions
         platform={data.platform}
         aelixtoLikes={aelixtoLikes}
@@ -127,28 +128,36 @@ export const AelixtoNativeCard = ({
         isPlatformConnected={isPlatformConnected}
         onPlatformLike={onPlatformLike}
         onPlatformComment={onPlatformComment}
+        postUrl={data.url}
       />
 
-      {/* Caption */}
-      {data.media_type !== 'text' && caption && (
-        <div className="px-4 pb-4">
-          <p className="text-sm text-white/80 leading-relaxed">
-            {displayName && (
-              <span className="font-semibold text-white mr-1">
-                {displayName}
-              </span>
-            )}
-            {showFullCaption ? caption : truncatedCaption}
-          </p>
-          {needsTruncation && (
-            <button 
-              onClick={() => setShowFullCaption(!showFullCaption)}
-              className="text-xs text-white/40 mt-1 hover:text-white/60"
-            >
-              {showFullCaption ? 'less' : 'more'}
-            </button>
-          )}
+      {/* Like count */}
+      {data.likes_count !== undefined && data.likes_count > 0 && (
+        <div className="px-4 pb-2">
+          <span className="text-sm font-semibold text-gray-900">
+            {formatCount(data.likes_count)} likes
+          </span>
         </div>
+      )}
+
+      {/* Add a comment input (Instagram style) */}
+      <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
+        <span className="text-sm text-gray-400">Add a comment...</span>
+        {/* Platform icon */}
+        <img 
+          src={`/src/assets/platforms/${data.platform === 'twitter' ? 'x' : data.platform}.svg`}
+          alt={platformName}
+          className="w-5 h-5 opacity-60"
+        />
+      </div>
+
+      {/* Connect prompt - shows as floating banner if not connected */}
+      {showConnectPrompt && !isPlatformConnected && onConnectPlatform && onDismissConnectPrompt && (
+        <ConnectPromptBanner
+          platform={data.platform}
+          onConnect={onConnectPlatform}
+          onDismiss={onDismissConnectPrompt}
+        />
       )}
     </div>
   );
