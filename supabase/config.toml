@@ -38,3 +38,12 @@ verify_jwt = false
 
 [functions.send-push-notification]
 verify_jwt = false
+
+[functions.fetch-universal-content]
+verify_jwt = false
+
+[functions.outstand-oauth]
+verify_jwt = false
+
+[functions.platform-action]
+verify_jwt = false
