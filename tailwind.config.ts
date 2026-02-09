@@ -140,7 +140,7 @@ export default {
         "bounce-in": "bounce-in 0.5s ease-out both",
         ripple: "ripple 0.6s linear",
         "underline-slide": "underline-slide 0.2s ease-out",
-        "fade-in": "fade-in 0.3s ease-out forwards",
+        "fade-in": "fade-in 0.2s ease-out forwards",
       },
     },
   },
