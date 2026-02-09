@@ -7,7 +7,6 @@ import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
-import { PlatformCover } from '@/components/PlatformCover';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -78,19 +77,35 @@ export const HydratedEmbed = memo(({
   // Rectangular, flush edges - looks exactly like a paused native video
   if (!isHydrated) {
     return (
-      <PlatformCover
-        platform={post.platform}
-        thumbnailUrl={effectiveThumbnail}
-        imageLoaded={imageLoaded}
-        imageError={imageError}
-        onImageLoad={() => setImageLoaded(true)}
-        onImageError={() => setImageError(true)}
-        onPlay={onPlayClick}
-        originalUrl={r.url}
-        authorName={post.author?.username?.replace('@', '')}
-        authorAvatar={post.author?.avatar}
-        aspectClass={aspectClass}
-      />
+      <div 
+        className={`relative w-full bg-black cursor-pointer ${aspectClass}`}
+        onClick={onPlayClick}
+      >
+        {/* Shimmer placeholder while loading */}
+        {!imageLoaded && !imageError && (
+          <div className="absolute inset-0 bg-gradient-to-r from-muted via-muted-foreground/10 to-muted animate-shimmer" />
+        )}
+        
+        {/* High-res thumbnail - rectangular, edge to edge, looks like a paused video frame */}
+        {effectiveThumbnail && !imageError && (
+          <img
+            src={effectiveThumbnail}
+            alt="Content preview"
+            className={`w-full h-full object-cover transition-opacity duration-200 ${
+              imageLoaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setImageError(true)}
+            loading="eager"
+            decoding="async"
+          />
+        )}
+        
+        {/* Fallback gradient if no thumbnail */}
+        {(!effectiveThumbnail || imageError) && (
+          <div className="absolute inset-0 bg-black" />
+        )}
+      </div>
     );
   }
   
