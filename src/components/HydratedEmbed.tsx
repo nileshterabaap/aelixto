@@ -58,7 +58,22 @@ export const HydratedEmbed = memo(({
   // If no renderer or none type, show nothing
   if (r.kind === 'none') return null;
   
-  // THUMBNAIL STATE: Show high-res thumbnail with play button overlay
+  // IMAGES: Load directly without play button (swift loading)
+  if (r.kind === 'image' && r.url) {
+    return (
+      <ImageViewTracker postId={post.id}>
+        <img 
+          src={r.url} 
+          alt="Post content" 
+          className="w-full h-auto object-cover" 
+          loading="eager"
+          decoding="async"
+        />
+      </ImageViewTracker>
+    );
+  }
+  
+  // THUMBNAIL STATE for videos/embeds only: Show thumbnail with play button
   if (!isHydrated) {
     return (
       <div 
@@ -90,15 +105,12 @@ export const HydratedEmbed = memo(({
           <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted-foreground/20" />
         )}
         
-        {/* Subtle play button overlay - only for video/embed content */}
-        {(r.kind === 'video' || r.kind === 'raw' || r.kind === 'twitter' || 
-          r.kind === 'reddit' || r.kind === 'pinterest' || r.kind === 'universal') && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors group">
-            <div className="bg-white/90 dark:bg-black/70 backdrop-blur-sm rounded-full p-4 shadow-lg group-hover:scale-110 transition-transform">
-              <Play className="w-8 h-8 text-foreground fill-current" />
-            </div>
+        {/* Play button overlay for videos/embeds */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors group">
+          <div className="bg-white/90 dark:bg-black/70 backdrop-blur-sm rounded-full p-4 shadow-lg group-hover:scale-110 transition-transform">
+            <Play className="w-8 h-8 text-foreground fill-current" />
           </div>
-        )}
+        </div>
       </div>
     );
   }
