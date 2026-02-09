@@ -1,5 +1,4 @@
-import { useState, useCallback, memo } from 'react';
-import { Play } from 'lucide-react';
+import { useState, memo } from 'react';
 import type { Post } from '@/data/demoData';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
@@ -73,7 +72,8 @@ export const HydratedEmbed = memo(({
     );
   }
   
-  // THUMBNAIL STATE for videos/embeds only: Show thumbnail with play button
+  // THUMBNAIL STATE for videos/embeds only: Clean thumbnail, no overlay
+  // Entire thumbnail is clickable - "Seamless Invisible Swap"
   if (!isHydrated) {
     return (
       <div 
@@ -85,7 +85,7 @@ export const HydratedEmbed = memo(({
           <div className="absolute inset-0 bg-gradient-to-r from-muted via-muted-foreground/10 to-muted animate-shimmer" />
         )}
         
-        {/* High-res thumbnail - edge to edge */}
+        {/* High-res thumbnail - edge to edge, looks like a paused video */}
         {effectiveThumbnail && !imageError && (
           <img
             src={effectiveThumbnail}
@@ -104,13 +104,6 @@ export const HydratedEmbed = memo(({
         {(!effectiveThumbnail || imageError) && (
           <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted-foreground/20" />
         )}
-        
-        {/* Play button overlay for videos/embeds */}
-        <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors group">
-          <div className="bg-white/90 dark:bg-black/70 backdrop-blur-sm rounded-full p-4 shadow-lg group-hover:scale-110 transition-transform">
-            <Play className="w-8 h-8 text-foreground fill-current" />
-          </div>
-        </div>
       </div>
     );
   }
