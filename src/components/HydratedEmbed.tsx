@@ -74,10 +74,11 @@ export const HydratedEmbed = memo(({
   
   // THUMBNAIL STATE for videos/embeds only: Clean thumbnail, no overlay
   // Entire thumbnail is clickable - "Seamless Invisible Swap"
+  // Rectangular, flush edges - looks exactly like a paused native video
   if (!isHydrated) {
     return (
       <div 
-        className={`relative w-full bg-muted cursor-pointer overflow-hidden ${aspectClass}`}
+        className={`relative w-full bg-black cursor-pointer ${aspectClass}`}
         onClick={onPlayClick}
       >
         {/* Shimmer placeholder while loading */}
@@ -85,12 +86,12 @@ export const HydratedEmbed = memo(({
           <div className="absolute inset-0 bg-gradient-to-r from-muted via-muted-foreground/10 to-muted animate-shimmer" />
         )}
         
-        {/* High-res thumbnail - edge to edge, looks like a paused video */}
+        {/* High-res thumbnail - rectangular, edge to edge, looks like a paused video frame */}
         {effectiveThumbnail && !imageError && (
           <img
             src={effectiveThumbnail}
             alt="Content preview"
-            className={`w-full h-full object-cover transition-opacity duration-300 ${
+            className={`w-full h-full object-cover transition-opacity duration-200 ${
               imageLoaded ? 'opacity-100' : 'opacity-0'
             }`}
             onLoad={() => setImageLoaded(true)}
@@ -102,7 +103,7 @@ export const HydratedEmbed = memo(({
         
         {/* Fallback gradient if no thumbnail */}
         {(!effectiveThumbnail || imageError) && (
-          <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted-foreground/20" />
+          <div className="absolute inset-0 bg-black" />
         )}
       </div>
     );
