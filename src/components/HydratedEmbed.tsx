@@ -75,12 +75,11 @@ export const HydratedEmbed = memo(({
   // THUMBNAIL STATE for videos/embeds only: Clean thumbnail, no overlay
   // Entire thumbnail is clickable - "Seamless Invisible Swap"
   // Rectangular, flush edges - looks exactly like a paused native video
+  // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
+  // No click overlay - hydration happens automatically via IntersectionObserver
   if (!isHydrated) {
     return (
-      <div 
-        className={`relative w-full bg-black cursor-pointer ${aspectClass}`}
-        onClick={onPlayClick}
-      >
+      <div className={`relative w-full bg-black ${aspectClass}`}>
         {effectiveThumbnail && !imageError && (
           <img
             src={effectiveThumbnail}
