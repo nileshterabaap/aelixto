@@ -81,12 +81,6 @@ export const HydratedEmbed = memo(({
         className={`relative w-full bg-black cursor-pointer ${aspectClass}`}
         onClick={onPlayClick}
       >
-        {/* Shimmer placeholder while loading */}
-        {!imageLoaded && !imageError && (
-          <div className="absolute inset-0 bg-gradient-to-r from-muted via-muted-foreground/10 to-muted animate-shimmer" />
-        )}
-        
-        {/* High-res thumbnail - rectangular, edge to edge, looks like a paused video frame */}
         {effectiveThumbnail && !imageError && (
           <img
             src={effectiveThumbnail}
@@ -99,11 +93,6 @@ export const HydratedEmbed = memo(({
             loading="eager"
             decoding="async"
           />
-        )}
-        
-        {/* Fallback gradient if no thumbnail */}
-        {(!effectiveThumbnail || imageError) && (
-          <div className="absolute inset-0 bg-black" />
         )}
       </div>
     );
