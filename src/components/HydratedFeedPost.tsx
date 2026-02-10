@@ -76,10 +76,16 @@ const detectPlatformFromUrl = (url?: string) => {
 
 export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
-  
-  const isHydrated = isActive; // Auto-hydrate when near viewport, dehydrate when far away
+
+  // Dehydrate when post moves far off-screen to save memory
+  useEffect(() => {
+    if (!isActive && isHydrated) {
+      setIsHydrated(false);
+    }
+  }, [isActive, isHydrated]);
   
   // Normalize field access
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
@@ -130,7 +136,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
   }, [canUseActions, toggleRepost]);
 
   const handlePlayClick = useCallback(() => {
-    // No-op since hydration is now automatic
+    setIsHydrated(true);
   }, []);
 
   // Resolve the embed type for rendering
