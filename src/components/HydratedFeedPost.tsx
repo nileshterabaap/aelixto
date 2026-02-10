@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
-import { useState, useRef, memo, useCallback, useEffect } from "react";
+import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
@@ -79,8 +79,27 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
   const [isHydrated, setIsHydrated] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
+  const embedRef = useRef<HTMLDivElement>(null);
 
-  // Dehydrate when post moves far off-screen to save memory
+  // Tight auto-hydration observer: only hydrate when within ~400px of viewport
+  // This limits concurrent embeds to ~2-3, keeping scrolling butter-smooth
+  useEffect(() => {
+    const el = embedRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsHydrated(true);
+        }
+      },
+      { rootMargin: '400px', threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Dehydrate when post moves far off-screen (1500px via parent) to free memory
   useEffect(() => {
     if (!isActive && isHydrated) {
       setIsHydrated(false);
@@ -210,13 +229,15 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
       )}
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed */}
-      <HydratedEmbed
-        post={post}
-        renderer={r}
-        thumbnailUrl={effectiveThumbnail}
-        isHydrated={isHydrated}
-        onPlayClick={handlePlayClick}
-      />
+      <div ref={embedRef}>
+        <HydratedEmbed
+          post={post}
+          renderer={r}
+          thumbnailUrl={effectiveThumbnail}
+          isHydrated={isHydrated}
+          onPlayClick={handlePlayClick}
+        />
+      </div>
 
       {/* Title for video/image posts */}
       {post.title && (r.kind === 'image' || r.kind === 'video') && (
