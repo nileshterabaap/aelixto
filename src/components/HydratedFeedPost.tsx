@@ -93,7 +93,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
           setIsHydrated(true);
         }
       },
-      { rootMargin: '400px', threshold: 0 }
+      { rootMargin: '900px', threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
