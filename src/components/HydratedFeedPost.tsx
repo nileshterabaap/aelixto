@@ -99,12 +99,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
     return () => observer.disconnect();
   }, []);
 
-  // Dehydrate when post moves far off-screen (1500px via parent) to free memory
-  useEffect(() => {
-    if (!isActive && isHydrated) {
-      setIsHydrated(false);
-    }
-  }, [isActive, isHydrated]);
+  // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
   
   // Normalize field access
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
