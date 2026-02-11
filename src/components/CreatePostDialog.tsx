@@ -21,6 +21,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [caption, setCaption] = useState("");
   const [showThumbnailInput, setShowThumbnailInput] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [embedHtml, setEmbedHtml] = useState("");
   const createPost = useCreatePost();
 
   const handleLinkSubmit = async () => {
@@ -150,6 +151,20 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
         }
       }
       
+      // Fetch oEmbed HTML in parallel for instant embed rendering
+      console.log('[CreatePostDialog] Fetching oEmbed HTML...');
+      try {
+        const { data: oembedData, error: oembedError } = await supabase.functions.invoke('fetch-oembed', {
+          body: { url: linkUrl }
+        });
+        if (!oembedError && oembedData?.embed_html) {
+          setEmbedHtml(oembedData.embed_html);
+          console.log('[CreatePostDialog] Got oEmbed HTML, length:', oembedData.embed_html.length);
+        }
+      } catch (error) {
+        console.error('[CreatePostDialog] oEmbed fetch failed:', error);
+      }
+
       console.log('[CreatePostDialog] Setting thumbnail:', thumbnail);
       console.log('[CreatePostDialog] Setting title:', videoTitle);
       setThumbnailUrl(thumbnail);
@@ -209,6 +224,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       media_url: linkUrl,
       platform: platform,
       thumbnail_url: thumbnailUrl,
+      embed_html: embedHtml ? `${embedHtml.length} chars` : 'none',
     });
 
     createPost.mutate({
@@ -218,6 +234,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       media_url: linkUrl,
       platform: platform || undefined,
       thumbnail_url: thumbnailUrl || undefined,
+      embed_html: embedHtml || undefined,
     });
 
     // Reset form
@@ -227,6 +244,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setTitle("");
     setCaption("");
     setShowThumbnailInput(false);
+    setEmbedHtml("");
     onOpenChange(false);
   };
 
@@ -248,6 +266,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setCaption("");
     setShowThumbnailInput(false);
     setIsLoadingPreview(false);
+    setEmbedHtml("");
     onOpenChange(false);
   };
 
