@@ -123,16 +123,24 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           if (window.instgrm?.Embeds?.process) {
             window.instgrm.Embeds.process();
             
-            // Check if embed rendered successfully after a short delay
+            // Check if embed rendered successfully after a longer delay (SDK can be slow)
             setTimeout(() => {
               if (containerRef.current) {
                 const hasIframe = containerRef.current.querySelector('iframe');
                 if (!hasIframe) {
-                  setEmbedFailed(true);
-                  onError?.();
+                  // Retry once more before giving up
+                  if (window.instgrm?.Embeds?.process) {
+                    window.instgrm.Embeds.process();
+                  }
+                  setTimeout(() => {
+                    if (containerRef.current && !containerRef.current.querySelector('iframe')) {
+                      setEmbedFailed(true);
+                      onError?.();
+                    }
+                  }, 3000);
                 }
               }
-            }, 2000);
+            }, 4000);
           }
         } else if (platform === 'facebook') {
           await loadFacebookSDK();

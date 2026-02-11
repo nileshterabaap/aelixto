@@ -83,9 +83,10 @@ serve(async (req) => {
       }
     }
 
-    // Instagram oEmbed (requires Meta token)
+    // Instagram - build blockquote embed HTML (works without Meta API token)
     if (urlLower.includes('instagram.com')) {
       platform = 'instagram';
+      // First try Meta oEmbed API if token available
       const metaToken = Deno.env.get('META_APP_TOKEN');
       if (metaToken) {
         try {
@@ -95,12 +96,35 @@ serve(async (req) => {
             const data = await res.json();
             if (data.html) {
               embedHtml = data.html;
-              console.log('[fetch-oembed] Instagram oEmbed success');
+              console.log('[fetch-oembed] Instagram oEmbed API success');
             }
           }
         } catch (e) {
-          console.error('[fetch-oembed] Instagram oEmbed failed:', e);
+          console.error('[fetch-oembed] Instagram oEmbed API failed:', e);
         }
+      }
+      // Fallback: build standard Instagram blockquote (SDK processes it client-side)
+      if (!embedHtml) {
+        embedHtml = `<blockquote class="instagram-media" data-instgrm-permalink="${url}" data-instgrm-version="14" style="background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:540px; min-width:326px; padding:0; width:99.375%; width:calc(100% - 2px);"><a href="${url}" target="_blank"></a></blockquote>`;
+        console.log('[fetch-oembed] Instagram blockquote built (fallback)');
+      }
+    }
+
+    // Pinterest oEmbed
+    if (urlLower.includes('pinterest.com') || urlLower.includes('pin.it')) {
+      platform = 'pinterest';
+      try {
+        const oembedUrl = `https://www.pinterest.com/oembed/?url=${encodeURIComponent(url)}&format=json`;
+        const res = await fetch(oembedUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.html) {
+            embedHtml = data.html;
+            console.log('[fetch-oembed] Pinterest oEmbed success');
+          }
+        }
+      } catch (e) {
+        console.error('[fetch-oembed] Pinterest oEmbed failed:', e);
       }
     }
 
