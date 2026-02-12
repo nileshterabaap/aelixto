@@ -54,10 +54,21 @@ const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 're
   return 'unknown';
 };
 
-// Build Instagram embed HTML
+// Build Instagram embed HTML using direct iframe (bypasses unreliable SDK)
 const buildInstagramEmbed = (url: string): string => {
-  // Use Instagram's recommended embed format with captioned attribute
-  return `<blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="${url}" data-instgrm-version="14" style="background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:540px; min-width:326px; padding:0; width:99.375%; width:-webkit-calc(100% - 2px); width:calc(100% - 2px);"><a href="${url}" style="background:#FFFFFF; line-height:0; padding:0 0; text-align:center; text-decoration:none; width:100%;" target="_blank"></a></blockquote>`;
+  // Extract the post/reel path and build a direct embed iframe URL
+  // Instagram supports /embed/ suffix on post/reel URLs
+  try {
+    const u = new URL(url);
+    // Clean the path - remove trailing slash, add /embed/
+    let embedPath = u.pathname.replace(/\/$/, '') + '/embed/';
+    const embedUrl = `https://www.instagram.com${embedPath}`;
+    return `<iframe src="${embedUrl}" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+  } catch {
+    // Fallback: just append /embed/ to the URL
+    const cleanUrl = url.split('?')[0].replace(/\/$/, '');
+    return `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+  }
 };
 
 // Normalize Facebook URLs for reliable embedding
@@ -319,10 +330,10 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   }, [url]);
 
   if (embedHtml && !showFallback) {
-    // For Spotify only, render directly without RawEmbedRenderer
-    const isSpotifyIframe = embedHtml.includes('open.spotify.com/embed');
+    // For Spotify and Instagram iframes, render directly without RawEmbedRenderer (no SDK needed)
+    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || embedHtml.includes('instagram.com') && embedHtml.includes('<iframe');
 
-    if (isSpotifyIframe) {
+    if (isDirectIframe) {
       const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
         ALLOWED_TAGS: ['iframe'],
         ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading']

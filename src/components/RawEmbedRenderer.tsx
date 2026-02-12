@@ -20,7 +20,7 @@ const sanitizeEmbedHtml = (html: string): string => {
   
   return DOMPurify.sanitize(processedHtml, {
     ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img'],
-    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt'],
+    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling'],
     ALLOW_DATA_ATTR: true
   });
 };
@@ -61,6 +61,10 @@ const transformFacebookEmbed = (html: string): string => {
 
 // Detect platform from embed HTML
 const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
+  // Instagram iframes don't need SDK processing
+  if (html.includes('instagram.com') && html.includes('<iframe')) {
+    return 'unknown'; // Treat as generic iframe, no SDK needed
+  }
   if (html.includes('instagram.com') || html.includes('instagram-media')) {
     return 'instagram';
   }
