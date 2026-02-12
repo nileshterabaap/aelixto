@@ -14,7 +14,6 @@ import {
   Bell, 
   Palette, 
   HelpCircle,
-  Link2,
   ChevronRight,
   LogOut,
   Trash2,
@@ -37,7 +36,6 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { ConnectedSocials } from "@/components/settings/ConnectedSocials";
 
 type Theme = 'system' | 'light' | 'dark';
 
@@ -327,16 +325,6 @@ const Settings = () => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </Section>
-
-        {/* Connected Socials Section */}
-        <Section title="Connected Socials">
-          <SettingRow
-            icon={Link2}
-            label="Connected Accounts"
-            description="Manage your linked social platforms"
-          />
-          <ConnectedSocials />
         </Section>
 
         {/* Privacy Section */}

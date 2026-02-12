@@ -2,13 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
 
-// Extend ServiceWorkerRegistration to include pushManager
-declare global {
-  interface ServiceWorkerRegistration {
-    readonly pushManager: PushManager;
-  }
-}
-
 export const usePushNotifications = () => {
   const { user } = useSession();
   const [isSupported, setIsSupported] = useState(false);
