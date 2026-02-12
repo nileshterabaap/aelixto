@@ -83,30 +83,21 @@ serve(async (req) => {
       }
     }
 
-    // Instagram - build blockquote embed HTML (works without Meta API token)
+    // Instagram - build direct iframe embed (bypasses unreliable SDK)
     if (urlLower.includes('instagram.com')) {
       platform = 'instagram';
-      // First try Meta oEmbed API if token available
-      const metaToken = Deno.env.get('META_APP_TOKEN');
-      if (metaToken) {
-        try {
-          const oembedUrl = `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${metaToken}&omitscript=true`;
-          const res = await fetch(oembedUrl);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.html) {
-              embedHtml = data.html;
-              console.log('[fetch-oembed] Instagram oEmbed API success');
-            }
-          }
-        } catch (e) {
-          console.error('[fetch-oembed] Instagram oEmbed API failed:', e);
-        }
-      }
-      // Fallback: build standard Instagram blockquote (SDK processes it client-side)
-      if (!embedHtml) {
-        embedHtml = `<blockquote class="instagram-media" data-instgrm-permalink="${url}" data-instgrm-version="14" style="background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:540px; min-width:326px; padding:0; width:99.375%; width:calc(100% - 2px);"><a href="${url}" target="_blank"></a></blockquote>`;
-        console.log('[fetch-oembed] Instagram blockquote built (fallback)');
+      try {
+        const u = new URL(url);
+        // Clean the path - remove trailing slash, add /embed/
+        let embedPath = u.pathname.replace(/\/$/, '') + '/embed/';
+        const embedUrl = `https://www.instagram.com${embedPath}`;
+        embedHtml = `<iframe src="${embedUrl}" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+        console.log('[fetch-oembed] Instagram iframe embed built');
+      } catch (e) {
+        // Fallback: just append /embed/ to the cleaned URL
+        const cleanUrl = url.split('?')[0].replace(/\/$/, '');
+        embedHtml = `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+        console.log('[fetch-oembed] Instagram iframe embed built (fallback)');
       }
     }
 
