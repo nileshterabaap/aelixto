@@ -31,10 +31,11 @@ export const ConnectPlatformBanner = memo(({
   const colorClass = platformColors[platform.toLowerCase()] || 'bg-muted text-foreground border-border';
 
   return (
-    <div className={`flex items-center gap-2 mx-5 mb-2 px-3 py-1.5 rounded-lg border text-xs font-medium ${colorClass}`}>
+    <div className="mx-5 mb-2 flex items-center gap-1.5">
       <button
         onClick={() => onConnect(platform)}
-        className="flex-1 text-left truncate hover:underline"
+        className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold ${colorClass} hover:opacity-80 transition-opacity`}
+        style={{ borderWidth: 0, backgroundColor: 'hsl(var(--foreground) / 0.12)', color: 'hsl(var(--foreground))' }}
       >
         Connect {platformDisplayName}
       </button>
@@ -43,7 +44,7 @@ export const ConnectPlatformBanner = memo(({
           e.stopPropagation();
           onDismiss(platform);
         }}
-        className="shrink-0 p-0.5 rounded hover:bg-foreground/10 transition-colors"
+        className="shrink-0 p-0.5 rounded hover:bg-foreground/10 transition-colors text-muted-foreground"
         aria-label={`Dismiss connect ${platformDisplayName}`}
       >
         <X className="h-3.5 w-3.5" />

@@ -234,7 +234,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
           platform={detectedPlatform}
           platformDisplayName={platform?.name || detectedPlatform}
           onDismiss={dismiss}
-          onConnect={(p) => toast({ title: 'Coming soon', description: `Connect your ${platform?.name || p} account from Settings → Connected Socials.` })}
+          onConnect={(p) => toast({ title: 'Coming soon', description: `${platform?.name || p} account linking will be available soon.` })}
         />
       )}
 

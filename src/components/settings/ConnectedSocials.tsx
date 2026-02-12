@@ -82,7 +82,7 @@ export const ConnectedSocials = () => {
   if (socials.length === 0) {
     return (
       <div className="p-4 text-sm text-muted-foreground text-center">
-        No connected accounts yet. Connect platforms from your feed.
+        No connected accounts yet. Account linking coming soon.
       </div>
     );
   }
