@@ -338,9 +338,10 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         ALLOWED_TAGS: ['iframe'],
         ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading']
       });
+      const isInstagramIframe = embedHtml.includes('instagram.com');
       return (
         <div
-          className="relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block"
+          className={`relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block ${isInstagramIframe ? '[&>iframe]:mb-[-130px]' : ''}`}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       );
