@@ -2,6 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
 
+// Extend ServiceWorkerRegistration to include pushManager
+declare global {
+  interface ServiceWorkerRegistration {
+    readonly pushManager: PushManager;
+  }
+}
+
 export const usePushNotifications = () => {
   const { user } = useSession();
   const [isSupported, setIsSupported] = useState(false);
@@ -35,7 +42,7 @@ export const usePushNotifications = () => {
 
         // Check if already subscribed
         const registration = await navigator.serviceWorker.ready;
-      const subscription = await (registration as any).pushManager.getSubscription();
+        const subscription = await registration.pushManager.getSubscription();
         setIsSubscribed(!!subscription);
       } catch (err) {
         console.error('Error initializing push notifications:', err);
@@ -78,7 +85,7 @@ export const usePushNotifications = () => {
       const registration = await navigator.serviceWorker.ready;
 
       // Subscribe to push notifications
-      const subscription = await (registration as any).pushManager.subscribe({
+      const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
       });
@@ -118,7 +125,7 @@ export const usePushNotifications = () => {
 
     try {
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await (registration as any).pushManager.getSubscription();
+      const subscription = await registration.pushManager.getSubscription();
 
       if (subscription) {
         await subscription.unsubscribe();
