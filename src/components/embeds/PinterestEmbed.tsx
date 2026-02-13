@@ -129,7 +129,7 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
       <Card className="p-6 flex flex-col items-center gap-4">
         <img src={pinterestIcon} alt="Pinterest" className="w-12 h-12" />
         <p className="text-sm text-muted-foreground text-center">
-          Loading Pinterest embed...
+          Loading Pinterest post..
         </p>
       </Card>
     );
@@ -141,7 +141,7 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
       <Card className="p-6 flex flex-col items-center gap-4">
         <img src={pinterestIcon} alt="Pinterest" className="w-12 h-12" />
         <p className="text-sm text-muted-foreground text-center">
-          Unable to load Pinterest embed
+          Unable to load Pinterest post
         </p>
         <Button
           variant="outline"
