@@ -72,19 +72,20 @@ export const HydratedEmbed = memo(({
     );
   }
   
-  // THUMBNAIL STATE for videos/embeds only: Clean thumbnail, no overlay
-  // Entire thumbnail is clickable - "Seamless Invisible Swap"
-  // Rectangular, flush edges - looks exactly like a paused native video
   // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
-  // No click overlay - hydration happens automatically via IntersectionObserver
   if (!isHydrated) {
     return (
-      <div className={`relative w-full bg-black ${aspectClass}`}>
-        {effectiveThumbnail && !imageError && (
+      <div className={`relative w-full bg-muted overflow-hidden ${aspectClass}`}>
+        {/* Animated shimmer overlay */}
+        <div className="absolute inset-0 z-10">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-foreground/5 to-transparent animate-[shimmer_1.8s_ease-in-out_infinite]" 
+               style={{ backgroundSize: '200% 100%' }} />
+        </div>
+        {effectiveThumbnail && !imageError ? (
           <img
             src={effectiveThumbnail}
             alt="Content preview"
-            className={`w-full h-full object-cover transition-opacity duration-200 ${
+            className={`w-full h-full object-cover transition-opacity duration-500 ${
               imageLoaded ? 'opacity-100' : 'opacity-0'
             }`}
             onLoad={() => setImageLoaded(true)}
@@ -92,14 +93,18 @@ export const HydratedEmbed = memo(({
             loading="eager"
             decoding="async"
           />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/60 animate-spin" />
+          </div>
         )}
       </div>
     );
   }
   
-  // HYDRATED STATE: Show the actual embed with fade-in animation
+  // HYDRATED STATE: Show the actual embed with smooth crossfade
   return (
-    <div className="w-full animate-fade-in">
+    <div className="w-full animate-[embedReveal_0.5s_ease-out_forwards]">
       {/* YouTube video */}
       {r.kind === 'video' && post.platform === 'youtube' && r.url && (
         <div className={`w-full bg-black ${aspectClass}`}>
