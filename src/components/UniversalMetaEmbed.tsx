@@ -341,7 +341,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       const isInstagramIframe = embedHtml.includes('instagram.com');
       return (
         <div
-          className={`relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block ${isInstagramIframe ? '[&>iframe]:mb-[-130px]' : ''}`}
+          className={`relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block ${isInstagramIframe ? '[&>iframe]:mb-[-190px]' : ''}`}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       );
