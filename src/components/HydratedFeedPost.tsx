@@ -169,9 +169,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
         </div>
       )}
       
-      {/* Standardized Header: 40px avatar, bold username, platform icon + timestamp */}
+      {/* Standardized Header: avatar, bold username, timestamp + platform icon top-right */}
       <div className="flex items-center gap-3 px-5 pt-4 pb-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full overflow-hidden bg-muted">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full overflow-hidden bg-muted">
           <img 
             src={post.author.avatar} 
             alt={post.author.username}
@@ -185,35 +185,37 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
             {post.author.name || post.author.username.replace('@', '')}
           </UsernameLink>
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-            {platform && (
-              <img 
-                src={platform.icon} 
-                alt={platform.name}
-                className="w-3 h-3 object-contain opacity-70 dark:invert"
-              />
-            )}
             <span>{formatTimestamp(post.timestamp)}</span>
           </div>
         </div>
-        {post.isRealPost && (post as any).user_id === userId && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
-                <MoreVertical className="h-5 w-5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="bg-background z-50">
-              <DropdownMenuItem
-                onClick={() => deletePost()}
-                disabled={isDeleting}
-                className="text-destructive focus:text-destructive cursor-pointer"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <div className="flex items-center gap-2 shrink-0 text-foreground">
+          {platform && (
+            <img 
+              src={platform.icon} 
+              alt={platform.name}
+              className={`object-contain dark:invert ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' ? 'w-6 h-6' : 'w-8 h-8'}`}
+            />
+          )}
+          {post.isRealPost && (post as any).user_id === userId && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                  <MoreVertical className="h-5 w-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-background z-50">
+                <DropdownMenuItem
+                  onClick={() => deletePost()}
+                  disabled={isDeleting}
+                  className="text-destructive focus:text-destructive cursor-pointer"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </div>
       </div>
 
       {/* Caption */}
