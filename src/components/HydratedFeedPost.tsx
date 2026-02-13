@@ -27,9 +27,6 @@ import mediumIcon from "@/assets/platforms/medium.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
-import { ConnectPlatformBanner } from "@/components/ConnectPlatformBanner";
-import { useConnectBannerDismiss } from "@/hooks/useConnectBannerDismiss";
-import { useToast } from "@/hooks/use-toast";
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -83,8 +80,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
   const embedRef = useRef<HTMLDivElement>(null);
-  const { isDismissed, dismiss } = useConnectBannerDismiss();
-  const { toast } = useToast();
 
   // Tight auto-hydration observer: only hydrate when within ~400px of viewport
   // This limits concurrent embeds to ~2-3, keeping scrolling butter-smooth
@@ -228,15 +223,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
         </div>
       )}
 
-      {/* Connect Platform Banner */}
-      {detectedPlatform && !isDismissed(detectedPlatform) && (
-        <ConnectPlatformBanner
-          platform={detectedPlatform}
-          platformDisplayName={platform?.name || detectedPlatform}
-          onDismiss={dismiss}
-          onConnect={(p) => toast({ title: 'Coming soon', description: `${platform?.name || p} account linking will be available soon.` })}
-        />
-      )}
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed */}
       <div ref={embedRef}>

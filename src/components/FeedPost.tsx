@@ -38,9 +38,6 @@ import { QuoraPreviewCard } from "@/features/article-embeds/QuoraPreviewCard";
 import { useVideoPlayTracking } from "@/hooks/useViewTracking";
 import { ImageViewTracker } from "@/components/ImageViewTracker";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
-import { ConnectPlatformBanner } from "@/components/ConnectPlatformBanner";
-import { useConnectBannerDismiss } from "@/hooks/useConnectBannerDismiss";
-import { useToast } from "@/hooks/use-toast";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -106,8 +103,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [repostAnimating, setRepostAnimating] = useState(false);
   const trackVideoPlay = useVideoPlayTracking();
   const lastTapRef = useRef<number>(0);
-  const { isDismissed, dismiss } = useConnectBannerDismiss();
-  const { toast } = useToast();
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
   const previewImageUrl = (post as any).preview_image_url;
   const mediaUrl = post.mediaUrl || (post as any).media_url;
@@ -464,17 +459,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         )}
 
-        {/* Connect Platform Banner */}
-        {detectedPlatform && !isDismissed(detectedPlatform) && (
-          <div className="mb-2">
-            <ConnectPlatformBanner
-              platform={detectedPlatform}
-              platformDisplayName={platform?.name || detectedPlatform}
-              onDismiss={dismiss}
-              onConnect={(p) => toast({ title: 'Coming soon', description: `${platform?.name || p} account linking will be available soon.` })}
-            />
-          </div>
-        )}
 
         {/* Single renderer based on resolver */}
         {embedEnabled && (
