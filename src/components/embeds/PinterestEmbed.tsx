@@ -12,94 +12,128 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [embedFailed, setEmbedFailed] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState(url);
-  const [isLoading, setIsLoading] = useState(true);
-  const [embedReady, setEmbedReady] = useState(false);
+  const [isExpanding, setIsExpanding] = useState(false);
+  const [pinTitle, setPinTitle] = useState<string>("");
+
+  console.log("[PinterestEmbed] Component mounted with URL:", url);
 
   useEffect(() => {
-    let cancelled = false;
-
     const loadEmbed = async () => {
+      console.log("[PinterestEmbed] useEffect triggered - Loading Pinterest embed for URL:", url);
+      
       let finalUrl = url;
 
       // If it's a pin.it short link, expand it first
       if (url.includes('pin.it/')) {
+        console.log("[PinterestEmbed] Detected pin.it short link, expanding...");
+        setIsExpanding(true);
+        
         try {
           const { supabase } = await import("@/integrations/supabase/client");
           const { data, error } = await supabase.functions.invoke('expand-pin', {
             body: { url }
           });
+
           if (error) throw error;
+          
           if (data?.finalUrl) {
             finalUrl = data.finalUrl;
-            if (!cancelled) setResolvedUrl(finalUrl);
+            console.log("[PinterestEmbed] Expanded to:", finalUrl);
+            setResolvedUrl(finalUrl);
           } else {
             throw new Error("No final URL returned");
           }
-        } catch {
-          if (!cancelled) { setEmbedFailed(true); setIsLoading(false); }
+        } catch (error) {
+          console.error("[PinterestEmbed] Failed to expand short link:", error);
+          setEmbedFailed(true);
+          setIsExpanding(false);
           return;
         }
+        
+        setIsExpanding(false);
       }
 
-      // Validate Pinterest URL
+      // Fetch pin metadata using Pinterest oEmbed API
+      try {
+        const oembedUrl = `https://www.pinterest.com/oembed/?url=${encodeURIComponent(finalUrl)}`;
+        const response = await fetch(oembedUrl);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.title) {
+            setPinTitle(data.title);
+            console.log("[PinterestEmbed] Fetched pin title:", data.title);
+          }
+        }
+      } catch (error) {
+        console.warn("[PinterestEmbed] Failed to fetch pin metadata:", error);
+      }
+
+      // Validate Pinterest URL - must be a pin URL with digits or alphanumeric ID
       const isPinterestPin = /pinterest\.com\/pin\/[a-zA-Z0-9]+\/?/.test(finalUrl);
       if (!isPinterestPin) {
-        if (!cancelled) { setEmbedFailed(true); setIsLoading(false); }
+        console.warn("[PinterestEmbed] Invalid Pinterest pin URL:", finalUrl);
+        setEmbedFailed(true);
         return;
       }
 
-      // Load Pinterest script
+      // Load Pinterest script using ScriptLoader
       try {
         await loadPinterestEmbed();
+        console.log("[PinterestEmbed] Pinterest script loaded successfully");
+        
+        // Process embeds after script loads
         setTimeout(() => {
           if (window.PinUtils) {
             window.PinUtils.build();
+            console.log("[PinterestEmbed] Pinterest embeds processed");
           }
         }, 100);
-      } catch {
-        if (!cancelled) { setEmbedFailed(true); setIsLoading(false); }
+      } catch (error) {
+        console.error("[PinterestEmbed] Failed to load Pinterest script:", error);
+        setEmbedFailed(true);
       }
     };
 
+    console.log("[PinterestEmbed] Calling loadEmbed function...");
     loadEmbed();
 
-    // MutationObserver to detect when Pinterest SDK replaces the <a> with actual embed content
-    // AND to remove save buttons
+    // MutationObserver to remove Pinterest save buttons after they load
     const observer = new MutationObserver(() => {
-      if (!containerRef.current) return;
-      
-      // Check if Pinterest SDK has rendered real content (it creates a span/embed container)
-      const hasRendered = containerRef.current.querySelector('span[data-pin-id], span[style]');
-      if (hasRendered && !cancelled) {
-        setEmbedReady(true);
-        setIsLoading(false);
+      if (containerRef.current) {
+        // Find and remove all Pinterest save buttons
+        const saveButtons = containerRef.current.querySelectorAll(
+          'span[data-pin-log], a[data-pin-log], button[data-pin-save="true"], .pin-save-button, span[data-pin-href]'
+        );
+        saveButtons.forEach(button => {
+          button.remove();
+          console.log("[PinterestEmbed] Removed save button");
+        });
       }
-
-      // Remove Pinterest save buttons
-      const saveButtons = containerRef.current.querySelectorAll(
-        'span[data-pin-log], a[data-pin-log], button[data-pin-save="true"], .pin-save-button, span[data-pin-href]'
-      );
-      saveButtons.forEach(button => button.remove());
     });
 
     if (containerRef.current) {
-      observer.observe(containerRef.current, { childList: true, subtree: true });
+      observer.observe(containerRef.current, {
+        childList: true,
+        subtree: true
+      });
     }
 
-    // Timeout: if embed doesn't render within 10s, show fallback
-    const timeout = setTimeout(() => {
-      if (!cancelled && !embedReady) {
-        setEmbedFailed(true);
-        setIsLoading(false);
-      }
-    }, 10000);
-
     return () => {
-      cancelled = true;
       observer.disconnect();
-      clearTimeout(timeout);
     };
   }, [url]);
+
+  // Show loading state while expanding
+  if (isExpanding) {
+    return (
+      <Card className="p-6 flex flex-col items-center gap-4">
+        <img src={pinterestIcon} alt="Pinterest" className="w-12 h-12" />
+        <p className="text-sm text-muted-foreground text-center">
+          Loading Pinterest post..
+        </p>
+      </Card>
+    );
+  }
 
   // Fallback card if Pinterest embed fails
   if (embedFailed) {
@@ -119,30 +153,26 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
     );
   }
 
+  console.log("[PinterestEmbed] Rendering Pinterest embed. Failed:", embedFailed, "Expanding:", isExpanding, "URL:", resolvedUrl);
+
   return (
-    <div className="w-full max-w-[500px] mx-auto relative">
-      {/* Loading overlay - visible until SDK renders real content */}
-      {isLoading && (
-        <Card className="p-6 flex flex-col items-center gap-4 absolute inset-0 z-10">
-          <img src={pinterestIcon} alt="Pinterest" className="w-12 h-12" />
-          <p className="text-sm text-muted-foreground text-center">
-            Loading Pinterest post..
-          </p>
-        </Card>
-      )}
-      
-      {/* Actual Pinterest embed container - hidden until ready, then fades in */}
-      <div 
-        ref={containerRef} 
-        className={`pinterest-embed-container w-full flex flex-col justify-center transition-opacity duration-500 ${
-          embedReady ? 'opacity-100' : 'opacity-0'
-        }`}
-      >
+    <div className="w-full max-w-[500px] mx-auto">
+      <div ref={containerRef} className="pinterest-embed-container w-full flex flex-col justify-center">
+        {pinTitle && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-card rounded-t-lg border border-b-0">
+            <img src={pinterestIcon} alt="Pinterest" className="w-5 h-5" />
+            <span className="text-sm font-medium text-foreground line-clamp-1">{pinTitle}</span>
+          </div>
+        )}
         <a 
           data-pin-do="embedPin" 
           data-pin-width="medium"
           href={resolvedUrl}
-        />
+          className={pinTitle ? "rounded-t-none" : ""}
+        >
+          {/* Fallback content */}
+          View Pin
+        </a>
       </div>
     </div>
   );

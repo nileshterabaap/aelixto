@@ -1,56 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
-
-/** Renders an iframe with a loading shimmer that crossfades to content once loaded */
-const IframeWithLoader = ({ html }: { html: string }) => {
-  const [loaded, setLoaded] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const sanitizedHtml = DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ['iframe'],
-    ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading']
-  });
-
-  // Detect when the iframe fires its load event
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const iframe = containerRef.current.querySelector('iframe');
-    if (!iframe) return;
-
-    const onLoad = () => setLoaded(true);
-    iframe.addEventListener('load', onLoad);
-
-    // Safety timeout – if load event never fires (CORS), reveal after 5s
-    const timeout = setTimeout(() => setLoaded(true), 5000);
-
-    return () => {
-      iframe.removeEventListener('load', onLoad);
-      clearTimeout(timeout);
-    };
-  }, [sanitizedHtml]);
-
-  return (
-    <div className="relative w-full overflow-hidden">
-      {/* Shimmer loading placeholder */}
-      <div className={`absolute inset-0 z-10 bg-muted transition-opacity duration-500 ${loaded ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-foreground/5 to-transparent animate-[shimmer_1.8s_ease-in-out_infinite]" 
-             style={{ backgroundSize: '200% 100%' }} />
-        <div className="flex items-center justify-center h-full min-h-[400px]">
-          <div className="w-10 h-10 rounded-full border-2 border-muted-foreground/20 border-t-muted-foreground/60 animate-spin" />
-        </div>
-      </div>
-      {/* Actual iframe – always mounted but invisible until loaded */}
-      <div 
-        ref={containerRef}
-        className={`w-full [&>iframe]:w-full [&>iframe]:block transition-opacity duration-500 ${loaded ? 'opacity-100' : 'opacity-0'}`}
-        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-      />
-    </div>
-  );
-};
 
 interface UniversalMetaEmbedProps {
   url: string;
@@ -382,7 +334,16 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || embedHtml.includes('instagram.com') && embedHtml.includes('<iframe');
 
     if (isDirectIframe) {
-      return <IframeWithLoader html={embedHtml} />;
+      const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
+        ALLOWED_TAGS: ['iframe'],
+        ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading']
+      });
+      return (
+        <div
+          className="relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block"
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        />
+      );
     }
 
     return (
