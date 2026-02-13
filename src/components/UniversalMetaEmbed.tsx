@@ -63,11 +63,11 @@ const buildInstagramEmbed = (url: string): string => {
     // Clean the path - remove trailing slash, add /embed/
     let embedPath = u.pathname.replace(/\/$/, '') + '/embed/';
     const embedUrl = `https://www.instagram.com${embedPath}`;
-    return `<iframe src="${embedUrl}" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+    return `<iframe src="${embedUrl}" style="border:0;width:100%;min-height:500px;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
   } catch {
     // Fallback: just append /embed/ to the URL
     const cleanUrl = url.split('?')[0].replace(/\/$/, '');
-    return `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+    return `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;min-height:500px;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
   }
 };
 
@@ -336,7 +336,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     if (isDirectIframe) {
       const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
         ALLOWED_TAGS: ['iframe'],
-        ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading']
+        ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'scrolling']
       });
       const isInstagramIframe = embedHtml.includes('instagram.com');
       return (
