@@ -353,7 +353,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         // - pointer-events:none prevents accidental internal scrolling
         return (
           <div
-            className="relative w-full overflow-hidden"
+            className="relative w-full overflow-hidden pointer-events-none"
             style={{ aspectRatio: '4 / 5' }}
           >
             <iframe
@@ -368,9 +368,8 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
                 top: '-65px',
                 left: 0,
                 width: '100%',
-                height: 'calc(100% + 500px)',
+                height: 'calc(100% + 120px)',
                 overflow: 'hidden',
-                pointerEvents: 'none',
               }}
             />
           </div>
