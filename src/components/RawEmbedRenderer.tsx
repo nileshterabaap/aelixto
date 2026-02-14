@@ -120,7 +120,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     lastTapRef.current = now;
   };
 
-
   useEffect(() => {
     const processEmbed = async () => {
       if (!containerRef.current) return;
@@ -204,6 +203,19 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
         className="relative w-full overflow-hidden"
         style={{ maxHeight: '85vh' }}
       >
+        {/* Touch shield: prevents iframe internal scrolling while allowing clicks to pass through */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            zIndex: 10,
+            touchAction: 'pan-y',
+            pointerEvents: 'none',
+          }}
+        />
         <div
           ref={containerRef}
           onClick={handleDoubleTap}
