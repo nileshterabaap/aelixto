@@ -195,17 +195,35 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     return null;
   }
 
-  // Instagram embeds get viewport-lock surgery to mask native header/buttons
+  // Instagram embeds get viewport-lock surgery to mask native action buttons/comments
+  // The SDK replaces the blockquote with an iframe. We clip the bottom portion
+  // (likes, comments, "Add a comment") using a height-constrained overflow-hidden container.
   if (isInstagram) {
     return (
-    <div className="w-full overflow-hidden !min-h-0 !max-h-none">
       <div
-        ref={containerRef}
-        onClick={handleDoubleTap}
-        className="embed-container w-full max-w-full [&>*]:!m-0 [&_iframe]:!mb-[-200px]"
-        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-      />
-    </div>
+        className="relative w-full overflow-hidden"
+        style={{ maxHeight: '85vh' }}
+      >
+        {/* Touch shield: intercepts touch so iframe can't scroll internally */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            zIndex: 10,
+            touchAction: 'pan-y',
+          }}
+        />
+        <div
+          ref={containerRef}
+          onClick={handleDoubleTap}
+          className="embed-container w-full max-w-full [&>*]:!m-0"
+          style={{ marginBottom: '-160px' }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        />
+      </div>
     );
   }
 
