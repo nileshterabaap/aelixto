@@ -346,15 +346,13 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         const iframeSrc = srcMatch ? srcMatch[1] : '';
 
         // Viewport-lock strategy:
-        // - Container has a fixed 4/5 aspect ratio with overflow:hidden
-        // - Iframe is absolutely positioned, offset upward by 65px to hide the IG header
-        // - Iframe height is container + 500px so the bottom action buttons overflow
-        //   outside the visible container and get clipped
-        // - pointer-events:none prevents accidental internal scrolling
+        // - Container has overflow:hidden to clip native action buttons
+        // - Iframe renders at natural position (header + media + "View more" visible)
+        // - Extra height pushes action buttons outside the clipped container
         return (
           <div
-            className="relative w-full overflow-hidden pointer-events-none"
-            style={{ aspectRatio: '4 / 5', border: '5px solid red' }}
+            className="relative w-full overflow-hidden"
+            style={{ aspectRatio: '4 / 5', pointerEvents: 'none' }}
           >
             <iframe
               src={iframeSrc}
@@ -365,10 +363,10 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               style={{
                 border: 'none',
                 position: 'absolute',
-                top: '-65px',
+                top: 0,
                 left: 0,
                 width: '100%',
-                height: 'calc(100% + 120px)',
+                height: 'calc(100% + 300px)',
                 overflow: 'hidden',
               }}
             />
