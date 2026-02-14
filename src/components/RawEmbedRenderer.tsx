@@ -120,6 +120,17 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     lastTapRef.current = now;
   };
 
+  // Lock iframe scrolling by setting scrolling="no" and overflow styles
+  const lockIframeScroll = () => {
+    if (!containerRef.current) return;
+    const iframes = containerRef.current.querySelectorAll('iframe');
+    iframes.forEach((iframe) => {
+      iframe.setAttribute('scrolling', 'no');
+      iframe.style.overflow = 'hidden';
+      iframe.style.touchAction = 'pan-y';
+    });
+  };
+
   useEffect(() => {
     const processEmbed = async () => {
       if (!containerRef.current) return;
@@ -132,8 +143,9 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           if (window.instgrm?.Embeds?.process) {
             window.instgrm.Embeds.process();
             
-            // Check if embed rendered successfully after a longer delay (SDK can be slow)
+            // Lock iframe scroll after SDK renders + check success
             setTimeout(() => {
+              lockIframeScroll();
               if (containerRef.current) {
                 const hasIframe = containerRef.current.querySelector('iframe');
                 if (!hasIframe) {
@@ -142,6 +154,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
                     window.instgrm.Embeds.process();
                   }
                   setTimeout(() => {
+                    lockIframeScroll();
                     if (containerRef.current && !containerRef.current.querySelector('iframe')) {
                       setEmbedFailed(true);
                       onError?.();
@@ -203,19 +216,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
         className="relative w-full overflow-hidden"
         style={{ maxHeight: '85vh' }}
       >
-        {/* Touch shield: prevents iframe internal scrolling while allowing clicks to pass through */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: 10,
-            touchAction: 'pan-y',
-            pointerEvents: 'auto',
-          }}
-        />
+        {/* CSS-based scroll lock on iframe - no overlay needed */}
         <div
           ref={containerRef}
           onClick={handleDoubleTap}
