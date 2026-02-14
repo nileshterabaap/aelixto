@@ -194,6 +194,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
       ref={containerRef}
       onClick={handleDoubleTap}
       className="embed-container w-full max-w-full min-h-[300px] [&>*]:!m-0 [&_.fb-post]:!max-w-full [&_.fb-video]:!max-w-full cursor-pointer"
+      style={{ border: '5px solid red' }}
       dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );
