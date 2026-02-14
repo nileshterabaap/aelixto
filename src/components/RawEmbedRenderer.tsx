@@ -213,7 +213,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             height: '100%',
             zIndex: 10,
             touchAction: 'pan-y',
-            pointerEvents: 'none',
+            pointerEvents: 'auto',
           }}
         />
         <div
