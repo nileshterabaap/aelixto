@@ -354,7 +354,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         return (
           <div
             className="relative w-full overflow-hidden pointer-events-none"
-            style={{ aspectRatio: '4 / 5' }}
+            style={{ aspectRatio: '4 / 5', border: '5px solid red' }}
           >
             <iframe
               src={iframeSrc}
