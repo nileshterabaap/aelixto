@@ -59,11 +59,16 @@ const transformFacebookEmbed = (html: string): string => {
   return html;
 };
 
-// Detect platform from embed HTML
+// Detect if content is Instagram (for rendering decisions like viewport-lock)
+const isInstagramEmbed = (html: string): boolean => {
+  return html.includes('instagram.com') || html.includes('instagram-media');
+};
+
+// Detect platform for SDK processing purposes
 const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
-  // Instagram iframes don't need SDK processing
+  // Instagram iframes don't need SDK processing, but are still Instagram for rendering
   if (html.includes('instagram.com') && html.includes('<iframe')) {
-    return 'unknown'; // Treat as generic iframe, no SDK needed
+    return 'unknown'; // Skip SDK, but isInstagramEmbed() still returns true
   }
   if (html.includes('instagram.com') || html.includes('instagram-media')) {
     return 'instagram';
@@ -79,6 +84,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   const lastTapRef = useRef<number>(0);
   const [embedFailed, setEmbedFailed] = useState(false);
   const platform = detectPlatform(embedHtml);
+  const isInstagram = isInstagramEmbed(embedHtml);
   let sanitizedHtml = sanitizeEmbedHtml(embedHtml);
   
   // Transform Facebook embeds to SDK-compatible format
@@ -190,7 +196,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   }
 
   // Instagram embeds get viewport-lock surgery to mask native header/buttons
-  if (platform === 'instagram') {
+  if (isInstagram) {
     return (
       <div className="relative w-full overflow-hidden pointer-events-none !min-h-0 !max-h-none" style={{ aspectRatio: '4 / 5' }}>
         <div
