@@ -189,12 +189,30 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     return null;
   }
 
+  // Instagram embeds get viewport-lock surgery to mask native header/buttons
+  if (platform === 'instagram') {
+    return (
+      <div className="relative w-full overflow-hidden pointer-events-none !min-h-0 !max-h-none" style={{ aspectRatio: '4 / 5' }}>
+        <div
+          ref={containerRef}
+          onClick={handleDoubleTap}
+          className="embed-container w-full max-w-full [&>*]:!m-0 absolute left-0"
+          style={{
+            top: '-65px',
+            height: 'calc(100% + 130px)',
+            width: '100%',
+          }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div 
       ref={containerRef}
       onClick={handleDoubleTap}
       className="embed-container w-full max-w-full min-h-[300px] [&>*]:!m-0 [&_.fb-post]:!max-w-full [&_.fb-video]:!max-w-full cursor-pointer"
-      style={{ border: '5px solid red' }}
       dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );
