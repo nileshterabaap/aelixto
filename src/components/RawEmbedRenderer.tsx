@@ -204,18 +204,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
         className="relative w-full overflow-hidden"
         style={{ maxHeight: '85vh' }}
       >
-        {/* Touch shield: intercepts touch so iframe can't scroll internally */}
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: 10,
-            touchAction: 'pan-y',
-          }}
-        />
         <div
           ref={containerRef}
           onClick={handleDoubleTap}
