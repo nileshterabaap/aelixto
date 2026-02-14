@@ -204,8 +204,8 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           onClick={handleDoubleTap}
           className="embed-container w-full max-w-full [&>*]:!m-0 absolute left-0"
           style={{
-            top: '-70px',
-            height: 'calc(100% + 160px)',
+            top: '0px',
+            height: 'calc(100% + 90px)',
             width: '100%',
             touchAction: 'none',
           }}
