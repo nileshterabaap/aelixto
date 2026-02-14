@@ -205,7 +205,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
         className="embed-container w-full max-w-full [&>*]:!m-0 absolute left-0"
         style={{
           top: '0px',
-          height: 'calc(100% + 90px)',
+          height: 'calc(100% + 140px)',
           width: '100%',
           touchAction: 'none',
         }}
