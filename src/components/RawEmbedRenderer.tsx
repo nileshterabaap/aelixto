@@ -81,6 +81,7 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
 
 export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const shieldRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<number>(0);
   const [embedFailed, setEmbedFailed] = useState(false);
   const platform = detectPlatform(embedHtml);
@@ -110,7 +111,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     const timeSinceLastTap = now - lastTapRef.current;
     
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
-      // Double tap detected
       const url = getEmbedUrl();
       if (url) {
         window.open(url, '_blank', 'noopener,noreferrer');
@@ -120,16 +120,34 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     lastTapRef.current = now;
   };
 
-  // Lock iframe scrolling by setting scrolling="no" and overflow styles
-  const lockIframeScroll = () => {
-    if (!containerRef.current) return;
-    const iframes = containerRef.current.querySelectorAll('iframe');
-    iframes.forEach((iframe) => {
-      iframe.setAttribute('scrolling', 'no');
-      iframe.style.overflow = 'hidden';
-      iframe.style.touchAction = 'pan-y';
-    });
-  };
+  // Touch shield: intercepts touchmove to prevent iframe scrolling,
+  // but forwards click/tap events to the content underneath.
+  useEffect(() => {
+    const shield = shieldRef.current;
+    if (!shield) return;
+
+    const onTouchMove = (e: TouchEvent) => {
+      // Don't preventDefault — let the browser handle pan-y (page scroll).
+      // The shield sitting on top means the iframe never gets the touch events,
+      // so it can't scroll internally. The page scrolls because of touch-action: pan-y.
+    };
+
+    // Forward taps: momentarily hide shield so the click reaches the iframe
+    const onTap = (e: MouseEvent) => {
+      shield.style.display = 'none';
+      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      if (el) el.click();
+      shield.style.display = '';
+    };
+
+    shield.addEventListener('touchmove', onTouchMove, { passive: true });
+    shield.addEventListener('click', onTap);
+
+    return () => {
+      shield.removeEventListener('touchmove', onTouchMove);
+      shield.removeEventListener('click', onTap);
+    };
+  }, []);
 
   useEffect(() => {
     const processEmbed = async () => {
@@ -143,9 +161,8 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           if (window.instgrm?.Embeds?.process) {
             window.instgrm.Embeds.process();
             
-            // Lock iframe scroll after SDK renders + check success
+            // Check if embed rendered successfully after a longer delay
             setTimeout(() => {
-              lockIframeScroll();
               if (containerRef.current) {
                 const hasIframe = containerRef.current.querySelector('iframe');
                 if (!hasIframe) {
@@ -154,7 +171,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
                     window.instgrm.Embeds.process();
                   }
                   setTimeout(() => {
-                    lockIframeScroll();
                     if (containerRef.current && !containerRef.current.querySelector('iframe')) {
                       setEmbedFailed(true);
                       onError?.();
@@ -216,10 +232,21 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
         className="relative w-full overflow-hidden"
         style={{ maxHeight: '85vh' }}
       >
-        {/* CSS-based scroll lock on iframe - no overlay needed */}
+        {/* Touch shield: sits on top to block iframe scroll, forwards clicks via JS */}
+        <div
+          ref={shieldRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            zIndex: 10,
+            touchAction: 'pan-y',
+          }}
+        />
         <div
           ref={containerRef}
-          onClick={handleDoubleTap}
           className="embed-container w-full max-w-full [&>*]:!m-0"
           style={{ marginBottom: '-10px' }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
