@@ -354,7 +354,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         return (
           <div
             className="relative w-full overflow-hidden pointer-events-none"
-            style={{ aspectRatio: '4 / 5', border: '5px solid red' }}
+            style={{ aspectRatio: '4 / 5' }}
           >
             <iframe
               src={iframeSrc}
@@ -362,7 +362,6 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               allowFullScreen
               allow="encrypted-media"
               loading="lazy"
-              className="ig-viewport-locked"
               style={{
                 border: 'none',
                 position: 'absolute',

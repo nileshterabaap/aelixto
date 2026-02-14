@@ -179,22 +179,12 @@ span[data-pin-href] button {
 
 /* Instagram embed styles */
 .embed-container .instagram-media,
-.embed-container iframe[src*="instagram.com"]:not(.ig-viewport-locked) {
+.embed-container iframe[src*="instagram.com"] {
   min-width: 100% !important;
   max-width: 100% !important;
   width: 100% !important;
   margin: 0 auto !important;
   border-radius: 1rem !important;
-}
-
-/* Viewport-locked Instagram iframes — override ALL global constraints */
-iframe.ig-viewport-locked {
-  min-width: unset !important;
-  max-width: unset !important;
-  min-height: unset !important;
-  max-height: unset !important;
-  margin: 0 !important;
-  border-radius: 0 !important;
 }
 
 /* Instagram dark mode fix - try transparent background first */
@@ -209,7 +199,7 @@ iframe.ig-viewport-locked {
 }
 
 .dark .embed-container .instagram-media,
-.dark .embed-container iframe[src*="instagram.com"]:not(.ig-viewport-locked) {
+.dark .embed-container iframe[src*="instagram.com"] {
   mix-blend-mode: multiply;
 }
 
