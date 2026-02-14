@@ -339,9 +339,47 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'scrolling']
       });
       const isInstagramIframe = embedHtml.includes('instagram.com');
+
+      if (isInstagramIframe) {
+        // Extract the src URL from the sanitized iframe HTML
+        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
+        const iframeSrc = srcMatch ? srcMatch[1] : '';
+
+        // Viewport-lock strategy:
+        // - Container has a fixed 4/5 aspect ratio with overflow:hidden
+        // - Iframe is absolutely positioned, offset upward by 65px to hide the IG header
+        // - Iframe height is container + 500px so the bottom action buttons overflow
+        //   outside the visible container and get clipped
+        // - pointer-events:none prevents accidental internal scrolling
+        return (
+          <div
+            className="relative w-full overflow-hidden"
+            style={{ aspectRatio: '4 / 5' }}
+          >
+            <iframe
+              src={iframeSrc}
+              scrolling="no"
+              allowFullScreen
+              allow="encrypted-media"
+              loading="lazy"
+              style={{
+                border: 'none',
+                position: 'absolute',
+                top: '-65px',
+                left: 0,
+                width: '100%',
+                height: 'calc(100% + 500px)',
+                overflow: 'hidden',
+                pointerEvents: 'none',
+              }}
+            />
+          </div>
+        );
+      }
+
       return (
         <div
-          className={`relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block ${isInstagramIframe ? '[&>iframe]:mt-[-65px] [&>iframe]:mb-[-440px]' : ''}`}
+          className="relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block"
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       );
