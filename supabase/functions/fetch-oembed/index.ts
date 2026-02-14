@@ -142,6 +142,65 @@ serve(async (req) => {
       }
     }
 
+    // Reddit - build blockquote embed (uses widgets.js on client)
+    if (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) {
+      platform = 'reddit';
+      try {
+        // Reddit supports oEmbed
+        const oembedUrl = `https://www.reddit.com/oembed?url=${encodeURIComponent(url)}`;
+        const res = await fetch(oembedUrl, {
+          headers: { 'User-Agent': 'Aelixto/1.0' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.html) {
+            embedHtml = data.html;
+            console.log('[fetch-oembed] Reddit oEmbed success');
+          }
+        }
+      } catch (e) {
+        console.error('[fetch-oembed] Reddit oEmbed failed:', e);
+      }
+    }
+
+    // TikTok oEmbed
+    if (urlLower.includes('tiktok.com')) {
+      platform = 'tiktok';
+      try {
+        const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+        const res = await fetch(oembedUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.html) {
+            embedHtml = data.html;
+            console.log('[fetch-oembed] TikTok oEmbed success');
+          }
+        }
+      } catch (e) {
+        console.error('[fetch-oembed] TikTok oEmbed failed:', e);
+      }
+    }
+
+    // Blog/Article platforms - store OG metadata as a link preview card HTML
+    if (
+      !platform && (
+        urlLower.includes('medium.com') ||
+        urlLower.includes('substack.com') ||
+        urlLower.includes('wordpress.com') ||
+        urlLower.includes('blogger.com') ||
+        urlLower.includes('ghost.io') ||
+        urlLower.includes('quora.com') ||
+        urlLower.includes('blog')
+      )
+    ) {
+      platform = urlLower.includes('medium.com') ? 'medium'
+        : urlLower.includes('quora.com') ? 'quora'
+        : 'blog';
+      // Articles use the ArticleEmbed client component which calls unfurl-article.
+      // We don't pre-cache HTML for these, but we set the platform so it's recognized.
+      console.log(`[fetch-oembed] ${platform} detected, no oEmbed available - client-side rendering`);
+    }
+
     return new Response(
       JSON.stringify({ embed_html: embedHtml, platform }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
