@@ -81,7 +81,6 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
 
 export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const shieldRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<number>(0);
   const [embedFailed, setEmbedFailed] = useState(false);
   const platform = detectPlatform(embedHtml);
@@ -120,34 +119,43 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     lastTapRef.current = now;
   };
 
-  // Touch shield: intercepts touchmove to prevent iframe scrolling,
-  // but forwards click/tap events to the content underneath.
+  // MutationObserver: watch for iframe creation and lock its scrolling immediately
   useEffect(() => {
-    const shield = shieldRef.current;
-    if (!shield) return;
+    if (!isInstagram || !containerRef.current) return;
 
-    const onTouchMove = (e: TouchEvent) => {
-      // Don't preventDefault — let the browser handle pan-y (page scroll).
-      // The shield sitting on top means the iframe never gets the touch events,
-      // so it can't scroll internally. The page scrolls because of touch-action: pan-y.
+    const lockIframe = (iframe: HTMLIFrameElement) => {
+      iframe.setAttribute('scrolling', 'no');
+      iframe.style.overflow = 'hidden';
+      // Wrap iframe's container to prevent touch-scroll
+      const parent = iframe.parentElement;
+      if (parent) {
+        parent.style.overflow = 'hidden';
+        parent.style.touchAction = 'pan-y';
+      }
     };
 
-    // Forward taps: momentarily hide shield so the click reaches the iframe
-    const onTap = (e: MouseEvent) => {
-      shield.style.display = 'none';
-      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-      if (el) el.click();
-      shield.style.display = '';
-    };
+    // Lock any existing iframes
+    containerRef.current.querySelectorAll('iframe').forEach(lockIframe);
 
-    shield.addEventListener('touchmove', onTouchMove, { passive: true });
-    shield.addEventListener('click', onTap);
+    // Watch for new iframes (SDK creates them asynchronously)
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node instanceof HTMLIFrameElement) {
+            lockIframe(node);
+          }
+          // Also check children of added nodes
+          if (node instanceof HTMLElement) {
+            node.querySelectorAll('iframe').forEach(lockIframe);
+          }
+        }
+      }
+    });
 
-    return () => {
-      shield.removeEventListener('touchmove', onTouchMove);
-      shield.removeEventListener('click', onTap);
-    };
-  }, []);
+    observer.observe(containerRef.current, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, [isInstagram]);
 
   useEffect(() => {
     const processEmbed = async () => {
@@ -232,21 +240,9 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
         className="relative w-full overflow-hidden"
         style={{ maxHeight: '85vh' }}
       >
-        {/* Touch shield: sits on top to block iframe scroll, forwards clicks via JS */}
-        <div
-          ref={shieldRef}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: 10,
-            touchAction: 'pan-y',
-          }}
-        />
         <div
           ref={containerRef}
+          onClick={handleDoubleTap}
           className="embed-container w-full max-w-full [&>*]:!m-0"
           style={{ marginBottom: '-10px' }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
