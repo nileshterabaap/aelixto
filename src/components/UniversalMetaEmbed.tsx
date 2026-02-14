@@ -352,8 +352,19 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         return (
           <div
             className="relative w-full overflow-hidden"
-            style={{ aspectRatio: '3 / 4' }}
+            style={{ aspectRatio: '3 / 4', touchAction: 'pan-y' }}
           >
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                zIndex: 2,
+                touchAction: 'pan-y',
+              }}
+            />
             <iframe
               src={iframeSrc}
               scrolling="no"
