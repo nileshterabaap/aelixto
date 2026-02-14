@@ -198,17 +198,11 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   // Instagram embeds get viewport-lock surgery to mask native header/buttons
   if (isInstagram) {
     return (
-    <div className="relative w-full overflow-hidden !min-h-0 !max-h-none" style={{ aspectRatio: '7 / 10' }}>
+    <div className="w-full overflow-hidden !min-h-0 !max-h-none">
       <div
         ref={containerRef}
         onClick={handleDoubleTap}
-        className="embed-container w-full max-w-full [&>*]:!m-0 absolute left-0"
-        style={{
-          top: '0px',
-          height: 'calc(100% + 200px)',
-          width: '100%',
-          touchAction: 'none',
-        }}
+        className="embed-container w-full max-w-full [&>*]:!m-0 [&_iframe]:!mb-[-75px]"
         dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
     </div>
