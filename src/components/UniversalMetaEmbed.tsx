@@ -182,17 +182,17 @@ const buildLinkedInEmbed = (url: string): string | null => {
     }
 
     // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
-    const postMatch = u.pathname.match(/\/posts\/[^/]+-(?:ugcPost|activity)-(\d+)-/);
+    // Note: separator before type can be underscore or hyphen
+    const postMatch = u.pathname.match(/\/posts\/[^/]+[_-](?:ugcPost|activity)-(\d+)-/);
     if (postMatch) {
       const id = postMatch[1];
-      // Check if it's ugcPost or activity
-      const typeMatch = u.pathname.match(/-(ugcPost|activity)-/);
+      const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
       const type = typeMatch ? typeMatch[1] : 'ugcPost';
       return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 3: /posts/username_slug-share-ID-hash
-    const shareMatch = u.pathname.match(/\/posts\/[^/]+-share-(\d+)-/);
+    const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
     if (shareMatch) {
       return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
@@ -202,18 +202,16 @@ const buildLinkedInEmbed = (url: string): string | null => {
   return null;
 };
 
-// Build Threads embed HTML
+// Build Threads embed HTML using direct iframe (like Instagram)
 const buildThreadsEmbed = (url: string): string | null => {
   try {
-    // Threads URLs: threads.com/@user/post/CODE or threads.net/@user/post/CODE
     const u = new URL(url);
     const postMatch = u.pathname.match(/\/@[^/]+\/post\/([A-Za-z0-9_-]+)/);
     if (postMatch) {
-      // Threads embed endpoint always uses threads.net
-      const embedUrl = `https://www.threads.net${u.pathname.replace(/\/$/, '')}/embed`;
-      // Replace threads.com with threads.net in the path if needed
-      const finalEmbedUrl = embedUrl.replace('threads.com', 'threads.net');
-      return `<iframe src="${finalEmbedUrl}" style="border:none;width:100%;min-height:500px;overflow:hidden;display:block;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+      // Standardize to threads.net and append /embed
+      const cleanPath = u.pathname.replace(/\/$/, '');
+      const embedUrl = `https://www.threads.net${cleanPath}/embed`.replace('threads.com', 'threads.net');
+      return `<iframe src="${embedUrl}" style="border:none;width:100%;min-height:500px;overflow:hidden;display:block;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
@@ -398,7 +396,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
   if (embedHtml && !showFallback) {
     // For direct iframe embeds (Spotify, Instagram, LinkedIn, Threads), render without RawEmbedRenderer
-    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || embedHtml.includes('threads.net') && embedHtml.includes('<iframe');
+    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || (embedHtml.includes('threads.net') && embedHtml.includes('<iframe'));
 
     if (isDirectIframe) {
       const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
