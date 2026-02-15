@@ -451,6 +451,35 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         );
       }
 
+      // Threads iframe: clip bottom whitespace to match original post size
+      const isThreadsIframe = embedHtml.includes('threads.net') && embedHtml.includes('<iframe');
+      if (isThreadsIframe) {
+        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
+        const iframeSrc = srcMatch ? srcMatch[1] : '';
+
+        return (
+          <div
+            className="relative w-full overflow-hidden -mb-3"
+            style={{ minHeight: '480px', touchAction: 'pan-y' }}
+          >
+            <iframe
+              src={iframeSrc}
+              scrolling="no"
+              allowFullScreen
+              allow="encrypted-media"
+              loading="lazy"
+              style={{
+                border: 'none',
+                width: '100%',
+                height: '600px',
+                display: 'block',
+                overflow: 'hidden',
+              }}
+            />
+          </div>
+        );
+      }
+
       return (
         <div
           className="relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block"
