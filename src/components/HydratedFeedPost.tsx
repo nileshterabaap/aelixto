@@ -24,6 +24,8 @@ import facebookIcon from "@/assets/platforms/facebook.svg";
 import quoraIcon from "@/assets/platforms/quora.svg";
 import spotifyIcon from "@/assets/platforms/spotify.svg";
 import mediumIcon from "@/assets/platforms/medium.svg";
+import threadsIcon from "@/assets/platforms/threads.svg";
+import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
@@ -61,6 +63,8 @@ const getPlatformIcon = (platform?: string) => {
     spotify: { name: 'Spotify', icon: spotifyIcon },
     quora: { name: 'Quora', icon: quoraIcon },
     medium: { name: 'Medium', icon: mediumIcon },
+    threads: { name: 'Threads', icon: threadsIcon },
+    linkedin: { name: 'LinkedIn', icon: linkedinIcon },
   };
   
   return icons[platform] || null;
@@ -71,6 +75,8 @@ const detectPlatformFromUrl = (url?: string) => {
   if (url.includes('spotify.com')) return 'spotify';
   if (url.includes('instagram.com')) return 'instagram';
   if (url.includes('facebook.com') || url.includes('fb.watch') || url.includes('fb.me')) return 'facebook';
+  if (url.includes('threads.net')) return 'threads';
+  if (url.includes('linkedin.com')) return 'linkedin';
   return null;
 };
 
