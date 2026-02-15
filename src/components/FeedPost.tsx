@@ -97,7 +97,7 @@ const detectPlatformFromUrl = (url?: string) => {
   if (url.includes('spotify.com')) return 'spotify';
   if (url.includes('instagram.com')) return 'instagram';
   if (url.includes('facebook.com') || url.includes('fb.watch') || url.includes('fb.me')) return 'facebook';
-  if (url.includes('threads.net')) return 'threads';
+  if (url.includes('threads.net') || url.includes('threads.com')) return 'threads';
   if (url.includes('linkedin.com')) return 'linkedin';
   
   return null;
