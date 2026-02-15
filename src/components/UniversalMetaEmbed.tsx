@@ -178,7 +178,7 @@ const buildLinkedInEmbed = (url: string): string | null => {
     const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
     if (feedMatch) {
       const urn = feedMatch[1];
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
@@ -188,13 +188,13 @@ const buildLinkedInEmbed = (url: string): string | null => {
       const id = postMatch[1];
       const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
       const type = typeMatch ? typeMatch[1] : 'ugcPost';
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 3: /posts/username_slug-share-ID-hash
     const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
     if (shareMatch) {
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through to null
@@ -403,13 +403,17 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         ALLOWED_TAGS: ['iframe'],
         ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'scrolling']
       });
-      const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
-      const iframeSrc = srcMatch ? srcMatch[1] : '';
       const isInstagramIframe = embedHtml.includes('instagram.com');
-      const isThreadsIframe = embedHtml.includes('threads.net');
-      const isLinkedInIframe = embedHtml.includes('linkedin.com/embed');
 
       if (isInstagramIframe) {
+        // Extract the src URL from the sanitized iframe HTML
+        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
+        const iframeSrc = srcMatch ? srcMatch[1] : '';
+
+        // Viewport-lock strategy:
+        // - Container has overflow:hidden to clip native action buttons
+        // - Iframe renders at natural position (header + media + "View more" visible)
+        // - Extra height pushes action buttons outside the clipped container
         return (
           <div
             className="relative w-full overflow-hidden"
@@ -441,64 +445,6 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
                 height: 'calc(100% + 400px)',
                 overflow: 'hidden',
                 pointerEvents: 'none',
-              }}
-            />
-          </div>
-        );
-      }
-
-      if (isThreadsIframe) {
-        // Clip the Threads "Trending" top bar (~56px) and the
-        // native action-buttons / footer at the bottom.
-        // Container auto-sizes via the iframe's intrinsic height
-        // minus what we clip from top & bottom.
-        // top clip = 56px, bottom clip ≈ 100px → container = iframe - 156
-        const iframeH = 490;
-        const topClip = 56;
-        const bottomClip = 264;
-        const containerH = iframeH - topClip - bottomClip; // 444px
-
-        return (
-          <div
-            className="relative w-full overflow-hidden"
-            style={{ height: `${containerH}px`, touchAction: 'pan-y' }}
-          >
-            <iframe
-              src={iframeSrc}
-              scrolling="no"
-              allowFullScreen
-              allow="encrypted-media"
-              loading="lazy"
-              style={{
-                border: 'none',
-                position: 'absolute',
-                top: `-${topClip}px`,
-                left: 0,
-                width: '100%',
-                height: `${iframeH}px`,
-                overflow: 'hidden',
-                pointerEvents: 'none',
-              }}
-            />
-          </div>
-        );
-      }
-
-      if (isLinkedInIframe) {
-        // LinkedIn's native embed handles "...more" for long text;
-        // just give it enough height and let the iframe scroll internally
-        return (
-          <div className="relative w-full overflow-hidden">
-            <iframe
-              src={iframeSrc}
-              allowFullScreen
-              loading="lazy"
-              style={{
-                border: 'none',
-                width: '100%',
-                height: '600px',
-                display: 'block',
-                overflow: 'hidden',
               }}
             />
           </div>
