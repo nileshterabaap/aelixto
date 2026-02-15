@@ -21,7 +21,7 @@ type CachedEmbed = {
 const embedCache = new Map<string, CachedEmbed>();
 
 // Detect platform from URL
-const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 'reddit' | 'quora' | 'medium' | 'blog' | 'unknown' => {
+const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 'reddit' | 'quora' | 'medium' | 'blog' | 'threads' | 'linkedin' | 'unknown' => {
   const urlLower = url.toLowerCase();
   if (urlLower.includes('instagram.com') || urlLower.includes('instagr.am')) {
     return 'instagram';
@@ -41,6 +41,12 @@ const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 're
   }
   if (urlLower.includes('medium.com')) {
     return 'medium';
+  }
+  if (urlLower.includes('threads.net')) {
+    return 'threads';
+  }
+  if (urlLower.includes('linkedin.com')) {
+    return 'linkedin';
   }
   if (
     urlLower.includes('blog') ||
@@ -424,7 +430,11 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
                 ? 'Medium'
                 : platform === 'blog'
                   ? 'Blog'
-                  : 'Web';
+                  : platform === 'threads'
+                    ? 'Threads'
+                    : platform === 'linkedin'
+                      ? 'LinkedIn'
+                      : 'Web';
 
   return (
     <OgCardFallback
