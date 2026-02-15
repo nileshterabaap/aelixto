@@ -202,22 +202,22 @@ const buildLinkedInEmbed = (url: string): string | null => {
   return null;
 };
 
-// Build Threads embed HTML using direct iframe (like Instagram)
+// Build Threads embed HTML using official blockquote + embed.js (auto-sizes)
 const buildThreadsEmbed = (url: string): string | null => {
   try {
     const u = new URL(url);
-    const postMatch = u.pathname.match(/\/@[^/]+\/post\/([A-Za-z0-9_-]+)/);
+    const postMatch = u.pathname.match(/\/@([^/]+)\/post\/([A-Za-z0-9_-]+)/);
     if (postMatch) {
-      // Standardize to threads.net and append /embed
       const cleanPath = u.pathname.replace(/\/$/, '');
-      const embedUrl = `https://www.threads.net${cleanPath}/embed`.replace('threads.com', 'threads.net');
-      return `<iframe src="${embedUrl}" style="border:none;width:100%;min-height:500px;overflow:hidden;display:block;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+      const postUrl = `https://www.threads.net${cleanPath}`.replace('threads.com', 'threads.net');
+      return `<blockquote class="text-post-media" data-text-post-permalink="${postUrl}" data-text-post-version="0" style="background:#fff;border-width:1px;border-style:solid;border-color:#00000026;border-radius:16px;max-width:540px;margin:0 auto;padding:0;width:calc(100% - 2px);"><a href="${postUrl}" target="_blank" rel="noopener noreferrer">View on Threads</a></blockquote><script async src="https://www.threads.net/embed.js"></script>`;
     }
   } catch {
     // Fall through
   }
   return null;
 };
+
 
 export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   const cached = embedCache.get(url);
@@ -396,7 +396,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
   if (embedHtml && !showFallback) {
     // For direct iframe embeds (Spotify, Instagram, LinkedIn, Threads), render without RawEmbedRenderer
-    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || (embedHtml.includes('threads.net') && embedHtml.includes('<iframe'));
+    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed');
 
     if (isDirectIframe) {
       const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
@@ -451,37 +451,6 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         );
       }
 
-      // Threads iframe: render at full width, clip bottom whitespace
-      const isThreadsIframe = embedHtml.includes('threads.net') && embedHtml.includes('<iframe');
-      if (isThreadsIframe) {
-        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
-        const iframeSrc = srcMatch ? srcMatch[1] : '';
-
-        return (
-          <div
-            className="relative w-full overflow-hidden"
-            style={{
-              maxHeight: '650px',
-              touchAction: 'pan-y',
-            }}
-          >
-            <iframe
-              src={iframeSrc}
-              scrolling="no"
-              allowFullScreen
-              allow="encrypted-media"
-              loading="lazy"
-              style={{
-                border: 'none',
-                width: '100%',
-                height: '900px',
-                display: 'block',
-                overflow: 'hidden',
-              }}
-            />
-          </div>
-        );
-      }
 
       return (
         <div
@@ -537,4 +506,3 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     />
   );
 };
-
