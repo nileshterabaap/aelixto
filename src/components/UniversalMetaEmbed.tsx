@@ -404,14 +404,16 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'scrolling']
       });
       const isInstagramIframe = embedHtml.includes('instagram.com');
-      const isThreadsIframe = embedHtml.includes('threads.net') && embedHtml.includes('<iframe');
-      const isLinkedInIframe = embedHtml.includes('linkedin.com/embed');
 
       if (isInstagramIframe) {
         // Extract the src URL from the sanitized iframe HTML
         const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
         const iframeSrc = srcMatch ? srcMatch[1] : '';
 
+        // Viewport-lock strategy:
+        // - Container has overflow:hidden to clip native action buttons
+        // - Iframe renders at natural position (header + media + "View more" visible)
+        // - Extra height pushes action buttons outside the clipped container
         return (
           <div
             className="relative w-full overflow-hidden"
@@ -443,89 +445,6 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
                 height: 'calc(100% + 400px)',
                 overflow: 'hidden',
                 pointerEvents: 'none',
-              }}
-            />
-          </div>
-        );
-      }
-
-      if (isThreadsIframe) {
-        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
-        const iframeSrc = srcMatch ? srcMatch[1] : '';
-
-        // Viewport-lock: clip top ~56px to hide "Trending" banner
-        return (
-          <div
-            className="relative w-full overflow-hidden"
-            style={{ aspectRatio: '3 / 4', touchAction: 'pan-y' }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                zIndex: 2,
-                touchAction: 'pan-y',
-              }}
-            />
-            <iframe
-              src={iframeSrc}
-              scrolling="no"
-              allowFullScreen
-              allow="encrypted-media"
-              loading="lazy"
-              style={{
-                border: 'none',
-                position: 'absolute',
-                top: '-56px',
-                left: 0,
-                width: '100%',
-                height: 'calc(100% + 456px)',
-                overflow: 'hidden',
-                pointerEvents: 'none',
-              }}
-            />
-          </div>
-        );
-      }
-
-      if (isLinkedInIframe) {
-        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
-        const iframeSrc = srcMatch ? srcMatch[1] : '';
-
-        // Viewport-lock: clip overflow to truncate long text, keep video visible
-        return (
-          <div
-            className="relative w-full overflow-hidden"
-            style={{ maxHeight: '600px', touchAction: 'pan-y' }}
-          >
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                zIndex: 2,
-                touchAction: 'pan-y',
-                // Gradient fade at text cutoff area
-                background: 'linear-gradient(to bottom, transparent 85%, hsl(var(--background)) 100%)',
-                pointerEvents: 'none',
-              }}
-            />
-            <iframe
-              src={iframeSrc}
-              scrolling="no"
-              allowFullScreen
-              loading="lazy"
-              style={{
-                border: 'none',
-                width: '100%',
-                height: '600px',
-                overflow: 'hidden',
-                pointerEvents: 'auto',
               }}
             />
           </div>
