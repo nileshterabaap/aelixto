@@ -451,26 +451,18 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         );
       }
 
-      // Threads iframe: scale up to fill width and clip the huge bottom gap
+      // Threads iframe: render at full width, clip bottom whitespace
       const isThreadsIframe = embedHtml.includes('threads.net') && embedHtml.includes('<iframe');
       if (isThreadsIframe) {
         const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
         const iframeSrc = srcMatch ? srcMatch[1] : '';
 
-        // Threads renders content at ~550px wide centered in the iframe.
-        // We scale the iframe up so the content fills the container, then
-        // clip the excessive whitespace at the bottom with a fixed container height.
-        const scale = 1.18; // ~18% wider to fill mobile viewport
-        const iframeHeight = 680; // native content height before the empty space
-        const visibleHeight = Math.round(iframeHeight * scale);
-
         return (
           <div
             className="relative w-full overflow-hidden"
             style={{
-              height: `${visibleHeight}px`,
+              maxHeight: '650px',
               touchAction: 'pan-y',
-              marginBottom: '-16px',
             }}
           >
             <iframe
@@ -481,12 +473,10 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               loading="lazy"
               style={{
                 border: 'none',
-                width: `${100 / scale}%`,
-                height: `${iframeHeight}px`,
+                width: '100%',
+                height: '900px',
                 display: 'block',
                 overflow: 'hidden',
-                transform: `scale(${scale})`,
-                transformOrigin: 'top left',
               }}
             />
           </div>
