@@ -3,6 +3,7 @@ export type Renderer =
   | { kind: 'raw'; html: string }
   | { kind: 'twitter'; url: string }
   | { kind: 'pinterest'; url: string }
+  | { kind: 'threads'; url: string }
   | { kind: 'article'; url: string }
   | { kind: 'universal'; url: string }
   | { kind: 'image'; url: string }
@@ -27,7 +28,10 @@ export function resolveRenderer(post: any): Renderer {
   // 2) reddit wins before everything else
   if (isRedditUrl(url)) return { kind: 'reddit', url };
 
-  // 3) platform-specific embeds next
+  // 3) Threads gets its own dedicated embed (like X/Twitter)
+  if (url.includes('threads.net') || url.includes('threads.com')) return { kind: 'threads', url };
+
+  // 4) platform-specific embeds next
   if (post?.platform === 'twitter') return { kind: 'twitter', url };
   if (post?.platform === 'pinterest') return { kind: 'pinterest', url };
 

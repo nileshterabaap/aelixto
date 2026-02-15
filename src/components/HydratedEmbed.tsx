@@ -1,6 +1,7 @@
 import { useState, memo, useCallback, useEffect, useRef } from 'react';
 import type { Post } from '@/data/demoData';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
+import { ThreadsEmbed } from '@/components/embeds/ThreadsEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
@@ -10,7 +11,7 @@ import { ImageViewTracker } from '@/components/ImageViewTracker';
 import { EmbedSkeleton } from '@/components/EmbedSkeleton';
 
 interface RendererResult {
-  kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
+  kind: 'raw' | 'reddit' | 'twitter' | 'threads' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
   html?: string;
   url?: string;
 }
@@ -225,6 +226,15 @@ export const HydratedEmbed = memo(({
         <SkeletonGate platform="twitter">
           <ImageViewTracker postId={post.id}>
             <TwitterEmbed url={r.url} />
+          </ImageViewTracker>
+        </SkeletonGate>
+      )}
+      
+      {/* Threads embed */}
+      {r.kind === 'threads' && r.url && (
+        <SkeletonGate platform="threads">
+          <ImageViewTracker postId={post.id}>
+            <ThreadsEmbed url={r.url} />
           </ImageViewTracker>
         </SkeletonGate>
       )}
