@@ -403,17 +403,13 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         ALLOWED_TAGS: ['iframe'],
         ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'scrolling']
       });
+      const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
+      const iframeSrc = srcMatch ? srcMatch[1] : '';
       const isInstagramIframe = embedHtml.includes('instagram.com');
+      const isThreadsIframe = embedHtml.includes('threads.net');
+      const isLinkedInIframe = embedHtml.includes('linkedin.com/embed');
 
       if (isInstagramIframe) {
-        // Extract the src URL from the sanitized iframe HTML
-        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
-        const iframeSrc = srcMatch ? srcMatch[1] : '';
-
-        // Viewport-lock strategy:
-        // - Container has overflow:hidden to clip native action buttons
-        // - Iframe renders at natural position (header + media + "View more" visible)
-        // - Extra height pushes action buttons outside the clipped container
         return (
           <div
             className="relative w-full overflow-hidden"
@@ -445,6 +441,54 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
                 height: 'calc(100% + 400px)',
                 overflow: 'hidden',
                 pointerEvents: 'none',
+              }}
+            />
+          </div>
+        );
+      }
+
+      if (isThreadsIframe) {
+        // Clip ~50px from top to hide the "Trending" banner, keep content playable
+        return (
+          <div
+            className="relative w-full overflow-hidden"
+            style={{ aspectRatio: '3 / 4', touchAction: 'pan-y' }}
+          >
+            <iframe
+              src={iframeSrc}
+              scrolling="no"
+              allowFullScreen
+              allow="encrypted-media"
+              loading="lazy"
+              style={{
+                border: 'none',
+                position: 'absolute',
+                top: '-50px',
+                left: 0,
+                width: '100%',
+                height: 'calc(100% + 450px)',
+                overflow: 'hidden',
+              }}
+            />
+          </div>
+        );
+      }
+
+      if (isLinkedInIframe) {
+        // LinkedIn's native embed handles "...more" for long text;
+        // just give it enough height and let the iframe scroll internally
+        return (
+          <div className="relative w-full overflow-hidden">
+            <iframe
+              src={iframeSrc}
+              allowFullScreen
+              loading="lazy"
+              style={{
+                border: 'none',
+                width: '100%',
+                height: '600px',
+                display: 'block',
+                overflow: 'hidden',
               }}
             />
           </div>
