@@ -448,12 +448,20 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       }
 
       if (isThreadsIframe) {
-        // Clip top 56px (Trending banner) but keep username visible.
-        // Tight bottom to reduce blank area below action row.
+        // Clip the Threads "Trending" top bar (~56px) and the
+        // native action-buttons / footer at the bottom.
+        // Container auto-sizes via the iframe's intrinsic height
+        // minus what we clip from top & bottom.
+        // top clip = 56px, bottom clip ≈ 100px → container = iframe - 156
+        const iframeH = 490;
+        const topClip = 56;
+        const bottomClip = 264;
+        const containerH = iframeH - topClip - bottomClip; // 444px
+
         return (
           <div
             className="relative w-full overflow-hidden"
-            style={{ height: '540px', touchAction: 'pan-y' }}
+            style={{ height: `${containerH}px`, touchAction: 'pan-y' }}
           >
             <iframe
               src={iframeSrc}
@@ -464,10 +472,10 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               style={{
                 border: 'none',
                 position: 'absolute',
-                top: '-56px',
+                top: `-${topClip}px`,
                 left: 0,
                 width: '100%',
-                height: '700px',
+                height: `${iframeH}px`,
                 overflow: 'hidden',
                 pointerEvents: 'none',
               }}
