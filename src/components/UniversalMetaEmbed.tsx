@@ -448,12 +448,12 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       }
 
       if (isThreadsIframe) {
-        // Clip top 50px (Trending banner) and bottom 60px (native action buttons).
-        // Fixed container keeps it compact like X/Twitter embeds.
+        // Clip top 56px (Trending banner) but keep username visible.
+        // Tight bottom to reduce blank area below action row.
         return (
           <div
             className="relative w-full overflow-hidden"
-            style={{ height: '420px', touchAction: 'pan-y' }}
+            style={{ height: '540px', touchAction: 'pan-y' }}
           >
             <iframe
               src={iframeSrc}
@@ -464,10 +464,10 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               style={{
                 border: 'none',
                 position: 'absolute',
-                top: '-50px',
+                top: '-56px',
                 left: 0,
                 width: '100%',
-                height: '580px',
+                height: '700px',
                 overflow: 'hidden',
                 pointerEvents: 'none',
               }}
