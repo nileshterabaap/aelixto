@@ -3,7 +3,6 @@ export type Renderer =
   | { kind: 'raw'; html: string }
   | { kind: 'twitter'; url: string }
   | { kind: 'pinterest'; url: string }
-  | { kind: 'threads'; url: string }
   | { kind: 'article'; url: string }
   | { kind: 'universal'; url: string }
   | { kind: 'image'; url: string }
@@ -28,20 +27,17 @@ export function resolveRenderer(post: any): Renderer {
   // 2) reddit wins before everything else
   if (isRedditUrl(url)) return { kind: 'reddit', url };
 
-  // 3) Threads gets its own dedicated embed (like X/Twitter)
-  if (url.includes('threads.net') || url.includes('threads.com')) return { kind: 'threads', url };
-
-  // 4) platform-specific embeds next
+  // 3) platform-specific embeds next
   if (post?.platform === 'twitter') return { kind: 'twitter', url };
   if (post?.platform === 'pinterest') return { kind: 'pinterest', url };
 
   // 4) article extractor for blogs/quora/medium/etc (never reddit)
-  const blocked = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','twitter.com','x.com','pinterest.com','youtube.com','youtu.be','tiktok.com','reddit.com','redd.it','linkedin.com'];
+  const blocked = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','twitter.com','x.com','pinterest.com','youtube.com','youtu.be','tiktok.com','reddit.com','redd.it','threads.net','threads.com','linkedin.com'];
   const isBlocked = blocked.some(d => url.includes(d));
   if (!isBlocked && post?.mediaType === 'none') return { kind: 'article', url };
 
   // 5) universal meta (not reddit)
-  const universalAllow = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','linkedin.com'];
+  const universalAllow = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','threads.net','threads.com','linkedin.com'];
   if (universalAllow.some(d => url.includes(d))) return { kind: 'universal', url };
 
   // 6) media fallbacks
