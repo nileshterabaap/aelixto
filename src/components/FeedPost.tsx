@@ -279,7 +279,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <img 
                 src={displayIcon} 
                 alt={displayName || 'Platform'}
-                className={`object-contain dark:invert ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || detectedPlatform === 'threads' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
+                className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'} dark:invert`}
               />
             )}
             {post.isRealPost && (post as any).user_id === userId && (
@@ -421,7 +421,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <img 
                 src={displayIcon} 
                 alt={displayName || 'Platform'}
-                className={`object-contain dark:invert ${detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || detectedPlatform === 'threads' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
+                className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'} dark:invert`}
               />
             )}
             {post.isRealPost && (post as any).user_id === userId && (

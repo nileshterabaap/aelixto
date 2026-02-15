@@ -451,7 +451,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         );
       }
 
-      // Threads iframe: clip bottom whitespace to match original post size
+      // Threads iframe: match original post proportions and eliminate gap with action bar
       const isThreadsIframe = embedHtml.includes('threads.net') && embedHtml.includes('<iframe');
       if (isThreadsIframe) {
         const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
@@ -459,8 +459,8 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
         return (
           <div
-            className="relative w-full overflow-hidden -mb-3"
-            style={{ minHeight: '480px', touchAction: 'pan-y' }}
+            className="relative w-full overflow-hidden -mb-8"
+            style={{ touchAction: 'pan-y' }}
           >
             <iframe
               src={iframeSrc}
@@ -471,7 +471,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               style={{
                 border: 'none',
                 width: '100%',
-                height: '600px',
+                height: '720px',
                 display: 'block',
                 overflow: 'hidden',
               }}
