@@ -42,7 +42,7 @@ const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 're
   if (urlLower.includes('medium.com')) {
     return 'medium';
   }
-  if (urlLower.includes('threads.net')) {
+  if (urlLower.includes('threads.net') || urlLower.includes('threads.com')) {
     return 'threads';
   }
   if (urlLower.includes('linkedin.com')) {
@@ -163,21 +163,62 @@ const isEmbeddableSpotifyUrl = (url: string): boolean => {
 
 // Build Spotify embed HTML
 const buildSpotifyEmbed = (url: string): string | null => {
-  // Check if this URL can be embedded
-  if (!isEmbeddableSpotifyUrl(url)) {
-    return null; // Return null to trigger fallback
-  }
-
-  // Convert regular Spotify URL to embed URL
-  // e.g., https://open.spotify.com/track/xyz -> https://open.spotify.com/embed/track/xyz
+  if (!isEmbeddableSpotifyUrl(url)) return null;
   let embedUrl = url.replace('open.spotify.com/', 'open.spotify.com/embed/');
-
-  // If it already has /embed/, don't add it again
-  if (url.includes('/embed/')) {
-    embedUrl = url;
-  }
-
+  if (url.includes('/embed/')) embedUrl = url;
   return `<iframe style="border-radius:12px;display:block;" src="${embedUrl}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
+};
+
+// Build LinkedIn embed HTML using their native embed endpoint
+const buildLinkedInEmbed = (url: string): string | null => {
+  try {
+    const u = new URL(url);
+
+    // Pattern 1: /feed/update/urn:li:activity:ID or urn:li:share:ID or urn:li:ugcPost:ID
+    const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
+    if (feedMatch) {
+      const urn = feedMatch[1];
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+    }
+
+    // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
+    const postMatch = u.pathname.match(/\/posts\/[^/]+-(?:ugcPost|activity)-(\d+)-/);
+    if (postMatch) {
+      const id = postMatch[1];
+      // Check if it's ugcPost or activity
+      const typeMatch = u.pathname.match(/-(ugcPost|activity)-/);
+      const type = typeMatch ? typeMatch[1] : 'ugcPost';
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+    }
+
+    // Pattern 3: /posts/username_slug-share-ID-hash
+    const shareMatch = u.pathname.match(/\/posts\/[^/]+-share-(\d+)-/);
+    if (shareMatch) {
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+    }
+  } catch {
+    // Fall through to null
+  }
+  return null;
+};
+
+// Build Threads embed HTML
+const buildThreadsEmbed = (url: string): string | null => {
+  try {
+    // Threads URLs: threads.com/@user/post/CODE or threads.net/@user/post/CODE
+    const u = new URL(url);
+    const postMatch = u.pathname.match(/\/@[^/]+\/post\/([A-Za-z0-9_-]+)/);
+    if (postMatch) {
+      // Threads embed endpoint always uses threads.net
+      const embedUrl = `https://www.threads.net${u.pathname.replace(/\/$/, '')}/embed`;
+      // Replace threads.com with threads.net in the path if needed
+      const finalEmbedUrl = embedUrl.replace('threads.com', 'threads.net');
+      return `<iframe src="${finalEmbedUrl}" style="border:none;width:100%;min-height:500px;overflow:hidden;display:block;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+    }
+  } catch {
+    // Fall through
+  }
+  return null;
 };
 
 export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
@@ -215,7 +256,11 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           ? buildFacebookEmbed(url)
           : platform === 'spotify'
             ? buildSpotifyEmbed(url)
-            : null;
+            : platform === 'linkedin'
+              ? buildLinkedInEmbed(url)
+              : platform === 'threads'
+                ? buildThreadsEmbed(url)
+                : null;
 
     if (immediateHtml && !showFallback) {
       setEmbedHtml(immediateHtml);
@@ -309,6 +354,22 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               shouldShowFallback = true;
               setShowFallback(true);
             }
+          } else if (platform === 'linkedin') {
+            const html = buildLinkedInEmbed(urlForEmbed);
+            if (html) {
+              setEmbedHtml(html);
+            } else {
+              shouldShowFallback = true;
+              setShowFallback(true);
+            }
+          } else if (platform === 'threads') {
+            const html = buildThreadsEmbed(urlForEmbed);
+            if (html) {
+              setEmbedHtml(html);
+            } else {
+              shouldShowFallback = true;
+              setShowFallback(true);
+            }
           }
         } else {
           setShowFallback(true);
@@ -336,8 +397,8 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   }, [url]);
 
   if (embedHtml && !showFallback) {
-    // For Spotify and Instagram iframes, render directly without RawEmbedRenderer (no SDK needed)
-    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || embedHtml.includes('instagram.com') && embedHtml.includes('<iframe');
+    // For direct iframe embeds (Spotify, Instagram, LinkedIn, Threads), render without RawEmbedRenderer
+    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || embedHtml.includes('threads.net') && embedHtml.includes('<iframe');
 
     if (isDirectIframe) {
       const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
