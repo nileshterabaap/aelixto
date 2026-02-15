@@ -103,7 +103,10 @@ export const loadFacebookSDK = (): Promise<void> => {
 export const loadPinterestEmbed = () => loadScript('https://assets.pinterest.com/js/pinit.js');
 
 // Threads embed script loader
-export const loadThreadsEmbed = () => loadScript('https://www.threads.net/embed.js');
+export const loadThreadsEmbed = (): Promise<void> => {
+  const scriptUrl = 'https://www.threads.net/embed.js';
+  return loadScript(scriptUrl);
+};
 
 // Preload all embed SDKs early for faster embed rendering
 export const preloadEmbedSDKs = () => {
