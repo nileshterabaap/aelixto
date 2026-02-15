@@ -16,21 +16,26 @@ interface ThreadsData {
   description?: string;
   image?: string;
   username?: string;
+  displayName?: string;
 }
 
-// Extract @username from OG title like "Username (@handle) on Threads"
 const extractUsername = (title?: string): string | null => {
   if (!title) return null;
   const match = title.match(/@([a-zA-Z0-9_.]+)/);
   return match ? match[1] : null;
 };
 
-// Extract display name from title like "Display Name (@handle) on Threads"
 const extractDisplayName = (title?: string): string | null => {
   if (!title) return null;
   const match = title.match(/^(.+?)\s*\(/);
   return match ? match[1].trim() : null;
 };
+
+const decodeHtml = (text?: string) =>
+  text
+    ?.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    ?.replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec)))
+    ?.replace(/&amp;/g, '&');
 
 const cache = new Map<string, ThreadsData>();
 
@@ -48,12 +53,13 @@ export const ThreadsEmbed = memo(({ url }: ThreadsEmbedProps) => {
           body: { url },
         });
         if (ogError) throw ogError;
-        
+
         const result: ThreadsData = {
           title: ogData?.title,
           description: ogData?.description,
           image: ogData?.image,
           username: extractUsername(ogData?.title),
+          displayName: extractDisplayName(ogData?.title),
         };
         cache.set(url, result);
         setData(result);
@@ -71,7 +77,7 @@ export const ThreadsEmbed = memo(({ url }: ThreadsEmbedProps) => {
     return (
       <Card className="p-6 text-center space-y-3">
         <div className="flex justify-center">
-          <img src={threadsIcon} alt="Threads" className="w-10 h-10 dark:invert" />
+          <img src={threadsIcon} alt="Threads" className="w-10 h-10" />
         </div>
         <p className="text-sm text-muted-foreground">Unable to load this post</p>
         <Button variant="outline" size="sm" asChild>
@@ -91,25 +97,24 @@ export const ThreadsEmbed = memo(({ url }: ThreadsEmbedProps) => {
   if (!data) return null;
 
   const username = data.username;
-  const displayName = extractDisplayName(data.title);
-  // Decode HTML entities in description
-  const description = data.description
-    ?.replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    ?.replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec)))
-    ?.replace(/&amp;/g, '&');
+  const displayName = data.displayName;
+  const description = decodeHtml(data.description);
+  const proxyImg = (src: string) =>
+    `${SUPABASE_URL}/functions/v1/img-proxy?u=${encodeURIComponent(src)}`;
 
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className="block mx-4"
+      className="block"
     >
       <div className="rounded-xl border border-border overflow-hidden bg-card">
-        {/* Header: avatar area + username + Threads icon */}
-        <div className="flex items-center gap-2.5 px-4 pt-3 pb-2">
-          <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
-            <img src={threadsIcon} alt="Threads" className="w-5 h-5 dark:invert" />
+        {/* Header */}
+        <div className="flex items-center gap-3 px-4 pt-3 pb-2">
+          {/* Avatar placeholder with Threads icon */}
+          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0 border border-border">
+            <img src={threadsIcon} alt="" className="w-5 h-5 opacity-60" />
           </div>
           <div className="flex-1 min-w-0">
             {displayName && (
@@ -122,24 +127,27 @@ export const ThreadsEmbed = memo(({ url }: ThreadsEmbedProps) => {
                 @{username}
               </span>
             )}
+            {!displayName && !username && (
+              <span className="font-semibold text-sm block leading-tight">Threads</span>
+            )}
           </div>
-          <img src={threadsIcon} alt="Threads" className="w-5 h-5 shrink-0 dark:invert" />
+          <img src={threadsIcon} alt="Threads" className="w-5 h-5 shrink-0 opacity-50" />
         </div>
 
-        {/* Text content */}
+        {/* Text */}
         {description && (
-          <div className="px-4 pb-2">
-            <p className="text-sm whitespace-pre-line leading-relaxed line-clamp-4">
+          <div className="px-4 pb-3">
+            <p className="text-sm whitespace-pre-line leading-relaxed line-clamp-6">
               {description}
             </p>
           </div>
         )}
 
-        {/* Image */}
+        {/* Media image */}
         {data.image && (
           <div className="w-full">
             <img
-              src={`${SUPABASE_URL}/functions/v1/img-proxy?url=${encodeURIComponent(data.image)}`}
+              src={proxyImg(data.image)}
               alt="Thread post"
               className="w-full h-auto object-cover"
               loading="lazy"
