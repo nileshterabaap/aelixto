@@ -448,11 +448,12 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       }
 
       if (isThreadsIframe) {
-        // Clip ~50px from top to hide the "Trending" banner, keep content playable
+        // Clip top (-50px hides "Trending" banner) and bottom (hides native action bar + Threads watermark)
+        // The container clips both ends; the iframe is taller than the container to keep content visible
         return (
           <div
             className="relative w-full overflow-hidden"
-            style={{ aspectRatio: '3 / 4', touchAction: 'pan-y' }}
+            style={{ height: '520px', touchAction: 'pan-y' }}
           >
             <iframe
               src={iframeSrc}
@@ -466,7 +467,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
                 top: '-50px',
                 left: 0,
                 width: '100%',
-                height: 'calc(100% + 450px)',
+                height: '750px',
                 overflow: 'hidden',
               }}
             />
