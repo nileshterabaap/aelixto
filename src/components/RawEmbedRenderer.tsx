@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadInstagramEmbed, loadFacebookSDK } from '@/lib/ScriptLoader';
+import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed } from '@/lib/ScriptLoader';
 import DOMPurify from 'dompurify';
 
 interface RawEmbedRendererProps {
@@ -65,7 +65,7 @@ const isInstagramEmbed = (html: string): boolean => {
 };
 
 // Detect platform for SDK processing purposes
-const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
+const detectPlatform = (html: string): 'instagram' | 'facebook' | 'threads' | 'unknown' => {
   // Instagram iframes don't need SDK processing, but are still Instagram for rendering
   if (html.includes('instagram.com') && html.includes('<iframe')) {
     return 'unknown'; // Skip SDK, but isInstagramEmbed() still returns true
@@ -75,6 +75,9 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'unknown' => {
   }
   if (html.includes('facebook.com') || html.includes('fb-post') || html.includes('fb-video')) {
     return 'facebook';
+  }
+  if (html.includes('text-post-media') || html.includes('threads.net')) {
+    return 'threads';
   }
   return 'unknown';
 };
@@ -216,6 +219,8 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
               }
             }, 2000);
           }
+        } else if (platform === 'threads') {
+          await loadThreadsEmbed();
         }
       } catch (error) {
         console.error('[RawEmbedRenderer] Failed to load embed script:', error);
