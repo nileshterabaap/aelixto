@@ -229,3 +229,11 @@ span[data-pin-href] button {
   height: auto !important;
   min-height: 500px !important;
 }
+
+/* Threads embed: hide fallback "View on Threads" link & tighten spacing */
+.text-post-media > a {
+  display: none !important;
+}
+.text-post-media {
+  margin-bottom: -8px !important;
+}
