@@ -257,12 +257,12 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   }
 
 
-  // Threads embeds: tighter container, no min-height bloat
+  // Threads embeds: tighter container, hide fallback link, no min-height bloat
   if (platform === 'threads') {
     return (
       <div
         ref={containerRef}
-        className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0"
+        className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&_a]:!hidden"
         style={{ overflow: 'hidden' }}
         dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
