@@ -230,10 +230,23 @@ span[data-pin-href] button {
   min-height: 500px !important;
 }
 
-/* Threads embed: hide fallback "View on Threads" link & tighten spacing */
+/* Threads embed: hide fallback link, kill all extra spacing */
 .text-post-media > a {
   display: none !important;
 }
 .text-post-media {
-  margin-bottom: -8px !important;
+  margin-bottom: -16px !important;
+  padding-bottom: 0 !important;
+}
+/* After SDK processes, the blockquote becomes an iframe or wrapper div */
+.text-post-media + script {
+  display: none !important;
+}
+.embed-container iframe[src*="threads.net"] {
+  display: block !important;
+  margin-bottom: -16px !important;
+}
+/* Target the SDK-generated wrapper */
+.embed-container > div[style] iframe {
+  margin-bottom: 0 !important;
 }
