@@ -97,7 +97,7 @@ export const ConnectedSocials = () => {
               <img
                 src={meta.icon}
                 alt={meta.name}
-                className="h-5 w-5 object-contain dark:invert shrink-0"
+                className="h-5 w-5 object-contain shrink-0"
               />
             )}
             <div className="flex-1 min-w-0">

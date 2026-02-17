@@ -12,11 +12,11 @@ import { formatDistanceToNow } from "date-fns";
 const getNotificationIcon = (type: string) => {
   switch (type) {
     case 'like':
-      return { icon: Heart, bgColor: 'bg-red-100 dark:bg-red-900/30', iconColor: 'text-red-500' };
+      return { icon: Heart, bgColor: 'bg-red-100', iconColor: 'text-red-500' };
     case 'comment':
-      return { icon: MessageCircle, bgColor: 'bg-blue-100 dark:bg-blue-900/30', iconColor: 'text-blue-500' };
+      return { icon: MessageCircle, bgColor: 'bg-blue-100', iconColor: 'text-blue-500' };
     case 'repost':
-      return { icon: Repeat2, bgColor: 'bg-green-100 dark:bg-green-900/30', iconColor: 'text-green-500' };
+      return { icon: Repeat2, bgColor: 'bg-green-100', iconColor: 'text-green-500' };
     default:
       return { icon: Bell, bgColor: 'bg-muted', iconColor: 'text-muted-foreground' };
   }
