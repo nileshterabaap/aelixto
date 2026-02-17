@@ -9,16 +9,16 @@ interface ConnectPlatformBannerProps {
 }
 
 const platformColors: Record<string, string> = {
-  youtube: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
-  instagram: 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border-pink-500/20',
+  youtube: 'bg-red-500/10 text-red-600 border-red-500/20',
+  instagram: 'bg-pink-500/10 text-pink-600 border-pink-500/20',
   tiktok: 'bg-foreground/5 text-foreground border-foreground/10',
   twitter: 'bg-foreground/5 text-foreground border-foreground/10',
   x: 'bg-foreground/5 text-foreground border-foreground/10',
-  facebook: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
-  reddit: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20',
-  pinterest: 'bg-red-600/10 text-red-700 dark:text-red-400 border-red-600/20',
-  spotify: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20',
-  quora: 'bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20',
+  facebook: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
+  reddit: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
+  pinterest: 'bg-red-600/10 text-red-700 border-red-600/20',
+  spotify: 'bg-green-500/10 text-green-600 border-green-500/20',
+  quora: 'bg-red-500/10 text-red-600 border-red-500/20',
   medium: 'bg-foreground/5 text-foreground border-foreground/10',
 };
 

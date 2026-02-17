@@ -55,51 +55,6 @@ All colors MUST be HSL.
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
-  .dark {
-    --background: 0 0% 5%;
-    --foreground: 0 0% 100%;
-
-    --card: 0 0% 8%;
-    --card-foreground: 0 0% 100%;
-
-    --popover: 0 0% 8%;
-    --popover-foreground: 0 0% 100%;
-
-    --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 0%;
-
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 100%;
-
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 65%;
-
-    --accent: 0 0% 12%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
-    --ring: 0 0% 100%;
-    
-    --gradient-sunset: linear-gradient(180deg, hsl(35 100% 65%) 0%, hsl(28 100% 60%) 30%, hsl(210 70% 50%) 100%);
-    --gradient-aelixto: linear-gradient(180deg, hsl(25 100% 60%) 0%, hsl(20 100% 56%) 35%, hsl(220 85% 48%) 100%);
-    
-    --brand-orange: 22 100% 51%;
-    --brand-blue: 213 100% 50%;
-    --shadow-soft: 0 0% 0% / 0.15;
-    
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
 }
 
 /* Like animation keyframes */
@@ -187,21 +142,6 @@ span[data-pin-href] button {
   border-radius: 1rem !important;
 }
 
-/* Instagram dark mode fix - try transparent background first */
-.dark .embed-container .instagram-media {
-  background: transparent !important;
-  border: none !important;
-}
-
-/* Fallback: wrap with dark background and blend mode to drop white */
-.dark .embed-container {
-  background-color: hsl(var(--background));
-}
-
-.dark .embed-container .instagram-media,
-.dark .embed-container iframe[src*="instagram.com"] {
-  mix-blend-mode: multiply;
-}
 
 /* Facebook embed responsive sizing for mobile */
 .fb-post,

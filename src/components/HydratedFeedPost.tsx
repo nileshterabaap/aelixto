@@ -199,7 +199,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
             <img 
               src={platform.icon} 
               alt={platform.name}
-              className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' ? 'w-6 h-6' : 'w-8 h-8'} dark:invert`}
+              className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' ? 'w-6 h-6' : 'w-8 h-8'}`}
             />
           )}
           {post.isRealPost && (post as any).user_id === userId && (
