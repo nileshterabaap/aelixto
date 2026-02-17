@@ -26,6 +26,10 @@ export const EmbedSkeleton = ({ platform }: EmbedSkeletonProps) => {
         return 'aspect-[9/16] max-w-[325px] mx-auto';
       case 'facebook':
         return 'aspect-[4/3]';
+      case 'threads':
+        return 'aspect-[3/4] max-w-[540px] mx-auto';
+      case 'linkedin':
+        return 'h-[400px]';
       case 'medium':
       case 'quora':
       case 'blog':
