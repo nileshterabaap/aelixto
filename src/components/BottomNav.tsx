@@ -1,4 +1,4 @@
-import { Home, Compass, Plus, Bell, User } from "lucide-react";
+import { Home, Search, Plus, Bell, User, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useCallback, MouseEvent, useRef } from "react";
@@ -130,9 +130,9 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             {isActive("/") && <span className="absolute bottom-2 w-5 h-0.5 bg-foreground rounded-full animate-underline-slide" />}
           </Button>
 
-          {/* Discover */}
+          {/* Search/Discover */}
           <Button
-            aria-label="Explore"
+            aria-label="Search"
             variant="ghost"
             size="icon"
             className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
@@ -147,7 +147,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
                 style={{ left: ripple.x, top: ripple.y }}
               />
             ))}
-            <Compass
+            <Search
               strokeWidth={2.5}
               className={`${baseIcon} ${isActive("/discover") ? activeIcon : inactiveIcon}`}
             />
