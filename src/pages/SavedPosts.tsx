@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
-import { FeedPost } from "@/components/FeedPost";
+import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
