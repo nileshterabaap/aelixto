@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed } from '@/lib/ScriptLoader';
+import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed, clearScriptCache } from '@/lib/ScriptLoader';
 import DOMPurify from 'dompurify';
 
 interface RawEmbedRendererProps {
@@ -219,8 +219,29 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
               }
             }, 2000);
           }
-        } else if (platform === 'threads') {
+      } else if (platform === 'threads') {
           await loadThreadsEmbed();
+          
+          // Threads SDK auto-processes blockquotes on first load but has
+          // no public process() API for re-processing in SPAs.
+          // If the script was already cached, new blockquotes won't render.
+          const retryThreads = (attempt: number) => {
+            if (!containerRef.current || attempt > 2) return;
+            if (containerRef.current.querySelector('iframe')) return;
+            
+            // Remove old script, clear cache, re-inject with cache-bust
+            document.querySelectorAll('script[src*="threads.net/embed"]').forEach(s => s.remove());
+            clearScriptCache('https://www.threads.net/embed.js');
+            
+            const script = document.createElement('script');
+            script.src = `https://www.threads.net/embed.js?t=${Date.now()}`;
+            script.async = true;
+            document.body.appendChild(script);
+          };
+          
+          setTimeout(() => retryThreads(0), 2000);
+          setTimeout(() => retryThreads(1), 5000);
+          setTimeout(() => retryThreads(2), 8000);
         }
       } catch (error) {
         console.error('[RawEmbedRenderer] Failed to load embed script:', error);
@@ -291,5 +312,6 @@ declare global {
         parse: (element?: HTMLElement) => void;
       };
     };
+    __threadsRetryCount?: number;
   }
 }
