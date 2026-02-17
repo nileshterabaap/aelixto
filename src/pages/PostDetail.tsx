@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { FeedPost } from "@/components/FeedPost";
+import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
 import type { Post } from "@/data/demoData";
 
 interface SupabasePost {
