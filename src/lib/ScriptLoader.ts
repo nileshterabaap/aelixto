@@ -108,6 +108,12 @@ export const loadThreadsEmbed = (): Promise<void> => {
   return loadScript(scriptUrl);
 };
 
+// Clear a script from the internal cache (for retry logic)
+export const clearScriptCache = (src: string) => {
+  loadedScripts.delete(src);
+  loadingPromises.delete(src);
+};
+
 // Preload all embed SDKs early for faster embed rendering
 export const preloadEmbedSDKs = () => {
   // Load in background without blocking
