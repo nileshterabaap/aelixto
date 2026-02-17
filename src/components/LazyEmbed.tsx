@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { useScrollVelocity } from '@/hooks/useScrollVelocity';
+import { EmbedSkeleton } from '@/components/EmbedSkeleton';
 
 interface LazyEmbedProps {
   children: ReactNode;
@@ -11,8 +12,80 @@ interface LazyEmbedProps {
   autoLoad?: boolean;
 }
 
+const MIN_SKELETON_MS = 200;
+
+/**
+ * SkeletonGate: shows a platform-aware skeleton for at least MIN_SKELETON_MS,
+ * then fades smoothly into real content once it renders (detected via MutationObserver).
+ */
+const SkeletonGate = ({
+  platform,
+  children,
+}: {
+  platform?: string;
+  children: React.ReactNode;
+}) => {
+  const [ready, setReady] = useState(false);
+  const [minElapsed, setMinElapsed] = useState(false);
+  const mountTime = useRef(Date.now());
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const remaining = MIN_SKELETON_MS - (Date.now() - mountTime.current);
+    const timer = setTimeout(() => setMinElapsed(true), Math.max(0, remaining));
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const check = () => {
+      if (el.querySelector('iframe, img, .twitter-embed-container *, .pinterest-embed-container *, .embed-container *')) {
+        setReady(true);
+        return true;
+      }
+      return false;
+    };
+
+    if (check()) return;
+
+    const observer = new MutationObserver(() => { check(); });
+    observer.observe(el, { childList: true, subtree: true });
+
+    // Fallback: mark ready after 5s regardless
+    const fallback = setTimeout(() => setReady(true), 5000);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(fallback);
+    };
+  }, []);
+
+  const showContent = ready && minElapsed;
+
+  return (
+    <div className="relative w-full">
+      {/* Skeleton layer */}
+      <div
+        className={`transition-opacity duration-300 ${showContent ? 'opacity-0 pointer-events-none absolute inset-0' : 'opacity-100'}`}
+      >
+        <EmbedSkeleton platform={platform} />
+      </div>
+      {/* Content layer - always mounted so embeds can initialize */}
+      <div
+        ref={containerRef}
+        className={`transition-opacity duration-300 ${showContent ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
+
 export const LazyEmbed = ({
   children,
+  platform,
   autoLoad = false
 }: LazyEmbedProps) => {
   const [shouldLoad, setShouldLoad] = useState(autoLoad);
@@ -71,7 +144,6 @@ export const LazyEmbed = ({
   }, [autoLoad, shouldLoad]);
 
   // Visibility observer - tracks if content is near viewport
-  // CRITICAL: We no longer unmount content, just track visibility for potential optimizations
   useEffect(() => {
     if (!containerRef.current || autoLoad) return;
 
@@ -84,7 +156,7 @@ export const LazyEmbed = ({
         });
       },
       {
-        rootMargin: '500px', // Generous margin - content stays "visible" when slightly off-screen
+        rootMargin: '500px',
         threshold: 0
       }
     );
@@ -105,11 +177,14 @@ export const LazyEmbed = ({
   }, [isScrollingFast, velocity, checkShouldLoad, shouldLoad]);
 
   // CRITICAL FIX: Never unmount content once loaded!
-  // This prevents the white flash and reload when scrolling back up.
-  // Content stays in DOM, we just don't render until shouldLoad is true.
+  // Content stays in DOM, wrapped in SkeletonGate for smooth fade-in.
   return (
     <div ref={containerRef}>
-      {shouldLoad && children}
+      {shouldLoad && (
+        <SkeletonGate platform={platform}>
+          {children}
+        </SkeletonGate>
+      )}
     </div>
   );
 };
