@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { FeedPost } from "@/components/FeedPost";
+import { HydratedFeedPost } from "@/components/HydratedFeedPost";
 import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts";
 import { useSession } from "@/hooks/useSession";
 import type { Post } from "@/data/demoData";
@@ -22,7 +22,7 @@ interface ProfileData {
   avatar_url: string | null;
 }
 
-function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { isRealPost: boolean; user_id: string } {
+function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { isRealPost: boolean; user_id: string; likes_count: number; comments_count: number } {
   const postUserId = post.original_user_id || post.user_id;
   return {
     id: post.id,
@@ -41,8 +41,10 @@ function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { 
     embed_html: post.embed_html,
     timestamp: new Date(post.created_at),
     saves: post.saves_count,
+    likes_count: post.likes_count || 0,
+    comments_count: 0,
     isRealPost: true,
-  } as Post & { isRealPost: boolean; user_id: string };
+  } as any;
 }
 
 export const PlatformPostViewer = ({
@@ -204,7 +206,7 @@ export const PlatformPostViewer = ({
                   if (el) postRefs.current.set(post.id, el);
                 }}
               >
-                <FeedPost
+                <HydratedFeedPost
                   post={transformPost(post, profileData || undefined)}
                   userId={user?.id}
                 />
