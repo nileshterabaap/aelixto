@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useState } from "react";
+import React, { useState } from "react";
 import { useComments, type Comment } from "@/hooks/useComments";
 import { UsernameLink, parseTextWithMentions } from "@/components/UsernameLink";
 import { useCanInteract } from "@/hooks/useInteractionPermissions";
@@ -41,45 +41,70 @@ const CommentItem = ({
   onReply: (commentId: string, username: string) => void;
   onDelete: (commentId: string) => void;
   isReply?: boolean;
-}) => (
-  <div className={`flex gap-3 ${isReply ? 'ml-12 mt-3' : ''}`}>
-    <img 
-      src={comment.profiles?.avatar_url || "/placeholder.svg"} 
-      alt={comment.profiles?.username || "User"}
-      className={`${isReply ? 'h-7 w-7' : 'h-9 w-9'} rounded-full object-cover flex-shrink-0`}
-    />
-    <div className="flex-1 min-w-0">
-      <div className="flex items-center gap-2">
-        <UsernameLink 
-          username={comment.profiles?.username || "unknown"}
-          className="font-semibold text-sm"
-        >
-          {comment.profiles?.username || "unknown"}
-        </UsernameLink>
-        <span className="text-xs text-muted-foreground">{timeAgo(comment.created_at)}</span>
-      </div>
-      <p className="text-sm mt-0.5">{parseTextWithMentions(comment.content)}</p>
-      <div className="flex items-center gap-4 mt-1">
-        {!isReply && (
+}) => {
+  const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showDelete, setShowDelete] = React.useState(false);
+
+  const handleTouchStart = () => {
+    if (currentUserId !== comment.user_id) return;
+    longPressTimer.current = setTimeout(() => setShowDelete(true), 500);
+  };
+  const handleTouchEnd = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
+
+  return (
+    <div
+      className={`flex gap-3 ${isReply ? 'ml-12 mt-3' : ''}`}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      onContextMenu={(e) => {
+        if (currentUserId === comment.user_id) {
+          e.preventDefault();
+          setShowDelete(true);
+        }
+      }}
+    >
+      <img 
+        src={comment.profiles?.avatar_url || "/placeholder.svg"} 
+        alt={comment.profiles?.username || "User"}
+        className={`${isReply ? 'h-7 w-7' : 'h-9 w-9'} rounded-full object-cover flex-shrink-0`}
+      />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <UsernameLink 
+            username={comment.profiles?.username || "unknown"}
+            className="font-semibold text-sm"
+          >
+            {comment.profiles?.username || "unknown"}
+          </UsernameLink>
+          <span className="text-xs text-muted-foreground">{timeAgo(comment.created_at)}</span>
+        </div>
+        <p className="text-sm mt-0.5">{parseTextWithMentions(comment.content)}</p>
+        <div className="flex items-center gap-4 mt-1">
           <button
-            onClick={() => onReply(comment.id, comment.profiles?.username || "unknown")}
+            onClick={() => onReply(
+              isReply ? comment.parent_id! : comment.id,
+              comment.profiles?.username || "unknown"
+            )}
             className="text-xs font-semibold text-muted-foreground hover:text-foreground"
           >
             Reply
           </button>
-        )}
-        {currentUserId === comment.user_id && (
-          <button
-            onClick={() => onDelete(comment.id)}
-            className="text-xs font-semibold text-muted-foreground hover:text-destructive"
-          >
-            Delete
-          </button>
-        )}
+          {showDelete && currentUserId === comment.user_id && (
+            <button
+              onClick={() => { onDelete(comment.id); setShowDelete(false); }}
+              className="text-xs font-semibold text-destructive animate-in fade-in duration-150"
+            >
+              Delete
+            </button>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const RepliesSection = ({
   replies,
