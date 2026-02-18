@@ -254,7 +254,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
       <div className="flex items-center justify-around px-3 py-3">
         <button
           onClick={handleLikeClick}
-          className="action-btn p-1.5 active:scale-90 transition-transform"
+          className="action-btn p-1.5 active:scale-90 transition-transform flex items-center gap-1"
         >
           <Heart 
             className={`h-6 w-6 stroke-[1.5] ${likeAnimating ? 'animate-like-pop' : ''}`}
@@ -263,12 +263,18 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
               color: isLiked ? '#ef4444' : 'currentColor'
             }}
           />
+          {!(post as any).hide_likes && (post as any).likes_count > 0 && (
+            <span className="text-xs text-muted-foreground">{(post as any).likes_count}</span>
+          )}
         </button>
         <button 
           onClick={() => setCommentsOpen(true)}
-          className="action-btn p-1.5 active:scale-90 transition-transform"
+          className="action-btn p-1.5 active:scale-90 transition-transform flex items-center gap-1"
         >
           <MessageCircle className="h-6 w-6 stroke-[1.5] fill-none" />
+          {(post as any).comments_count > 0 && (
+            <span className="text-xs text-muted-foreground">{(post as any).comments_count}</span>
+          )}
         </button>
         <button 
           onClick={handleRepostClick}

@@ -16,10 +16,13 @@ export interface Post {
   preview_title?: string | null;
   preview_text?: string | null;
   saves_count: number;
+  likes_count: number;
+  comments_count: number;
   created_at: string;
   profiles: {
     username: string;
     avatar_url: string | null;
+    settings?: any;
   } | null;
 }
 
@@ -33,7 +36,8 @@ export const usePosts = () => {
           *,
           profiles!posts_user_id_fkey (
             username,
-            avatar_url
+            avatar_url,
+            settings
           )
         `)
         .order("created_at", { ascending: false });

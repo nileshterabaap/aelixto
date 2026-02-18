@@ -19,6 +19,8 @@ export interface Post {
   embed_html?: string | null;
   timestamp: Date;
   saves: number;
+  likes_count?: number;
+  comments_count?: number;
 }
 
 export const demoPosts: Post[] = [

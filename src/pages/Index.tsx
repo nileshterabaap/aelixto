@@ -60,6 +60,9 @@ const Index = () => {
         embed_html: post.embed_html,
         timestamp: new Date(post.created_at),
         saves: post.saves_count,
+        likes_count: (post as any).likes_count || 0,
+        comments_count: (post as any).comments_count || 0,
+        hide_likes: (post.profiles as any)?.settings?.hide_likes || false,
         isRealPost: true,
       }))
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
@@ -94,6 +97,8 @@ const Index = () => {
       embed_html: post.embed_html,
       timestamp: new Date(post.created_at),
       saves: post.saves_count,
+      likes_count: post.likes_count || 0,
+      comments_count: (post as any).comments_count || 0,
       isRealPost: true,
       isRepost: post.is_repost,
       repostedByUsername: post.reposted_by_username,
