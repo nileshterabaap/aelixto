@@ -198,26 +198,32 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           if (window.FB?.XFBML?.parse) {
             window.FB.XFBML.parse(containerRef.current);
             
-            // Check for errors after render
-            setTimeout(() => {
-              if (containerRef.current) {
-                const text = (containerRef.current.textContent || '').toLowerCase();
-                const iframe = containerRef.current.querySelector('iframe');
-                
-                const hasError = 
-                  text.includes('no longer available') ||
-                  text.includes('been removed') ||
-                  text.includes('privacy setting') ||
-                  text.includes("isn't available") ||
-                  text.includes('log in to facebook') ||
-                  (text.length > 30 && !iframe);
-                
-                if (hasError) {
-                  setEmbedFailed(true);
-                  onError?.();
+            // Check for errors after render - two passes
+            const checkFacebookError = (timeout: number) => {
+              setTimeout(() => {
+                if (containerRef.current) {
+                  const text = (containerRef.current.textContent || '').toLowerCase();
+                  const iframe = containerRef.current.querySelector('iframe');
+                  
+                  const hasError = 
+                    text.includes('no longer available') ||
+                    text.includes('been removed') ||
+                    text.includes('privacy setting') ||
+                    text.includes("isn't available") ||
+                    text.includes('log in to facebook') ||
+                    !iframe; // No iframe = SDK failed to render
+                  
+                  if (hasError) {
+                    setEmbedFailed(true);
+                    onError?.();
+                  }
                 }
-              }
-            }, 2000);
+              }, timeout);
+            };
+            
+            // First check at 3s, final check at 6s
+            checkFacebookError(3000);
+            checkFacebookError(6000);
           }
       } else if (platform === 'threads') {
           await loadThreadsEmbed();
@@ -242,6 +248,15 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           setTimeout(() => retryThreads(0), 2000);
           setTimeout(() => retryThreads(1), 5000);
           setTimeout(() => retryThreads(2), 8000);
+          
+          // Final check: if no iframe after all retries, trigger error fallback
+          setTimeout(() => {
+            if (containerRef.current && !containerRef.current.querySelector('iframe')) {
+              console.warn('[RawEmbedRenderer] Threads embed failed after all retries');
+              setEmbedFailed(true);
+              onError?.();
+            }
+          }, 11000);
         }
       } catch (error) {
         console.error('[RawEmbedRenderer] Failed to load embed script:', error);
@@ -278,12 +293,12 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   }
 
 
-  // Threads embeds: tighter container, hide fallback link, no min-height bloat
+  // Threads embeds: tighter container, hide fallback link only when iframe loads
   if (platform === 'threads') {
     return (
       <div
         ref={containerRef}
-        className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&_a]:!hidden"
+        className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&>iframe~*]:!hidden"
         style={{ overflow: 'hidden' }}
         dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
@@ -294,7 +309,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     <div 
       ref={containerRef}
       onClick={handleDoubleTap}
-      className="embed-container w-full max-w-full min-h-[300px] [&>*]:!m-0 [&_.fb-post]:!max-w-full [&_.fb-video]:!max-w-full cursor-pointer"
+      className="embed-container w-full max-w-full [&>*]:!m-0 [&_.fb-post]:!max-w-full [&_.fb-video]:!max-w-full cursor-pointer"
       dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
     />
   );
