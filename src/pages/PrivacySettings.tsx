@@ -1,17 +1,22 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Ban } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { InteractionPermissions } from "@/components/settings/InteractionPermissions";
 import type { CommentPermission, MessagePermission, MentionPermission } from "@/hooks/useInteractionPermissions";
+import { useBlockedUsers } from "@/hooks/useBlockedUsers";
+import { useToast } from "@/hooks/use-toast";
 
 const PrivacySettings = () => {
   const navigate = useNavigate();
   const { user } = useSession();
   const { profile, loading, upsertProfile } = useCurrentProfile();
+  const { blockedUsers, isLoading: blockedLoading, unblock } = useBlockedUsers();
+  const { toast } = useToast();
 
   const [isPrivate, setIsPrivate] = useState(false);
   const [whoCanComment, setWhoCanComment] = useState<CommentPermission>('everyone');
@@ -105,6 +110,54 @@ const PrivacySettings = () => {
             onChangeMessage={handleMessageChange}
             onChangeMention={handleMentionChange}
           />
+        </div>
+
+        {/* Blocked Accounts */}
+        <p className="text-base text-muted-foreground pt-6 pb-2">Blocked accounts</p>
+        <div className="divide-y divide-border">
+          {blockedLoading ? (
+            <div className="py-8 flex justify-center">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : blockedUsers.length === 0 ? (
+            <div className="py-8 flex flex-col items-center gap-2">
+              <Ban className="h-8 w-8 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">No blocked accounts</p>
+            </div>
+          ) : (
+            blockedUsers.map((block) => (
+              <div key={block.id} className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar className="h-10 w-10 flex-shrink-0">
+                    <AvatarImage src={block.profile?.avatar_url || ''} />
+                    <AvatarFallback className="text-sm">
+                      {(block.profile?.username || '?')[0].toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {block.profile?.display_name || block.profile?.username || 'Unknown'}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      @{block.profile?.username || 'unknown'}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    unblock.mutate(block.blocked_user_id, {
+                      onSuccess: () => toast({ title: "Unblocked", description: `@${block.profile?.username || 'user'} has been unblocked.` }),
+                    });
+                  }}
+                  disabled={unblock.isPending}
+                >
+                  Unblock
+                </Button>
+              </div>
+            ))
+          )}
         </div>
       </main>
     </div>
