@@ -1,120 +1,35 @@
 import { useState, useEffect } from "react";
-
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { 
-  ArrowLeft, 
-  User, 
-  Shield, 
-  Bell, 
-  HelpCircle,
-  ChevronRight,
-  LogOut,
-  Trash2,
-  Mail,
-  Lock,
-  Eye,
-  MessageSquare,
-  Play,
-  Loader2,
-  ExternalLink,
-  Ban,
-  BellRing
-} from "lucide-react";
+import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
-
-
-
 
 const Settings = () => {
   const navigate = useNavigate();
   const { user } = useSession();
   const { profile, loading, upsertProfile } = useCurrentProfile();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
-  const { isSupported: pushSupported, isSubscribed: pushSubscribed, isLoading: pushLoading, subscribe: subscribePush, unsubscribe: unsubscribePush } = usePushNotifications();
+  const { isSupported: pushSupported } = usePushNotifications();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  
-  // Settings state
-  const [settings, setSettings] = useState({
-    // Privacy
-    profilePublic: true,
-    whoCanComment: 'everyone' as 'everyone' | 'followers' | 'no_one',
-    whoCanMessage: 'everyone' as 'everyone' | 'followers' | 'following' | 'no_one',
-    whoCanMention: 'everyone' as 'everyone' | 'followers' | 'following' | 'no_one',
-    // Content & Feed
-    autoplayEmbeds: true,
-    loadEmbedsOnTap: false,
-    defaultFeedTab: 'following' as 'following' | 'discover',
-    // Notifications
-    notifyFollowers: true,
-    notifySaves: true,
-    notifyUpdates: true,
-  });
 
   // Dialogs
   const [changeEmailOpen, setChangeEmailOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Load settings from profile
-  useEffect(() => {
-    if (profile?.settings) {
-      const s = profile.settings as any;
-      setSettings(prev => ({
-        ...prev,
-        profilePublic: s.profile_public !== false,
-        whoCanComment: s.who_can_comment || 'everyone',
-        whoCanMessage: s.who_can_message || 'everyone',
-        whoCanMention: s.who_can_mention || 'everyone',
-        autoplayEmbeds: s.autoplay_embeds !== false,
-        loadEmbedsOnTap: s.load_embeds_on_tap === true,
-        defaultFeedTab: s.default_feed_tab || 'following',
-        notifyFollowers: s.notify_followers !== false,
-        notifySaves: s.notify_saves !== false,
-        notifyUpdates: s.notify_updates !== false,
-        
-      }));
-    }
-  }, [profile]);
-
-
-  const saveSettings = async (newSettings: typeof settings) => {
-    setSettings(newSettings);
-    await upsertProfile({
-      settings: {
-        ...((profile?.settings as any) || {}),
-        profile_public: newSettings.profilePublic,
-        who_can_comment: newSettings.whoCanComment,
-        who_can_message: newSettings.whoCanMessage,
-        who_can_mention: newSettings.whoCanMention,
-        autoplay_embeds: newSettings.autoplayEmbeds,
-        load_embeds_on_tap: newSettings.loadEmbedsOnTap,
-        default_feed_tab: newSettings.defaultFeedTab,
-        notify_followers: newSettings.notifyFollowers,
-        notify_saves: newSettings.notifySaves,
-        notify_updates: newSettings.notifyUpdates,
-        
-      },
-    });
-  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -161,7 +76,6 @@ const Settings = () => {
       setChangePasswordOpen(false);
       setNewPassword('');
       setConfirmPassword('');
-      setCurrentPassword('');
     }
   };
 
@@ -184,118 +98,57 @@ const Settings = () => {
     );
   }
 
-  const SettingRow = ({ 
-    icon: Icon, 
-    label, 
-    description,
-    onClick,
-    rightElement,
-    danger = false,
-  }: { 
-    icon: any; 
-    label: string; 
-    description?: string;
+  const Row = ({ label, onClick, hasChevron = true, danger = false }: {
+    label: string;
     onClick?: () => void;
-    rightElement?: React.ReactNode;
+    hasChevron?: boolean;
     danger?: boolean;
   }) => (
     <button
       onClick={onClick}
-      disabled={!onClick && !rightElement}
-      className={`w-full flex items-center gap-4 p-4 text-left transition-colors ${
-        onClick ? 'hover:bg-muted/50 active:bg-muted cursor-pointer' : ''
-      } ${danger ? 'text-destructive' : ''}`}
+      className={`w-full flex items-center justify-between py-4 text-left transition-colors active:bg-muted/50 ${danger ? 'text-destructive' : 'text-foreground'}`}
     >
-      <Icon className={`h-5 w-5 flex-shrink-0 ${danger ? '' : 'text-muted-foreground'}`} />
-      <div className="flex-1 min-w-0">
-        <p className="font-medium">{label}</p>
-        {description && <p className="text-sm text-muted-foreground truncate">{description}</p>}
-      </div>
-      {rightElement || (onClick && <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />)}
+      <span className="text-base">{label}</span>
+      {hasChevron && <ChevronRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />}
     </button>
   );
 
-  const SettingToggle = ({ 
-    icon: Icon, 
-    label, 
-    description,
-    checked,
-    onCheckedChange,
-  }: { 
-    icon: any; 
-    label: string; 
-    description?: string;
-    checked: boolean;
-    onCheckedChange: (checked: boolean) => void;
-  }) => (
-    <div className="flex items-center gap-4 p-4">
-      <Icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="font-medium">{label}</p>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
-      </div>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
-    </div>
-  );
-
-  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="mb-6">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground px-4 mb-2">{title}</h2>
-      <div className="bg-card rounded-xl border divide-y divide-border">
-        {children}
-      </div>
-    </div>
+  const SectionHeader = ({ title }: { title: string }) => (
+    <p className="text-base text-muted-foreground pt-6 pb-2">{title}</p>
   );
 
   return (
     <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
-      
-      <main className="mx-auto max-w-2xl px-4 py-6">
-        <div className="flex items-center gap-4 mb-6">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+
+      <main className="mx-auto max-w-2xl px-4 py-4">
+        {/* Top bar */}
+        <div className="flex items-center gap-3 mb-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="-ml-2">
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-2xl font-bold">Settings</h1>
+          <h1 className="text-xl font-semibold flex-1 text-center pr-10">Settings</h1>
         </div>
 
-        {/* Profile Section */}
-        <Section title="Profile">
-          <SettingRow
-            icon={User}
-            label="Edit Profile"
-            description="Username, name, bio, avatar, cover"
-            onClick={() => navigate('/edit-profile')}
-          />
-        </Section>
+        {/* Account */}
+        <SectionHeader title="Account" />
+        <div className="divide-y divide-border">
+          <Row label="Edit profile" onClick={() => navigate('/edit-profile')} />
+          <Row label="Email" onClick={() => setChangeEmailOpen(true)} />
+          <Row label="Change password" onClick={() => setChangePasswordOpen(true)} />
+          <Row label="Allow interactions" onClick={() => navigate('/settings/interactions')} />
+          <Row label="Notifications" onClick={() => navigate('/settings/notifications')} />
+          <Row label="Privacy and data" onClick={() => navigate('/settings/privacy')} />
+        </div>
 
-        {/* Account Section */}
-        <Section title="Account">
-          <SettingRow
-            icon={Mail}
-            label="Email"
-            description={user.email}
-            onClick={() => setChangeEmailOpen(true)}
-          />
-          <SettingRow
-            icon={Lock}
-            label="Change Password"
-            onClick={() => setChangePasswordOpen(true)}
-          />
-          <SettingRow
-            icon={LogOut}
-            label="Log Out"
-            onClick={handleLogout}
-          />
+        {/* Actions */}
+        <SectionHeader title="" />
+        <div className="divide-y divide-border">
+          <Row label="Log out" onClick={handleLogout} hasChevron={false} />
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <div>
-                <SettingRow
-                  icon={Trash2}
-                  label="Delete Account"
-                  danger
-                  onClick={() => {}}
-                />
+                <Row label="Delete account" onClick={() => {}} hasChevron={false} danger />
               </div>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -313,139 +166,32 @@ const Settings = () => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-        </Section>
+        </div>
 
-        <Section title="Privacy">
-          <SettingToggle
-            icon={Eye}
-            label="Public Profile"
-            description="Anyone can view your profile"
-            checked={settings.profilePublic}
-            onCheckedChange={(checked) => saveSettings({ ...settings, profilePublic: checked })}
-          />
-          <SettingRow
-            icon={MessageSquare}
-            label="Allow Interactions"
-            description="Control who can interact with you"
-            onClick={() => navigate('/settings/interactions')}
-          />
-        </Section>
-
-        {/* Content & Feed Section */}
-        <Section title="Content & Feed">
-          <SettingToggle
-            icon={Play}
-            label="Autoplay"
-            description="Videos and media play automatically"
-            checked={settings.autoplayEmbeds}
-            onCheckedChange={(checked) => saveSettings({ ...settings, autoplayEmbeds: checked })}
-          />
-        </Section>
-
-        {/* Notifications Section */}
-        <Section title="Notifications">
-          {pushSupported && (
-            <div className="flex items-center gap-4 p-4">
-              <BellRing className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="font-medium">Push Notifications</p>
-                <p className="text-sm text-muted-foreground">Get notified even when app is closed</p>
-              </div>
-              <Switch 
-                checked={pushSubscribed} 
-                disabled={pushLoading}
-                onCheckedChange={async (checked) => {
-                  if (checked) {
-                    const success = await subscribePush();
-                    if (success) {
-                      toast({ title: "Push notifications enabled" });
-                    } else {
-                      toast({ title: "Failed to enable", description: "Please allow notifications in your browser settings", variant: "destructive" });
-                    }
-                  } else {
-                    await unsubscribePush();
-                    toast({ title: "Push notifications disabled" });
-                  }
-                }} 
-              />
-            </div>
-          )}
-          <SettingToggle
-            icon={Bell}
-            label="New Followers"
-            description="When someone follows you"
-            checked={settings.notifyFollowers}
-            onCheckedChange={(checked) => saveSettings({ ...settings, notifyFollowers: checked })}
-          />
-          <SettingToggle
-            icon={Bell}
-            label="Saves"
-            description="When someone saves your post"
-            checked={settings.notifySaves}
-            onCheckedChange={(checked) => saveSettings({ ...settings, notifySaves: checked })}
-          />
-          <SettingToggle
-            icon={Bell}
-            label="Platform Updates"
-            description="News and feature announcements"
-            checked={settings.notifyUpdates}
-            onCheckedChange={(checked) => saveSettings({ ...settings, notifyUpdates: checked })}
-          />
-        </Section>
-
-
-        {/* Help & Legal Section */}
-        <Section title="Help & Legal">
-          <SettingRow
-            icon={HelpCircle}
-            label="Report a Problem"
-            onClick={() => window.open('mailto:support@aelixto.com', '_blank')}
-          />
-          <SettingRow
-            icon={Ban}
-            label="Blocked Users"
-            description="Manage blocked accounts"
-            onClick={() => toast({ title: "Coming soon", description: "Blocked users management is coming soon." })}
-          />
-          <SettingRow
-            icon={ExternalLink}
-            label="Terms of Service"
-            onClick={() => window.open('/terms', '_blank')}
-          />
-          <SettingRow
-            icon={Shield}
-            label="Privacy Policy"
-            onClick={() => window.open('/privacy', '_blank')}
-          />
-        </Section>
+        {/* Support */}
+        <SectionHeader title="Support" />
+        <div className="divide-y divide-border">
+          <Row label="Report a problem" onClick={() => window.open('mailto:support@aelixto.com', '_blank')} hasChevron={false} />
+          <Row label="Help centre" onClick={() => toast({ title: "Coming soon" })} />
+          <Row label="Terms of Service" onClick={() => window.open('/terms', '_blank')} />
+          <Row label="Privacy Policy" onClick={() => window.open('/privacy', '_blank')} />
+        </div>
       </main>
 
       <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
-      
-      <CreatePostDialog 
-        open={isCreateDialogOpen} 
-        onOpenChange={setIsCreateDialogOpen}
-      />
+      <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
 
       {/* Change Email Dialog */}
       <Dialog open={changeEmailOpen} onOpenChange={setChangeEmailOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Change Email</DialogTitle>
-            <DialogDescription>
-              Enter your new email address. You'll receive a verification email.
-            </DialogDescription>
+            <DialogDescription>Enter your new email address. You'll receive a verification email.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="new-email">New Email</Label>
-              <Input
-                id="new-email"
-                type="email"
-                value={newEmail}
-                onChange={(e) => setNewEmail(e.target.value)}
-                placeholder="your@email.com"
-              />
+              <Input id="new-email" type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="your@email.com" />
             </div>
           </div>
           <DialogFooter>
@@ -462,30 +208,16 @@ const Settings = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Change Password</DialogTitle>
-            <DialogDescription>
-              Enter your new password below.
-            </DialogDescription>
+            <DialogDescription>Enter your new password below.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="new-password">New Password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-              />
+              <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirm Password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-              />
+              <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" />
             </div>
           </div>
           <DialogFooter>
