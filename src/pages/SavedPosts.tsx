@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
-import { FeedPost } from "@/components/FeedPost";
+import { HydratedFeedPost } from "@/components/HydratedFeedPost";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
@@ -114,7 +114,7 @@ export default function SavedPosts() {
         ) : (
           <div className="space-y-4">
             {savedPosts.map((post) => (
-              <FeedPost key={post.id} post={post} userId={session?.user?.id} />
+              <HydratedFeedPost key={post.id} post={{...post, likes_count: post.likes || 0, comments_count: post.comments || 0} as any} userId={session?.user?.id} />
             ))}
           </div>
         )}
