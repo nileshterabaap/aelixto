@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { InteractionPermissions } from "@/components/settings/InteractionPermissions";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
@@ -10,11 +11,8 @@ import {
   ArrowLeft, 
   User, 
   Shield, 
-  Rss, 
   Bell, 
-  Palette, 
   HelpCircle,
-  Link2,
   ChevronRight,
   LogOut,
   Trash2,
@@ -39,7 +37,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
 
-type Theme = 'system' | 'light' | 'dark';
+
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -54,7 +52,9 @@ const Settings = () => {
   const [settings, setSettings] = useState({
     // Privacy
     profilePublic: true,
-    allowInteractions: true,
+    whoCanComment: 'everyone' as 'everyone' | 'followers' | 'no_one',
+    whoCanMessage: 'everyone' as 'everyone' | 'followers' | 'following' | 'no_one',
+    whoCanMention: 'everyone' as 'everyone' | 'followers' | 'following' | 'no_one',
     // Content & Feed
     autoplayEmbeds: true,
     loadEmbedsOnTap: false,
@@ -63,8 +63,6 @@ const Settings = () => {
     notifyFollowers: true,
     notifySaves: true,
     notifyUpdates: true,
-    // Appearance
-    theme: 'system' as Theme,
   });
 
   // Dialogs
@@ -83,34 +81,20 @@ const Settings = () => {
       setSettings(prev => ({
         ...prev,
         profilePublic: s.profile_public !== false,
-        allowInteractions: s.allow_interactions !== false,
+        whoCanComment: s.who_can_comment || 'everyone',
+        whoCanMessage: s.who_can_message || 'everyone',
+        whoCanMention: s.who_can_mention || 'everyone',
         autoplayEmbeds: s.autoplay_embeds !== false,
         loadEmbedsOnTap: s.load_embeds_on_tap === true,
         defaultFeedTab: s.default_feed_tab || 'following',
         notifyFollowers: s.notify_followers !== false,
         notifySaves: s.notify_saves !== false,
         notifyUpdates: s.notify_updates !== false,
-        theme: s.theme || 'system',
+        
       }));
     }
   }, [profile]);
 
-  // Apply theme
-  useEffect(() => {
-    const root = document.documentElement;
-    if (settings.theme === 'dark') {
-      root.classList.add('dark');
-    } else if (settings.theme === 'light') {
-      root.classList.remove('dark');
-    } else {
-      // System preference
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-    }
-  }, [settings.theme]);
 
   const saveSettings = async (newSettings: typeof settings) => {
     setSettings(newSettings);
@@ -118,14 +102,16 @@ const Settings = () => {
       settings: {
         ...((profile?.settings as any) || {}),
         profile_public: newSettings.profilePublic,
-        allow_interactions: newSettings.allowInteractions,
+        who_can_comment: newSettings.whoCanComment,
+        who_can_message: newSettings.whoCanMessage,
+        who_can_mention: newSettings.whoCanMention,
         autoplay_embeds: newSettings.autoplayEmbeds,
         load_embeds_on_tap: newSettings.loadEmbedsOnTap,
         default_feed_tab: newSettings.defaultFeedTab,
         notify_followers: newSettings.notifyFollowers,
         notify_saves: newSettings.notifySaves,
         notify_updates: newSettings.notifyUpdates,
-        theme: newSettings.theme,
+        
       },
     });
   };
@@ -329,7 +315,6 @@ const Settings = () => {
           </AlertDialog>
         </Section>
 
-        {/* Privacy Section */}
         <Section title="Privacy">
           <SettingToggle
             icon={Eye}
@@ -338,13 +323,25 @@ const Settings = () => {
             checked={settings.profilePublic}
             onCheckedChange={(checked) => saveSettings({ ...settings, profilePublic: checked })}
           />
-          <SettingToggle
-            icon={MessageSquare}
-            label="Allow Interactions"
-            description="Others can comment and message you"
-            checked={settings.allowInteractions}
-            onCheckedChange={(checked) => saveSettings({ ...settings, allowInteractions: checked })}
-          />
+          <div className="divide-y divide-border">
+            <div className="p-4">
+              <div className="flex items-center gap-4">
+                <MessageSquare className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium">Allow Interactions</p>
+                  <p className="text-sm text-muted-foreground">Control who can interact with you</p>
+                </div>
+              </div>
+            </div>
+            <InteractionPermissions
+              whoCanComment={settings.whoCanComment}
+              whoCanMessage={settings.whoCanMessage}
+              whoCanMention={settings.whoCanMention}
+              onChangeComment={(v) => saveSettings({ ...settings, whoCanComment: v })}
+              onChangeMessage={(v) => saveSettings({ ...settings, whoCanMessage: v })}
+              onChangeMention={(v) => saveSettings({ ...settings, whoCanMention: v })}
+            />
+          </div>
         </Section>
 
         {/* Content & Feed Section */}

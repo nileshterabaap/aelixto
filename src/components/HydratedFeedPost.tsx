@@ -298,6 +298,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
           open={commentsOpen} 
           onOpenChange={setCommentsOpen}
           postId={post.id}
+          postAuthorId={(post as any).user_id}
         />
       )}
     </Card>

@@ -5,22 +5,27 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useState } from "react";
 import { useComments } from "@/hooks/useComments";
 import { UsernameLink, parseTextWithMentions } from "@/components/UsernameLink";
+import { useCanInteract } from "@/hooks/useInteractionPermissions";
 
 interface CommentsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   postId: string;
+  postAuthorId?: string;
 }
 
-export const CommentsDialog = ({ open, onOpenChange, postId }: CommentsDialogProps) => {
+export const CommentsDialog = ({ open, onOpenChange, postId, postAuthorId }: CommentsDialogProps) => {
   const [comment, setComment] = useState("");
   const { comments, isLoading, createComment, isCreating } = useComments(postId);
+  const { data: canComment } = useCanInteract(postAuthorId, 'comment');
 
   const handleSubmit = () => {
     if (!comment.trim()) return;
     createComment(comment);
     setComment("");
   };
+
+  const commentDisabled = canComment && !canComment.allowed;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -58,21 +63,27 @@ export const CommentsDialog = ({ open, onOpenChange, postId }: CommentsDialogPro
             )}
           </ScrollArea>
           
-          <div className="space-y-2">
-            <Textarea
-              placeholder="Write a comment..."
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              rows={3}
-            />
-            <Button 
-              onClick={handleSubmit} 
-              disabled={!comment.trim() || isCreating}
-              className="w-full"
-            >
-              {isCreating ? "Posting..." : "Post Comment"}
-            </Button>
-          </div>
+          {commentDisabled ? (
+            <p className="text-sm text-muted-foreground text-center py-2">
+              {canComment?.reason || 'Comments are disabled'}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <Textarea
+                placeholder="Write a comment..."
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                rows={3}
+              />
+              <Button 
+                onClick={handleSubmit} 
+                disabled={!comment.trim() || isCreating}
+                className="w-full"
+              >
+                {isCreating ? "Posting..." : "Post Comment"}
+              </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
