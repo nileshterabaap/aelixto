@@ -376,6 +376,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             open={commentsOpen} 
             onOpenChange={setCommentsOpen}
             postId={post.id}
+            postAuthorId={(post as any).user_id}
           />
         )}
       </Card>
@@ -754,6 +755,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           open={commentsOpen} 
           onOpenChange={setCommentsOpen}
           postId={post.id}
+          postAuthorId={(post as any).user_id}
         />
       )}
     </Card>

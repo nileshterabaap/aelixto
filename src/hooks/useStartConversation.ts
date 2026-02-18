@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
 import { useToast } from './use-toast';
 import { useNavigate } from 'react-router-dom';
+import { getInteractionSettings } from './useInteractionPermissions';
 
 export const useStartConversation = () => {
   const { user } = useSession();
@@ -36,6 +37,50 @@ export const useStartConversation = () => {
     setLoading(true);
 
     try {
+      // Check message permissions
+      const { data: targetProfile } = await supabase
+        .from('profiles')
+        .select('settings')
+        .eq('user_id', otherUserId)
+        .single();
+
+      const interactionSettings = getInteractionSettings(targetProfile?.settings as any);
+      const perm = interactionSettings.who_can_message;
+
+      if (perm === 'no_one') {
+        toast({ title: 'Cannot message', description: 'This user has disabled messages', variant: 'destructive' });
+        setLoading(false);
+        return;
+      }
+
+      if (perm === 'followers') {
+        const { data: followData } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('follower_id', user.id)
+          .eq('following_id', otherUserId)
+          .maybeSingle();
+        if (!followData) {
+          toast({ title: 'Cannot message', description: 'Only followers can message this user', variant: 'destructive' });
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (perm === 'following') {
+        const { data: followData } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('follower_id', otherUserId)
+          .eq('following_id', user.id)
+          .maybeSingle();
+        if (!followData) {
+          toast({ title: 'Cannot message', description: 'Only people this user follows can message them', variant: 'destructive' });
+          setLoading(false);
+          return;
+        }
+      }
+
       console.log('Checking for existing conversations...');
       // Check if conversation already exists
       const { data: existingParticipants, error: participantError } = await supabase
