@@ -8,7 +8,7 @@ import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,12 +36,6 @@ const Settings = () => {
     navigate('/auth');
   };
 
-  const handleDeleteAccount = async () => {
-    toast({
-      title: "Account deletion requested",
-      description: "Please contact support to complete account deletion.",
-    });
-  };
 
   const handleChangeEmail = async () => {
     if (!newEmail) return;
@@ -136,36 +130,8 @@ const Settings = () => {
           <Row label="Edit profile" onClick={() => navigate('/edit-profile')} />
           <Row label="Email" onClick={() => setChangeEmailOpen(true)} />
           <Row label="Change password" onClick={() => setChangePasswordOpen(true)} />
-          <Row label="Allow interactions" onClick={() => navigate('/settings/interactions')} />
           <Row label="Notifications" onClick={() => navigate('/settings/notifications')} />
-          <Row label="Privacy and data" onClick={() => navigate('/settings/privacy')} />
-        </div>
-
-        {/* Actions */}
-        <SectionHeader title="" />
-        <div className="divide-y divide-border">
-          <Row label="Log out" onClick={handleLogout} hasChevron={false} />
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <div>
-                <Row label="Delete account" onClick={() => {}} hasChevron={false} danger />
-              </div>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Account?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This will permanently delete your account and all your data. This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteAccount} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                  Delete Account
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Row label="Privacy settings" onClick={() => navigate('/settings/privacy')} />
         </div>
 
         {/* Support */}
@@ -175,6 +141,12 @@ const Settings = () => {
           <Row label="Help centre" onClick={() => toast({ title: "Coming soon" })} />
           <Row label="Terms of Service" onClick={() => window.open('/terms', '_blank')} />
           <Row label="Privacy Policy" onClick={() => window.open('/privacy', '_blank')} />
+        </div>
+
+        {/* Log out at bottom */}
+        <SectionHeader title="" />
+        <div className="divide-y divide-border">
+          <Row label="Log out" onClick={handleLogout} hasChevron={false} />
         </div>
       </main>
 
