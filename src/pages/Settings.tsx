@@ -351,47 +351,11 @@ const Settings = () => {
         <Section title="Content & Feed">
           <SettingToggle
             icon={Play}
-            label="Autoplay Embeds"
+            label="Autoplay"
             description="Videos and media play automatically"
             checked={settings.autoplayEmbeds}
             onCheckedChange={(checked) => saveSettings({ ...settings, autoplayEmbeds: checked })}
           />
-          <SettingToggle
-            icon={Rss}
-            label="Load Embeds on Tap"
-            description="Load media only when tapped"
-            checked={settings.loadEmbedsOnTap}
-            onCheckedChange={(checked) => saveSettings({ ...settings, loadEmbedsOnTap: checked })}
-          />
-          <div className="flex items-center gap-4 p-4">
-            <Rss className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="font-medium">Default Feed Tab</p>
-              <p className="text-sm text-muted-foreground">Choose your home feed default</p>
-            </div>
-            <div className="flex gap-1 bg-muted rounded-lg p-1">
-              <button
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  settings.defaultFeedTab === 'following' 
-                    ? 'bg-background shadow-sm font-medium' 
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => saveSettings({ ...settings, defaultFeedTab: 'following' })}
-              >
-                Following
-              </button>
-              <button
-                className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-                  settings.defaultFeedTab === 'discover' 
-                    ? 'bg-background shadow-sm font-medium' 
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => saveSettings({ ...settings, defaultFeedTab: 'discover' })}
-              >
-                Discover
-              </button>
-            </div>
-          </div>
         </Section>
 
         {/* Notifications Section */}
@@ -445,30 +409,6 @@ const Settings = () => {
           />
         </Section>
 
-        {/* Appearance Section */}
-        <Section title="Appearance">
-          <div className="flex items-center gap-4 p-4">
-            <Palette className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="font-medium">Theme</p>
-            </div>
-            <div className="flex gap-1 bg-muted rounded-lg p-1">
-              {(['system', 'light', 'dark'] as Theme[]).map((t) => (
-                <button
-                  key={t}
-                  className={`px-3 py-1.5 text-sm rounded-md transition-colors capitalize ${
-                    settings.theme === t 
-                      ? 'bg-background shadow-sm font-medium' 
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                  onClick={() => saveSettings({ ...settings, theme: t })}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-          </div>
-        </Section>
 
         {/* Help & Legal Section */}
         <Section title="Help & Legal">
