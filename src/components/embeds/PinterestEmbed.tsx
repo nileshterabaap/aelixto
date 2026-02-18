@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import pinterestIcon from "@/assets/platforms/pinterest.svg";
 import { loadPinterestEmbed } from "@/lib/ScriptLoader";
 
@@ -88,6 +86,17 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
             console.log("[PinterestEmbed] Pinterest embeds processed");
           }
         }, 100);
+        
+        // Check if embed actually rendered after SDK processing
+        setTimeout(() => {
+          if (containerRef.current) {
+            const hasRendered = containerRef.current.querySelector('span[data-pin-href], iframe, img');
+            if (!hasRendered) {
+              console.warn("[PinterestEmbed] SDK did not render content, showing fallback");
+              setEmbedFailed(true);
+            }
+          }
+        }, 4000);
       } catch (error) {
         console.error("[PinterestEmbed] Failed to load Pinterest script:", error);
         setEmbedFailed(true);
@@ -126,30 +135,30 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   // Show loading state while expanding
   if (isExpanding) {
     return (
-      <Card className="p-6 flex flex-col items-center gap-4">
+      <div className="p-6 flex flex-col items-center gap-4 border border-border rounded-xl bg-card">
         <img src={pinterestIcon} alt="Pinterest" className="w-12 h-12" />
         <p className="text-sm text-muted-foreground text-center">
           Loading Pinterest embed...
         </p>
-      </Card>
+      </div>
     );
   }
 
   // Fallback card if Pinterest embed fails
   if (embedFailed) {
     return (
-      <Card className="p-6 flex flex-col items-center gap-4">
-        <img src={pinterestIcon} alt="Pinterest" className="w-12 h-12" />
-        <p className="text-sm text-muted-foreground text-center">
-          Unable to load Pinterest embed
-        </p>
-        <Button
-          variant="outline"
-          onClick={() => window.open(url, '_blank')}
-        >
-          View on Pinterest
-        </Button>
-      </Card>
+      <div 
+        className="rounded-xl overflow-hidden border border-border bg-card cursor-pointer hover:opacity-90 transition-opacity"
+        onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
+      >
+        <div className="flex items-center gap-3 p-4">
+          <img src={pinterestIcon} alt="Pinterest" className="w-8 h-8" />
+          <div className="flex-1 min-w-0">
+            {pinTitle && <p className="text-sm font-medium text-foreground line-clamp-2">{pinTitle}</p>}
+            <p className="text-xs text-muted-foreground mt-0.5">View on Pinterest</p>
+          </div>
+        </div>
+      </div>
     );
   }
 
