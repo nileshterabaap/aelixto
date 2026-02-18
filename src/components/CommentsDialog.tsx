@@ -8,6 +8,7 @@ import { UsernameLink, parseTextWithMentions } from "@/components/UsernameLink";
 import { useCanInteract } from "@/hooks/useInteractionPermissions";
 import { useSession } from "@/hooks/useSession";
 import { Trash2, Reply, X } from "lucide-react";
+import { formatDistanceToNowStrict } from "date-fns";
 
 interface CommentsDialogProps {
   open: boolean;
@@ -15,6 +16,18 @@ interface CommentsDialogProps {
   postId: string;
   postAuthorId?: string;
 }
+
+const timeAgo = (date: string) => {
+  const str = formatDistanceToNowStrict(new Date(date), { addSuffix: false });
+  return str
+    .replace(' seconds', 's').replace(' second', 's')
+    .replace(' minutes', 'm').replace(' minute', 'm')
+    .replace(' hours', 'h').replace(' hour', 'h')
+    .replace(' days', 'd').replace(' day', 'd')
+    .replace(' weeks', 'w').replace(' week', 'w')
+    .replace(' months', 'mo').replace(' month', 'mo')
+    .replace(' years', 'y').replace(' year', 'y');
+};
 
 const CommentItem = ({
   comment,
@@ -29,36 +42,37 @@ const CommentItem = ({
   onDelete: (commentId: string) => void;
   isReply?: boolean;
 }) => (
-  <div className={`flex gap-3 ${isReply ? 'ml-8 mt-2' : ''}`}>
+  <div className={`flex gap-3 ${isReply ? 'ml-12 mt-3' : ''}`}>
     <img 
       src={comment.profiles?.avatar_url || "/placeholder.svg"} 
       alt={comment.profiles?.username || "User"}
-      className="h-8 w-8 rounded-full object-cover flex-shrink-0"
+      className={`${isReply ? 'h-7 w-7' : 'h-9 w-9'} rounded-full object-cover flex-shrink-0`}
     />
     <div className="flex-1 min-w-0">
-      <UsernameLink 
-        username={comment.profiles?.username || "unknown"}
-        className="font-semibold text-sm"
-      >
-        {comment.profiles?.display_name || comment.profiles?.username || "Unknown"}
-      </UsernameLink>
+      <div className="flex items-center gap-2">
+        <UsernameLink 
+          username={comment.profiles?.username || "unknown"}
+          className="font-semibold text-sm"
+        >
+          {comment.profiles?.username || "unknown"}
+        </UsernameLink>
+        <span className="text-xs text-muted-foreground">{timeAgo(comment.created_at)}</span>
+      </div>
       <p className="text-sm mt-0.5">{parseTextWithMentions(comment.content)}</p>
-      <div className="flex items-center gap-3 mt-1">
+      <div className="flex items-center gap-4 mt-1">
         {!isReply && (
           <button
             onClick={() => onReply(comment.id, comment.profiles?.username || "unknown")}
-            className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
+            className="text-xs font-semibold text-muted-foreground hover:text-foreground"
           >
-            <Reply className="h-3 w-3" />
             Reply
           </button>
         )}
         {currentUserId === comment.user_id && (
           <button
             onClick={() => onDelete(comment.id)}
-            className="text-xs text-muted-foreground hover:text-destructive flex items-center gap-1"
+            className="text-xs font-semibold text-muted-foreground hover:text-destructive"
           >
-            <Trash2 className="h-3 w-3" />
             Delete
           </button>
         )}
@@ -66,6 +80,56 @@ const CommentItem = ({
     </div>
   </div>
 );
+
+const RepliesSection = ({
+  replies,
+  currentUserId,
+  onReply,
+  onDelete,
+}: {
+  replies: Comment[];
+  currentUserId?: string;
+  onReply: (commentId: string, username: string) => void;
+  onDelete: (commentId: string) => void;
+}) => {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!replies || replies.length === 0) return null;
+
+  return (
+    <div className="ml-12 mt-2">
+      {!expanded ? (
+        <button
+          onClick={() => setExpanded(true)}
+          className="text-xs font-semibold text-primary hover:underline flex items-center gap-2"
+        >
+          <span className="w-6 h-px bg-muted-foreground/40 inline-block" />
+          View {replies.length} {replies.length === 1 ? 'reply' : 'replies'}
+        </button>
+      ) : (
+        <div className="space-y-3">
+          {replies.map((reply) => (
+            <CommentItem
+              key={reply.id}
+              comment={reply}
+              currentUserId={currentUserId}
+              onReply={onReply}
+              onDelete={onDelete}
+              isReply
+            />
+          ))}
+          <button
+            onClick={() => setExpanded(false)}
+            className="text-xs font-semibold text-primary hover:underline flex items-center gap-2"
+          >
+            <span className="w-6 h-px bg-muted-foreground/40 inline-block" />
+            Hide replies
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const CommentsDialog = ({ open, onOpenChange, postId, postAuthorId }: CommentsDialogProps) => {
   const [comment, setComment] = useState("");
@@ -95,7 +159,7 @@ export const CommentsDialog = ({ open, onOpenChange, postId, postAuthorId }: Com
           <DialogTitle>Comments ({totalCount})</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <ScrollArea className="h-[300px] pr-4">
+          <ScrollArea className="h-[350px] pr-4">
             {isLoading ? (
               <p className="text-sm text-muted-foreground text-center py-4">Loading comments...</p>
             ) : comments.length === 0 ? (
@@ -110,16 +174,12 @@ export const CommentsDialog = ({ open, onOpenChange, postId, postAuthorId }: Com
                       onReply={handleReply}
                       onDelete={deleteComment}
                     />
-                    {c.replies?.map((reply) => (
-                      <CommentItem
-                        key={reply.id}
-                        comment={reply}
-                        currentUserId={user?.id}
-                        onReply={handleReply}
-                        onDelete={deleteComment}
-                        isReply
-                      />
-                    ))}
+                    <RepliesSection
+                      replies={c.replies || []}
+                      currentUserId={user?.id}
+                      onReply={handleReply}
+                      onDelete={deleteComment}
+                    />
                   </div>
                 ))}
               </div>
