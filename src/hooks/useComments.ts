@@ -7,12 +7,14 @@ export interface Comment {
   post_id: string;
   user_id: string;
   content: string;
+  parent_id: string | null;
   created_at: string;
   profiles?: {
     username: string;
     display_name: string | null;
     avatar_url: string | null;
   };
+  replies?: Comment[];
 }
 
 export const useComments = (postId: string) => {
@@ -32,28 +34,57 @@ export const useComments = (postId: string) => {
       if (!commentsData) return [];
 
       // Fetch profiles for all comment authors
-      const userIds = commentsData.map(c => c.user_id);
+      const userIds = [...new Set(commentsData.map(c => c.user_id))];
       const { data: profilesData } = await supabase
         .from("profiles")
         .select("user_id, username, display_name, avatar_url")
         .in("user_id", userIds);
 
       // Merge profiles with comments
-      return commentsData.map(comment => ({
+      const allComments = commentsData.map(comment => ({
         ...comment,
-        profiles: profilesData?.find(p => p.user_id === comment.user_id) || null
+        profiles: profilesData?.find(p => p.user_id === comment.user_id) || null,
+        replies: [] as Comment[],
       })) as Comment[];
+
+      // Build tree: separate top-level and replies
+      const topLevel: Comment[] = [];
+      const replyMap = new Map<string, Comment[]>();
+
+      for (const c of allComments) {
+        if (!c.parent_id) {
+          topLevel.push(c);
+        } else {
+          if (!replyMap.has(c.parent_id)) replyMap.set(c.parent_id, []);
+          replyMap.get(c.parent_id)!.push(c);
+        }
+      }
+
+      // Attach replies to parents
+      for (const c of topLevel) {
+        c.replies = replyMap.get(c.id) || [];
+      }
+
+      return topLevel;
     },
   });
 
+  // Total count including replies
+  const totalCount = comments.reduce((sum, c) => sum + 1 + (c.replies?.length || 0), 0);
+
   const createComment = useMutation({
-    mutationFn: async (content: string) => {
+    mutationFn: async ({ content, parentId }: { content: string; parentId?: string }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
       const { error } = await supabase
         .from("comments")
-        .insert({ post_id: postId, user_id: user.id, content });
+        .insert({ 
+          post_id: postId, 
+          user_id: user.id, 
+          content,
+          ...(parentId ? { parent_id: parentId } : {}),
+        });
 
       if (error) throw error;
     },
@@ -71,10 +102,36 @@ export const useComments = (postId: string) => {
     },
   });
 
+  const deleteComment = useMutation({
+    mutationFn: async (commentId: string) => {
+      const { error } = await supabase
+        .from("comments")
+        .delete()
+        .eq("id", commentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["comments", postId] });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      toast({ title: "Comment deleted" });
+    },
+    onError: () => {
+      toast({ 
+        title: "Error", 
+        description: "Failed to delete comment", 
+        variant: "destructive" 
+      });
+    },
+  });
+
   return {
     comments,
+    totalCount,
     isLoading,
-    createComment: createComment.mutate,
+    createComment: (content: string, parentId?: string) => createComment.mutate({ content, parentId }),
     isCreating: createComment.isPending,
+    deleteComment: deleteComment.mutate,
+    isDeleting: deleteComment.isPending,
   };
 };

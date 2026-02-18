@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Loader2, Ban } from "lucide-react";
+import { ArrowLeft, Loader2, Ban, Heart } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -19,6 +19,7 @@ const PrivacySettings = () => {
   const { toast } = useToast();
 
   const [isPrivate, setIsPrivate] = useState(false);
+  const [hideLikes, setHideLikes] = useState(false);
   const [whoCanComment, setWhoCanComment] = useState<CommentPermission>('everyone');
   const [whoCanMessage, setWhoCanMessage] = useState<MessagePermission>('everyone');
   const [whoCanMention, setWhoCanMention] = useState<MentionPermission>('everyone');
@@ -27,6 +28,7 @@ const PrivacySettings = () => {
     if (profile?.settings) {
       const s = profile.settings as any;
       setIsPrivate(s.is_private || false);
+      setHideLikes(s.hide_likes || false);
       setWhoCanComment(s.who_can_comment || 'everyone');
       setWhoCanMessage(s.who_can_message || 'everyone');
       setWhoCanMention(s.who_can_mention || 'everyone');
@@ -44,6 +46,11 @@ const PrivacySettings = () => {
   const handlePrivateToggle = (checked: boolean) => {
     setIsPrivate(checked);
     saveSettings({ is_private: checked });
+  };
+
+  const handleHideLikesToggle = (checked: boolean) => {
+    setHideLikes(checked);
+    saveSettings({ hide_likes: checked });
   };
 
   const handleCommentChange = (v: CommentPermission) => {
@@ -96,6 +103,13 @@ const PrivacySettings = () => {
               <p className="text-sm text-muted-foreground mt-0.5">Only approved followers can see your posts</p>
             </div>
             <Switch checked={isPrivate} onCheckedChange={handlePrivateToggle} />
+          </div>
+          <div className="flex items-center justify-between py-4">
+            <div>
+              <span className="text-base text-foreground">Hide like counts</span>
+              <p className="text-sm text-muted-foreground mt-0.5">Others won't see like counts on your posts</p>
+            </div>
+            <Switch checked={hideLikes} onCheckedChange={handleHideLikesToggle} />
           </div>
         </div>
 
