@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { InteractionPermissions } from "@/components/settings/InteractionPermissions";
+
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
@@ -323,25 +323,12 @@ const Settings = () => {
             checked={settings.profilePublic}
             onCheckedChange={(checked) => saveSettings({ ...settings, profilePublic: checked })}
           />
-          <div className="divide-y divide-border">
-            <div className="p-4">
-              <div className="flex items-center gap-4">
-                <MessageSquare className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium">Allow Interactions</p>
-                  <p className="text-sm text-muted-foreground">Control who can interact with you</p>
-                </div>
-              </div>
-            </div>
-            <InteractionPermissions
-              whoCanComment={settings.whoCanComment}
-              whoCanMessage={settings.whoCanMessage}
-              whoCanMention={settings.whoCanMention}
-              onChangeComment={(v) => saveSettings({ ...settings, whoCanComment: v })}
-              onChangeMessage={(v) => saveSettings({ ...settings, whoCanMessage: v })}
-              onChangeMention={(v) => saveSettings({ ...settings, whoCanMention: v })}
-            />
-          </div>
+          <SettingRow
+            icon={MessageSquare}
+            label="Allow Interactions"
+            description="Control who can interact with you"
+            onClick={() => navigate('/settings/interactions')}
+          />
         </Section>
 
         {/* Content & Feed Section */}
