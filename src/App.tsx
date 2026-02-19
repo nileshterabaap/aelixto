@@ -26,6 +26,8 @@ import NotFound from "./pages/NotFound";
 import SavedPosts from "./pages/SavedPosts";
 import InteractionSettings from "./pages/InteractionSettings";
 import PrivacySettings from "./pages/PrivacySettings";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
 // Configure QueryClient with aggressive caching for instant navigation
 const queryClient = new QueryClient({
@@ -91,6 +93,8 @@ const AnimatedRoutes = () => {
             <Route path="/edit-profile" element={<PageTransition><EditProfile /></PageTransition>} />
             <Route path="/saved" element={<PageTransition><SavedPosts /></PageTransition>} />
             <Route path="/auth" element={<PageTransition><Auth /></PageTransition>} />
+            <Route path="/privacy" element={<PageTransition><PrivacyPolicy /></PageTransition>} />
+            <Route path="/terms" element={<PageTransition><TermsOfService /></PageTransition>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
           </Routes>

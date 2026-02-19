@@ -139,8 +139,8 @@ const Settings = () => {
         <div className="divide-y divide-border">
           <Row label="Report a problem" onClick={() => window.open('mailto:support@aelixto.com', '_blank')} hasChevron={false} />
           <Row label="Help centre" onClick={() => toast({ title: "Coming soon" })} />
-          <Row label="Terms of Service" onClick={() => window.open('/terms', '_blank')} />
-          <Row label="Privacy Policy" onClick={() => window.open('/privacy', '_blank')} />
+          <Row label="Terms of Service" onClick={() => navigate('/terms')} />
+          <Row label="Privacy Policy" onClick={() => navigate('/privacy')} />
         </div>
 
         {/* Log out at bottom */}
