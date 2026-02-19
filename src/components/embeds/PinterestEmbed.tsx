@@ -13,17 +13,12 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   const [isExpanding, setIsExpanding] = useState(false);
   const [pinTitle, setPinTitle] = useState<string>("");
 
-  console.log("[PinterestEmbed] Component mounted with URL:", url);
-
   useEffect(() => {
     const loadEmbed = async () => {
-      console.log("[PinterestEmbed] useEffect triggered - Loading Pinterest embed for URL:", url);
-      
       let finalUrl = url;
 
       // If it's a pin.it short link, expand it first
       if (url.includes('pin.it/')) {
-        console.log("[PinterestEmbed] Detected pin.it short link, expanding...");
         setIsExpanding(true);
         
         try {
@@ -36,13 +31,11 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
           
           if (data?.finalUrl) {
             finalUrl = data.finalUrl;
-            console.log("[PinterestEmbed] Expanded to:", finalUrl);
             setResolvedUrl(finalUrl);
           } else {
             throw new Error("No final URL returned");
           }
-        } catch (error) {
-          console.error("[PinterestEmbed] Failed to expand short link:", error);
+        } catch {
           setEmbedFailed(true);
           setIsExpanding(false);
           return;
@@ -59,17 +52,15 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
           const data = await response.json();
           if (data.title) {
             setPinTitle(data.title);
-            console.log("[PinterestEmbed] Fetched pin title:", data.title);
           }
         }
-      } catch (error) {
-        console.warn("[PinterestEmbed] Failed to fetch pin metadata:", error);
+      } catch {
+        // Non-critical: title is optional
       }
 
-      // Validate Pinterest URL - must be a pin URL with digits or alphanumeric ID
+      // Validate Pinterest URL
       const isPinterestPin = /pinterest\.com\/pin\/[a-zA-Z0-9]+\/?/.test(finalUrl);
       if (!isPinterestPin) {
-        console.warn("[PinterestEmbed] Invalid Pinterest pin URL:", finalUrl);
         setEmbedFailed(true);
         return;
       }
@@ -77,13 +68,11 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
       // Load Pinterest script using ScriptLoader
       try {
         await loadPinterestEmbed();
-        console.log("[PinterestEmbed] Pinterest script loaded successfully");
         
         // Process embeds after script loads
         setTimeout(() => {
           if (window.PinUtils) {
             window.PinUtils.build();
-            console.log("[PinterestEmbed] Pinterest embeds processed");
           }
         }, 100);
         
@@ -92,31 +81,24 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
           if (containerRef.current) {
             const hasRendered = containerRef.current.querySelector('span[data-pin-href], iframe, img');
             if (!hasRendered) {
-              console.warn("[PinterestEmbed] SDK did not render content, showing fallback");
               setEmbedFailed(true);
             }
           }
         }, 4000);
-      } catch (error) {
-        console.error("[PinterestEmbed] Failed to load Pinterest script:", error);
+      } catch {
         setEmbedFailed(true);
       }
     };
 
-    console.log("[PinterestEmbed] Calling loadEmbed function...");
     loadEmbed();
 
     // MutationObserver to remove Pinterest save buttons after they load
     const observer = new MutationObserver(() => {
       if (containerRef.current) {
-        // Find and remove all Pinterest save buttons
         const saveButtons = containerRef.current.querySelectorAll(
           'span[data-pin-log], a[data-pin-log], button[data-pin-save="true"], .pin-save-button, span[data-pin-href]'
         );
-        saveButtons.forEach(button => {
-          button.remove();
-          console.log("[PinterestEmbed] Removed save button");
-        });
+        saveButtons.forEach(button => button.remove());
       }
     });
 
@@ -132,7 +114,6 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
     };
   }, [url]);
 
-  // Show loading state while expanding
   if (isExpanding) {
     return (
       <div className="p-6 flex flex-col items-center gap-4 border border-border rounded-xl bg-card">
@@ -144,7 +125,6 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
     );
   }
 
-  // Fallback card if Pinterest embed fails
   if (embedFailed) {
     return (
       <div 
@@ -162,8 +142,6 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
     );
   }
 
-  console.log("[PinterestEmbed] Rendering Pinterest embed. Failed:", embedFailed, "Expanding:", isExpanding, "URL:", resolvedUrl);
-
   return (
     <div className="w-full max-w-[500px] mx-auto">
       <div ref={containerRef} className="pinterest-embed-container w-full flex flex-col justify-center">
@@ -179,7 +157,6 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
           href={resolvedUrl}
           className={pinTitle ? "rounded-t-none" : ""}
         >
-          {/* Fallback content */}
           View Pin
         </a>
       </div>
@@ -187,7 +164,6 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
   );
 };
 
-// Extend window type for Pinterest
 declare global {
   interface Window {
     PinUtils?: {
