@@ -58,25 +58,19 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
 
   useEffect(() => {
     const loadEmbed = async () => {
-      console.log('[TwitterEmbed] Loading tweet from URL:', url);
       try {
         const tweetId = extractTweetId(url);
-        console.log('[TwitterEmbed] Extracted tweet ID:', tweetId);
         
         if (!tweetId) {
-          console.error('[TwitterEmbed] Failed to extract tweet ID from URL');
           setError(true);
           setLoading(false);
           return;
         }
 
-        console.log('[TwitterEmbed] Loading Twitter script...');
         await loadTwitterScript();
-        console.log('[TwitterEmbed] Twitter script loaded successfully');
 
         if (containerRef.current && window.twttr) {
           containerRef.current.innerHTML = "";
-          console.log('[TwitterEmbed] Creating tweet widget...');
           
           const tweet = await window.twttr.widgets.createTweet(
             tweetId,
@@ -90,10 +84,7 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
           );
 
           if (!tweet) {
-            console.error('[TwitterEmbed] Failed to create tweet widget');
             setError(true);
-          } else {
-            console.log('[TwitterEmbed] Tweet widget created successfully');
           }
         }
       } catch (err) {

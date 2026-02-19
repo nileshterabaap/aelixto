@@ -77,6 +77,7 @@ const detectPlatformFromUrl = (url?: string) => {
   if (url.includes('facebook.com') || url.includes('fb.watch') || url.includes('fb.me')) return 'facebook';
   if (url.includes('threads.net') || url.includes('threads.com')) return 'threads';
   if (url.includes('linkedin.com')) return 'linkedin';
+  if (url.includes('tiktok.com')) return 'tiktok';
   return null;
 };
 

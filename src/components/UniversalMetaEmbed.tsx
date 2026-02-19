@@ -21,17 +21,19 @@ type CachedEmbed = {
 const embedCache = new Map<string, CachedEmbed>();
 
 // Detect platform from URL
-const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 'reddit' | 'quora' | 'medium' | 'blog' | 'threads' | 'linkedin' | 'unknown' => {
+const detectPlatform = (url: string): 'instagram' | 'facebook' | 'spotify' | 'reddit' | 'quora' | 'medium' | 'blog' | 'threads' | 'linkedin' | 'tiktok' | 'unknown' => {
   const urlLower = url.toLowerCase();
   if (urlLower.includes('instagram.com') || urlLower.includes('instagr.am')) {
     return 'instagram';
   }
   if (urlLower.includes('facebook.com') || urlLower.includes('fb.watch') || urlLower.includes('fb.me')) {
-    console.log('[UniversalMetaEmbed] Detected Facebook URL:', url);
     return 'facebook';
   }
   if (urlLower.includes('spotify.com') || urlLower.includes('open.spotify.com')) {
     return 'spotify';
+  }
+  if (urlLower.includes('tiktok.com')) {
+    return 'tiktok';
   }
   if (urlLower.includes('reddit.com')) {
     return 'reddit';
@@ -81,8 +83,6 @@ const buildInstagramEmbed = (url: string): string => {
 const normalizeFacebookUrl = (raw: string): string => {
   let url = raw.trim();
 
-  console.log('[FB EMBED] Starting normalization for:', url);
-
   // 1) Always use www. instead of mobile variants
   url = url
     .replace(/^https?:\/\/m\.facebook\.com\//, 'https://www.facebook.com/')
@@ -94,7 +94,6 @@ const normalizeFacebookUrl = (raw: string): string => {
     const u = new URL(url);
     if (u.hostname.endsWith('facebook.com') && u.pathname.includes('/login') && u.searchParams.get('next')) {
       const actualUrl = decodeURIComponent(u.searchParams.get('next')!);
-      console.log('[FB EMBED] Extracted URL from login redirect:', actualUrl);
       url = actualUrl;
     }
   } catch (e) {
@@ -106,7 +105,6 @@ const normalizeFacebookUrl = (raw: string): string => {
     const u = new URL(url);
     if (u.hostname.endsWith('facebook.com') && u.pathname === '/l.php' && u.searchParams.get('u')) {
       const extractedUrl = decodeURIComponent(u.searchParams.get('u')!);
-      console.log('[FB EMBED] Extracted redirect URL:', extractedUrl);
       url = extractedUrl;
     }
   } catch (e) {
@@ -126,7 +124,7 @@ const normalizeFacebookUrl = (raw: string): string => {
     console.warn('[FB EMBED] Failed to clean URL params:', e);
   }
 
-  console.log('[FB EMBED] Normalized URL:', url);
+  return url;
   return url;
 };
 
@@ -134,11 +132,6 @@ const normalizeFacebookUrl = (raw: string): string => {
 const buildFacebookEmbed = (url: string): string => {
   const canonical = normalizeFacebookUrl(url);
 
-  console.log('[FB EMBED] Building embed:', {
-    originalUrl: url,
-    normalizedUrl: canonical,
-    embedType: 'sdk-xfbml-div',
-  });
 
   // IMPORTANT: do not hardcode data-width (breaks mobile sizing). Let CSS control width.
   return `<div class="fb-post" data-href="${canonical}" data-show-text="true"></div>`;
@@ -218,6 +211,21 @@ const buildThreadsEmbed = (url: string): string | null => {
   return null;
 };
 
+// Build TikTok embed HTML using oEmbed blockquote approach
+const buildTikTokEmbed = (url: string): string | null => {
+  try {
+    const u = new URL(url);
+    // TikTok video URLs: /@user/video/ID or /t/ID
+    const videoMatch = u.pathname.match(/\/@[^/]+\/video\/(\d+)/) || u.pathname.match(/\/t\/([A-Za-z0-9]+)/);
+    if (videoMatch) {
+      return `<blockquote class="tiktok-embed" cite="${url}" data-video-id="${videoMatch[1]}" style="max-width:605px;min-width:325px;"><section><a target="_blank" href="${url}" rel="noopener noreferrer">View on TikTok</a></section></blockquote><script async src="https://www.tiktok.com/embed.js"></script>`;
+    }
+  } catch {
+    // Fall through
+  }
+  return null;
+};
+
 
 export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   const cached = embedCache.get(url);
@@ -258,7 +266,9 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               ? buildLinkedInEmbed(url)
               : platform === 'threads'
                 ? buildThreadsEmbed(url)
-                : null;
+                : platform === 'tiktok'
+                  ? buildTikTokEmbed(url)
+                  : null;
 
     if (immediateHtml && !showFallback) {
       setEmbedHtml(immediateHtml);
@@ -268,6 +278,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       let finalUrl = url;
       let urlForEmbed = url;
       let shouldShowFallback = false;
+      let computedHtml: string | null = null;
 
       try {
         // Step 1: Expand short URLs and Facebook share URLs
@@ -279,7 +290,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           (url.includes('facebook.com') && url.includes('/share/'));
 
         if (needsExpansion) {
-          console.log('[UniversalMetaEmbed] Expanding URL:', url);
+          
           try {
             const { data: expandData, error: expandError } = await supabase.functions.invoke('expand-url', {
               body: { url },
@@ -288,16 +299,16 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
             if (!expandError && expandData?.finalUrl) {
               finalUrl = expandData.finalUrl;
               urlForEmbed = finalUrl;
-              console.log('[UniversalMetaEmbed] Expanded to:', finalUrl);
+              
 
               // If expanded URL is a login redirect or has login in title, use fallback
               if (finalUrl.includes('/login/') && platform === 'facebook') {
-                console.log('[UniversalMetaEmbed] Expanded URL is login redirect, will use fallback');
+                
                 shouldShowFallback = true;
               }
 
               if (expandData?.title?.toLowerCase().includes('log in to facebook')) {
-                console.log('[UniversalMetaEmbed] Title indicates login required, will use fallback');
+                
                 shouldShowFallback = true;
               }
             } else {
@@ -324,7 +335,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
               // Check if the OG data indicates a login page
               if (ogTitle?.toLowerCase().includes('log in to facebook') && platform === 'facebook') {
-                console.log('[UniversalMetaEmbed] OG title indicates login page, showing fallback');
+                
                 shouldShowFallback = true;
                 setShowFallback(true);
               }
@@ -339,52 +350,44 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           .catch((err) => console.warn('[UniversalMetaEmbed] OG fetch failed:', err));
 
         // Step 3: Build embed HTML based on platform (skip if we should show fallback)
+        computedHtml = null;
         if (!shouldShowFallback) {
           if (platform === 'instagram') {
-            setEmbedHtml(buildInstagramEmbed(urlForEmbed));
+            computedHtml = buildInstagramEmbed(urlForEmbed);
           } else if (platform === 'facebook') {
-            setEmbedHtml(buildFacebookEmbed(urlForEmbed));
+            computedHtml = buildFacebookEmbed(urlForEmbed);
           } else if (platform === 'spotify') {
-            const html = buildSpotifyEmbed(urlForEmbed);
-            if (html) {
-              setEmbedHtml(html);
-            } else {
-              shouldShowFallback = true;
-              setShowFallback(true);
-            }
+            computedHtml = buildSpotifyEmbed(urlForEmbed);
           } else if (platform === 'linkedin') {
-            const html = buildLinkedInEmbed(urlForEmbed);
-            if (html) {
-              setEmbedHtml(html);
-            } else {
-              shouldShowFallback = true;
-              setShowFallback(true);
-            }
+            computedHtml = buildLinkedInEmbed(urlForEmbed);
           } else if (platform === 'threads') {
-            const html = buildThreadsEmbed(urlForEmbed);
-            if (html) {
-              setEmbedHtml(html);
-            } else {
-              shouldShowFallback = true;
-              setShowFallback(true);
-            }
+            computedHtml = buildThreadsEmbed(urlForEmbed);
+          } else if (platform === 'tiktok') {
+            computedHtml = buildTikTokEmbed(urlForEmbed);
+          }
+
+          if (computedHtml) {
+            setEmbedHtml(computedHtml);
+          } else {
+            shouldShowFallback = true;
+            setShowFallback(true);
           }
         } else {
           setShowFallback(true);
         }
       } catch (error) {
         console.error('[UniversalMetaEmbed] Error processing URL:', error);
-      } finally {
-        // Write the most recent state to cache (prevents flicker on navigation back)
-        const next: CachedEmbed = {
-          embedHtml: shouldShowFallback ? null : embedHtml,
-          fallbackData,
-          expandedUrl: finalUrl,
-          embedUrl: urlForEmbed,
-          showFallback: shouldShowFallback || showFallback,
-        };
-        embedCache.set(url, next);
       }
+
+      // Write computed values to cache (NOT stale state refs)
+      const cacheEntry: CachedEmbed = {
+        embedHtml: shouldShowFallback ? null : computedHtml ?? immediateHtml,
+        fallbackData: null, // OG data arrives async and updates cache separately
+        expandedUrl: finalUrl,
+        embedUrl: urlForEmbed,
+        showFallback: shouldShowFallback,
+      };
+      embedCache.set(url, cacheEntry);
     };
 
     // If we already have a cached resolved version, don't redo network work.
@@ -465,7 +468,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         <RawEmbedRenderer
           embedHtml={embedHtml}
           onError={() => {
-            console.log('[UniversalMetaEmbed] onError called, setting showFallback to true');
+            
             setShowFallback(true);
           }}
         />
@@ -476,25 +479,17 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   // Show fallback if no embed HTML or if embed failed
   const platform = detectPlatform(expandedUrl);
   const platformName =
-    platform === 'instagram'
-      ? 'Instagram'
-      : platform === 'facebook'
-        ? 'Facebook'
-        : platform === 'spotify'
-          ? 'Spotify'
-          : platform === 'reddit'
-            ? 'Reddit'
-            : platform === 'quora'
-              ? 'Quora'
-              : platform === 'medium'
-                ? 'Medium'
-                : platform === 'blog'
-                  ? 'Blog'
-                  : platform === 'threads'
-                    ? 'Threads'
-                    : platform === 'linkedin'
-                      ? 'LinkedIn'
-                      : 'Web';
+    platform === 'instagram' ? 'Instagram'
+    : platform === 'facebook' ? 'Facebook'
+    : platform === 'spotify' ? 'Spotify'
+    : platform === 'reddit' ? 'Reddit'
+    : platform === 'quora' ? 'Quora'
+    : platform === 'medium' ? 'Medium'
+    : platform === 'blog' ? 'Blog'
+    : platform === 'threads' ? 'Threads'
+    : platform === 'linkedin' ? 'LinkedIn'
+    : platform === 'tiktok' ? 'TikTok'
+    : 'Web';
 
   return (
     <OgCardFallback

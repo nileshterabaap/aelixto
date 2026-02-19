@@ -18,6 +18,8 @@ export const EmbedSkeleton = ({ platform }: EmbedSkeletonProps) => {
         return 'aspect-[4/3]';
       case 'spotify':
         return 'h-[352px]';
+      case 'tiktok':
+        return 'aspect-[9/16] max-w-[325px] mx-auto';
       case 'pinterest':
         return 'aspect-[3/4] max-w-[500px] mx-auto';
       case 'reddit':

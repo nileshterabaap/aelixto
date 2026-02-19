@@ -7,7 +7,7 @@ import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
-import { EmbedSkeleton } from '@/components/EmbedSkeleton';
+import { SkeletonGate } from '@/components/embeds/SkeletonGate';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -34,81 +34,6 @@ const isYouTubeShort = (url: string) => url.includes('/shorts/');
 const getYouTubeThumbnail = (url: string) => {
   const videoId = getYouTubeVideoId(url);
   return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : null;
-};
-
-const MIN_SKELETON_MS = 200;
-
-/**
- * Wrapper that guarantees a skeleton shows for at least MIN_SKELETON_MS,
- * then fades smoothly into the real content.
- */
-const SkeletonGate = ({
-  platform,
-  children,
-}: {
-  platform?: string;
-  children: React.ReactNode;
-}) => {
-  const [ready, setReady] = useState(false);
-  const [minElapsed, setMinElapsed] = useState(false);
-  const mountTime = useRef(Date.now());
-
-  useEffect(() => {
-    const remaining = MIN_SKELETON_MS - (Date.now() - mountTime.current);
-    const timer = setTimeout(() => setMinElapsed(true), Math.max(0, remaining));
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Content signals it's ready via a MutationObserver (iframe appeared)
-  // or after a reasonable timeout
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
-    // Check immediately
-    const check = () => {
-      if (el.querySelector('iframe, img, .twitter-embed-container *, .pinterest-embed-container *')) {
-        setReady(true);
-        return true;
-      }
-      return false;
-    };
-
-    if (check()) return;
-
-    const observer = new MutationObserver(() => { check(); });
-    observer.observe(el, { childList: true, subtree: true });
-
-    // Fallback: mark ready after 5s regardless
-    const fallback = setTimeout(() => setReady(true), 5000);
-
-    return () => {
-      observer.disconnect();
-      clearTimeout(fallback);
-    };
-  }, []);
-
-  const showContent = ready && minElapsed;
-
-  return (
-    <div className="relative w-full">
-      {/* Skeleton layer */}
-      <div
-        className={`transition-opacity duration-300 ${showContent ? 'opacity-0 pointer-events-none absolute inset-0' : 'opacity-100'}`}
-      >
-        <EmbedSkeleton platform={platform} />
-      </div>
-      {/* Content layer - always mounted so embeds can initialize */}
-      <div
-        ref={containerRef}
-        className={`transition-opacity duration-300 ${showContent ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}
-      >
-        {children}
-      </div>
-    </div>
-  );
 };
 
 export const HydratedEmbed = memo(({ 
