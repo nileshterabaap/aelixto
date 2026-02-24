@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
@@ -14,6 +14,7 @@ import { useUserPlatformTabs } from "@/hooks/useUserPlatformTabs";
 import { useStartConversation } from "@/hooks/useStartConversation";
 import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
 import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
+import { PullToRefresh } from "@/components/PullToRefresh";
 
 interface UserProfileProps {
   usernameOverride?: string;
@@ -32,6 +33,10 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
+
+  const handleRefresh = useCallback(async () => {
+    await fetchProfile();
+  }, [username]);
 
   useEffect(() => {
     if (username) {
@@ -128,8 +133,10 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
     );
   }
 
+
   return (
     <div className="min-h-screen bg-background pb-20">
+      <PullToRefresh onRefresh={handleRefresh}>
       <main className="mx-auto max-w-2xl">
         {/* Cover Image with Header Overlay */}
         <div className="relative h-[400px] bg-gradient-to-r from-purple-500 to-pink-500">
@@ -288,6 +295,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           ) : null}
         </div>
       </main>
+      </PullToRefresh>
 
       <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
       
