@@ -1,8 +1,76 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
+
+/**
+ * Threads iframe with auto-fallback to OG card if iframe fails to load.
+ */
+const ThreadsIframeEmbed = ({
+  src,
+  expandedUrl,
+  fallbackData,
+}: {
+  src: string;
+  expandedUrl: string;
+  fallbackData: { title?: string; image?: string; description?: string } | null;
+}) => {
+  const [failed, setFailed] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  useEffect(() => {
+    // Safety timeout: if iframe doesn't render content in 10s, show fallback
+    const timeout = setTimeout(() => {
+      if (iframeRef.current) {
+        try {
+          // If we can't access contentDocument (cross-origin), that's normal
+          // Just check if the iframe is still showing (visible height > 0)
+          const rect = iframeRef.current.getBoundingClientRect();
+          if (rect.height < 50) {
+            setFailed(true);
+          }
+        } catch {
+          // Cross-origin — iframe loaded something, that's fine
+        }
+      }
+    }, 10000);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  if (failed) {
+    return (
+      <OgCardFallback
+        url={expandedUrl}
+        title={fallbackData?.title}
+        image={fallbackData?.image}
+        description={fallbackData?.description}
+        platform="Threads"
+      />
+    );
+  }
+
+  return (
+    <div className="relative w-full overflow-hidden" style={{ minHeight: 480 }}>
+      <iframe
+        ref={iframeRef}
+        src={src}
+        scrolling="no"
+        allowFullScreen
+        allow="encrypted-media"
+        loading="lazy"
+        onError={() => setFailed(true)}
+        style={{
+          border: 'none',
+          width: '100%',
+          minHeight: 480,
+          overflow: 'hidden',
+          background: 'transparent',
+        }}
+      />
+    </div>
+  );
+};
 
 interface UniversalMetaEmbedProps {
   url: string;
@@ -399,7 +467,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
   if (embedHtml && !showFallback) {
     // For direct iframe embeds (Spotify, Instagram, LinkedIn, Threads), render without RawEmbedRenderer
-    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || embedHtml.includes('threads.net') && embedHtml.includes('<iframe');
+    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || (embedHtml.includes('threads.net') && embedHtml.includes('<iframe'));
 
     if (isDirectIframe) {
       const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
@@ -407,16 +475,13 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'scrolling']
       });
       const isInstagramIframe = embedHtml.includes('instagram.com');
+      const isThreadsIframe = embedHtml.includes('threads.net');
 
       if (isInstagramIframe) {
         // Extract the src URL from the sanitized iframe HTML
         const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
         const iframeSrc = srcMatch ? srcMatch[1] : '';
 
-        // Viewport-lock strategy:
-        // - Container has overflow:hidden to clip native action buttons
-        // - Iframe renders at natural position (header + media + "View more" visible)
-        // - Extra height pushes action buttons outside the clipped container
         return (
           <div
             className="relative w-full overflow-hidden"
@@ -454,6 +519,19 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         );
       }
 
+      // Threads iframe: render with onError fallback
+      if (isThreadsIframe) {
+        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
+        const iframeSrc = srcMatch ? srcMatch[1] : '';
+
+        return (
+          <ThreadsIframeEmbed
+            src={iframeSrc}
+            expandedUrl={expandedUrl}
+            fallbackData={fallbackData}
+          />
+        );
+      }
 
       return (
         <div

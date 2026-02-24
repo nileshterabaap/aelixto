@@ -76,8 +76,8 @@ export const HydratedEmbed = memo(({
   // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
   if (!isHydrated) {
     return (
-      <div className={`relative w-full bg-black ${aspectClass}`}>
-        {effectiveThumbnail && !imageError && (
+      <div className={`relative w-full bg-muted ${aspectClass}`}>
+        {effectiveThumbnail && !imageError ? (
           <img
             src={effectiveThumbnail}
             alt="Content preview"
@@ -89,6 +89,8 @@ export const HydratedEmbed = memo(({
             loading="eager"
             decoding="async"
           />
+        ) : (
+          <div className="w-full h-full animate-pulse bg-muted" />
         )}
       </div>
     );
