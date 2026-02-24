@@ -32,23 +32,22 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
         }
       }
 
-      // Fetch pin metadata using Pinterest oEmbed API
+      // Fetch pin metadata via our edge function (avoids CORS issues with direct Pinterest API)
       try {
-        const oembedUrl = `https://www.pinterest.com/oembed/?url=${encodeURIComponent(finalUrl)}`;
-        const response = await fetch(oembedUrl);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.title) setPinTitle(data.title);
-          if (data.description) setPinDescription(data.description);
-          // oEmbed returns the pin image in the url field or we can extract from html
-          if (data.url) {
-            setPinImage(data.url);
-          } else if (data.thumbnail_url) {
-            setPinImage(data.thumbnail_url);
-          }
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
+          body: { url: finalUrl }
+        });
+        if (!ogError && ogData) {
+          const title = ogData.meta?.title || ogData.title || '';
+          const description = ogData.meta?.description || ogData.description || '';
+          const image = ogData.meta?.image || ogData.image || '';
+          if (title) setPinTitle(title);
+          if (description) setPinDescription(description);
+          if (image) setPinImage(image);
         }
       } catch {
-        // Non-critical
+        // Non-critical — will show "View on Pinterest" link
       }
 
       setLoading(false);
