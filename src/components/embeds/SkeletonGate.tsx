@@ -64,8 +64,8 @@ export const SkeletonGate = ({
         return false;
       }
 
-      // For non-iframe content (images, blockquotes, etc.), ready immediately
-      if (el.querySelector('img, .twitter-embed-container *, .pinterest-embed-container *, .embed-container *')) {
+      // For non-iframe content (images, blockquotes, cards, etc.), ready immediately
+      if (el.querySelector('img, .twitter-embed-container *, .embed-container *, [class*="rounded-xl"], [class*="og-card"]')) {
         setReady(true);
         return true;
       }
