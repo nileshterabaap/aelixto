@@ -195,15 +195,15 @@ const buildLinkedInEmbed = (url: string): string | null => {
   return null;
 };
 
-// Build Threads embed HTML using official blockquote + embed.js (auto-sizes)
+// Build Threads embed HTML using direct iframe (reliable in SPAs, no SDK needed)
 const buildThreadsEmbed = (url: string): string | null => {
   try {
     const u = new URL(url);
     const postMatch = u.pathname.match(/\/@([^/]+)\/post\/([A-Za-z0-9_-]+)/);
     if (postMatch) {
       const cleanPath = u.pathname.replace(/\/$/, '');
-      const postUrl = `https://www.threads.net${cleanPath}`.replace('threads.com', 'threads.net');
-      return `<blockquote class="text-post-media" data-text-post-permalink="${postUrl}" data-text-post-version="0" style="background:#fff;border-width:1px;border-style:solid;border-color:#00000026;border-radius:16px;max-width:540px;margin:0 auto;padding:0;width:calc(100% - 2px);"><a href="${postUrl}" target="_blank" rel="noopener noreferrer">View on Threads</a></blockquote><script async src="https://www.threads.net/embed.js"></script>`;
+      const embedUrl = `https://www.threads.net${cleanPath}/embed`.replace('threads.com', 'threads.net');
+      return `<iframe src="${embedUrl}" style="border:none;width:100%;min-height:480px;overflow:hidden;background:transparent;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
@@ -399,7 +399,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
   if (embedHtml && !showFallback) {
     // For direct iframe embeds (Spotify, Instagram, LinkedIn, Threads), render without RawEmbedRenderer
-    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed');
+    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || embedHtml.includes('threads.net') && embedHtml.includes('<iframe');
 
     if (isDirectIframe) {
       const sanitizedHtml = DOMPurify.sanitize(embedHtml, {

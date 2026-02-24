@@ -76,6 +76,10 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'threads' | 'u
   if (html.includes('facebook.com') || html.includes('fb-post') || html.includes('fb-video')) {
     return 'facebook';
   }
+  // Threads iframes don't need SDK processing
+  if ((html.includes('threads.net') && html.includes('<iframe'))) {
+    return 'unknown';
+  }
   if (html.includes('text-post-media') || html.includes('threads.net')) {
     return 'threads';
   }
