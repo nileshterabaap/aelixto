@@ -1,17 +1,19 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 
 export default function SavedPosts() {
   const { session, loading } = useSession();
   const navigate = useNavigate();
   const [createPostOpen, setCreatePostOpen] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!loading && !session) {
@@ -89,6 +91,10 @@ export default function SavedPosts() {
     enabled: !!session?.user?.id,
   });
 
+  const handleRefresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ["saved-posts"] });
+  }, [queryClient]);
+
   if (loading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -101,24 +107,26 @@ export default function SavedPosts() {
     <div className="min-h-screen pb-20">
       <Header onCreatePost={() => setCreatePostOpen(true)} />
       
-      <main className="container max-w-2xl mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold mb-6">Saved Posts</h1>
-        
-        {savedPosts.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground mb-2">No saved posts yet</p>
-            <p className="text-sm text-muted-foreground">
-              Save posts to see them here
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {savedPosts.map((post) => (
-              <HydratedFeedPost key={post.id} post={{...post, likes_count: post.likes || 0, comments_count: post.comments || 0} as any} userId={session?.user?.id} />
-            ))}
-          </div>
-        )}
-      </main>
+      <PullToRefresh onRefresh={handleRefresh}>
+        <main className="container max-w-2xl mx-auto px-4 py-6">
+          <h1 className="text-2xl font-bold mb-6">Saved Posts</h1>
+          
+          {savedPosts.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-muted-foreground mb-2">No saved posts yet</p>
+              <p className="text-sm text-muted-foreground">
+                Save posts to see them here
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {savedPosts.map((post) => (
+                <HydratedFeedPost key={post.id} post={{...post, likes_count: post.likes || 0, comments_count: post.comments || 0} as any} userId={session?.user?.id} />
+              ))}
+            </div>
+          )}
+        </main>
+      </PullToRefresh>
 
       <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
       <CreatePostDialog open={createPostOpen} onOpenChange={setCreatePostOpen} />

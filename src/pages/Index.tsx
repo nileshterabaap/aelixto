@@ -1,20 +1,23 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
 import { PostSkeleton } from "@/components/PostSkeleton";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 import { useActivePostTracker } from "@/hooks/useActivePostTracker";
+import { useQueryClient } from "@tanstack/react-query";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
   const hasRenderedOnce = useRef(false);
+  const queryClient = useQueryClient();
   
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
@@ -130,6 +133,10 @@ const Index = () => {
     }
   }, [allPosts.length]);
 
+  const handleRefresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
+  }, [queryClient, showDemoFeed]);
+
   // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
   const shouldShowSkeleton = !hasRenderedOnce.current && (sessionLoading || loading) && allPosts.length === 0;
@@ -154,44 +161,46 @@ const Index = () => {
     <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
-      <main className="mx-auto max-w-2xl px-4 py-6">
-        {!showDemoFeed && followingEmpty ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <h2 className="text-xl font-semibold">No posts yet</h2>
-            <p className="text-sm text-muted-foreground mt-2">
-              Posts from people you follow will appear here once they share something.
-            </p>
-            <p className="text-sm text-muted-foreground mt-1">
-              Start by following creators you like to fill your feed ✨
-            </p>
-            <Link
-              to="/discover"
-              className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
-            >
-              Discover people to follow
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {allPosts.map((post) => (
-              <div 
-                key={post.id} 
-                ref={(el) => {
-                  registerItem(post.id)(el);
-                  registerPost(post.id)(el);
-                }}
-                data-feed-item-id={post.id}
+      <PullToRefresh onRefresh={handleRefresh}>
+        <main className="mx-auto max-w-2xl px-4 py-6">
+          {!showDemoFeed && followingEmpty ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <h2 className="text-xl font-semibold">No posts yet</h2>
+              <p className="text-sm text-muted-foreground mt-2">
+                Posts from people you follow will appear here once they share something.
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Start by following creators you like to fill your feed ✨
+              </p>
+              <Link
+                to="/discover"
+                className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
               >
-                <FeedPost 
-                  post={post} 
-                  userId={user?.id} 
-                  isActive={isActive(post.id)}
-                />
-              </div>
-            ))}
-          </div>
-        )}
-      </main>
+                Discover people to follow
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {allPosts.map((post) => (
+                <div 
+                  key={post.id} 
+                  ref={(el) => {
+                    registerItem(post.id)(el);
+                    registerPost(post.id)(el);
+                  }}
+                  data-feed-item-id={post.id}
+                >
+                  <FeedPost 
+                    post={post} 
+                    userId={user?.id} 
+                    isActive={isActive(post.id)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+        </main>
+      </PullToRefresh>
 
       <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
