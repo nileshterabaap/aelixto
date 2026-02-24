@@ -196,13 +196,11 @@ const normalizeFacebookUrl = (raw: string): string => {
   return url;
 };
 
-// Build Facebook embed using SDK approach (XFBML)
+// Build Facebook embed using direct iframe (bypasses slow SDK)
 const buildFacebookEmbed = (url: string): string => {
   const canonical = normalizeFacebookUrl(url);
-
-
-  // IMPORTANT: do not hardcode data-width (breaks mobile sizing). Let CSS control width.
-  return `<div class="fb-post" data-href="${canonical}" data-show-text="true"></div>`;
+  const encodedUrl = encodeURIComponent(canonical);
+  return `<iframe src="https://www.facebook.com/plugins/post.php?href=${encodedUrl}&show_text=true&width=500" style="border:none;width:100%;min-height:500px;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
 };
 
 // Check if Spotify URL is embeddable (not wrapped-share or other special pages)
@@ -467,7 +465,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
   if (embedHtml && !showFallback) {
     // For direct iframe embeds (Spotify, Instagram, LinkedIn, Threads), render without RawEmbedRenderer
-    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || (embedHtml.includes('threads.net') && embedHtml.includes('<iframe'));
+    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || (embedHtml.includes('threads.net') && embedHtml.includes('<iframe')) || (embedHtml.includes('facebook.com/plugins/') && embedHtml.includes('<iframe'));
 
     if (isDirectIframe) {
       const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
