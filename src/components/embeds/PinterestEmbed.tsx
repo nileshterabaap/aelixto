@@ -1,47 +1,35 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import pinterestIcon from "@/assets/platforms/pinterest.svg";
-import { loadPinterestEmbed } from "@/lib/ScriptLoader";
 
 interface PinterestEmbedProps {
   url: string;
 }
 
 export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [embedFailed, setEmbedFailed] = useState(false);
   const [resolvedUrl, setResolvedUrl] = useState(url);
-  const [isExpanding, setIsExpanding] = useState(false);
+  const [pinImage, setPinImage] = useState<string | null>(null);
   const [pinTitle, setPinTitle] = useState<string>("");
+  const [pinDescription, setPinDescription] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadEmbed = async () => {
+    const loadPin = async () => {
       let finalUrl = url;
 
       // If it's a pin.it short link, expand it first
       if (url.includes('pin.it/')) {
-        setIsExpanding(true);
-        
         try {
           const { supabase } = await import("@/integrations/supabase/client");
           const { data, error } = await supabase.functions.invoke('expand-pin', {
             body: { url }
           });
-
-          if (error) throw error;
-          
-          if (data?.finalUrl) {
+          if (!error && data?.finalUrl) {
             finalUrl = data.finalUrl;
             setResolvedUrl(finalUrl);
-          } else {
-            throw new Error("No final URL returned");
           }
         } catch {
-          setEmbedFailed(true);
-          setIsExpanding(false);
-          return;
+          // Use original URL
         }
-        
-        setIsExpanding(false);
       }
 
       // Fetch pin metadata using Pinterest oEmbed API
@@ -50,124 +38,53 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
         const response = await fetch(oembedUrl);
         if (response.ok) {
           const data = await response.json();
-          if (data.title) {
-            setPinTitle(data.title);
+          if (data.title) setPinTitle(data.title);
+          if (data.description) setPinDescription(data.description);
+          // oEmbed returns the pin image in the url field or we can extract from html
+          if (data.url) {
+            setPinImage(data.url);
+          } else if (data.thumbnail_url) {
+            setPinImage(data.thumbnail_url);
           }
         }
       } catch {
-        // Non-critical: title is optional
+        // Non-critical
       }
 
-      // Validate Pinterest URL
-      const isPinterestPin = /pinterest\.com\/pin\/[a-zA-Z0-9]+\/?/.test(finalUrl);
-      if (!isPinterestPin) {
-        setEmbedFailed(true);
-        return;
-      }
-
-      // Load Pinterest script using ScriptLoader
-      try {
-        await loadPinterestEmbed();
-        
-        // Process embeds after script loads
-        setTimeout(() => {
-          if (window.PinUtils) {
-            window.PinUtils.build();
-          }
-        }, 100);
-        
-        // Check if embed actually rendered after SDK processing
-        setTimeout(() => {
-          if (containerRef.current) {
-            const hasRendered = containerRef.current.querySelector('span[data-pin-href], iframe, img');
-            if (!hasRendered) {
-              setEmbedFailed(true);
-            }
-          }
-        }, 4000);
-      } catch {
-        setEmbedFailed(true);
-      }
+      setLoading(false);
     };
 
-    loadEmbed();
-
-    // MutationObserver to remove Pinterest save buttons after they load
-    const observer = new MutationObserver(() => {
-      if (containerRef.current) {
-        const saveButtons = containerRef.current.querySelectorAll(
-          'span[data-pin-log], a[data-pin-log], button[data-pin-save="true"], .pin-save-button, span[data-pin-href]'
-        );
-        saveButtons.forEach(button => button.remove());
-      }
-    });
-
-    if (containerRef.current) {
-      observer.observe(containerRef.current, {
-        childList: true,
-        subtree: true
-      });
-    }
-
-    return () => {
-      observer.disconnect();
-    };
+    loadPin();
   }, [url]);
 
-  if (isExpanding) {
+  if (loading) {
     return (
-      <div className="p-6 flex flex-col items-center gap-4 border border-border rounded-xl bg-card">
-        <img src={pinterestIcon} alt="Pinterest" className="w-12 h-12" />
-        <p className="text-sm text-muted-foreground text-center">
-          Loading Pinterest embed...
-        </p>
-      </div>
-    );
-  }
-
-  if (embedFailed) {
-    return (
-      <div 
-        className="rounded-xl overflow-hidden border border-border bg-card cursor-pointer hover:opacity-90 transition-opacity"
-        onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
-      >
-        <div className="flex items-center gap-3 p-4">
-          <img src={pinterestIcon} alt="Pinterest" className="w-8 h-8" />
-          <div className="flex-1 min-w-0">
-            {pinTitle && <p className="text-sm font-medium text-foreground line-clamp-2">{pinTitle}</p>}
-            <p className="text-xs text-muted-foreground mt-0.5">View on Pinterest</p>
-          </div>
-        </div>
-      </div>
+      <div className="w-full animate-pulse bg-muted rounded-xl" style={{ aspectRatio: '3/4', maxWidth: 500, margin: '0 auto' }} />
     );
   }
 
   return (
-    <div className="w-full max-w-[500px] mx-auto">
-      <div ref={containerRef} className="pinterest-embed-container w-full flex flex-col justify-center">
-        {pinTitle && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-card rounded-t-lg border border-b-0">
-            <img src={pinterestIcon} alt="Pinterest" className="w-5 h-5" />
-            <span className="text-sm font-medium text-foreground line-clamp-1">{pinTitle}</span>
-          </div>
-        )}
-        <a 
-          data-pin-do="embedPin" 
-          data-pin-width="medium"
-          href={resolvedUrl}
-          className={pinTitle ? "rounded-t-none" : ""}
-        >
-          View Pin
-        </a>
+    <div 
+      className="rounded-xl overflow-hidden border border-border bg-card cursor-pointer hover:opacity-95 transition-opacity max-w-[500px] mx-auto"
+      onClick={() => window.open(resolvedUrl, '_blank', 'noopener,noreferrer')}
+    >
+      {pinImage && (
+        <img 
+          src={pinImage} 
+          alt={pinTitle || "Pinterest pin"} 
+          className="w-full h-auto object-cover"
+          loading="eager"
+          decoding="async"
+        />
+      )}
+      <div className="flex items-center gap-3 p-3">
+        <img src={pinterestIcon} alt="Pinterest" className="w-6 h-6 flex-shrink-0" />
+        <div className="flex-1 min-w-0">
+          {pinTitle && <p className="text-sm font-medium text-foreground line-clamp-2">{pinTitle}</p>}
+          {pinDescription && !pinTitle && <p className="text-sm text-muted-foreground line-clamp-2">{pinDescription}</p>}
+          <p className="text-xs text-muted-foreground mt-0.5">View on Pinterest</p>
+        </div>
       </div>
     </div>
   );
 };
-
-declare global {
-  interface Window {
-    PinUtils?: {
-      build: () => void;
-    };
-  }
-}

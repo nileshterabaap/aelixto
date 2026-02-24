@@ -66,12 +66,16 @@ const isInstagramEmbed = (html: string): boolean => {
 
 // Detect platform for SDK processing purposes
 const detectPlatform = (html: string): 'instagram' | 'facebook' | 'threads' | 'unknown' => {
-  // Instagram iframes don't need SDK processing, but are still Instagram for rendering
+  // Instagram iframes don't need SDK processing
   if (html.includes('instagram.com') && html.includes('<iframe')) {
-    return 'unknown'; // Skip SDK, but isInstagramEmbed() still returns true
+    return 'unknown';
   }
   if (html.includes('instagram.com') || html.includes('instagram-media')) {
     return 'instagram';
+  }
+  // Facebook iframes (plugins/post.php) don't need SDK processing
+  if (html.includes('facebook.com/plugins/') && html.includes('<iframe')) {
+    return 'unknown';
   }
   if (html.includes('facebook.com') || html.includes('fb-post') || html.includes('fb-video')) {
     return 'facebook';
