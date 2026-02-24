@@ -2,12 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { EmbedSkeleton } from '@/components/EmbedSkeleton';
 
 const MIN_SKELETON_MS = 200;
-const IFRAME_LOAD_TIMEOUT = 12000; // 12s max wait for iframe content
+const IFRAME_LOAD_TIMEOUT = 12000;
 
 /**
  * Shared skeleton gate: shows a platform-aware skeleton for at least MIN_SKELETON_MS,
- * then fades smoothly into real content once it renders (detected via MutationObserver).
- * Also detects failed/blank iframes and forces a retry.
+ * then fades smoothly into real content once it renders.
+ *
+ * KEY FIX: For iframes, we wait for the `load` event instead of just detecting
+ * the element in the DOM. This prevents revealing blank/black boxes.
  */
 export const SkeletonGate = ({
   platform,
@@ -22,6 +24,7 @@ export const SkeletonGate = ({
   const mountTime = useRef(Date.now());
   const containerRef = useRef<HTMLDivElement>(null);
   const hasRetried = useRef(false);
+  const handledIframes = useRef(new WeakSet<HTMLIFrameElement>());
 
   useEffect(() => {
     const remaining = MIN_SKELETON_MS - (Date.now() - mountTime.current);
@@ -29,28 +32,22 @@ export const SkeletonGate = ({
     return () => clearTimeout(timer);
   }, []);
 
-  // Attach load/error handlers to iframes
-  const attachIframeHandlers = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    
-    const iframes = el.querySelectorAll('iframe');
-    iframes.forEach((iframe) => {
-      if ((iframe as any).__skeletonHandled) return;
-      (iframe as any).__skeletonHandled = true;
-      
-      iframe.addEventListener('load', () => {
-        setReady(true);
-      });
-      iframe.addEventListener('error', () => {
-        if (!hasRetried.current) {
-          hasRetried.current = true;
-          setReady(false);
-          setRetryKey(k => k + 1);
-        } else {
-          setReady(true);
-        }
-      });
+  // Attach load/error handlers to iframes — only mark ready on load, not on DOM presence
+  const attachIframeHandlers = useCallback((iframe: HTMLIFrameElement) => {
+    if (handledIframes.current.has(iframe)) return;
+    handledIframes.current.add(iframe);
+
+    iframe.addEventListener('load', () => {
+      setReady(true);
+    });
+    iframe.addEventListener('error', () => {
+      if (!hasRetried.current) {
+        hasRetried.current = true;
+        setReady(false);
+        setRetryKey(k => k + 1);
+      } else {
+        setReady(true); // give up, show whatever we have
+      }
     });
   }, []);
 
@@ -59,9 +56,17 @@ export const SkeletonGate = ({
     if (!el) return;
 
     const check = () => {
-      if (el.querySelector('iframe, img, .twitter-embed-container *, .pinterest-embed-container *, .embed-container *')) {
+      // For iframes: attach load handlers but do NOT set ready yet
+      const iframes = el.querySelectorAll('iframe');
+      if (iframes.length > 0) {
+        iframes.forEach(iframe => attachIframeHandlers(iframe as HTMLIFrameElement));
+        // Don't return true — wait for load event
+        return false;
+      }
+
+      // For non-iframe content (images, blockquotes, etc.), ready immediately
+      if (el.querySelector('img, .twitter-embed-container *, .pinterest-embed-container *, .embed-container *')) {
         setReady(true);
-        attachIframeHandlers();
         return true;
       }
       return false;
