@@ -34,6 +34,7 @@ interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
   userId?: string;
   isActive?: boolean; // Controlled by parent - whether this post is near viewport
+  startHydrated?: boolean; // Skip IntersectionObserver, hydrate immediately
 }
 
 const formatTimestamp = (date: Date) => {
@@ -81,9 +82,9 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
-export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeedPostProps) => {
+export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(startHydrated);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
   const embedRef = useRef<HTMLDivElement>(null);
@@ -91,6 +92,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
   // Tight auto-hydration observer: only hydrate when within ~400px of viewport
   // This limits concurrent embeds to ~2-3, keeping scrolling butter-smooth
   useEffect(() => {
+    if (startHydrated) return; // Already hydrated, skip observer
     const el = embedRef.current;
     if (!el) return;
 
@@ -104,7 +106,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [startHydrated]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
   
@@ -316,6 +318,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeed
 const arePropsEqual = (prev: HydratedFeedPostProps, next: HydratedFeedPostProps) => {
   if (prev.userId !== next.userId) return false;
   if (prev.isActive !== next.isActive) return false;
+  if (prev.startHydrated !== next.startHydrated) return false;
   if (prev.post.id !== next.post.id) return false;
   
   const p = prev.post;

@@ -209,6 +209,7 @@ export const PlatformPostViewer = ({
                 <HydratedFeedPost
                   post={transformPost(post, profileData || undefined)}
                   userId={user?.id}
+                  startHydrated={post.id === initialPostId}
                 />
               </div>
             ))
