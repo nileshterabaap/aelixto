@@ -292,7 +292,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
         <div
           ref={containerRef}
           onClick={handleDoubleTap}
-          className="embed-container w-full max-w-full [&>*]:!m-0 [&_iframe]:!pointer-events-none"
+          className="embed-container w-full max-w-full [&>*]:!m-0"
           style={{ marginBottom: '-120px' }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
