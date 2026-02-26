@@ -508,7 +508,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
                 top: 0,
                 left: 0,
                 width: '100%',
-                height: 'calc(100% + 400px)',
+                height: 'calc(100% + 800px)',
                 overflow: 'hidden',
                 pointerEvents: 'none',
               }}

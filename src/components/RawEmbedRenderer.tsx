@@ -292,9 +292,21 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
         <div
           ref={containerRef}
           onClick={handleDoubleTap}
-          className="embed-container w-full max-w-full [&>*]:!m-0"
-          style={{ marginBottom: '-10px' }}
+          className="embed-container w-full max-w-full [&>*]:!m-0 [&_iframe]:!pointer-events-none"
+          style={{ marginBottom: '-120px' }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        />
+        {/* Overlay to capture taps while blocking native IG buttons */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            width: '100%',
+            height: '160px',
+            zIndex: 3,
+            background: 'linear-gradient(to bottom, transparent, var(--background) 80%)',
+          }}
         />
       </div>
     );
