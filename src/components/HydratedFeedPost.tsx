@@ -93,7 +93,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const hydrationResumeTimer = useRef<number | null>(null);
 
   // Track if embed is within viewport proximity (conservative 400px)
-  const [isNearViewport, setIsNearViewport] = useState(startHydrated);
+  // Default to true so posts hydrate immediately on mount — IO corrects for off-screen posts
+  const [isNearViewport, setIsNearViewport] = useState(true);
 
   useEffect(() => {
     if (startHydrated) return;
