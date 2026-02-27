@@ -27,6 +27,8 @@ const Index = () => {
     items: followingPosts,
     empty: followingEmpty,
     loading: followingLoading,
+    loadMore,
+    hasMore,
   } = useFollowingFeed();
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -137,6 +139,25 @@ const Index = () => {
     await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
   }, [queryClient, showDemoFeed]);
 
+  // Prefetch next page when user is within last 5 posts
+  const prefetchSentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!hasMore || showDemoFeed) return;
+    const el = prefetchSentinelRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: '1500px', threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore, showDemoFeed, allPosts.length]);
+
   // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
   const shouldShowSkeleton = !hasRenderedOnce.current && (sessionLoading || loading) && allPosts.length === 0;
@@ -197,6 +218,10 @@ const Index = () => {
                   />
                 </div>
               ))}
+              {/* Sentinel for prefetching next page ahead of scroll */}
+              {hasMore && !showDemoFeed && (
+                <div ref={prefetchSentinelRef} style={{ height: 1 }} />
+              )}
             </div>
           )}
         </main>

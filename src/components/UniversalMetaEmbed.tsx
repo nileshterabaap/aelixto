@@ -51,7 +51,7 @@ const ThreadsIframeEmbed = ({
   }
 
   return (
-    <div className="relative w-full overflow-hidden" style={{ minHeight: 480 }}>
+    <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4 / 5' }}>
       <iframe
         ref={iframeRef}
         src={src}
@@ -63,7 +63,7 @@ const ThreadsIframeEmbed = ({
         style={{
           border: 'none',
           width: '100%',
-          minHeight: 480,
+          height: '100%',
           overflow: 'hidden',
           background: 'transparent',
         }}
@@ -139,11 +139,11 @@ const buildInstagramEmbed = (url: string): string => {
     // Clean the path - remove trailing slash, add /embed/
     let embedPath = u.pathname.replace(/\/$/, '') + '/embed/';
     const embedUrl = `https://www.instagram.com${embedPath}`;
-    return `<iframe src="${embedUrl}" style="border:0;width:100%;min-height:500px;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+    return `<iframe src="${embedUrl}" style="border:0;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
   } catch {
     // Fallback: just append /embed/ to the URL
     const cleanUrl = url.split('?')[0].replace(/\/$/, '');
-    return `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;min-height:500px;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+    return `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
   }
 };
 
@@ -200,7 +200,7 @@ const normalizeFacebookUrl = (raw: string): string => {
 const buildFacebookEmbed = (url: string): string => {
   const canonical = normalizeFacebookUrl(url);
   const encodedUrl = encodeURIComponent(canonical);
-  return `<iframe src="https://www.facebook.com/plugins/post.php?href=${encodedUrl}&show_text=true&width=500" style="border:none;width:100%;min-height:500px;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+  return `<iframe src="https://www.facebook.com/plugins/post.php?href=${encodedUrl}&show_text=true&width=500" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
 };
 
 // Check if Spotify URL is embeddable (not wrapped-share or other special pages)
@@ -237,7 +237,7 @@ const buildLinkedInEmbed = (url: string): string | null => {
     const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
     if (feedMatch) {
       const urn = feedMatch[1];
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
     }
 
     // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
@@ -247,13 +247,13 @@ const buildLinkedInEmbed = (url: string): string | null => {
       const id = postMatch[1];
       const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
       const type = typeMatch ? typeMatch[1] : 'ugcPost';
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
     }
 
     // Pattern 3: /posts/username_slug-share-ID-hash
     const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
     if (shareMatch) {
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through to null
@@ -269,7 +269,7 @@ const buildThreadsEmbed = (url: string): string | null => {
     if (postMatch) {
       const cleanPath = u.pathname.replace(/\/$/, '');
       const embedUrl = `https://www.threads.net${cleanPath}/embed`.replace('threads.com', 'threads.net');
-      return `<iframe src="${embedUrl}" style="border:none;width:100%;min-height:480px;overflow:hidden;background:transparent;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+      return `<iframe src="${embedUrl}" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;background:transparent;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
