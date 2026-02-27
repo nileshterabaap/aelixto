@@ -139,11 +139,11 @@ const buildInstagramEmbed = (url: string): string => {
     // Clean the path - remove trailing slash, add /embed/
     let embedPath = u.pathname.replace(/\/$/, '') + '/embed/';
     const embedUrl = `https://www.instagram.com${embedPath}`;
-    return `<iframe src="${embedUrl}" style="border:0;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+    return `<iframe src="${embedUrl}" style="border:0;width:100%;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
   } catch {
     // Fallback: just append /embed/ to the URL
     const cleanUrl = url.split('?')[0].replace(/\/$/, '');
-    return `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+    return `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
   }
 };
 
@@ -489,15 +489,15 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               src={iframeSrc}
               scrolling="no"
               allowFullScreen
-              allow="encrypted-media"
+              allow="encrypted-media; autoplay"
               loading="lazy"
               style={{
                 border: 'none',
                 position: 'absolute',
-                top: '-64px',
+                top: '-120px',
                 left: 0,
                 width: '100%',
-                height: 'calc(100% + 864px)',
+                height: 'calc(100% + 420px)',
                 overflow: 'hidden',
               }}
             />
