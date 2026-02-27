@@ -65,7 +65,6 @@ export const useCreatePost = () => {
       platform?: string;
       embed_html?: string;
       thumbnail_url?: string;
-      raw_json_data?: Record<string, unknown>;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -81,7 +80,6 @@ export const useCreatePost = () => {
           platform: newPost.platform || null,
           embed_html: newPost.embed_html || null,
           thumbnail_url: newPost.thumbnail_url || null,
-          raw_json_data: (newPost.raw_json_data as any) || null,
         })
         .select()
         .single();

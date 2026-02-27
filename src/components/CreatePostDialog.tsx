@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
-import { computeEmbedMetadata } from "@/lib/embedMetadata";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -228,9 +227,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       embed_html: embedHtml ? `${embedHtml.length} chars` : 'none',
     });
 
-    // Compute embed metadata for static-first rendering
-    const embedMeta = computeEmbedMetadata(platform, mediaType, linkUrl, embedHtml);
-
     createPost.mutate({
       title: title.trim() || undefined,
       content: caption.trim() || "",
@@ -239,10 +235,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       platform: platform || undefined,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
-      raw_json_data: {
-        ...embedMeta,
-        stored_at: new Date().toISOString(),
-      },
     });
 
     // Reset form
