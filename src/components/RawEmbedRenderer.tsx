@@ -298,7 +298,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             top: 0,
             left: 0,
             width: '100%',
-            height: 'calc(100% + 200px)',
+            height: 'calc(100% + 350px)',
             overflow: 'hidden',
           }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
