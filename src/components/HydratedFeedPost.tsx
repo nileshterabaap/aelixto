@@ -132,10 +132,10 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       return;
     }
 
-    // User is scrolling slowly — debounce to let them settle
+    // User is scrolling slowly — hydrate quickly
     hydrationResumeTimer.current = window.setTimeout(() => {
       setIsHydrated(true);
-    }, 150);
+    }, 60);
 
     return () => {
       if (hydrationResumeTimer.current) {

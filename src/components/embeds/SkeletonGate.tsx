@@ -52,6 +52,9 @@ export const SkeletonGate = ({
     const el = containerRef.current;
     if (!el) return;
 
+    // Platforms that use SDK to replace blockquote → iframe (must wait for iframe)
+    const needsIframe = platform === 'instagram' || platform === 'facebook' || platform === 'threads';
+
     const check = () => {
       const iframes = el.querySelectorAll('iframe');
       if (iframes.length > 0) {
@@ -59,8 +62,11 @@ export const SkeletonGate = ({
         return false; // wait for load or per-iframe timeout
       }
 
+      // For SDK-based embeds, don't mark ready until iframe appears
+      if (needsIframe) return false;
+
       // Non-iframe content: any visible child means ready
-      if (el.children.length > 0 && el.querySelector('img, blockquote, video, div, [class*="embed"], [class*="card"], [class*="rounded"]')) {
+      if (el.children.length > 0 && el.querySelector('img, video, div, [class*="card"], [class*="rounded"]')) {
         markReady();
         return true;
       }
