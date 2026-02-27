@@ -497,14 +497,9 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
                 top: 0,
                 left: 0,
                 width: '100%',
-                height: 'calc(100% + 350px)',
+                height: 'calc(100% + 500px)',
                 overflow: 'hidden',
               }}
-            />
-            {/* Opaque overlay to hide Instagram native action buttons at bottom */}
-            <div
-              className="absolute bottom-0 left-0 w-full bg-background"
-              style={{ height: '72px', zIndex: 2 }}
             />
           </div>
         );
