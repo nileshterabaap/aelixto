@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
+import { useScrollVelocity } from "@/hooks/useScrollVelocity";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
@@ -88,25 +89,52 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
   const embedRef = useRef<HTMLDivElement>(null);
+  const { isScrollingFast } = useScrollVelocity();
+  const hydrationResumeTimer = useRef<number | null>(null);
 
-  // Tight auto-hydration observer: only hydrate when within ~400px of viewport
-  // This limits concurrent embeds to ~2-3, keeping scrolling butter-smooth
+  // Track if embed is within viewport proximity (conservative 400px)
+  const [isNearViewport, setIsNearViewport] = useState(startHydrated);
+
   useEffect(() => {
-    if (startHydrated) return; // Already hydrated, skip observer
+    if (startHydrated) return;
     const el = embedRef.current;
     if (!el) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsHydrated(true);
-        }
+        setIsNearViewport(entry.isIntersecting);
       },
-      { rootMargin: '900px', threshold: 0 }
+      { rootMargin: '400px', threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, [startHydrated]);
+
+  // Gate hydration: only hydrate when near viewport AND not scrolling fast
+  // Debounced resume: wait 150ms after scrolling stops before hydrating
+  useEffect(() => {
+    if (isHydrated || !isNearViewport) return;
+
+    if (isScrollingFast) {
+      // Clear any pending hydration
+      if (hydrationResumeTimer.current) {
+        clearTimeout(hydrationResumeTimer.current);
+        hydrationResumeTimer.current = null;
+      }
+      return;
+    }
+
+    // Debounced resume: hydrate after scrolling settles
+    hydrationResumeTimer.current = window.setTimeout(() => {
+      setIsHydrated(true);
+    }, 150);
+
+    return () => {
+      if (hydrationResumeTimer.current) {
+        clearTimeout(hydrationResumeTimer.current);
+      }
+    };
+  }, [isNearViewport, isScrollingFast, isHydrated]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
   
@@ -236,7 +264,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed */}
-      <div ref={embedRef}>
+      <div ref={embedRef} style={{ contain: 'layout paint size' }}>
         <HydratedEmbed
           post={post}
           renderer={r}
