@@ -287,26 +287,21 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     return (
       <div
         className="relative w-full overflow-hidden"
-        style={{ maxHeight: '85vh' }}
+        style={{ aspectRatio: '4 / 5', touchAction: 'pan-y' }}
       >
         <div
           ref={containerRef}
           onClick={handleDoubleTap}
           className="embed-container w-full max-w-full [&>*]:!m-0"
-          style={{ marginBottom: '-120px' }}
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-        />
-        {/* Overlay to capture taps while blocking native IG buttons */}
-        <div
           style={{
             position: 'absolute',
-            bottom: 0,
+            top: '-120px',
             left: 0,
             width: '100%',
-            height: '160px',
-            zIndex: 3,
-            background: 'linear-gradient(to bottom, transparent, var(--background) 80%)',
+            height: 'calc(100% + 420px)',
+            overflow: 'hidden',
           }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       </div>
     );
