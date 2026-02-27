@@ -290,7 +290,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
       {/* Interaction Bar - tight spacing, professional layout */}
-      <div className="flex items-center justify-around px-3 py-3">
+      {/* For Instagram: pull bar up to cover native action buttons */}
+      <div className={`flex items-center justify-around px-3 py-3 relative z-10 bg-background ${detectedPlatform === 'instagram' ? '-mt-16' : ''}`}>
         <button
           onClick={handleLikeClick}
           className="action-btn p-1.5 active:scale-90 transition-transform flex items-center gap-1"
