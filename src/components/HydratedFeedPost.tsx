@@ -89,7 +89,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
   const embedRef = useRef<HTMLDivElement>(null);
-  const { isScrollingFast } = useScrollVelocity();
+  const { isScrollingFast, velocity } = useScrollVelocity();
   const hydrationResumeTimer = useRef<number | null>(null);
 
   // Track if embed is within viewport proximity (conservative 400px)
@@ -110,13 +110,14 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     return () => observer.disconnect();
   }, [startHydrated]);
 
-  // Gate hydration: only hydrate when near viewport AND not scrolling fast
-  // Debounced resume: wait 150ms after scrolling stops before hydrating
+  // Gate hydration: hydrate when near viewport, suppress only during active fast scrolling.
+  // On idle / initial load, hydrate immediately (no debounce needed).
   useEffect(() => {
     if (isHydrated || !isNearViewport) return;
 
+    // Only suppress during *active* fast scrolling
     if (isScrollingFast) {
-      // Clear any pending hydration
+      // Clear any pending hydration timer
       if (hydrationResumeTimer.current) {
         clearTimeout(hydrationResumeTimer.current);
         hydrationResumeTimer.current = null;
@@ -124,7 +125,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       return;
     }
 
-    // Debounced resume: hydrate after scrolling settles
+    // If user is idle (direction === 'idle' or velocity === 0), hydrate immediately
+    if (velocity === 0) {
+      setIsHydrated(true);
+      return;
+    }
+
+    // User is scrolling slowly — debounce to let them settle
     hydrationResumeTimer.current = window.setTimeout(() => {
       setIsHydrated(true);
     }, 150);
@@ -134,7 +141,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         clearTimeout(hydrationResumeTimer.current);
       }
     };
-  }, [isNearViewport, isScrollingFast, isHydrated]);
+  }, [isNearViewport, isScrollingFast, isHydrated, velocity]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
   
