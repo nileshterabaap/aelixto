@@ -271,7 +271,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed */}
-      <div ref={embedRef} style={{ contain: 'layout paint size' }}>
+      <div ref={embedRef} style={{ contain: 'layout paint' }}>
         <HydratedEmbed
           post={post}
           renderer={r}
