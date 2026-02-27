@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,8 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
-import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
-import { useScrollVelocity } from "@/hooks/useScrollVelocity";
+import { useState, memo, useCallback, useMemo } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
@@ -28,14 +27,17 @@ import mediumIcon from "@/assets/platforms/medium.svg";
 import threadsIcon from "@/assets/platforms/threads.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
+import { StaticPreview } from "@/components/StaticPreview";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
+import { computeEmbedMetadata } from "@/lib/embedMetadata";
+import { ImageViewTracker } from "@/components/ImageViewTracker";
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
   userId?: string;
-  isActive?: boolean; // Controlled by parent - whether this post is near viewport
-  startHydrated?: boolean; // Skip IntersectionObserver, hydrate immediately
+  isActive?: boolean;
+  startHydrated?: boolean;
 }
 
 const formatTimestamp = (date: Date) => {
@@ -52,7 +54,6 @@ const formatTimestamp = (date: Date) => {
 
 const getPlatformIcon = (platform?: string) => {
   if (!platform) return null;
-  
   const icons: Record<string, { name: string; icon: string }> = {
     youtube: { name: 'YouTube', icon: youtubeIcon },
     tiktok: { name: 'TikTok', icon: tiktokIcon },
@@ -68,7 +69,6 @@ const getPlatformIcon = (platform?: string) => {
     threads: { name: 'Threads', icon: threadsIcon },
     linkedin: { name: 'LinkedIn', icon: linkedinIcon },
   };
-  
   return icons[platform] || null;
 };
 
@@ -83,68 +83,13 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
-export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
+export const HydratedFeedPost = ({ post, userId, startHydrated = false }: HydratedFeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(startHydrated);
+  // Static-first: embeds start inactive. Only images and startHydrated bypass.
+  const [isInteractive, setIsInteractive] = useState(startHydrated);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
-  const embedRef = useRef<HTMLDivElement>(null);
-  const { isScrollingFast, velocity } = useScrollVelocity();
-  const hydrationResumeTimer = useRef<number | null>(null);
 
-  // Track if embed is within viewport proximity (conservative 400px)
-  const [isNearViewport, setIsNearViewport] = useState(startHydrated);
-
-  useEffect(() => {
-    if (startHydrated) return;
-    const el = embedRef.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsNearViewport(entry.isIntersecting);
-      },
-      { rootMargin: '400px', threshold: 0 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [startHydrated]);
-
-  // Gate hydration: hydrate when near viewport, suppress only during active fast scrolling.
-  // On idle / initial load, hydrate immediately (no debounce needed).
-  useEffect(() => {
-    if (isHydrated || !isNearViewport) return;
-
-    // Only suppress during *active* fast scrolling
-    if (isScrollingFast) {
-      // Clear any pending hydration timer
-      if (hydrationResumeTimer.current) {
-        clearTimeout(hydrationResumeTimer.current);
-        hydrationResumeTimer.current = null;
-      }
-      return;
-    }
-
-    // If user is idle (direction === 'idle' or velocity === 0), hydrate immediately
-    if (velocity === 0) {
-      setIsHydrated(true);
-      return;
-    }
-
-    // User is scrolling slowly — debounce to let them settle
-    hydrationResumeTimer.current = window.setTimeout(() => {
-      setIsHydrated(true);
-    }, 150);
-
-    return () => {
-      if (hydrationResumeTimer.current) {
-        clearTimeout(hydrationResumeTimer.current);
-      }
-    };
-  }, [isNearViewport, isScrollingFast, isHydrated, velocity]);
-
-  // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
-  
   // Normalize field access
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
   const previewImageUrl = (post as any).preview_image_url;
@@ -153,8 +98,20 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   // Detect platform
   const detectedPlatform = post.platform || detectPlatformFromUrl(mediaUrl);
   const platform = getPlatformIcon(detectedPlatform);
-  
-  // Always call hooks unconditionally
+
+  // Compute embed metadata deterministically (pure string matching, zero cost)
+  const embedMeta = useMemo(
+    () => computeEmbedMetadata(detectedPlatform, post.mediaType, mediaUrl, post.embed_html),
+    [detectedPlatform, post.mediaType, mediaUrl, post.embed_html]
+  );
+
+  // Resolve renderer (only used when interactive — but cheap to compute)
+  const r = useMemo(() => resolveRenderer(post), [post]);
+
+  // Derive thumbnail
+  const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
+
+  // Hooks (must be unconditional)
   const postActionsResult = usePostActions(post.id, userId || '');
   const repostActionsResult = useRepost(post.id, userId || '');
   
@@ -162,15 +119,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   
   const postActions = canUseActions 
     ? postActionsResult
-    : { 
-        isLiked: false, 
-        isSaved: false, 
-        toggleLike: () => {}, 
-        toggleSave: () => {}, 
-        handleShare: () => {}, 
-        deletePost: () => {},
-        isDeleting: false 
-      };
+    : { isLiked: false, isSaved: false, toggleLike: () => {}, toggleSave: () => {}, handleShare: () => {}, deletePost: () => {}, isDeleting: false };
 
   const repostActions = canUseActions
     ? repostActionsResult
@@ -193,15 +142,14 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setTimeout(() => setRepostAnimating(false), 500);
   }, [canUseActions, toggleRepost]);
 
-  const handlePlayClick = useCallback(() => {
-    setIsHydrated(true);
+  // Tap-to-activate: user taps static preview → load interactive embed
+  const handleActivate = useCallback(() => {
+    setIsInteractive(true);
   }, []);
 
-  // Resolve the embed type for rendering
-  const r = resolveRenderer(post);
-  
-  // Derive thumbnail: prefer stored, then derive from URL
-  const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
+  // Determine what to render in the embed area
+  const isImageOnly = embedMeta.rendererKind === 'image' && r.kind === 'image' && r.url;
+  const hasEmbedContent = r.kind !== 'none';
 
   return (
     <Card className="overflow-hidden border border-border rounded-xl">
@@ -213,7 +161,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       )}
       
-      {/* Standardized Header: avatar, bold username, timestamp + platform icon top-right */}
+      {/* Header */}
       <div className="flex items-center gap-3 px-5 pt-4 pb-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full overflow-hidden bg-muted">
           <img 
@@ -269,16 +217,43 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       )}
 
+      {/* EMBED AREA: Static-first rendering with CSS containment */}
+      <div style={{ contain: 'layout paint' }}>
+        {/* Images render directly — no tap needed, no heavy JS */}
+        {isImageOnly && r.kind === 'image' && (
+          <ImageViewTracker postId={post.id}>
+            <img 
+              src={r.url} 
+              alt="Post content" 
+              className="w-full h-auto object-cover" 
+              loading="eager"
+              decoding="async"
+            />
+          </ImageViewTracker>
+        )}
 
-      {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed */}
-      <div ref={embedRef} style={{ contain: 'layout paint' }}>
-        <HydratedEmbed
-          post={post}
-          renderer={r}
-          thumbnailUrl={effectiveThumbnail}
-          isHydrated={isHydrated}
-          onPlayClick={handlePlayClick}
-        />
+        {/* Non-image embeds: static preview until tapped */}
+        {!isImageOnly && hasEmbedContent && !isInteractive && (
+          <StaticPreview
+            thumbnailUrl={effectiveThumbnail}
+            aspectRatio={embedMeta.aspectRatio}
+            rendererKind={embedMeta.rendererKind}
+            platform={detectedPlatform}
+            title={post.title}
+            onActivate={handleActivate}
+          />
+        )}
+
+        {/* Interactive embed: loaded only after user taps */}
+        {!isImageOnly && hasEmbedContent && isInteractive && (
+          <HydratedEmbed
+            post={post}
+            renderer={r}
+            thumbnailUrl={effectiveThumbnail}
+            isHydrated={true}
+            onPlayClick={handleActivate}
+          />
+        )}
       </div>
 
       {/* Title for video/image posts */}
@@ -288,7 +263,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       )}
 
-      {/* Interaction Bar - tight spacing, professional layout */}
+      {/* Interaction Bar */}
       <div className="flex items-center justify-around px-3 py-3">
         <button
           onClick={handleLikeClick}
@@ -349,10 +324,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   );
 };
 
-// Deep memoization to prevent re-renders
+// Deep memoization
 const arePropsEqual = (prev: HydratedFeedPostProps, next: HydratedFeedPostProps) => {
   if (prev.userId !== next.userId) return false;
-  if (prev.isActive !== next.isActive) return false;
   if (prev.startHydrated !== next.startHydrated) return false;
   if (prev.post.id !== next.post.id) return false;
   
