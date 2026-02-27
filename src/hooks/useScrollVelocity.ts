@@ -69,7 +69,7 @@ const initScrollTracking = () => {
       velocityBuffer = [];
       globalState = { velocity: 0, direction: 'idle', isScrollingFast: false };
       notifyListeners();
-    }, 150);
+    }, 80);
   };
 
   const handleScroll = () => {
