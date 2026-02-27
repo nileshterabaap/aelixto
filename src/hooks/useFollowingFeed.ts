@@ -94,11 +94,11 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
+    refetchOnMount: true, // refetch if stale on mount/page reload
+    refetchOnReconnect: true,
     structuralSharing: true,
   });
 
