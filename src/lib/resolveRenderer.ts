@@ -18,8 +18,15 @@ export function isRedditUrl(u?: string) {
 }
 
 export function resolveRenderer(post: any): Renderer {
-  // 1) raw embed wins
-  if (post?.embed_html) return { kind: 'raw', html: post.embed_html };
+  // 1) raw embed wins — EXCEPT Instagram, which always uses the direct iframe
+  //    path (universal) for consistent sizing across refreshes.
+  if (post?.embed_html) {
+    const url: string | undefined = post?.mediaUrl;
+    const isInstagram = url && (url.includes('instagram.com') || url.includes('instagr.am'));
+    if (!isInstagram) {
+      return { kind: 'raw', html: post.embed_html };
+    }
+  }
 
   const url: string | undefined = post?.mediaUrl;
   if (!url) return { kind: 'none' };
