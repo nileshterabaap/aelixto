@@ -298,15 +298,10 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             top: 0,
             left: 0,
             width: '100%',
-            height: 'calc(100% + 350px)',
+            height: 'calc(100% + 500px)',
             overflow: 'hidden',
           }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-        />
-        {/* Opaque overlay to hide Instagram native action buttons at bottom */}
-        <div
-          className="absolute bottom-0 left-0 w-full bg-background"
-          style={{ height: '72px', zIndex: 2 }}
         />
       </div>
     );
