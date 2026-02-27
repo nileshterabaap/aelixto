@@ -287,7 +287,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     return (
       <div
         className="relative w-full overflow-hidden"
-        style={{ aspectRatio: '4 / 5', touchAction: 'pan-y' }}
+        style={{ aspectRatio: '3 / 5', touchAction: 'pan-y' }}
       >
         <div
           ref={containerRef}
