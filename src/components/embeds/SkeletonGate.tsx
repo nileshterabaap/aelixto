@@ -1,15 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { EmbedSkeleton } from '@/components/EmbedSkeleton';
 
-const MIN_SKELETON_MS = 200;
-const IFRAME_LOAD_TIMEOUT = 12000;
+const MIN_SKELETON_MS = 150;
+const IFRAME_LOAD_TIMEOUT = 3000; // Reduced from 12s — cross-origin iframes often never fire load
 
 /**
- * Shared skeleton gate: shows a platform-aware skeleton for at least MIN_SKELETON_MS,
- * then fades smoothly into real content once it renders.
+ * Shows a platform-aware skeleton while embed content loads,
+ * then crossfades smoothly into real content.
  *
- * KEY FIX: For iframes, we wait for the `load` event instead of just detecting
- * the element in the DOM. This prevents revealing blank/black boxes.
+ * Strategy:
+ * 1. For iframes: listen for `load` event, but also set a short per-iframe
+ *    timeout (2s) so we don't wait forever on cross-origin frames.
+ * 2. For non-iframe content: ready as soon as any meaningful DOM appears.
+ * 3. Global fallback at 3s.
+ * 4. Smooth crossfade transition on reveal.
  */
 export const SkeletonGate = ({
   platform,
@@ -20,10 +24,8 @@ export const SkeletonGate = ({
 }) => {
   const [ready, setReady] = useState(false);
   const [minElapsed, setMinElapsed] = useState(false);
-  const [retryKey, setRetryKey] = useState(0);
   const mountTime = useRef(Date.now());
   const containerRef = useRef<HTMLDivElement>(null);
-  const hasRetried = useRef(false);
   const handledIframes = useRef(new WeakSet<HTMLIFrameElement>());
 
   useEffect(() => {
@@ -32,41 +34,34 @@ export const SkeletonGate = ({
     return () => clearTimeout(timer);
   }, []);
 
-  // Attach load/error handlers to iframes — only mark ready on load, not on DOM presence
+  const markReady = useCallback(() => setReady(true), []);
+
+  // Attach load handler + per-iframe safety timeout
   const attachIframeHandlers = useCallback((iframe: HTMLIFrameElement) => {
     if (handledIframes.current.has(iframe)) return;
     handledIframes.current.add(iframe);
 
-    iframe.addEventListener('load', () => {
-      setReady(true);
-    });
-    iframe.addEventListener('error', () => {
-      if (!hasRetried.current) {
-        hasRetried.current = true;
-        setReady(false);
-        setRetryKey(k => k + 1);
-      } else {
-        setReady(true); // give up, show whatever we have
-      }
-    });
-  }, []);
+    iframe.addEventListener('load', markReady);
+    iframe.addEventListener('error', markReady);
+
+    // Per-iframe safety: if load doesn't fire within 2s, reveal anyway
+    setTimeout(markReady, 2000);
+  }, [markReady]);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
     const check = () => {
-      // For iframes: attach load handlers but do NOT set ready yet
       const iframes = el.querySelectorAll('iframe');
       if (iframes.length > 0) {
         iframes.forEach(iframe => attachIframeHandlers(iframe as HTMLIFrameElement));
-        // Don't return true — wait for load event
-        return false;
+        return false; // wait for load or per-iframe timeout
       }
 
-      // For non-iframe content (images, blockquotes, cards, etc.), ready immediately
-      if (el.querySelector('img, .twitter-embed-container *, .embed-container *, [class*="rounded-xl"], [class*="og-card"]')) {
-        setReady(true);
+      // Non-iframe content: any visible child means ready
+      if (el.children.length > 0 && el.querySelector('img, blockquote, video, div, [class*="embed"], [class*="card"], [class*="rounded"]')) {
+        markReady();
         return true;
       }
       return false;
@@ -77,28 +72,43 @@ export const SkeletonGate = ({
     const observer = new MutationObserver(() => { check(); });
     observer.observe(el, { childList: true, subtree: true });
 
-    // Fallback: mark ready after timeout regardless
-    const fallback = setTimeout(() => setReady(true), IFRAME_LOAD_TIMEOUT);
+    // Global fallback
+    const fallback = setTimeout(markReady, IFRAME_LOAD_TIMEOUT);
 
     return () => {
       observer.disconnect();
       clearTimeout(fallback);
     };
-  }, [retryKey, attachIframeHandlers]);
+  }, [attachIframeHandlers, markReady]);
 
   const showContent = ready && minElapsed;
 
   return (
     <div className="relative w-full">
+      {/* Skeleton layer */}
       <div
-        className={`transition-opacity duration-300 ${showContent ? 'opacity-0 pointer-events-none absolute inset-0' : 'opacity-100'}`}
+        className="transition-all duration-500 ease-out"
+        style={{
+          opacity: showContent ? 0 : 1,
+          transform: showContent ? 'scale(0.97)' : 'scale(1)',
+          position: showContent ? 'absolute' : 'relative',
+          inset: showContent ? 0 : undefined,
+          pointerEvents: showContent ? 'none' : 'auto',
+        }}
       >
         <EmbedSkeleton platform={platform} />
       </div>
+
+      {/* Real content layer */}
       <div
         ref={containerRef}
-        key={retryKey}
-        className={`transition-opacity duration-300 ${showContent ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}
+        className="transition-all duration-500 ease-out"
+        style={{
+          opacity: showContent ? 1 : 0,
+          transform: showContent ? 'scale(1)' : 'scale(1.01)',
+          height: showContent ? 'auto' : 0,
+          overflow: showContent ? 'visible' : 'hidden',
+        }}
       >
         {children}
       </div>
