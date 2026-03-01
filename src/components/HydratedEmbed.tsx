@@ -101,7 +101,7 @@ export const HydratedEmbed = memo(({
     <div className="w-full" style={{ contain: 'layout paint' }}>
       {/* YouTube video */}
       {r.kind === 'video' && post.platform === 'youtube' && r.url && (
-        <SkeletonGate platform="youtube" cacheKey={`${post.id}-youtube`}>
+        <SkeletonGate platform="youtube">
           <div className={`w-full bg-black ${aspectClass}`}>
             <iframe
               className="w-full h-full"
@@ -116,7 +116,7 @@ export const HydratedEmbed = memo(({
       
       {/* Non-YouTube video */}
       {r.kind === 'video' && post.platform !== 'youtube' && r.url && (
-        <SkeletonGate platform={post.platform || undefined} cacheKey={`${post.id}-video`}>
+        <SkeletonGate platform={post.platform || undefined}>
           <video 
             src={r.url} 
             className="w-full h-auto" 
@@ -140,7 +140,7 @@ export const HydratedEmbed = memo(({
       
       {/* Raw embed HTML (Instagram, Facebook, Spotify) */}
       {r.kind === 'raw' && r.html && (
-        <SkeletonGate platform={post.platform || undefined} cacheKey={`${post.id}-raw`}>
+        <SkeletonGate platform={post.platform || undefined}>
           <ImageViewTracker postId={post.id}>
             <RawEmbedRenderer embedHtml={r.html} />
           </ImageViewTracker>
@@ -149,7 +149,7 @@ export const HydratedEmbed = memo(({
       
       {/* Twitter/X embed */}
       {r.kind === 'twitter' && r.url && (
-        <SkeletonGate platform="twitter" cacheKey={`${post.id}-twitter`}>
+        <SkeletonGate platform="twitter">
           <ImageViewTracker postId={post.id}>
             <TwitterEmbed url={r.url} />
           </ImageViewTracker>
@@ -158,7 +158,7 @@ export const HydratedEmbed = memo(({
       
       {/* Reddit embed */}
       {r.kind === 'reddit' && r.url && (
-        <SkeletonGate platform="reddit" cacheKey={`${post.id}-reddit`}>
+        <SkeletonGate platform="reddit">
           <ImageViewTracker postId={post.id}>
             <RedditEmbed url={r.url} />
           </ImageViewTracker>
@@ -167,7 +167,7 @@ export const HydratedEmbed = memo(({
       
       {/* Pinterest embed */}
       {r.kind === 'pinterest' && r.url && (
-        <SkeletonGate platform="pinterest" cacheKey={`${post.id}-pinterest`}>
+        <SkeletonGate platform="pinterest">
           <ImageViewTracker postId={post.id}>
             <PinterestEmbed url={r.url} />
           </ImageViewTracker>
@@ -176,7 +176,7 @@ export const HydratedEmbed = memo(({
       
       {/* Article embed */}
       {r.kind === 'article' && r.url && (
-        <SkeletonGate platform={post.platform || 'blog'} cacheKey={`${post.id}-article`}>
+        <SkeletonGate platform={post.platform || 'blog'}>
           <ImageViewTracker postId={post.id}>
             <ArticleEmbed url={r.url} />
           </ImageViewTracker>
@@ -185,7 +185,7 @@ export const HydratedEmbed = memo(({
       
       {/* Universal Meta embed (Instagram, Facebook, etc) */}
       {r.kind === 'universal' && r.url && (
-        <SkeletonGate platform={post.platform || undefined} cacheKey={`${post.id}-universal`}>
+        <SkeletonGate platform={post.platform || undefined}>
           <ImageViewTracker postId={post.id}>
             <UniversalMetaEmbed url={r.url} />
           </ImageViewTracker>
