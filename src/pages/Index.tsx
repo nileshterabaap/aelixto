@@ -167,9 +167,15 @@ const Index = () => {
       <div className="min-h-screen bg-background pb-20">
         <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
         <main className="mx-auto max-w-2xl px-4 py-6">
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <PostSkeleton key={i} />
+          <div className="flex flex-col items-center gap-6">
+            {/* Circular spinner */}
+            <div className="py-8">
+              <div className="h-8 w-8 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
+            </div>
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="w-full opacity-40">
+                <PostSkeleton />
+              </div>
             ))}
           </div>
         </main>
@@ -202,7 +208,7 @@ const Index = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {allPosts.map((post) => (
+              {allPosts.map((post, index) => (
                 <div 
                   key={post.id} 
                   ref={(el) => {
@@ -210,6 +216,8 @@ const Index = () => {
                     registerPost(post.id)(el);
                   }}
                   data-feed-item-id={post.id}
+                  className="animate-fade-in"
+                  style={{ animationDelay: `${Math.min(index * 60, 300)}ms`, animationFillMode: 'both' }}
                 >
                   <FeedPost 
                     post={post} 
