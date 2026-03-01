@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export const PostSkeleton = () => {
   return (
-    <Card className="overflow-hidden border border-border rounded-xl">
+    <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
       <div className="p-5">
         {/* Author Info Skeleton */}
         <div className="flex items-center gap-3 mb-4">
