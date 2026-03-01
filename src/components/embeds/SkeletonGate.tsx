@@ -2,39 +2,46 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { EmbedSkeleton } from '@/components/EmbedSkeleton';
 
 const MIN_SKELETON_MS = 150;
-const IFRAME_LOAD_TIMEOUT = 3000; // Reduced from 12s — cross-origin iframes often never fire load
+const IFRAME_LOAD_TIMEOUT = 3000;
+
+// Module-level cache: once an embed in a post has loaded, never show skeleton again
+const readyCache = new Set<string>();
 
 /**
  * Shows a platform-aware skeleton while embed content loads,
  * then crossfades smoothly into real content.
- *
- * Strategy:
- * 1. For iframes: listen for `load` event, but also set a short per-iframe
- *    timeout (2s) so we don't wait forever on cross-origin frames.
- * 2. For non-iframe content: ready as soon as any meaningful DOM appears.
- * 3. Global fallback at 3s.
- * 4. Smooth crossfade transition on reveal.
+ * 
+ * Uses a global readyCache so scrolling back to already-loaded posts
+ * never flashes a skeleton.
  */
 export const SkeletonGate = ({
   platform,
   children,
+  cacheKey,
 }: {
   platform?: string;
   children: React.ReactNode;
+  /** Unique key (e.g. post ID) to remember ready state across re-mounts */
+  cacheKey?: string;
 }) => {
-  const [ready, setReady] = useState(false);
-  const [minElapsed, setMinElapsed] = useState(false);
+  const wasCached = cacheKey ? readyCache.has(cacheKey) : false;
+  const [ready, setReady] = useState(wasCached);
+  const [minElapsed, setMinElapsed] = useState(wasCached);
   const mountTime = useRef(Date.now());
   const containerRef = useRef<HTMLDivElement>(null);
   const handledIframes = useRef(new WeakSet<HTMLIFrameElement>());
 
   useEffect(() => {
+    if (wasCached) return; // Skip timer if already cached
     const remaining = MIN_SKELETON_MS - (Date.now() - mountTime.current);
     const timer = setTimeout(() => setMinElapsed(true), Math.max(0, remaining));
     return () => clearTimeout(timer);
-  }, []);
+  }, [wasCached]);
 
-  const markReady = useCallback(() => setReady(true), []);
+  const markReady = useCallback(() => {
+    setReady(true);
+    if (cacheKey) readyCache.add(cacheKey);
+  }, [cacheKey]);
 
   // Attach load handler + per-iframe safety timeout
   const attachIframeHandlers = useCallback((iframe: HTMLIFrameElement) => {
