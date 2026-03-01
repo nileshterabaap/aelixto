@@ -18,14 +18,10 @@ export function isRedditUrl(u?: string) {
 }
 
 export function resolveRenderer(post: any): Renderer {
-  // 1) raw embed wins — EXCEPT Instagram, which always uses the direct iframe
-  //    path (universal) for consistent sizing across refreshes.
+  // 1) raw embed wins for ALL platforms — pre-stored HTML renders instantly
+  //    without client-side SDK loading, ensuring smooth scrolling.
   if (post?.embed_html) {
-    const url: string | undefined = post?.mediaUrl;
-    const isInstagram = url && (url.includes('instagram.com') || url.includes('instagr.am'));
-    if (!isInstagram) {
-      return { kind: 'raw', html: post.embed_html };
-    }
+    return { kind: 'raw', html: post.embed_html };
   }
 
   const url: string | undefined = post?.mediaUrl;
