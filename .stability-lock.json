@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "protectedFiles": [
+    "src/components/HydratedFeedPost.tsx",
+    "src/components/RawEmbedRenderer.tsx",
+    "src/lib/resolveRenderer.ts",
+    "src/index.css"
+  ],
+  "baseline": {}
+}
