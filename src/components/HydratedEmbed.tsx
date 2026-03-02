@@ -45,6 +45,11 @@ export const HydratedEmbed = memo(({
 }: HydratedEmbedProps) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
+
+  const handleRawEmbedError = useCallback(() => {
+    setRawEmbedFailed(true);
+  }, []);
   
   // For YouTube, prefer their thumbnail
   const effectiveThumbnail = post.platform === 'youtube' && r.url 
@@ -139,12 +144,19 @@ export const HydratedEmbed = memo(({
       )}
       
       {/* Raw embed HTML (Instagram, Facebook, Spotify) */}
-      {r.kind === 'raw' && r.html && (
+      {r.kind === 'raw' && r.html && !rawEmbedFailed && (
         <SkeletonGate platform={post.platform || undefined}>
           <ImageViewTracker postId={post.id}>
-            <RawEmbedRenderer embedHtml={r.html} />
+            <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} />
           </ImageViewTracker>
         </SkeletonGate>
+      )}
+
+      {/* Fallback when raw embed fails — show UniversalMetaEmbed to rebuild */}
+      {r.kind === 'raw' && rawEmbedFailed && post.mediaUrl && (
+        <ImageViewTracker postId={post.id}>
+          <UniversalMetaEmbed url={post.mediaUrl} />
+        </ImageViewTracker>
       )}
       
       {/* Twitter/X embed */}
