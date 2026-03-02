@@ -119,26 +119,83 @@ serve(async (req) => {
       }
     }
 
-    // Facebook oEmbed (requires Meta token)
+    // Facebook oEmbed (requires Meta token) + direct iframe fallback parity
     if (urlLower.includes('facebook.com') || urlLower.includes('fb.watch') || urlLower.includes('fb.me')) {
       platform = 'facebook';
-      const metaToken = Deno.env.get('META_APP_TOKEN');
-      if (metaToken) {
+
+      const stripFacebookTrackingParams = (raw: string) => {
         try {
-          const isVideo = url.includes('/videos/') || url.includes('/watch/') || url.includes('/reel/') || url.includes('fb.watch');
+          const u = new URL(raw);
+          ['mibextid', 'ref', 'refid', 'sfnsn', 'app', 'paipv', 'rdid', 'share_url'].forEach((p) => {
+            u.searchParams.delete(p);
+          });
+          u.hash = '';
+          return u.toString();
+        } catch {
+          return raw;
+        }
+      };
+
+      let resolvedFacebookUrl = url;
+
+      // Share links (/share/r, /share/v, fb.watch, fb.me) must be expanded to canonical post/reel URLs.
+      if (urlLower.includes('/share/') || urlLower.includes('fb.watch') || urlLower.includes('fb.me')) {
+        try {
+          const expanded = await fetch(url, {
+            method: 'GET',
+            redirect: 'follow',
+            headers: { 'User-Agent': 'Mozilla/5.0 (AelixtoBot/1.0)' },
+          });
+          if (expanded.url) {
+            resolvedFacebookUrl = expanded.url;
+            console.log('[fetch-oembed] Facebook URL expanded to:', resolvedFacebookUrl);
+          }
+        } catch (e) {
+          console.warn('[fetch-oembed] Facebook URL expansion failed, using original URL:', e);
+        }
+      }
+
+      const canonicalFacebookUrl = stripFacebookTrackingParams(resolvedFacebookUrl);
+      const unresolvedShare = canonicalFacebookUrl.includes('/share/');
+      const isVideo =
+        canonicalFacebookUrl.includes('/reel/') ||
+        canonicalFacebookUrl.includes('/videos/') ||
+        canonicalFacebookUrl.includes('/watch/') ||
+        canonicalFacebookUrl.includes('fb.watch');
+
+      const pluginEndpoint = isVideo ? 'video.php' : 'post.php';
+      const encodedUrl = encodeURIComponent(canonicalFacebookUrl);
+      const pluginQuery = isVideo
+        ? `href=${encodedUrl}&width=500`
+        : `href=${encodedUrl}&show_text=true&width=500`;
+
+      const fallbackIframe = `<iframe src="https://www.facebook.com/plugins/${pluginEndpoint}?${pluginQuery}" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+
+      const metaToken = Deno.env.get('META_APP_TOKEN');
+      if (metaToken && !unresolvedShare) {
+        try {
           const endpoint = isVideo ? 'oembed_video' : 'oembed_post';
-          const oembedUrl = `https://graph.facebook.com/v18.0/${endpoint}?url=${encodeURIComponent(url)}&access_token=${metaToken}&omitscript=true`;
+          const oembedUrl = `https://graph.facebook.com/v18.0/${endpoint}?url=${encodeURIComponent(canonicalFacebookUrl)}&access_token=${metaToken}&omitscript=true`;
           const res = await fetch(oembedUrl);
+
           if (res.ok) {
             const data = await res.json();
             if (data.html) {
               embedHtml = data.html;
               console.log('[fetch-oembed] Facebook oEmbed success');
             }
+          } else {
+            const errorText = await res.text();
+            console.warn('[fetch-oembed] Facebook oEmbed non-200, using iframe fallback:', errorText);
           }
         } catch (e) {
           console.error('[fetch-oembed] Facebook oEmbed failed:', e);
         }
+      }
+
+      if (!embedHtml && !unresolvedShare) {
+        embedHtml = fallbackIframe;
+        console.log('[fetch-oembed] Facebook iframe fallback built');
       }
     }
 

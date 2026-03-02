@@ -200,10 +200,22 @@ const normalizeFacebookUrl = (raw: string): string => {
 const buildFacebookEmbed = (url: string): string | null => {
   const canonical = normalizeFacebookUrl(url);
   // Share URLs (e.g. /share/v/..., /share/r/...) redirect and won't render in
-  // plugins/post.php. Skip immediate render — let URL expansion resolve them first.
+  // facebook plugins directly. Skip immediate render — let URL expansion resolve them first.
   if (canonical.includes('/share/')) return null;
+
+  const isVideo =
+    canonical.includes('/reel/') ||
+    canonical.includes('/videos/') ||
+    canonical.includes('/watch/') ||
+    canonical.includes('fb.watch');
+
+  const pluginEndpoint = isVideo ? 'video.php' : 'post.php';
   const encodedUrl = encodeURIComponent(canonical);
-  return `<iframe src="https://www.facebook.com/plugins/post.php?href=${encodedUrl}&show_text=true&width=500" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+  const query = isVideo
+    ? `href=${encodedUrl}&width=500`
+    : `href=${encodedUrl}&show_text=true&width=500`;
+
+  return `<iframe src="https://www.facebook.com/plugins/${pluginEndpoint}?${query}" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
 };
 
 // Check if Spotify URL is embeddable (not wrapped-share or other special pages)
