@@ -197,8 +197,11 @@ const normalizeFacebookUrl = (raw: string): string => {
 };
 
 // Build Facebook embed using direct iframe (bypasses slow SDK)
-const buildFacebookEmbed = (url: string): string => {
+const buildFacebookEmbed = (url: string): string | null => {
   const canonical = normalizeFacebookUrl(url);
+  // Share URLs (e.g. /share/v/..., /share/r/...) redirect and won't render in
+  // plugins/post.php. Skip immediate render — let URL expansion resolve them first.
+  if (canonical.includes('/share/')) return null;
   const encodedUrl = encodeURIComponent(canonical);
   return `<iframe src="https://www.facebook.com/plugins/post.php?href=${encodedUrl}&show_text=true&width=500" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
 };
