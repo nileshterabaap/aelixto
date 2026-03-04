@@ -489,6 +489,36 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       });
       const isInstagramIframe = embedHtml.includes('instagram.com');
       const isThreadsIframe = embedHtml.includes('threads.net');
+      const isFacebookIframe = embedHtml.includes('facebook.com/plugins/');
+
+      if (isFacebookIframe) {
+        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
+        const iframeSrc = srcMatch ? srcMatch[1] : '';
+
+        return (
+          <div
+            className="relative w-full overflow-hidden"
+            style={{ aspectRatio: '4 / 5', touchAction: 'pan-y' }}
+          >
+            <iframe
+              src={iframeSrc}
+              scrolling="no"
+              allowFullScreen
+              allow="encrypted-media"
+              loading="lazy"
+              style={{
+                border: 'none',
+                position: 'absolute',
+                top: '-60px',
+                left: 0,
+                width: '100%',
+                height: 'calc(100% + 60px)',
+                overflow: 'hidden',
+              }}
+            />
+          </div>
+        );
+      }
 
       if (isInstagramIframe) {
         // Extract the src URL from the sanitized iframe HTML
