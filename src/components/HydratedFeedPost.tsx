@@ -105,7 +105,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       ([entry]) => {
         setIsNearViewport(entry.isIntersecting);
       },
-      { rootMargin: '400px', threshold: 0 }
+      { rootMargin: '2000px', threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();

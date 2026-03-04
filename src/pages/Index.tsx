@@ -202,7 +202,7 @@ const Index = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {allPosts.map((post) => (
+              {allPosts.map((post, index) => (
                 <div 
                   key={post.id} 
                   ref={(el) => {
@@ -215,6 +215,7 @@ const Index = () => {
                     post={post} 
                     userId={user?.id} 
                     isActive={isActive(post.id)}
+                    startHydrated={index < 5}
                   />
                 </div>
               ))}
