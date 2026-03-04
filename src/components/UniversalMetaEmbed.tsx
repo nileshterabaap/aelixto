@@ -498,7 +498,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         return (
           <div
             className="relative w-full overflow-hidden"
-            style={{ aspectRatio: '4 / 5', touchAction: 'pan-y' }}
+            style={{ aspectRatio: '3 / 5', touchAction: 'pan-y' }}
           >
             <iframe
               src={iframeSrc}
@@ -509,10 +509,10 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               style={{
                 border: 'none',
                 position: 'absolute',
-                top: '-60px',
+                top: '-80px',
                 left: 0,
                 width: '100%',
-                height: 'calc(100% + 60px)',
+                height: 'calc(100% + 580px)',
                 overflow: 'hidden',
               }}
             />
