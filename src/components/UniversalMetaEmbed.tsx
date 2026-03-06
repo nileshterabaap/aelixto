@@ -514,7 +514,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
                 width: '103%',
                 height: 'calc(100% + 56px)',
                 overflow: 'hidden',
-                transform: 'scale(0.80)',
+                transform: 'scale(0.92)',
                 transformOrigin: 'top center',
               }}
             />
