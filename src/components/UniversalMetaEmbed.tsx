@@ -509,12 +509,12 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
               style={{
                 border: 'none',
                 position: 'absolute',
-                top: '-32px',
-                left: '-1.5%',
-                width: '103%',
+                top: '-28px',
+                left: 0,
+                width: '100%',
                 height: 'calc(100% + 56px)',
                 overflow: 'hidden',
-                transform: 'scale(0.92)',
+                transform: 'scale(0.85)',
                 transformOrigin: 'top center',
               }}
             />
