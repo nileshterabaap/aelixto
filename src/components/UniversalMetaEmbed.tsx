@@ -72,6 +72,93 @@ const ThreadsIframeEmbed = ({
   );
 };
 
+/**
+ * Facebook iframe that auto-sizes to its content height.
+ * Falls back to a generous min-height, then listens for the Facebook
+ * plugins cross-origin resize message to snap to exact content height.
+ */
+const FacebookIframeEmbed = ({
+  html,
+  expandedUrl,
+  fallbackData,
+}: {
+  html: string;
+  expandedUrl: string;
+  fallbackData: { title?: string; image?: string; description?: string } | null;
+}) => {
+  const [failed, setFailed] = useState(false);
+  const [height, setHeight] = useState(520); // sensible default
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  const srcMatch = html.match(/src="([^"]+)"/);
+  const iframeSrc = srcMatch ? srcMatch[1] : '';
+
+  // Listen for Facebook's cross-origin resize messages
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (typeof e.data === 'string') {
+        try {
+          const parsed = JSON.parse(e.data);
+          // Facebook plugin sends {"type":"resize","height":XXX}
+          if (parsed?.type === 'resize' && typeof parsed.height === 'number' && parsed.height > 50) {
+            setHeight(parsed.height);
+          }
+        } catch {
+          // not JSON, ignore
+        }
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  // Fallback: if iframe doesn't render in 12s, show OG card
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (iframeRef.current) {
+        const rect = iframeRef.current.getBoundingClientRect();
+        if (rect.height < 50) setFailed(true);
+      }
+    }, 12000);
+    return () => clearTimeout(timeout);
+  }, []);
+
+  if (failed) {
+    return (
+      <OgCardFallback
+        url={expandedUrl}
+        title={fallbackData?.title}
+        image={fallbackData?.image}
+        description={fallbackData?.description}
+        platform="Facebook"
+      />
+    );
+  }
+
+  return (
+    <div
+      className="relative w-full overflow-hidden"
+      style={{ touchAction: 'pan-y' }}
+    >
+      <iframe
+        ref={iframeRef}
+        src={iframeSrc}
+        scrolling="no"
+        allowFullScreen
+        allow="encrypted-media"
+        loading="lazy"
+        onError={() => setFailed(true)}
+        style={{
+          border: 'none',
+          width: '100%',
+          height: `${height}px`,
+          overflow: 'hidden',
+          display: 'block',
+        }}
+      />
+    </div>
+  );
+
 interface UniversalMetaEmbedProps {
   url: string;
 }
