@@ -492,33 +492,12 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       const isFacebookIframe = embedHtml.includes('facebook.com/plugins/');
 
       if (isFacebookIframe) {
-        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
-        const iframeSrc = srcMatch ? srcMatch[1] : '';
-
         return (
-          <div
-            className="relative w-full overflow-hidden"
-            style={{ aspectRatio: '7 / 10', touchAction: 'pan-y' }}
-          >
-            <iframe
-              src={iframeSrc}
-              scrolling="no"
-              allowFullScreen
-              allow="encrypted-media"
-              loading="lazy"
-              style={{
-                border: 'none',
-                position: 'absolute',
-                top: '-28px',
-                left: 0,
-                width: '100%',
-                height: 'calc(100% + 56px)',
-                overflow: 'hidden',
-                transform: 'scale(0.85)',
-                transformOrigin: 'top center',
-              }}
-            />
-          </div>
+          <FacebookIframeEmbed
+            html={sanitizedHtml}
+            expandedUrl={expandedUrl}
+            fallbackData={fallbackData}
+          />
         );
       }
 
