@@ -158,6 +158,7 @@ const FacebookIframeEmbed = ({
       />
     </div>
   );
+};
 
 interface UniversalMetaEmbedProps {
   url: string;
