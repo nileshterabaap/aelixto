@@ -63,7 +63,8 @@ const ThreadsIframeEmbed = ({
         style={{
           border: 'none',
           width: '100%',
-          height: '860px',
+          height: '680px',
+          display: 'block',
           background: 'transparent',
         }}
       />
