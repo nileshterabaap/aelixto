@@ -271,16 +271,18 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
 
-      {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed */}
-      <div ref={embedRef} style={{ contain: 'layout paint' }}>
-        <HydratedEmbed
-          post={post}
-          renderer={r}
-          thumbnailUrl={effectiveThumbnail}
-          isHydrated={isHydrated}
-          onPlayClick={handlePlayClick}
-        />
-      </div>
+      {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip container when no content */}
+      {r.kind !== 'none' && (
+        <div ref={embedRef} style={{ contain: 'layout paint' }}>
+          <HydratedEmbed
+            post={post}
+            renderer={r}
+            thumbnailUrl={effectiveThumbnail}
+            isHydrated={isHydrated}
+            onPlayClick={handlePlayClick}
+          />
+        </div>
+      )}
 
       {/* Title for video/image posts */}
       {post.title && (r.kind === 'image' || r.kind === 'video') && (
