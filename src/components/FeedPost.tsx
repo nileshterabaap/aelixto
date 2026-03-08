@@ -476,7 +476,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
 
 
         {/* Single renderer based on resolver */}
-        {embedEnabled && (
+        {embedEnabled && r.kind !== 'none' && (
           <div className="mb-2">
             {r.kind === 'raw' && post.isRealPost && (
               <LazyEmbed
