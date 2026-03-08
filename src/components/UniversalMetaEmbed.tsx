@@ -371,7 +371,7 @@ const buildThreadsEmbed = (url: string): string | null => {
     if (postMatch) {
       const cleanPath = u.pathname.replace(/\/$/, '');
       const embedUrl = `https://www.threads.net${cleanPath}/embed`.replace('threads.com', 'threads.net');
-      return `<iframe src="${embedUrl}" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;background:transparent;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+      return `<iframe src="${embedUrl}" style="border:none;width:100%;height:860px;background:transparent;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
