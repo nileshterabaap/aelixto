@@ -51,7 +51,7 @@ const ThreadsIframeEmbed = ({
   }
 
   return (
-    <div className="relative w-full overflow-hidden" style={{ width: '100%', height: '520px' }}>
+    <div className="relative w-full overflow-hidden" style={{ width: '100%', display: 'block', height: '520px' }}>
       <iframe
         ref={iframeRef}
         src={src}
@@ -65,9 +65,13 @@ const ThreadsIframeEmbed = ({
           position: 'absolute',
           top: 0,
           left: 0,
+          right: 0,
           width: '100%',
+          maxWidth: '100%',
           height: '600px',
           display: 'block',
+          margin: 0,
+          padding: 0,
           background: 'transparent',
         }}
       />
