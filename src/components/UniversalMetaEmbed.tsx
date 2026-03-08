@@ -51,7 +51,7 @@ const ThreadsIframeEmbed = ({
   }
 
   return (
-    <div className="relative w-full overflow-hidden" style={{ aspectRatio: '4 / 5' }}>
+    <div className="relative w-full">
       <iframe
         ref={iframeRef}
         src={src}
@@ -63,8 +63,7 @@ const ThreadsIframeEmbed = ({
         style={{
           border: 'none',
           width: '100%',
-          height: '100%',
-          overflow: 'hidden',
+          height: '860px',
           background: 'transparent',
         }}
       />
@@ -372,7 +371,7 @@ const buildThreadsEmbed = (url: string): string | null => {
     if (postMatch) {
       const cleanPath = u.pathname.replace(/\/$/, '');
       const embedUrl = `https://www.threads.net${cleanPath}/embed`.replace('threads.com', 'threads.net');
-      return `<iframe src="${embedUrl}" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;background:transparent;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+      return `<iframe src="${embedUrl}" style="border:none;width:100%;height:860px;background:transparent;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
