@@ -4,8 +4,64 @@ import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 
+const THREADS_MIN_HEIGHT = 260;
+const THREADS_MAX_HEIGHT = 1400;
+const THREADS_DEFAULT_HEIGHT = 520;
+
+const clampThreadsHeight = (height: number) =>
+  Math.min(THREADS_MAX_HEIGHT, Math.max(THREADS_MIN_HEIGHT, Math.round(height)));
+
+const parseThreadsHeightFromMessage = (data: unknown): number | null => {
+  let payload: unknown = data;
+
+  if (typeof payload === 'number' && Number.isFinite(payload)) {
+    return payload;
+  }
+
+  if (typeof payload === 'string') {
+    try {
+      payload = JSON.parse(payload);
+    } catch {
+      return null;
+    }
+  }
+
+  const queue: unknown[] = [payload];
+  const visited = new Set<unknown>();
+
+  while (queue.length > 0) {
+    const current = queue.shift();
+    if (!current || typeof current !== 'object' || visited.has(current)) continue;
+
+    visited.add(current);
+    const record = current as Record<string, unknown>;
+
+    const directHeightCandidates = [
+      record.height,
+      record.iframeHeight,
+      record.frameHeight,
+      (record.dimensions as Record<string, unknown> | undefined)?.height,
+      (record.size as Record<string, unknown> | undefined)?.height,
+    ];
+
+    for (const candidate of directHeightCandidates) {
+      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
+        return candidate;
+      }
+    }
+
+    Object.values(record).forEach((value) => {
+      if (value && typeof value === 'object') {
+        queue.push(value);
+      }
+    });
+  }
+
+  return null;
+};
+
 /**
- * Threads iframe with auto-fallback to OG card if iframe fails to load.
+ * Threads iframe that listens for resize messages and adapts height per post.
  */
 const ThreadsIframeEmbed = ({
   src,
@@ -17,24 +73,39 @@ const ThreadsIframeEmbed = ({
   fallbackData: { title?: string; image?: string; description?: string } | null;
 }) => {
   const [failed, setFailed] = useState(false);
+  const [height, setHeight] = useState(THREADS_DEFAULT_HEIGHT);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    // Safety timeout: if iframe doesn't render content in 10s, show fallback
-    const timeout = setTimeout(() => {
-      if (iframeRef.current) {
-        try {
-          const rect = iframeRef.current.getBoundingClientRect();
-          if (rect.height < 50) {
-            setFailed(true);
-          }
-        } catch {
-          // Cross-origin — iframe loaded something, that's fine
-        }
-      }
-    }, 10000);
-    return () => clearTimeout(timeout);
+    const handleMessage = (event: MessageEvent) => {
+      const iframeWindow = iframeRef.current?.contentWindow;
+      if (!iframeWindow || event.source !== iframeWindow) return;
+
+      const isThreadsOrigin =
+        event.origin.includes('threads.net') || event.origin.includes('threads.com');
+      if (!isThreadsOrigin) return;
+
+      const nextHeight = parseThreadsHeightFromMessage(event.data);
+      if (!nextHeight) return;
+
+      const clampedHeight = clampThreadsHeight(nextHeight);
+      setHeight((prev) => (Math.abs(prev - clampedHeight) > 2 ? clampedHeight : prev));
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (!hasLoaded) {
+        setFailed(true);
+      }
+    }, 12000);
+
+    return () => clearTimeout(timeout);
+  }, [hasLoaded]);
 
   if (failed) {
     return (
@@ -48,12 +119,11 @@ const ThreadsIframeEmbed = ({
     );
   }
 
-  // Threads iframes render their content in the top portion with blank space below.
-  // Use a compact container height (360px) that fits most text + link-preview posts
-  // while clipping the blank padding the Threads embed adds below its content.
-  // The iframe itself is taller (550px) to ensure all content is reachable before clipping.
   return (
-    <div className="relative w-full overflow-hidden" style={{ width: '100%', display: 'block', height: '360px' }}>
+    <div
+      className="relative w-full overflow-hidden"
+      style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
+    >
       <iframe
         ref={iframeRef}
         src={src}
@@ -61,16 +131,12 @@ const ThreadsIframeEmbed = ({
         allowFullScreen
         allow="encrypted-media"
         loading="lazy"
+        onLoad={() => setHasLoaded(true)}
         onError={() => setFailed(true)}
         style={{
           border: 'none',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
           width: '100%',
-          maxWidth: '100%',
-          height: '550px',
+          height: '100%',
           display: 'block',
           margin: 0,
           padding: 0,
