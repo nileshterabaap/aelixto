@@ -27,6 +27,8 @@ import spotifyIcon from "@/assets/platforms/spotify.svg";
 import mediumIcon from "@/assets/platforms/medium.svg";
 import threadsIcon from "@/assets/platforms/threads.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
+import articlesIcon from "@/assets/platforms/articles.svg";
+import externalIcon from "@/assets/platforms/external.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
