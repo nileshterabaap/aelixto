@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node scripts/stability-guard.mjs restore && vite",
     "build": "node scripts/stability-guard.mjs check && vite build",
-    "build:dev": "node scripts/stability-guard.mjs approve && vite build --mode development",
+    "build:dev": "node scripts/stability-guard.mjs check && vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
     "stability:status": "node scripts/stability-guard.mjs status",
