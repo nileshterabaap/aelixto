@@ -60,7 +60,7 @@ export const HydratedEmbed = memo(({
     ? 'aspect-[9/16]'
     : 'aspect-video';
   
-  // If no renderer or none type, show nothing
+  // If no renderer or none type, show nothing (no placeholder/skeleton either)
   if (r.kind === 'none') return null;
   
   // IMAGES: Load directly without play button (swift loading)
