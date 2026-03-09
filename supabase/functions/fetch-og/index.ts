@@ -322,10 +322,12 @@ serve(async (req) => {
     const description = extractMeta('og:description') || extractMeta('twitter:description') || 
                         extractMeta('description');
 
-    console.log('[fetch-og] Extracted OG data:', { title, image, description, finalUrl });
+    const ogType = extractMeta('og:type');
+
+    console.log('[fetch-og] Extracted OG data:', { title, image, description, ogType, finalUrl });
 
     return new Response(
-      JSON.stringify({ title, image, description, finalUrl }),
+      JSON.stringify({ title, image, description, finalUrl, og_type: ogType }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
