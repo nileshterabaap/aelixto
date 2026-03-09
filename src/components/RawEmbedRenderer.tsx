@@ -5,6 +5,7 @@ import DOMPurify from 'dompurify';
 interface RawEmbedRendererProps {
   embedHtml: string;
   onError?: () => void;
+  backgroundUrl?: string | null;
 }
 
 // Sanitize embed HTML using DOMPurify to prevent XSS attacks
