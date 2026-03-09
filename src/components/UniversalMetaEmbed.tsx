@@ -17,76 +17,23 @@ const ThreadsIframeEmbed = ({
   fallbackData: { title?: string; image?: string; description?: string } | null;
 }) => {
   const [failed, setFailed] = useState(false);
-  const [containerHeight, setContainerHeight] = useState<number | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Poll the iframe's rendered height to auto-size the container.
-    // Threads iframes don't send cross-origin resize messages,
-    // so we observe the iframe element's actual height via getBoundingClientRect.
-    let attempts = 0;
-    const maxAttempts = 20; // ~10s of polling
-
-    const poll = setInterval(() => {
-      attempts++;
+    // Safety timeout: if iframe doesn't render content in 10s, show fallback
+    const timeout = setTimeout(() => {
       if (iframeRef.current) {
-        const rect = iframeRef.current.getBoundingClientRect();
-        // The iframe has position:absolute with height:600px, but only part has
-        // visible content. The Threads iframe uses an internal scroll container.
-        // Since we can't read cross-origin content, we detect via the iframe's
-        // offsetHeight and the actual painted area.
-        // 
-        // Best heuristic: if the iframe is loaded and rendered, check its
-        // scrollHeight via the container. Since cross-origin blocks direct access,
-        // we rely on the container's visual bounds.
-        if (rect.height > 50) {
-          // Iframe loaded. Use the iframe's natural content height.
-          // Threads embeds vary: text-only ~200-300px, with image ~500px.
-          // We'll wait until the iframe has loaded, then cap at actual content.
-          // Since we can't read the cross-origin iframe content height,
-          // use postMessage listener as a last resort.
-          clearInterval(poll);
-        }
-      }
-
-      if (attempts >= maxAttempts) {
-        clearInterval(poll);
-        // If iframe never rendered properly, show fallback
-        if (iframeRef.current) {
+        try {
           const rect = iframeRef.current.getBoundingClientRect();
           if (rect.height < 50) {
             setFailed(true);
           }
-        }
-      }
-    }, 500);
-
-    // Listen for cross-origin resize messages from the Threads iframe
-    const handleMessage = (e: MessageEvent) => {
-      if (typeof e.data === 'object' && e.data !== null) {
-        // Threads may send height info
-        if (e.data.type === 'resize' && typeof e.data.height === 'number' && e.data.height > 50) {
-          setContainerHeight(e.data.height);
-        }
-      }
-      if (typeof e.data === 'string') {
-        try {
-          const parsed = JSON.parse(e.data);
-          if (parsed?.type === 'resize' && typeof parsed.height === 'number' && parsed.height > 50) {
-            setContainerHeight(parsed.height);
-          }
         } catch {
-          // not JSON
+          // Cross-origin — iframe loaded something, that's fine
         }
       }
-    };
-    window.addEventListener('message', handleMessage);
-
-    return () => {
-      clearInterval(poll);
-      window.removeEventListener('message', handleMessage);
-    };
+    }, 10000);
+    return () => clearTimeout(timeout);
   }, []);
 
   if (failed) {
@@ -101,16 +48,12 @@ const ThreadsIframeEmbed = ({
     );
   }
 
-  // Use detected height or fall back to a max-height with overflow hidden
-  // This clips the blank space below content while showing the full embed
-  const effectiveHeight = containerHeight || 520;
-
+  // Threads iframes render their content in the top portion with blank space below.
+  // Use a compact container height (360px) that fits most text + link-preview posts
+  // while clipping the blank padding the Threads embed adds below its content.
+  // The iframe itself is taller (550px) to ensure all content is reachable before clipping.
   return (
-    <div
-      ref={containerRef}
-      className="relative w-full overflow-hidden"
-      style={{ width: '100%', display: 'block', maxHeight: `${effectiveHeight}px` }}
-    >
+    <div className="relative w-full overflow-hidden" style={{ width: '100%', display: 'block', height: '360px' }}>
       <iframe
         ref={iframeRef}
         src={src}
@@ -127,7 +70,7 @@ const ThreadsIframeEmbed = ({
           right: 0,
           width: '100%',
           maxWidth: '100%',
-          height: '600px',
+          height: '550px',
           display: 'block',
           margin: 0,
           padding: 0,
