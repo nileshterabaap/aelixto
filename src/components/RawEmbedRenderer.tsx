@@ -311,6 +311,16 @@ export const RawEmbedRenderer = ({ embedHtml, onError, backgroundUrl }: RawEmbed
         className="relative w-full overflow-hidden"
         style={{ aspectRatio: '3 / 5', touchAction: 'pan-y' }}
       >
+        {/* Blurred background fill — replaces black side bars */}
+        {backgroundUrl && (
+          <img
+            src={backgroundUrl}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl brightness-75 saturate-125"
+            style={{ zIndex: 0 }}
+          />
+        )}
         <div
           ref={containerRef}
           onClick={handleDoubleTap}
@@ -322,6 +332,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError, backgroundUrl }: RawEmbed
             width: '100%',
             height: 'calc(100% + 500px)',
             overflow: 'hidden',
+            zIndex: 1,
           }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
