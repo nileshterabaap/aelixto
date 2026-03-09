@@ -334,11 +334,12 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   if (platform === 'threads') {
     return (
       <div
-        style={{ width: '100%', maxHeight: 360, overflow: 'hidden', position: 'relative' }}
+        style={{ width: '100%', maxHeight: 520, overflow: 'hidden', position: 'relative' }}
       >
         <div
           ref={containerRef}
           className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&>iframe~*]:!hidden"
+          style={{ overflow: 'hidden' }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       </div>

@@ -24,8 +24,6 @@ const ThreadsIframeEmbed = ({
     const timeout = setTimeout(() => {
       if (iframeRef.current) {
         try {
-          // If we can't access contentDocument (cross-origin), that's normal
-          // Just check if the iframe is still showing (visible height > 0)
           const rect = iframeRef.current.getBoundingClientRect();
           if (rect.height < 50) {
             setFailed(true);
@@ -50,8 +48,12 @@ const ThreadsIframeEmbed = ({
     );
   }
 
+  // Threads iframes render their content in the top portion with blank space below.
+  // Use a compact container height (360px) that fits most text + link-preview posts
+  // while clipping the blank padding the Threads embed adds below its content.
+  // The iframe itself is taller (550px) to ensure all content is reachable before clipping.
   return (
-    <div className="relative w-full overflow-hidden" style={{ width: '100%', display: 'block', height: '520px' }}>
+    <div className="relative w-full overflow-hidden" style={{ width: '100%', display: 'block', height: '360px' }}>
       <iframe
         ref={iframeRef}
         src={src}
@@ -68,7 +70,7 @@ const ThreadsIframeEmbed = ({
           right: 0,
           width: '100%',
           maxWidth: '100%',
-          height: '600px',
+          height: '550px',
           display: 'block',
           margin: 0,
           padding: 0,
@@ -78,7 +80,6 @@ const ThreadsIframeEmbed = ({
     </div>
   );
 };
-
 /**
  * Facebook iframe that auto-sizes to its content height.
  * Falls back to a generous min-height, then listens for the Facebook
