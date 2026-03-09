@@ -147,7 +147,11 @@ export const HydratedEmbed = memo(({
       {r.kind === 'raw' && r.html && !rawEmbedFailed && (
         <SkeletonGate platform={post.platform || undefined}>
           <ImageViewTracker postId={post.id}>
-            <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} />
+          <RawEmbedRenderer 
+            embedHtml={r.html} 
+            onError={handleRawEmbedError}
+            backgroundUrl={post.platform === 'instagram' ? (effectiveThumbnail || post.preview_image_url || null) : null}
+          />
           </ImageViewTracker>
         </SkeletonGate>
       )}

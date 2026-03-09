@@ -5,6 +5,7 @@ import DOMPurify from 'dompurify';
 interface RawEmbedRendererProps {
   embedHtml: string;
   onError?: () => void;
+  backgroundUrl?: string | null;
 }
 
 // Sanitize embed HTML using DOMPurify to prevent XSS attacks
@@ -90,7 +91,7 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-ifra
   return 'unknown';
 };
 
-export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) => {
+export const RawEmbedRenderer = ({ embedHtml, onError, backgroundUrl }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<number>(0);
   const [embedFailed, setEmbedFailed] = useState(false);
@@ -310,6 +311,16 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
         className="relative w-full overflow-hidden"
         style={{ aspectRatio: '3 / 5', touchAction: 'pan-y' }}
       >
+        {/* Blurred background fill — replaces black side bars */}
+        {backgroundUrl && (
+          <img
+            src={backgroundUrl}
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 w-full h-full object-cover scale-110 blur-2xl brightness-75 saturate-125"
+            style={{ zIndex: 0 }}
+          />
+        )}
         <div
           ref={containerRef}
           onClick={handleDoubleTap}
@@ -321,6 +332,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             width: '100%',
             height: 'calc(100% + 500px)',
             overflow: 'hidden',
+            zIndex: 1,
           }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
