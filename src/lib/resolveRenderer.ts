@@ -39,11 +39,7 @@ export function resolveRenderer(post: any): Renderer {
   const isBlocked = blocked.some(d => url.includes(d));
   if (!isBlocked && post?.mediaType === 'none') return { kind: 'article', url };
 
-  // 5) Threads text-only posts: skip embed, show caption only (no media container)
-  const isThreads = url.includes('threads.net') || url.includes('threads.com');
-  if (isThreads && post?.mediaType === 'none') return { kind: 'none' };
-
-  // 6) universal meta (not reddit) — includes TikTok for client-side embed building
+  // 5) universal meta (not reddit) — includes TikTok for client-side embed building
   const universalAllow = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','threads.net','threads.com','linkedin.com','tiktok.com'];
   if (universalAllow.some(d => url.includes(d))) return { kind: 'universal', url };
 
