@@ -330,14 +330,19 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
 
 
   // Threads embeds: tighter container, hide fallback link only when iframe loads
+  // Height-contained wrapper clips extra vertical space injected by Threads SDK
   if (platform === 'threads') {
     return (
       <div
-        ref={containerRef}
-        className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&>iframe~*]:!hidden"
-        style={{ overflow: 'hidden' }}
-        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-      />
+        style={{ width: '100%', maxHeight: 520, overflow: 'hidden', position: 'relative' }}
+      >
+        <div
+          ref={containerRef}
+          className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&>iframe~*]:!hidden"
+          style={{ overflow: 'hidden' }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        />
+      </div>
     );
   }
 
