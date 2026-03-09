@@ -12,6 +12,10 @@ import quoraIcon from "@/assets/platforms/quora.svg";
 import mediumIcon from "@/assets/platforms/medium.svg";
 import blogIcon from "@/assets/platforms/blog.svg";
 import spotifyIcon from "@/assets/platforms/spotify.svg";
+import threadsIcon from "@/assets/platforms/threads.svg";
+import linkedinIcon from "@/assets/platforms/linkedin.svg";
+import articlesIcon from "@/assets/platforms/articles.svg";
+import externalIcon from "@/assets/platforms/external.svg";
 
 export type PlatformTab = {
   key: string;
@@ -33,7 +37,10 @@ const PLATFORM_META: Record<string, { label: string; icon: string }> = {
   medium: { label: "Medium", icon: mediumIcon },
   blog: { label: "Blogs", icon: blogIcon },
   spotify: { label: "Spotify", icon: spotifyIcon },
-  article: { label: "Articles", icon: blogIcon },
+  threads: { label: "Threads", icon: threadsIcon },
+  linkedin: { label: "LinkedIn", icon: linkedinIcon },
+  article: { label: "Articles 📜", icon: articlesIcon },
+  external: { label: "External 🔗", icon: externalIcon },
 };
 
 export const useUserPlatformTabs = (userId: string | undefined) => {
@@ -60,7 +67,7 @@ export const useUserPlatformTabs = (userId: string | undefined) => {
         const platformTabs: PlatformTab[] = (data || []).map((item: any) => ({
           key: item.platform,
           label: PLATFORM_META[item.platform]?.label || item.platform,
-          icon: PLATFORM_META[item.platform]?.icon || youtubeIcon,
+          icon: PLATFORM_META[item.platform]?.icon || externalIcon,
           count: item.post_count,
         }));
 

@@ -69,6 +69,8 @@ const getPlatformIcon = (platform?: string) => {
     medium: { name: 'Medium', icon: mediumIcon },
     threads: { name: 'Threads', icon: threadsIcon },
     linkedin: { name: 'LinkedIn', icon: linkedinIcon },
+    article: { name: 'Article', icon: articlesIcon },
+    external: { name: 'External', icon: externalIcon },
   };
   
   return icons[platform] || null;
