@@ -27,8 +27,6 @@ import spotifyIcon from "@/assets/platforms/spotify.svg";
 import mediumIcon from "@/assets/platforms/medium.svg";
 import threadsIcon from "@/assets/platforms/threads.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
-import articlesIcon from "@/assets/platforms/articles.svg";
-import externalIcon from "@/assets/platforms/external.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
@@ -69,8 +67,6 @@ const getPlatformIcon = (platform?: string) => {
     medium: { name: 'Medium', icon: mediumIcon },
     threads: { name: 'Threads', icon: threadsIcon },
     linkedin: { name: 'LinkedIn', icon: linkedinIcon },
-    article: { name: 'Article', icon: articlesIcon },
-    external: { name: 'External', icon: externalIcon },
   };
   
   return icons[platform] || null;
