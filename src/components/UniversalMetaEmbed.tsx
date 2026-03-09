@@ -17,25 +17,76 @@ const ThreadsIframeEmbed = ({
   fallbackData: { title?: string; image?: string; description?: string } | null;
 }) => {
   const [failed, setFailed] = useState(false);
+  const [containerHeight, setContainerHeight] = useState<number | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Safety timeout: if iframe doesn't render content in 10s, show fallback
-    const timeout = setTimeout(() => {
+    // Poll the iframe's rendered height to auto-size the container.
+    // Threads iframes don't send cross-origin resize messages,
+    // so we observe the iframe element's actual height via getBoundingClientRect.
+    let attempts = 0;
+    const maxAttempts = 20; // ~10s of polling
+
+    const poll = setInterval(() => {
+      attempts++;
       if (iframeRef.current) {
-        try {
-          // If we can't access contentDocument (cross-origin), that's normal
-          // Just check if the iframe is still showing (visible height > 0)
+        const rect = iframeRef.current.getBoundingClientRect();
+        // The iframe has position:absolute with height:600px, but only part has
+        // visible content. The Threads iframe uses an internal scroll container.
+        // Since we can't read cross-origin content, we detect via the iframe's
+        // offsetHeight and the actual painted area.
+        // 
+        // Best heuristic: if the iframe is loaded and rendered, check its
+        // scrollHeight via the container. Since cross-origin blocks direct access,
+        // we rely on the container's visual bounds.
+        if (rect.height > 50) {
+          // Iframe loaded. Use the iframe's natural content height.
+          // Threads embeds vary: text-only ~200-300px, with image ~500px.
+          // We'll wait until the iframe has loaded, then cap at actual content.
+          // Since we can't read the cross-origin iframe content height,
+          // use postMessage listener as a last resort.
+          clearInterval(poll);
+        }
+      }
+
+      if (attempts >= maxAttempts) {
+        clearInterval(poll);
+        // If iframe never rendered properly, show fallback
+        if (iframeRef.current) {
           const rect = iframeRef.current.getBoundingClientRect();
           if (rect.height < 50) {
             setFailed(true);
           }
-        } catch {
-          // Cross-origin — iframe loaded something, that's fine
         }
       }
-    }, 10000);
-    return () => clearTimeout(timeout);
+    }, 500);
+
+    // Listen for cross-origin resize messages from the Threads iframe
+    const handleMessage = (e: MessageEvent) => {
+      if (typeof e.data === 'object' && e.data !== null) {
+        // Threads may send height info
+        if (e.data.type === 'resize' && typeof e.data.height === 'number' && e.data.height > 50) {
+          setContainerHeight(e.data.height);
+        }
+      }
+      if (typeof e.data === 'string') {
+        try {
+          const parsed = JSON.parse(e.data);
+          if (parsed?.type === 'resize' && typeof parsed.height === 'number' && parsed.height > 50) {
+            setContainerHeight(parsed.height);
+          }
+        } catch {
+          // not JSON
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    return () => {
+      clearInterval(poll);
+      window.removeEventListener('message', handleMessage);
+    };
   }, []);
 
   if (failed) {
@@ -50,8 +101,16 @@ const ThreadsIframeEmbed = ({
     );
   }
 
+  // Use detected height or fall back to a max-height with overflow hidden
+  // This clips the blank space below content while showing the full embed
+  const effectiveHeight = containerHeight || 520;
+
   return (
-    <div className="relative w-full overflow-hidden" style={{ width: '100%', display: 'block', height: '520px' }}>
+    <div
+      ref={containerRef}
+      className="relative w-full overflow-hidden"
+      style={{ width: '100%', display: 'block', maxHeight: `${effectiveHeight}px` }}
+    >
       <iframe
         ref={iframeRef}
         src={src}
@@ -78,7 +137,6 @@ const ThreadsIframeEmbed = ({
     </div>
   );
 };
-
 /**
  * Facebook iframe that auto-sizes to its content height.
  * Falls back to a generous min-height, then listens for the Facebook
