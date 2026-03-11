@@ -340,6 +340,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </button>
         <button
           onClick={() => toggleSave()}
+          onPointerDown={() => {
+            longPressTimer.current = setTimeout(() => {
+              if (canUseActions) setCollectionSheetOpen(true);
+            }, 500);
+          }}
+          onPointerUp={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+          onPointerLeave={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
           className="action-btn p-1.5 active:scale-90 transition-transform"
         >
           <Bookmark className={`h-6 w-6 stroke-[1.5] ${isSaved ? 'fill-current' : 'fill-none'}`} />
@@ -352,6 +359,15 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           onOpenChange={setCommentsOpen}
           postId={post.id}
           postAuthorId={(post as any).user_id}
+        />
+      )}
+
+      {post.isRealPost && userId && (
+        <SaveToCollectionSheet
+          open={collectionSheetOpen}
+          onOpenChange={setCollectionSheetOpen}
+          postId={post.id}
+          userId={userId}
         />
       )}
     </Card>
