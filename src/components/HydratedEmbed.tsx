@@ -207,11 +207,9 @@ export const HydratedEmbed = memo(({
       
       {/* Article embed */}
       {r.kind === 'article' && r.url && (
-        <SkeletonGate platform={post.platform || 'blog'}>
-          <ImageViewTracker postId={post.id}>
-            <ArticleEmbed url={r.url} />
-          </ImageViewTracker>
-        </SkeletonGate>
+        <ImageViewTracker postId={post.id}>
+          <ArticleEmbed url={r.url} />
+        </ImageViewTracker>
       )}
       
       {/* Universal Meta embed (Instagram, Facebook, etc) */}
