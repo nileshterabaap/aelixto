@@ -86,9 +86,11 @@ const detectPlatformFromUrl = (url?: string) => {
 
 export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
   const { isScrollingFast, velocity } = useScrollVelocity();
   const hydrationResumeTimer = useRef<number | null>(null);
