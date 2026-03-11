@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
+import { PersistentEmbedHtml } from '@/components/embeds/PersistentEmbedHtml';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
