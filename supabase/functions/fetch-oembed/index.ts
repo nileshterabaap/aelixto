@@ -236,20 +236,35 @@ serve(async (req) => {
       }
     }
 
-    // TikTok oEmbed
+    // TikTok direct iframe embed (fastest, no SDK needed)
     if (platform === 'tiktok') {
       try {
-        const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
-        const res = await fetch(oembedUrl);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.html) {
-            embedHtml = data.html;
-            console.log('[fetch-oembed] TikTok oEmbed success');
+        const tiktokUrl = new URL(url);
+        const videoMatch = tiktokUrl.pathname.match(/\/@[^/]+\/video\/(\d+)/);
+        if (videoMatch) {
+          const videoId = videoMatch[1];
+          embedHtml = `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" style="border:none;width:100%;height:740px;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
+          console.log('[fetch-oembed] TikTok iframe embed built for video:', videoId);
+        } else {
+          // Fallback to oEmbed for non-standard URLs
+          const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+          const res = await fetch(oembedUrl);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.html) {
+              // Extract video ID from oEmbed response and build iframe
+              const idMatch = data.html?.match(/data-video-id="(\d+)"/);
+              if (idMatch) {
+                embedHtml = `<iframe src="https://www.tiktok.com/embed/v2/${idMatch[1]}" style="border:none;width:100%;height:740px;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
+              } else {
+                embedHtml = data.html;
+              }
+              console.log('[fetch-oembed] TikTok oEmbed fallback success');
+            }
           }
         }
       } catch (e) {
-        console.error('[fetch-oembed] TikTok oEmbed failed:', e);
+        console.error('[fetch-oembed] TikTok embed failed:', e);
       }
     }
 

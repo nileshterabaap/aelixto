@@ -646,7 +646,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
   if (embedHtml && !showFallback) {
     // For direct iframe embeds (Spotify, Instagram, LinkedIn, Threads), render without RawEmbedRenderer
-    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || (embedHtml.includes('threads.net') && embedHtml.includes('<iframe')) || (embedHtml.includes('facebook.com/plugins/') && embedHtml.includes('<iframe'));
+    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || (embedHtml.includes('threads.net') && embedHtml.includes('<iframe')) || (embedHtml.includes('facebook.com/plugins/') && embedHtml.includes('<iframe')) || (embedHtml.includes('tiktok.com/embed') && embedHtml.includes('<iframe'));
 
     if (isDirectIframe) {
       const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
