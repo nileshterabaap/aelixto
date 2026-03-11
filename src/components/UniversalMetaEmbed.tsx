@@ -454,14 +454,15 @@ const buildThreadsEmbed = (url: string): string | null => {
   return null;
 };
 
-// Build TikTok embed HTML using oEmbed blockquote approach
+// Build TikTok embed HTML using direct iframe (fastest, no SDK needed)
 const buildTikTokEmbed = (url: string): string | null => {
   try {
     const u = new URL(url);
-    // TikTok video URLs: /@user/video/ID or /t/ID
-    const videoMatch = u.pathname.match(/\/@[^/]+\/video\/(\d+)/) || u.pathname.match(/\/t\/([A-Za-z0-9]+)/);
+    // TikTok video URLs: /@user/video/ID
+    const videoMatch = u.pathname.match(/\/@[^/]+\/video\/(\d+)/);
     if (videoMatch) {
-      return `<blockquote class="tiktok-embed" cite="${url}" data-video-id="${videoMatch[1]}" style="max-width:605px;min-width:325px;"><section><a target="_blank" href="${url}" rel="noopener noreferrer">View on TikTok</a></section></blockquote><script async src="https://www.tiktok.com/embed.js"></script>`;
+      const videoId = videoMatch[1];
+      return `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" style="border:none;width:100%;height:740px;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
