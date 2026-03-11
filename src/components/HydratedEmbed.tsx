@@ -200,11 +200,9 @@ export const HydratedEmbed = memo(({
       
       {/* Pinterest embed */}
       {r.kind === 'pinterest' && r.url && (
-        <SkeletonGate platform="pinterest">
-          <ImageViewTracker postId={post.id}>
-            <PinterestEmbed url={r.url} />
-          </ImageViewTracker>
-        </SkeletonGate>
+        <ImageViewTracker postId={post.id}>
+          <PinterestEmbed url={r.url} />
+        </ImageViewTracker>
       )}
       
       {/* Article embed */}
