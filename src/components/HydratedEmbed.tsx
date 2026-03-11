@@ -62,6 +62,21 @@ export const HydratedEmbed = memo(({
   
   // If no renderer or none type, show nothing (no placeholder/skeleton either)
   if (r.kind === 'none') return null;
+
+  const rawUniversalUrl = ((post.mediaUrl || (post as any).media_url) ?? '').trim();
+  const normalizedPlatform = (post.platform || '').toLowerCase();
+  const rawHtmlSuggestsIframePlatform =
+    r.kind === 'raw' &&
+    !!r.html &&
+    (r.html.includes('instagram.com') ||
+      r.html.includes('facebook.com') ||
+      r.html.includes('fb.watch') ||
+      r.html.includes('threads.net') ||
+      r.html.includes('threads.com'));
+  const rawEmbedCanUseUniversal =
+    r.kind === 'raw' &&
+    !!rawUniversalUrl &&
+    (['instagram', 'facebook', 'threads'].includes(normalizedPlatform) || rawHtmlSuggestsIframePlatform);
   
   // IMAGES: Load directly without play button (swift loading)
   if (r.kind === 'image' && r.url) {
