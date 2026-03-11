@@ -63,7 +63,13 @@ export const HydratedEmbed = memo(({
   // If no renderer or none type, show nothing (no placeholder/skeleton either)
   if (r.kind === 'none') return null;
 
-  const rawUniversalUrl = ((post.mediaUrl || (post as any).media_url) ?? '').trim();
+  const rawHtmlUrlMatch =
+    r.kind === 'raw'
+      ? r.html.match(
+          /https?:\/\/(?:www\.)?(?:instagram\.com|facebook\.com|fb\.watch|threads\.net|threads\.com)\/[^"'\s<]+/i
+        )
+      : null;
+  const rawUniversalUrl = ((post.mediaUrl || (post as any).media_url) ?? rawHtmlUrlMatch?.[0] ?? '').trim();
   const normalizedPlatform = (post.platform || '').toLowerCase();
   const rawHtmlSuggestsIframePlatform =
     r.kind === 'raw' &&
