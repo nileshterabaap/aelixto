@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed, clearScriptCache } from '@/lib/ScriptLoader';
+import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed, loadTikTokEmbed, clearScriptCache } from '@/lib/ScriptLoader';
 import DOMPurify from 'dompurify';
 
 interface RawEmbedRendererProps {
