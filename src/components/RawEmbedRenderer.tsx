@@ -19,8 +19,8 @@ const sanitizeEmbedHtml = (html: string): string => {
   let processedHtml = stripInstagramCaption(html);
   
   return DOMPurify.sanitize(processedHtml, {
-    ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img', 'svg', 'path', 'title'],
-    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling', 'data-text-post-permalink', 'data-text-post-version', 'id', 'viewBox', 'xmlns', 'role', 'fill', 'd', 'aria-label'],
+    ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img', 'svg', 'path', 'title', 'section'],
+    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling', 'data-text-post-permalink', 'data-text-post-version', 'id', 'viewBox', 'xmlns', 'role', 'fill', 'd', 'aria-label', 'cite', 'data-video-id', 'rel'],
     ALLOW_DATA_ATTR: true
   });
 };
