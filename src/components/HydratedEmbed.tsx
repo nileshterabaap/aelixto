@@ -62,6 +62,27 @@ export const HydratedEmbed = memo(({
   
   // If no renderer or none type, show nothing (no placeholder/skeleton either)
   if (r.kind === 'none') return null;
+
+  const rawHtmlUrlMatch =
+    r.kind === 'raw'
+      ? r.html.match(
+          /https?:\/\/(?:www\.)?(?:instagram\.com|facebook\.com|fb\.watch|threads\.net|threads\.com)\/[^"'\s<]+/i
+        )
+      : null;
+  const rawUniversalUrl = ((post.mediaUrl || (post as any).media_url) ?? rawHtmlUrlMatch?.[0] ?? '').trim();
+  const normalizedPlatform = (post.platform || '').toLowerCase();
+  const rawHtmlSuggestsIframePlatform =
+    r.kind === 'raw' &&
+    !!r.html &&
+    (r.html.includes('instagram.com') ||
+      r.html.includes('facebook.com') ||
+      r.html.includes('fb.watch') ||
+      r.html.includes('threads.net') ||
+      r.html.includes('threads.com'));
+  const rawEmbedCanUseUniversal =
+    r.kind === 'raw' &&
+    !!rawUniversalUrl &&
+    (['instagram', 'facebook', 'threads'].includes(normalizedPlatform) || rawHtmlSuggestsIframePlatform);
   
   // IMAGES: Load directly without play button (swift loading)
   if (r.kind === 'image' && r.url) {
@@ -143,8 +164,16 @@ export const HydratedEmbed = memo(({
         </ImageViewTracker>
       )}
       
-      {/* Raw embed HTML (Instagram, Facebook, Spotify) */}
-      {r.kind === 'raw' && r.html && !rawEmbedFailed && (
+      {/* Raw embed HTML: route SDK-heavy platforms to direct iframe path */}
+      {r.kind === 'raw' && rawEmbedCanUseUniversal && rawUniversalUrl && (
+        <SkeletonGate platform={post.platform || undefined}>
+          <ImageViewTracker postId={post.id}>
+            <UniversalMetaEmbed url={rawUniversalUrl} />
+          </ImageViewTracker>
+        </SkeletonGate>
+      )}
+
+      {r.kind === 'raw' && r.html && !rawEmbedFailed && !rawEmbedCanUseUniversal && (
         <SkeletonGate platform={post.platform || undefined}>
           <ImageViewTracker postId={post.id}>
             <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} />
@@ -161,11 +190,9 @@ export const HydratedEmbed = memo(({
       
       {/* Twitter/X embed */}
       {r.kind === 'twitter' && r.url && (
-        <SkeletonGate platform="twitter">
-          <ImageViewTracker postId={post.id}>
-            <TwitterEmbed url={r.url} />
-          </ImageViewTracker>
-        </SkeletonGate>
+        <ImageViewTracker postId={post.id}>
+          <TwitterEmbed url={r.url} />
+        </ImageViewTracker>
       )}
       
       {/* Reddit embed */}
@@ -179,20 +206,16 @@ export const HydratedEmbed = memo(({
       
       {/* Pinterest embed */}
       {r.kind === 'pinterest' && r.url && (
-        <SkeletonGate platform="pinterest">
-          <ImageViewTracker postId={post.id}>
-            <PinterestEmbed url={r.url} />
-          </ImageViewTracker>
-        </SkeletonGate>
+        <ImageViewTracker postId={post.id}>
+          <PinterestEmbed url={r.url} />
+        </ImageViewTracker>
       )}
       
       {/* Article embed */}
       {r.kind === 'article' && r.url && (
-        <SkeletonGate platform={post.platform || 'blog'}>
-          <ImageViewTracker postId={post.id}>
-            <ArticleEmbed url={r.url} />
-          </ImageViewTracker>
-        </SkeletonGate>
+        <ImageViewTracker postId={post.id}>
+          <ArticleEmbed url={r.url} />
+        </ImageViewTracker>
       )}
       
       {/* Universal Meta embed (Instagram, Facebook, etc) */}
