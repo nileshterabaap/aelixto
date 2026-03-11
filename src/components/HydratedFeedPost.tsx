@@ -13,6 +13,7 @@ import { useScrollVelocity } from "@/hooks/useScrollVelocity";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
+import { SaveToCollectionSheet } from "@/components/saved/SaveToCollectionSheet";
 import { CollapsibleCaption } from "@/components/CollapsibleCaption";
 import { UsernameLink } from "@/components/UsernameLink";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
@@ -85,9 +86,11 @@ const detectPlatformFromUrl = (url?: string) => {
 
 export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
   const { isScrollingFast, velocity } = useScrollVelocity();
   const hydrationResumeTimer = useRef<number | null>(null);
@@ -337,6 +340,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </button>
         <button
           onClick={() => toggleSave()}
+          onPointerDown={() => {
+            longPressTimer.current = setTimeout(() => {
+              if (canUseActions) setCollectionSheetOpen(true);
+            }, 500);
+          }}
+          onPointerUp={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
+          onPointerLeave={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
           className="action-btn p-1.5 active:scale-90 transition-transform"
         >
           <Bookmark className={`h-6 w-6 stroke-[1.5] ${isSaved ? 'fill-current' : 'fill-none'}`} />
@@ -349,6 +359,15 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           onOpenChange={setCommentsOpen}
           postId={post.id}
           postAuthorId={(post as any).user_id}
+        />
+      )}
+
+      {post.isRealPost && userId && (
+        <SaveToCollectionSheet
+          open={collectionSheetOpen}
+          onOpenChange={setCollectionSheetOpen}
+          postId={post.id}
+          userId={userId}
         />
       )}
     </Card>
