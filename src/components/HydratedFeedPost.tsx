@@ -13,6 +13,7 @@ import { useScrollVelocity } from "@/hooks/useScrollVelocity";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
+import { SaveToCollectionSheet } from "@/components/saved/SaveToCollectionSheet";
 import { CollapsibleCaption } from "@/components/CollapsibleCaption";
 import { UsernameLink } from "@/components/UsernameLink";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
