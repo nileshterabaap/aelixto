@@ -158,8 +158,16 @@ export const HydratedEmbed = memo(({
         </ImageViewTracker>
       )}
       
-      {/* Raw embed HTML (Instagram, Facebook, Spotify) */}
-      {r.kind === 'raw' && r.html && !rawEmbedFailed && (
+      {/* Raw embed HTML: route SDK-heavy platforms to direct iframe path */}
+      {r.kind === 'raw' && rawEmbedCanUseUniversal && rawUniversalUrl && (
+        <SkeletonGate platform={post.platform || undefined}>
+          <ImageViewTracker postId={post.id}>
+            <UniversalMetaEmbed url={rawUniversalUrl} />
+          </ImageViewTracker>
+        </SkeletonGate>
+      )}
+
+      {r.kind === 'raw' && r.html && !rawEmbedFailed && !rawEmbedCanUseUniversal && (
         <SkeletonGate platform={post.platform || undefined}>
           <ImageViewTracker postId={post.id}>
             <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} />
