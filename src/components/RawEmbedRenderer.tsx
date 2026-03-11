@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed, clearScriptCache } from '@/lib/ScriptLoader';
+import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed, loadTikTokEmbed, clearScriptCache } from '@/lib/ScriptLoader';
 import DOMPurify from 'dompurify';
 
 interface RawEmbedRendererProps {
@@ -19,8 +19,8 @@ const sanitizeEmbedHtml = (html: string): string => {
   let processedHtml = stripInstagramCaption(html);
   
   return DOMPurify.sanitize(processedHtml, {
-    ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img', 'svg', 'path', 'title'],
-    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling', 'data-text-post-permalink', 'data-text-post-version', 'id', 'viewBox', 'xmlns', 'role', 'fill', 'd', 'aria-label'],
+    ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img', 'svg', 'path', 'title', 'section'],
+    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling', 'data-text-post-permalink', 'data-text-post-version', 'id', 'viewBox', 'xmlns', 'role', 'fill', 'd', 'aria-label', 'cite', 'data-video-id', 'rel'],
     ALLOW_DATA_ATTR: true
   });
 };
@@ -65,7 +65,7 @@ const isInstagramEmbed = (html: string): boolean => {
 };
 
 // Detect platform for SDK processing purposes
-const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-iframe' | 'threads' | 'unknown' => {
+const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-iframe' | 'threads' | 'tiktok' | 'unknown' => {
   // Instagram iframes don't need SDK processing
   if (html.includes('instagram.com') && html.includes('<iframe')) {
     return 'unknown';
@@ -86,6 +86,10 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-ifra
   }
   if (html.includes('text-post-media') || html.includes('threads.net')) {
     return 'threads';
+  }
+  // TikTok blockquote embeds need SDK
+  if (html.includes('tiktok-embed') || html.includes('tiktok.com/embed')) {
+    return 'tiktok';
   }
   return 'unknown';
 };
@@ -286,6 +290,40 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
               onError?.();
             }
           }, 11000);
+        } else if (platform === 'tiktok') {
+          // TikTok uses blockquote + embed.js SDK approach
+          // Remove any existing TikTok script to force re-processing
+          document.querySelectorAll('script[src*="tiktok.com/embed"]').forEach(s => s.remove());
+          clearScriptCache('https://www.tiktok.com/embed.js');
+
+          await loadTikTokEmbed();
+
+          // TikTok SDK auto-processes blockquotes on script load.
+          // For SPA re-renders, we need to re-inject the script.
+          const retryTikTok = (attempt: number) => {
+            if (!containerRef.current || attempt > 2) return;
+            if (containerRef.current.querySelector('iframe')) return;
+
+            document.querySelectorAll('script[src*="tiktok.com/embed"]').forEach(s => s.remove());
+            clearScriptCache('https://www.tiktok.com/embed.js');
+
+            const script = document.createElement('script');
+            script.src = `https://www.tiktok.com/embed.js?t=${Date.now()}`;
+            script.async = true;
+            document.body.appendChild(script);
+          };
+
+          setTimeout(() => retryTikTok(0), 2000);
+          setTimeout(() => retryTikTok(1), 5000);
+
+          // Final check: if no iframe after retries, trigger error fallback
+          setTimeout(() => {
+            if (containerRef.current && !containerRef.current.querySelector('iframe')) {
+              console.warn('[RawEmbedRenderer] TikTok embed failed after retries');
+              setEmbedFailed(true);
+              onError?.();
+            }
+          }, 8000);
         }
       } catch (error) {
         console.error('[RawEmbedRenderer] Failed to load embed script:', error);
