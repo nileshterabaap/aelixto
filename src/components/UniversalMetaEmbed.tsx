@@ -657,6 +657,7 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       const isInstagramIframe = embedHtml.includes('instagram.com');
       const isThreadsIframe = embedHtml.includes('threads.net');
       const isFacebookIframe = embedHtml.includes('facebook.com/plugins/');
+      const directEmbedCacheKey = `direct:${embedUrl}`;
 
       if (isFacebookIframe) {
         return (
@@ -669,30 +670,18 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       }
 
       if (isInstagramIframe) {
-        // Extract the src URL from the sanitized iframe HTML
         const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
         const iframeSrc = srcMatch ? srcMatch[1] : '';
+        const instagramIframeHtml = `<iframe src="${iframeSrc}" scrolling="no" allowfullscreen allow="encrypted-media; autoplay" loading="lazy" style="border:none;position:absolute;top:0;left:0;width:100%;height:calc(100% + 500px);overflow:hidden;"></iframe>`;
 
         return (
           <div
             className="relative w-full overflow-hidden"
             style={{ aspectRatio: '3 / 5', touchAction: 'pan-y' }}
           >
-            <iframe
-              src={iframeSrc}
-              scrolling="no"
-              allowFullScreen
-              allow="encrypted-media; autoplay"
-              loading="lazy"
-              style={{
-                border: 'none',
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: 'calc(100% + 500px)',
-                overflow: 'hidden',
-              }}
+            <PersistentEmbedHtml
+              cacheKey={`instagram:${iframeSrc}`}
+              html={instagramIframeHtml}
             />
           </div>
         );
@@ -713,9 +702,10 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
       }
 
       return (
-        <div
+        <PersistentEmbedHtml
+          cacheKey={directEmbedCacheKey}
+          html={sanitizedHtml}
           className="relative w-full overflow-hidden [&>iframe]:w-full [&>iframe]:block"
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       );
     }
