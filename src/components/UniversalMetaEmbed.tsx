@@ -530,6 +530,9 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           url.includes('fb.me') ||
           url.includes('bit.ly') ||
           url.includes('pin.it') ||
+          url.includes('vm.tiktok.com') ||
+          url.includes('vt.tiktok.com') ||
+          (url.includes('tiktok.com') && url.includes('/t/')) ||
           (url.includes('facebook.com') && url.includes('/share/'));
 
         if (needsExpansion) {
