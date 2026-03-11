@@ -184,11 +184,9 @@ export const HydratedEmbed = memo(({
       
       {/* Twitter/X embed */}
       {r.kind === 'twitter' && r.url && (
-        <SkeletonGate platform="twitter">
-          <ImageViewTracker postId={post.id}>
-            <TwitterEmbed url={r.url} />
-          </ImageViewTracker>
-        </SkeletonGate>
+        <ImageViewTracker postId={post.id}>
+          <TwitterEmbed url={r.url} />
+        </ImageViewTracker>
       )}
       
       {/* Reddit embed */}
