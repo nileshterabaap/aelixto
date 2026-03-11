@@ -65,7 +65,7 @@ const isInstagramEmbed = (html: string): boolean => {
 };
 
 // Detect platform for SDK processing purposes
-const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-iframe' | 'threads' | 'unknown' => {
+const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-iframe' | 'threads' | 'tiktok' | 'unknown' => {
   // Instagram iframes don't need SDK processing
   if (html.includes('instagram.com') && html.includes('<iframe')) {
     return 'unknown';
@@ -86,6 +86,10 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-ifra
   }
   if (html.includes('text-post-media') || html.includes('threads.net')) {
     return 'threads';
+  }
+  // TikTok blockquote embeds need SDK
+  if (html.includes('tiktok-embed') || html.includes('tiktok.com/embed')) {
+    return 'tiktok';
   }
   return 'unknown';
 };
