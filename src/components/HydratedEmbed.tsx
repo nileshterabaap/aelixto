@@ -194,7 +194,7 @@ export const HydratedEmbed = memo(({
       
       {/* Reddit embed */}
       {r.kind === 'reddit' && r.url && (
-        <SkeletonGate platform="reddit">
+        <SkeletonGate platform="reddit" cacheKey={`${post.id}:reddit`}>
           <ImageViewTracker postId={post.id}>
             <RedditEmbed url={r.url} />
           </ImageViewTracker>
