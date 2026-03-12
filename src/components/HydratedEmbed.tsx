@@ -185,7 +185,7 @@ export const HydratedEmbed = memo(({
       
       {/* Twitter/X embed */}
       {r.kind === 'twitter' && r.url && (
-        <SkeletonGate platform="twitter">
+        <SkeletonGate platform="twitter" cacheKey={`${post.id}:twitter`}>
           <ImageViewTracker postId={post.id}>
             <TwitterEmbed url={r.url} />
           </ImageViewTracker>
