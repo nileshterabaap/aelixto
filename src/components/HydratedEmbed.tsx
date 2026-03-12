@@ -212,7 +212,7 @@ export const HydratedEmbed = memo(({
       
       {/* Article embed */}
       {r.kind === 'article' && r.url && (
-        <SkeletonGate platform={post.platform || 'blog'}>
+        <SkeletonGate platform={post.platform || 'blog'} cacheKey={`${post.id}:article`}>
           <ImageViewTracker postId={post.id}>
             <ArticleEmbed url={r.url} />
           </ImageViewTracker>
