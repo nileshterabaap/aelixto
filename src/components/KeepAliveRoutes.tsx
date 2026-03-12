@@ -1,7 +1,7 @@
 import { ReactNode, useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useLocation, matchPath } from "react-router-dom";
 import { KeepAlive } from "./KeepAlive";
-import { setScrollPosition } from "@/hooks/useScrollRestoration";
+import { getScrollPosition, setScrollPosition } from "@/hooks/useScrollRestoration";
 
 interface KeepAliveRoute {
   /** Route pattern (supports dynamic segments like /u/:username) */
