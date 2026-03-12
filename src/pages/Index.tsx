@@ -202,30 +202,23 @@ const Index = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {allPosts.map((post, index) => {
-                const postIsActive = isActive(post.id) || index < 5;
-
-                return (
-                  <div
-                    key={post.id}
-                    ref={(el) => {
-                      registerItem(post.id)(el);
-                      registerPost(post.id)(el);
-                    }}
-                    data-feed-item-id={post.id}
-                    style={{
-                      contentVisibility: postIsActive ? 'visible' : 'auto',
-                      containIntrinsicSize: '920px',
-                    }}
-                  >
-                    <FeedPost
-                      post={post}
-                      userId={user?.id}
-                      startHydrated={index < 5}
-                    />
-                  </div>
-                );
-              })}
+              {allPosts.map((post, index) => (
+                <div 
+                  key={post.id} 
+                  ref={(el) => {
+                    registerItem(post.id)(el);
+                    registerPost(post.id)(el);
+                  }}
+                  data-feed-item-id={post.id}
+                >
+                  <FeedPost 
+                    post={post} 
+                    userId={user?.id} 
+                    isActive={isActive(post.id)}
+                    startHydrated={index < 5}
+                  />
+                </div>
+              ))}
               {/* Sentinel for prefetching next page ahead of scroll */}
               {hasMore && !showDemoFeed && (
                 <div ref={prefetchSentinelRef} style={{ height: 1 }} />
