@@ -221,7 +221,7 @@ export const HydratedEmbed = memo(({
       
       {/* Universal Meta embed (Instagram, Facebook, etc) */}
       {r.kind === 'universal' && r.url && (
-        <SkeletonGate platform={post.platform || undefined}>
+        <SkeletonGate platform={post.platform || undefined} cacheKey={`${post.id}:universal`}>
           <ImageViewTracker postId={post.id}>
             <UniversalMetaEmbed url={r.url} />
           </ImageViewTracker>
