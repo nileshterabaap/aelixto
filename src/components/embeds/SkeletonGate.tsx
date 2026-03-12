@@ -57,6 +57,7 @@ export const SkeletonGate = ({
   }, [markReady]);
 
   useEffect(() => {
+    if (cachedReady) return;
     const el = containerRef.current;
     if (!el) return;
 
