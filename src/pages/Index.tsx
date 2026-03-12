@@ -10,7 +10,7 @@ import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
-import { useActivePostTracker } from "@/hooks/useActivePostTracker";
+
 import { useQueryClient } from "@tanstack/react-query";
 const Index = () => {
   const navigate = useNavigate();
@@ -112,10 +112,6 @@ const Index = () => {
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
   
-  // Track which posts are near the viewport for smart hydration
-  const { registerPost, isActive } = useActivePostTracker(
-    useMemo(() => allPosts.map((p) => p.id), [allPosts])
-  );
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
@@ -207,15 +203,14 @@ const Index = () => {
                   key={post.id} 
                   ref={(el) => {
                     registerItem(post.id)(el);
-                    registerPost(post.id)(el);
                   }}
                   data-feed-item-id={post.id}
+                  style={{ contentVisibility: "auto", containIntrinsicSize: "920px" }}
                 >
                   <FeedPost 
                     post={post} 
                     userId={user?.id} 
-                    isActive={isActive(post.id)}
-                    startHydrated={index < 5}
+                    startHydrated={index < 8}
                   />
                 </div>
               ))}
