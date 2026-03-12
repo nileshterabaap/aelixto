@@ -94,7 +94,7 @@ export const SkeletonGate = ({
       observer.disconnect();
       clearTimeout(fallback);
     };
-  }, [attachIframeHandlers, markReady]);
+  }, [attachIframeHandlers, markReady, cachedReady]);
 
   const showContent = ready && minElapsed;
 
