@@ -205,7 +205,6 @@ const Index = () => {
                     registerItem(post.id)(el);
                   }}
                   data-feed-item-id={post.id}
-                  style={{ contentVisibility: "auto", containIntrinsicSize: "920px" }}
                 >
                   <FeedPost 
                     post={post} 
