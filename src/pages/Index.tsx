@@ -112,10 +112,6 @@ const Index = () => {
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
   
-  // Track which posts are near the viewport for smart hydration
-  const { registerPost, isActive } = useActivePostTracker(
-    useMemo(() => allPosts.map((p) => p.id), [allPosts])
-  );
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
