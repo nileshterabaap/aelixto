@@ -10,7 +10,7 @@ import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
-import { useActivePostTracker } from "@/hooks/useActivePostTracker";
+
 import { useQueryClient } from "@tanstack/react-query";
 const Index = () => {
   const navigate = useNavigate();
