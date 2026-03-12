@@ -203,15 +203,14 @@ const Index = () => {
                   key={post.id} 
                   ref={(el) => {
                     registerItem(post.id)(el);
-                    registerPost(post.id)(el);
                   }}
                   data-feed-item-id={post.id}
+                  style={{ contentVisibility: "auto", containIntrinsicSize: "920px" }}
                 >
                   <FeedPost 
                     post={post} 
                     userId={user?.id} 
-                    isActive={isActive(post.id)}
-                    startHydrated={index < 5}
+                    startHydrated={index < 8}
                   />
                 </div>
               ))}

@@ -103,7 +103,10 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
   });
 
   // Flatten all pages into single array - stable reference
-  const items = data?.pages.flatMap((page) => page.posts) ?? [];
+  const items = useMemo(
+    () => data?.pages.flatMap((page) => page.posts) ?? [],
+    [data?.pages]
+  );
 
   // Aggressively preload ALL thumbnails once on data arrival
   useEffect(() => {
