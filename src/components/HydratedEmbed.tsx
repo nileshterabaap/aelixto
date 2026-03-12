@@ -65,6 +65,21 @@ export const HydratedEmbed = memo(({
   const [imageError, setImageError] = useState(false);
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
   const shouldHydrate = isHydrated || hydratedPostIds.has(post.id);
+  const mediaUrl = post.mediaUrl || (post as any).media_url || r.url;
+  const platformHint = (post.platform || '').toLowerCase();
+  const lowerUrl = (mediaUrl || '').toLowerCase();
+  const forceTwitterRenderer =
+    r.kind === 'raw' &&
+    !!mediaUrl &&
+    (platformHint === 'twitter' || platformHint === 'x' || lowerUrl.includes('twitter.com/') || lowerUrl.includes('x.com/'));
+  const forcePinterestRenderer =
+    r.kind === 'raw' &&
+    !!mediaUrl &&
+    (platformHint === 'pinterest' || lowerUrl.includes('pinterest.com/') || lowerUrl.includes('pin.it/'));
+  const forceUniversalRenderer =
+    r.kind === 'raw' &&
+    !!mediaUrl &&
+    (platformHint === 'threads' || platformHint === 'linkedin' || lowerUrl.includes('threads.net/') || lowerUrl.includes('threads.com/') || lowerUrl.includes('linkedin.com/'));
 
   useEffect(() => {
     if (!shouldHydrate) return;
@@ -166,9 +181,34 @@ export const HydratedEmbed = memo(({
           />
         </ImageViewTracker>
       )}
+
+      {/* Fallback routing for legacy raw payloads */}
+      {forceTwitterRenderer && mediaUrl && (
+        <SkeletonGate platform="twitter" cacheKey={`${post.id}:twitter-forced`}>
+          <ImageViewTracker postId={post.id}>
+            <TwitterEmbed url={mediaUrl} />
+          </ImageViewTracker>
+        </SkeletonGate>
+      )}
+
+      {forcePinterestRenderer && mediaUrl && (
+        <SkeletonGate platform="pinterest" cacheKey={`${post.id}:pinterest-forced`}>
+          <ImageViewTracker postId={post.id}>
+            <PinterestEmbed url={mediaUrl} />
+          </ImageViewTracker>
+        </SkeletonGate>
+      )}
+
+      {forceUniversalRenderer && mediaUrl && (
+        <SkeletonGate platform={post.platform || undefined} cacheKey={`${post.id}:universal-forced`}>
+          <ImageViewTracker postId={post.id}>
+            <UniversalMetaEmbed url={mediaUrl} />
+          </ImageViewTracker>
+        </SkeletonGate>
+      )}
       
       {/* Raw embed HTML (Instagram, Facebook, Spotify) */}
-      {r.kind === 'raw' && r.html && !rawEmbedFailed && (
+      {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && r.html && !rawEmbedFailed && (
         <SkeletonGate platform={post.platform || undefined} cacheKey={`${post.id}:raw`}>
           <ImageViewTracker postId={post.id}>
             <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} />
@@ -177,7 +217,7 @@ export const HydratedEmbed = memo(({
       )}
 
       {/* Fallback when raw embed fails — show UniversalMetaEmbed to rebuild */}
-      {r.kind === 'raw' && rawEmbedFailed && post.mediaUrl && (
+      {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && rawEmbedFailed && post.mediaUrl && (
         <ImageViewTracker postId={post.id}>
           <UniversalMetaEmbed url={post.mediaUrl} />
         </ImageViewTracker>

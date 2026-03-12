@@ -19,6 +19,20 @@ const notifyListeners = () => {
   listeners.forEach(listener => listener(globalState));
 };
 
+const IDLE_SCROLL_STATE: ScrollVelocityState = {
+  velocity: 0,
+  direction: 'idle',
+  isScrollingFast: false,
+};
+
+const areStatesEqual = (a: ScrollVelocityState, b: ScrollVelocityState) => {
+  return (
+    a.velocity === b.velocity &&
+    a.direction === b.direction &&
+    a.isScrollingFast === b.isScrollingFast
+  );
+};
+
 // Throttle threshold for "fast" scrolling (pixels per second)
 const FAST_SCROLL_THRESHOLD = 800;
 
@@ -50,14 +64,17 @@ const initScrollTracking = () => {
       if (velocityBuffer.length > 5) velocityBuffer.shift();
       
       const avgVelocity = velocityBuffer.reduce((a, b) => a + b, 0) / velocityBuffer.length;
-      
-      globalState = {
-        velocity: Math.round(avgVelocity),
+      const quantizedVelocity = avgVelocity < 40 ? 0 : Math.round(avgVelocity / 120) * 120;
+      const nextState: ScrollVelocityState = {
+        velocity: quantizedVelocity,
         direction: deltaY > 0 ? 'down' : deltaY < 0 ? 'up' : globalState.direction,
         isScrollingFast: avgVelocity > FAST_SCROLL_THRESHOLD,
       };
-      
-      notifyListeners();
+
+      if (!areStatesEqual(globalState, nextState)) {
+        globalState = nextState;
+        notifyListeners();
+      }
     }
 
     lastScrollY = currentScrollY;
@@ -67,8 +84,10 @@ const initScrollTracking = () => {
     if (idleTimeout) clearTimeout(idleTimeout);
     idleTimeout = window.setTimeout(() => {
       velocityBuffer = [];
-      globalState = { velocity: 0, direction: 'idle', isScrollingFast: false };
-      notifyListeners();
+      if (!areStatesEqual(globalState, IDLE_SCROLL_STATE)) {
+        globalState = IDLE_SCROLL_STATE;
+        notifyListeners();
+      }
     }, 80);
   };
 
@@ -83,10 +102,15 @@ const initScrollTracking = () => {
   window.addEventListener('scroll', handleScroll, { passive: true });
 };
 
-export const useScrollVelocity = (): ScrollVelocityState => {
+export const useScrollVelocity = (enabled: boolean = true): ScrollVelocityState => {
   const [state, setState] = useState<ScrollVelocityState>(globalState);
 
   useEffect(() => {
+    if (!enabled) {
+      setState(IDLE_SCROLL_STATE);
+      return;
+    }
+
     initScrollTracking();
     
     const listener = (newState: ScrollVelocityState) => {
@@ -94,12 +118,14 @@ export const useScrollVelocity = (): ScrollVelocityState => {
     };
     
     listeners.add(listener);
+    setState(globalState);
+
     return () => {
       listeners.delete(listener);
     };
-  }, []);
+  }, [enabled]);
 
-  return state;
+  return enabled ? state : IDLE_SCROLL_STATE;
 };
 
 // For components that just need the preload distance
