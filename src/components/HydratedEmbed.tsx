@@ -1,4 +1,4 @@
-import { useState, memo, useCallback, useEffect, useRef } from 'react';
+import { useState, memo, useCallback, useEffect } from 'react';
 import type { Post } from '@/data/demoData';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
@@ -23,6 +23,24 @@ interface HydratedEmbedProps {
   onPlayClick: () => void;
 }
 
+const HYDRATED_CACHE_LIMIT = 800;
+const hydratedPostIds = new Set<string>();
+const hydratedPostQueue: string[] = [];
+
+const rememberHydratedPost = (postId: string) => {
+  if (hydratedPostIds.has(postId)) return;
+
+  hydratedPostIds.add(postId);
+  hydratedPostQueue.push(postId);
+
+  if (hydratedPostQueue.length > HYDRATED_CACHE_LIMIT) {
+    const oldestPostId = hydratedPostQueue.shift();
+    if (oldestPostId) {
+      hydratedPostIds.delete(oldestPostId);
+    }
+  }
+};
+
 const getYouTubeVideoId = (url: string) => {
   const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|&v=)([^#&?]*).*/;
   const match = url.match(regExp);
@@ -46,6 +64,12 @@ export const HydratedEmbed = memo(({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
+  const shouldHydrate = isHydrated || hydratedPostIds.has(post.id);
+
+  useEffect(() => {
+    if (!shouldHydrate) return;
+    rememberHydratedPost(post.id);
+  }, [post.id, shouldHydrate]);
 
   const handleRawEmbedError = useCallback(() => {
     setRawEmbedFailed(true);
@@ -79,7 +103,7 @@ export const HydratedEmbed = memo(({
   }
   
   // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
-  if (!isHydrated) {
+  if (!shouldHydrate) {
     return (
       <div className={`relative w-full bg-muted ${aspectClass}`}>
         {effectiveThumbnail && !imageError ? (
