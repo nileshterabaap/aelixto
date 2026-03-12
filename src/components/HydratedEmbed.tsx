@@ -145,7 +145,7 @@ export const HydratedEmbed = memo(({
       
       {/* Non-YouTube video */}
       {r.kind === 'video' && post.platform !== 'youtube' && r.url && (
-        <SkeletonGate platform={post.platform || undefined}>
+        <SkeletonGate platform={post.platform || undefined} cacheKey={`${post.id}:native-video`}>
           <video 
             src={r.url} 
             className="w-full h-auto" 
