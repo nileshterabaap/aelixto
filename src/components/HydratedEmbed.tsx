@@ -130,7 +130,7 @@ export const HydratedEmbed = memo(({
     <div className="w-full" style={{ contain: 'layout paint' }}>
       {/* YouTube video */}
       {r.kind === 'video' && post.platform === 'youtube' && r.url && (
-        <SkeletonGate platform="youtube">
+        <SkeletonGate platform="youtube" cacheKey={`${post.id}:youtube-video`}>
           <div className={`w-full bg-black ${aspectClass}`}>
             <iframe
               className="w-full h-full"
