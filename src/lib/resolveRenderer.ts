@@ -39,26 +39,18 @@ export function resolveRenderer(post: any): Renderer {
     return { kind: 'raw', html: post.embed_html };
   }
 
-  const url: string | undefined = post?.mediaUrl;
   if (!url) return { kind: 'none' };
 
-  // 2) reddit wins before everything else
-  if (isRedditUrl(url)) return { kind: 'reddit', url };
-
-  // 3) platform-specific embeds next
-  if (post?.platform === 'twitter') return { kind: 'twitter', url };
-  if (post?.platform === 'pinterest') return { kind: 'pinterest', url };
-
-  // 4) article extractor for blogs/quora/medium/etc (never reddit)
+  // 3) article extractor for blogs/quora/medium/etc (never reddit)
   const blocked = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','twitter.com','x.com','pinterest.com','youtube.com','youtu.be','tiktok.com','reddit.com','redd.it','threads.net','threads.com','linkedin.com'];
   const isBlocked = blocked.some(d => url.includes(d));
   if (!isBlocked && post?.mediaType === 'none') return { kind: 'article', url };
 
-  // 5) universal meta (not reddit) — includes TikTok for client-side embed building
-  const universalAllow = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','threads.net','threads.com','linkedin.com','tiktok.com'];
+  // 4) universal meta — includes TikTok for client-side embed building
+  const universalAllow = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','tiktok.com'];
   if (universalAllow.some(d => url.includes(d))) return { kind: 'universal', url };
 
-  // 6) media fallbacks
+  // 5) media fallbacks
   if (post?.mediaType === 'image') return { kind: 'image', url };
   if (post?.mediaType === 'video') return { kind: 'video', url };
 
