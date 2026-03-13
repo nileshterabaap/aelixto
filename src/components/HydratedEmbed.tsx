@@ -62,6 +62,8 @@ export const HydratedEmbed = memo(({
   isHydrated, 
   onPlayClick 
 }: HydratedEmbedProps) => {
+  const embedContainerRef = useRef<HTMLDivElement>(null);
+  useMediaPauseOnScroll(embedContainerRef);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
