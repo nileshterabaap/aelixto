@@ -94,20 +94,33 @@ export function useGlobalMediaPauseOnNavigate() {
 
   useEffect(() => {
     if (location.pathname !== prevPathRef.current) {
+      // Pause native media
       document.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
         if (!el.paused) el.pause();
       });
 
-      // Also pause YouTube iframes by postMessage
-      document.querySelectorAll<HTMLIFrameElement>('iframe[src*="youtube.com"]').forEach((iframe) => {
+      // Pause/freeze all platform iframes
+      document.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+        const src = iframe.src || '';
+        if (!src || src === 'about:blank') return;
         try {
-          iframe.contentWindow?.postMessage(
-            JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
-            '*'
-          );
-        } catch {
-          // cross-origin — ignore
-        }
+          if (src.includes('youtube.com')) {
+            iframe.contentWindow?.postMessage(
+              JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
+              '*'
+            );
+            return;
+          }
+          const needsFreeze = [
+            'spotify.com', 'tiktok.com',
+            'facebook.com', 'instagram.com',
+            'reddit.com', 'redd.it'
+          ].some(d => src.includes(d));
+          if (needsFreeze && !iframe.dataset.frozenSrc) {
+            iframe.dataset.frozenSrc = src;
+            iframe.src = 'about:blank';
+          }
+        } catch { /* cross-origin */ }
       });
 
       prevPathRef.current = location.pathname;
