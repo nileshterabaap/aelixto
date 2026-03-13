@@ -12,34 +12,46 @@ export function useMediaPauseOnScroll(containerRef: RefObject<HTMLElement | null
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
 
-  // Pause all playing media inside a container (including iframes)
+  /**
+   * Pause all playing media inside a container (native + all iframe platforms).
+   * Uses postMessage for YouTube; src-freeze for all others (no pause API).
+   */
   const pauseAllMedia = (root?: HTMLElement | null) => {
     const target = root || document;
+
+    // Native <video> and <audio>
     target.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
-      if (!el.paused) {
-        el.pause();
-      }
+      if (!el.paused) el.pause();
     });
 
-    // Pause YouTube iframes via postMessage
-    target.querySelectorAll<HTMLIFrameElement>('iframe[src*="youtube.com"]').forEach((iframe) => {
+    // All iframes — platform-specific strategies
+    target.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+      const src = iframe.src || '';
+      if (!src) return;
       try {
-        iframe.contentWindow?.postMessage(
-          JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
-          '*'
-        );
-      } catch { /* cross-origin */ }
-    });
-
-    // Pause Spotify iframes by replacing src to stop playback
-    target.querySelectorAll<HTMLIFrameElement>('iframe[src*="spotify.com"]').forEach((iframe) => {
-      try {
-        const src = iframe.src;
-        if (src && !src.includes('autoplay=false')) {
-          // Toggle src to force pause (Spotify has no postMessage API)
-          iframe.src = src.replace(/&?autoplay=[^&]*/g, '') + (src.includes('?') ? '&' : '?') + 'autoplay=false';
+        // YouTube — has postMessage API
+        if (src.includes('youtube.com')) {
+          iframe.contentWindow?.postMessage(
+            JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
+            '*'
+          );
+          return;
         }
-      } catch { /* cross-origin */ }
+
+        // For Spotify, TikTok, Facebook, Instagram, Reddit:
+        // Freeze the iframe by storing src and blanking it.
+        // The src is saved in a data attribute so it can be restored if needed.
+        const needsFreeze = [
+          'spotify.com', 'tiktok.com',
+          'facebook.com', 'instagram.com',
+          'reddit.com', 'redd.it'
+        ].some(d => src.includes(d));
+
+        if (needsFreeze && !iframe.dataset.frozenSrc) {
+          iframe.dataset.frozenSrc = src;
+          iframe.src = 'about:blank';
+        }
+      } catch { /* cross-origin — ignore */ }
     });
   };
 
