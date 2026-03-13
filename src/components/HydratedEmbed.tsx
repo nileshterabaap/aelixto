@@ -168,7 +168,6 @@ export const HydratedEmbed = memo(({
             src={r.url} 
             className="w-full h-auto" 
             controls 
-            autoPlay
             playsInline
           />
         </SkeletonGate>
