@@ -12,13 +12,34 @@ export function useMediaPauseOnScroll(containerRef: RefObject<HTMLElement | null
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
 
-  // Pause all playing media inside a container
+  // Pause all playing media inside a container (including iframes)
   const pauseAllMedia = (root?: HTMLElement | null) => {
     const target = root || document;
     target.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
       if (!el.paused) {
         el.pause();
       }
+    });
+
+    // Pause YouTube iframes via postMessage
+    target.querySelectorAll<HTMLIFrameElement>('iframe[src*="youtube.com"]').forEach((iframe) => {
+      try {
+        iframe.contentWindow?.postMessage(
+          JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
+          '*'
+        );
+      } catch { /* cross-origin */ }
+    });
+
+    // Pause Spotify iframes by replacing src to stop playback
+    target.querySelectorAll<HTMLIFrameElement>('iframe[src*="spotify.com"]').forEach((iframe) => {
+      try {
+        const src = iframe.src;
+        if (src && !src.includes('autoplay=false')) {
+          // Toggle src to force pause (Spotify has no postMessage API)
+          iframe.src = src.replace(/&?autoplay=[^&]*/g, '') + (src.includes('?') ? '&' : '?') + 'autoplay=false';
+        }
+      } catch { /* cross-origin */ }
     });
   };
 
