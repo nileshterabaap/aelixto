@@ -145,7 +145,7 @@ export const HydratedEmbed = memo(({
   
   // HYDRATED STATE: Show skeleton → fade into actual embed
   return (
-    <div className="w-full" style={{ contain: 'layout paint' }}>
+    <div ref={embedContainerRef} className="w-full" style={{ contain: 'layout paint' }}>
       {/* YouTube video */}
       {r.kind === 'video' && post.platform === 'youtube' && r.url && (
         <SkeletonGate platform="youtube" cacheKey={`${post.id}:youtube-video`}>
