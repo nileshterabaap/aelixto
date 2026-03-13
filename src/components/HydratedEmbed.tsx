@@ -1,4 +1,5 @@
-import { useState, memo, useCallback, useEffect } from 'react';
+import { useState, memo, useCallback, useEffect, useRef } from 'react';
+import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import type { Post } from '@/data/demoData';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
@@ -61,6 +62,8 @@ export const HydratedEmbed = memo(({
   isHydrated, 
   onPlayClick 
 }: HydratedEmbedProps) => {
+  const embedContainerRef = useRef<HTMLDivElement>(null);
+  useMediaPauseOnScroll(embedContainerRef);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
@@ -142,14 +145,14 @@ export const HydratedEmbed = memo(({
   
   // HYDRATED STATE: Show skeleton → fade into actual embed
   return (
-    <div className="w-full" style={{ contain: 'layout paint' }}>
+    <div ref={embedContainerRef} className="w-full" style={{ contain: 'layout paint' }}>
       {/* YouTube video */}
       {r.kind === 'video' && post.platform === 'youtube' && r.url && (
         <SkeletonGate platform="youtube" cacheKey={`${post.id}:youtube-video`}>
           <div className={`w-full bg-black ${aspectClass}`}>
             <iframe
               className="w-full h-full"
-              src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=0&playsinline=1&rel=0`}
+              src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=0&playsinline=1&rel=0&enablejsapi=1`}
               title="YouTube video player"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
@@ -165,7 +168,6 @@ export const HydratedEmbed = memo(({
             src={r.url} 
             className="w-full h-auto" 
             controls 
-            autoPlay
             playsInline
           />
         </SkeletonGate>
