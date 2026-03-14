@@ -45,22 +45,50 @@ function pauseSpotifyIframes(root: HTMLElement | Document) {
 }
 
 /**
- * For cross-origin iframes without a pause API (Instagram, Facebook, Threads,
- * X/Twitter, TikTok, Pinterest, LinkedIn), hide them to suspend browser rendering.
+ * Hard suspend cross-origin iframes while off-screen by swapping src to about:blank.
+ * This reliably stops playback for platforms without public pause APIs.
  */
-function freezeGenericIframes(root: HTMLElement | Document) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.matches(API_CONTROLLED_SELECTORS)) return;
+function suspendIframe(iframe: HTMLIFrameElement) {
+  if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
+
+  const src = iframe.getAttribute('src');
+  if (!src || src === 'about:blank') {
     iframe.style.visibility = 'hidden';
+    return;
+  }
+
+  iframe.dataset[SUSPENDED_SRC] = src;
+  iframe.dataset[SUSPENDED_FLAG] = '1';
+  iframe.setAttribute('src', 'about:blank');
+  iframe.style.visibility = 'hidden';
+}
+
+function restoreSuspendedIframe(iframe: HTMLIFrameElement) {
+  const shouldRestore = iframe.dataset[SUSPENDED_FLAG] === '1';
+  const storedSrc = iframe.dataset[SUSPENDED_SRC];
+
+  if (shouldRestore && storedSrc) {
+    iframe.setAttribute('src', storedSrc);
+  }
+
+  delete iframe.dataset[SUSPENDED_FLAG];
+  delete iframe.dataset[SUSPENDED_SRC];
+
+  if (iframe.style.visibility === 'hidden') {
+    iframe.style.visibility = '';
+  }
+}
+
+function suspendNonYouTubeIframes(root: HTMLElement | Document) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (iframe.matches(HARD_SUSPEND_EXCLUDED_SELECTORS)) return;
+    suspendIframe(iframe);
   });
 }
 
-function unfreezeGenericIframes(root: HTMLElement | Document) {
+function restoreSuspendedIframes(root: HTMLElement | Document) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.matches(API_CONTROLLED_SELECTORS)) return;
-    if (iframe.style.visibility === 'hidden') {
-      iframe.style.visibility = '';
-    }
+    restoreSuspendedIframe(iframe);
   });
 }
 
