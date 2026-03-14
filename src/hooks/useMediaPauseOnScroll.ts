@@ -136,6 +136,7 @@ function stageAResume(root: HTMLElement) {
 
 function hardSuspendIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (!isPlayableIframe(iframe)) return;
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
 
     const src = iframe.getAttribute('src');
