@@ -124,19 +124,20 @@ export function useMediaPauseOnScroll(
     if (!el) return;
 
     let rafId: number | null = null;
-    let wasVisible = isElementVisibleInViewport(el);
+    let hiddenMutationRaf: number | null = null;
+    let isVisibleNow = isElementVisibleInViewport(el);
 
     const checkVisibility = () => {
       const currentEl = containerRef.current;
       if (!currentEl) return;
 
       const isVisible = isElementVisibleInViewport(currentEl);
-      if (wasVisible && !isVisible) {
+      if (isVisibleNow && !isVisible) {
         pauseMediaInRoot(currentEl);
-      } else if (!wasVisible && isVisible) {
+      } else if (!isVisibleNow && isVisible) {
         resumeMediaInRoot(currentEl);
       }
-      wasVisible = isVisible;
+      isVisibleNow = isVisible;
     };
 
     const scheduleVisibilityCheck = () => {
@@ -147,23 +148,39 @@ export function useMediaPauseOnScroll(
       });
     };
 
+    const scheduleHiddenMutationPause = () => {
+      if (hiddenMutationRaf !== null) return;
+      hiddenMutationRaf = window.requestAnimationFrame(() => {
+        hiddenMutationRaf = null;
+        const currentEl = containerRef.current;
+        if (!currentEl || isVisibleNow) return;
+        pauseMediaInRoot(currentEl);
+      });
+    };
+
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           const target = entry.target as HTMLElement;
           if (!entry.isIntersecting || entry.intersectionRatio <= 0) {
             pauseMediaInRoot(target);
-            wasVisible = false;
+            isVisibleNow = false;
           } else {
             resumeMediaInRoot(target);
-            wasVisible = true;
+            isVisibleNow = true;
           }
         }
       },
       { threshold: [0, 0.1] }
     );
 
+    const mutationObserver = new MutationObserver(() => {
+      scheduleHiddenMutationPause();
+    });
+
     observer.observe(el);
+    mutationObserver.observe(el, { childList: true, subtree: true });
+
     document.addEventListener('scroll', scheduleVisibilityCheck, true);
     window.addEventListener('resize', scheduleVisibilityCheck);
     window.addEventListener('orientationchange', scheduleVisibilityCheck);
@@ -172,11 +189,17 @@ export function useMediaPauseOnScroll(
 
     return () => {
       observer.disconnect();
+      mutationObserver.disconnect();
+
       document.removeEventListener('scroll', scheduleVisibilityCheck, true);
       window.removeEventListener('resize', scheduleVisibilityCheck);
       window.removeEventListener('orientationchange', scheduleVisibilityCheck);
+
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
+      }
+      if (hiddenMutationRaf !== null) {
+        cancelAnimationFrame(hiddenMutationRaf);
       }
     };
   }, [containerRef, observeKey]);
