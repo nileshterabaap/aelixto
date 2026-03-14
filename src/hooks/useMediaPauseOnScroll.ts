@@ -230,8 +230,9 @@ export function useMediaPauseOnScroll(
       const currentEl = containerRef.current;
       if (!currentEl) return;
 
-      // Do not enter paused/suspended state before media nodes exist.
-      if (!hasPlayableMedia(currentEl)) {
+      // Never pause/suspend containers without playable media.
+      // But still allow active transitions so previously suspended iframes can restore.
+      if (!hasLifecycleTargets(currentEl) && target !== 'active') {
         stateRef.current = 'active';
         return;
       }

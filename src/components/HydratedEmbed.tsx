@@ -86,10 +86,18 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
 
+  const mediaLifecycleEnabled =
+    shouldHydrate &&
+    (isPlayableMediaPost ||
+      r.kind === 'raw' ||
+      r.kind === 'twitter' ||
+      r.kind === 'universal' ||
+      r.kind === 'pinterest');
+
   useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
-    { enabled: shouldHydrate && isPlayableMediaPost, hardSuspendDistanceVh: 2.5 }
+    { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 2.5 }
   );
 
   const forceTwitterRenderer =
