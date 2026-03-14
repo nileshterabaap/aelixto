@@ -31,26 +31,14 @@ const SUSPENDED_FLAG = 'aelixSuspended';
 const SUSPENDED_SRC = 'aelixSuspendedSrc';
 const FROZEN_FLAG = 'aelixFrozen';
 
-// ── Detection: does this container have playable media? ────────────────
+// ── Detection: does this container currently contain media nodes? ───────
 
-const PLAYABLE_MEDIA_SELECTOR = [
-  'video',
-  'audio',
-  'iframe[src*="youtube.com"]',
-  'iframe[src*="youtube-nocookie.com"]',
-  'iframe[src*="open.spotify.com"]',
-  'iframe[src*="tiktok.com"]',
-  'iframe[src*="instagram.com"]',
-  'iframe[src*="facebook.com"]',
-  'iframe[src*="fb.watch"]',
-  'iframe[src*="twitter.com"]',
-  'iframe[src*="x.com"]',
-  'iframe[src*="threads.net"]',
-  'iframe[src*="linkedin.com"]',
-  'iframe[src*="pinterest.com"]',
-  'iframe[src*="vimeo.com"]',
-  'iframe[src*="reddit.com"]',
-].join(', ');
+/**
+ * Runtime DOM check only.
+ * Whether a post should participate in lifecycle is controlled by hook options
+ * (computed in HydratedEmbed from renderer + media_type hints).
+ */
+const PLAYABLE_MEDIA_SELECTOR = 'video, audio, iframe';
 
 function hasPlayableMedia(root: HTMLElement): boolean {
   return root.querySelector(PLAYABLE_MEDIA_SELECTOR) !== null;
