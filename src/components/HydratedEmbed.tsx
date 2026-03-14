@@ -63,11 +63,11 @@ export const HydratedEmbed = memo(({
   onPlayClick 
 }: HydratedEmbedProps) => {
   const embedContainerRef = useRef<HTMLDivElement>(null);
-  useMediaPauseOnScroll(embedContainerRef, `${post.id}:${isHydrated ? 'hydrated' : 'placeholder'}:${r.kind}`);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
   const shouldHydrate = isHydrated || hydratedPostIds.has(post.id);
+  useMediaPauseOnScroll(embedContainerRef, `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`);
   const mediaUrl = post.mediaUrl || (post as any).media_url || r.url;
   const platformHint = (post.platform || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
