@@ -63,11 +63,11 @@ export const HydratedEmbed = memo(({
   onPlayClick 
 }: HydratedEmbedProps) => {
   const embedContainerRef = useRef<HTMLDivElement>(null);
-  useMediaPauseOnScroll(embedContainerRef);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
   const shouldHydrate = isHydrated || hydratedPostIds.has(post.id);
+  useMediaPauseOnScroll(embedContainerRef, `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`);
   const mediaUrl = post.mediaUrl || (post as any).media_url || r.url;
   const platformHint = (post.platform || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
@@ -152,7 +152,7 @@ export const HydratedEmbed = memo(({
           <div className={`w-full bg-black ${aspectClass}`}>
             <iframe
               className="w-full h-full"
-              src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=0&playsinline=1&rel=0&enablejsapi=1`}
+              src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=0&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
               title="YouTube video player"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               allowFullScreen
