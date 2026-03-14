@@ -31,26 +31,14 @@ const SUSPENDED_FLAG = 'aelixSuspended';
 const SUSPENDED_SRC = 'aelixSuspendedSrc';
 const FROZEN_FLAG = 'aelixFrozen';
 
-// ── Detection: does this container have playable media? ────────────────
+// ── Detection: does this container currently contain media nodes? ───────
 
-const PLAYABLE_MEDIA_SELECTOR = [
-  'video',
-  'audio',
-  'iframe[src*="youtube.com"]',
-  'iframe[src*="youtube-nocookie.com"]',
-  'iframe[src*="open.spotify.com"]',
-  'iframe[src*="tiktok.com"]',
-  'iframe[src*="instagram.com"]',
-  'iframe[src*="facebook.com"]',
-  'iframe[src*="fb.watch"]',
-  'iframe[src*="twitter.com"]',
-  'iframe[src*="x.com"]',
-  'iframe[src*="threads.net"]',
-  'iframe[src*="linkedin.com"]',
-  'iframe[src*="pinterest.com"]',
-  'iframe[src*="vimeo.com"]',
-  'iframe[src*="reddit.com"]',
-].join(', ');
+/**
+ * Runtime DOM check only.
+ * Whether a post should participate in lifecycle is controlled by hook options
+ * (computed in HydratedEmbed from renderer + media_type hints).
+ */
+const PLAYABLE_MEDIA_SELECTOR = 'video, audio, iframe';
 
 function hasPlayableMedia(root: HTMLElement): boolean {
   return root.querySelector(PLAYABLE_MEDIA_SELECTOR) !== null;
@@ -159,12 +147,21 @@ function restoreHardSuspended(root: HTMLElement) {
 
 type LifecycleState = 'active' | 'paused' | 'suspended';
 
+interface MediaLifecycleOptions {
+  /** Enable lifecycle for this post. Should be true only for playable media posts. */
+  enabled?: boolean;
+  /** Stage B threshold in viewport heights. Default: 2.5vh away from viewport. */
+  hardSuspendDistanceVh?: number;
+}
+
 // ── Hook ───────────────────────────────────────────────────────────────
 
 export function useMediaPauseOnScroll(
   containerRef: RefObject<HTMLElement | null>,
-  observeKey?: string | number | boolean
+  observeKey?: string | number | boolean,
+  options: MediaLifecycleOptions = {}
 ) {
+  const { enabled = true, hardSuspendDistanceVh = 2.5 } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
   const stateRef = useRef<LifecycleState>('active');
@@ -172,6 +169,14 @@ export function useMediaPauseOnScroll(
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+
+    // If lifecycle is disabled for this post, always keep media active/restored.
+    if (!enabled) {
+      restoreHardSuspended(el);
+      stageAResume(el);
+      stateRef.current = 'active';
+      return;
+    }
 
     let rafId: number | null = null;
     let mutationRaf: number | null = null;
@@ -184,38 +189,37 @@ export function useMediaPauseOnScroll(
       // Visible = intersecting viewport
       if (rect.bottom > 0 && rect.top < vh) return 'visible';
 
-      // Near = within ~1.5 viewport heights
-      const nearMargin = vh * 1.5;
+      // Near = within configurable 2–3 viewport-height band
+      const nearMargin = vh * Math.max(2, hardSuspendDistanceVh);
       if (rect.bottom > -nearMargin && rect.top < vh + nearMargin) return 'near';
 
-      // Far = beyond 1.5 viewport heights
+      // Far = beyond nearMargin
       return 'far';
     };
 
     const transition = (target: LifecycleState) => {
       const current = stateRef.current;
       if (current === target) return;
+
       const currentEl = containerRef.current;
       if (!currentEl) return;
 
-      // Only run lifecycle on containers with playable media
+      // Do not enter paused/suspended state before media nodes exist.
       if (!hasPlayableMedia(currentEl)) {
-        stateRef.current = target;
+        stateRef.current = 'active';
         return;
       }
 
       if (target === 'active') {
-        // Restore from whatever state we were in
         if (current === 'suspended') {
           restoreHardSuspended(currentEl);
-        } else if (current === 'paused') {
-          stageAResume(currentEl);
         }
+        stageAResume(currentEl);
       } else if (target === 'paused') {
         if (current === 'suspended') {
-          // Coming back from far → near: restore hard-suspended, then freeze
+          // Far -> near: restore iframe src once, then apply Stage A freeze/pause.
           restoreHardSuspended(currentEl);
-          // Small delay to let iframe reload before freezing
+          stageAPause(currentEl);
         } else if (current === 'active') {
           stageAPause(currentEl);
         }
@@ -250,23 +254,21 @@ export function useMediaPauseOnScroll(
         mutationRaf = null;
         const currentEl = containerRef.current;
         if (!currentEl) return;
-        // If we're not active and new playable media appeared, reconcile
-        if (stateRef.current !== 'active' && hasPlayableMedia(currentEl)) {
+
+        // Reconcile whenever media nodes are injected (late hydration / SDK render).
+        if (hasPlayableMedia(currentEl)) {
           reconcile();
         }
       });
     };
 
-    // IntersectionObserver with expanded margins for the "far" zone detection
-    const nearObserver = new IntersectionObserver(
-      () => scheduleReconcile(),
-      { rootMargin: '150% 0px' } // triggers when entering/leaving ~1.5vh zone
-    );
+    const nearObserver = new IntersectionObserver(() => scheduleReconcile(), {
+      rootMargin: `${Math.round(Math.max(2, hardSuspendDistanceVh) * 100)}% 0px`,
+    });
 
-    const viewportObserver = new IntersectionObserver(
-      () => scheduleReconcile(),
-      { threshold: [0, 0.1] }
-    );
+    const viewportObserver = new IntersectionObserver(() => scheduleReconcile(), {
+      threshold: [0, 0.1],
+    });
 
     const mutationObserver = new MutationObserver(() => scheduleMutationCheck());
 
@@ -290,10 +292,15 @@ export function useMediaPauseOnScroll(
       if (rafId !== null) cancelAnimationFrame(rafId);
       if (mutationRaf !== null) cancelAnimationFrame(mutationRaf);
     };
-  }, [containerRef, observeKey]);
+  }, [containerRef, observeKey, enabled, hardSuspendDistanceVh]);
 
-  // Route change — pause everything in this container
+  // Route change — pause everything in this container (playable posts only)
   useEffect(() => {
+    if (!enabled) {
+      prevPathRef.current = location.pathname;
+      return;
+    }
+
     if (location.pathname !== prevPathRef.current) {
       const el = containerRef.current;
       if (el && hasPlayableMedia(el)) {
@@ -303,7 +310,7 @@ export function useMediaPauseOnScroll(
       }
       prevPathRef.current = location.pathname;
     }
-  }, [location.pathname, containerRef]);
+  }, [enabled, location.pathname, containerRef]);
 }
 
 /**
