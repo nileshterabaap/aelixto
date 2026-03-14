@@ -96,11 +96,11 @@ function pauseMediaInRoot(root: HTMLElement | Document) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  freezeGenericIframes(root);
+  suspendNonYouTubeIframes(root);
 }
 
 function resumeMediaInRoot(root: HTMLElement | Document) {
-  unfreezeGenericIframes(root);
+  restoreSuspendedIframes(root);
 }
 
 function isElementVisibleInViewport(el: HTMLElement) {
