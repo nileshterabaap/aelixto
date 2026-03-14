@@ -12,6 +12,8 @@ import { useLocation } from 'react-router-dom';
  */
 
 const YOUTUBE_IFRAME_SELECTOR = 'iframe[src*="youtube.com"], iframe[src*="youtube-nocookie.com"]';
+const SPOTIFY_IFRAME_SELECTOR = 'iframe[src*="open.spotify.com"]';
+const VIMEO_IFRAME_SELECTOR = 'iframe[src*="player.vimeo.com"]';
 
 function pauseNativeMedia(root: HTMLElement | Document) {
   root.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
@@ -32,9 +34,34 @@ function pauseYouTubeIframes(root: HTMLElement | Document) {
   });
 }
 
+function pauseSpotifyIframes(root: HTMLElement | Document) {
+  root.querySelectorAll<HTMLIFrameElement>(SPOTIFY_IFRAME_SELECTOR).forEach((iframe) => {
+    try {
+      iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
+    } catch {
+      // cross-origin — ignore
+    }
+  });
+}
+
+function pauseVimeoIframes(root: HTMLElement | Document) {
+  root.querySelectorAll<HTMLIFrameElement>(VIMEO_IFRAME_SELECTOR).forEach((iframe) => {
+    try {
+      iframe.contentWindow?.postMessage(
+        JSON.stringify({ method: 'pause' }),
+        '*'
+      );
+    } catch {
+      // cross-origin — ignore
+    }
+  });
+}
+
 function pauseMediaInRoot(root: HTMLElement | Document) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
+  pauseSpotifyIframes(root);
+  pauseVimeoIframes(root);
 }
 
 function isElementVisibleInViewport(el: HTMLElement) {
