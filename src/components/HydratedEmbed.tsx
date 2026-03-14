@@ -67,10 +67,31 @@ export const HydratedEmbed = memo(({
   const [imageError, setImageError] = useState(false);
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
   const shouldHydrate = isHydrated || hydratedPostIds.has(post.id);
-  useMediaPauseOnScroll(embedContainerRef, `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`);
   const mediaUrl = post.mediaUrl || (post as any).media_url || r.url;
   const platformHint = (post.platform || '').toLowerCase();
+  const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
+
+  const isPlayableMediaPost =
+    mediaTypeHint === 'video' ||
+    mediaTypeHint === 'audio' ||
+    r.kind === 'video' ||
+    platformHint === 'youtube' ||
+    platformHint === 'spotify' ||
+    lowerUrl.includes('youtube.com/') ||
+    lowerUrl.includes('youtu.be/') ||
+    lowerUrl.includes('open.spotify.com/') ||
+    lowerUrl.includes('tiktok.com/') ||
+    lowerUrl.includes('/reel/') ||
+    lowerUrl.includes('/shorts/') ||
+    lowerUrl.includes('/video/');
+
+  useMediaPauseOnScroll(
+    embedContainerRef,
+    `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
+    { enabled: shouldHydrate && isPlayableMediaPost, hardSuspendDistanceVh: 2.5 }
+  );
+
   const forceTwitterRenderer =
     r.kind === 'raw' &&
     !!mediaUrl &&
