@@ -102,13 +102,30 @@ export function useGlobalMediaPauseOnNavigate() {
 
   useEffect(() => {
     if (location.pathname !== prevPathRef.current) {
-      document.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
-        if (!el.paused) el.pause();
+      const videos = document.querySelectorAll<HTMLVideoElement>('video');
+      const audios = document.querySelectorAll<HTMLAudioElement>('audio');
+      const ytIframes = document.querySelectorAll<HTMLIFrameElement>('iframe[src*="youtube.com"]');
+      const allIframes = document.querySelectorAll<HTMLIFrameElement>('iframe');
+
+      console.log(`[GlobalMediaPause] Route: ${prevPathRef.current} → ${location.pathname} — ` +
+        `videos: ${videos.length}, audios: ${audios.length}, yt-iframes: ${ytIframes.length}, all-iframes: ${allIframes.length}`);
+
+      videos.forEach((el) => {
+        if (!el.paused) {
+          console.log(`[GlobalMediaPause] pausing video: ${el.src?.slice(0, 80)}`);
+          el.pause();
+        }
+      });
+      audios.forEach((el) => {
+        if (!el.paused) {
+          console.log(`[GlobalMediaPause] pausing audio`);
+          el.pause();
+        }
       });
 
-      // Also pause YouTube iframes by postMessage
-      document.querySelectorAll<HTMLIFrameElement>('iframe[src*="youtube.com"]').forEach((iframe) => {
+      ytIframes.forEach((iframe) => {
         try {
+          console.log(`[GlobalMediaPause] sending pauseVideo to YT iframe: ${iframe.src?.slice(0, 80)}`);
           iframe.contentWindow?.postMessage(
             JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
             '*'
