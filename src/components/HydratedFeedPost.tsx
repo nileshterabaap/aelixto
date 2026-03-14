@@ -10,7 +10,6 @@ import {
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
 import { useScrollVelocity } from "@/hooks/useScrollVelocity";
-import { useMediaPauseOnScroll } from "@/hooks/useMediaPauseOnScroll";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
