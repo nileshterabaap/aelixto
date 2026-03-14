@@ -31,17 +31,41 @@ const SUSPENDED_FLAG = 'aelixSuspended';
 const SUSPENDED_SRC = 'aelixSuspendedSrc';
 const FROZEN_FLAG = 'aelixFrozen';
 
-// ── Detection: does this container currently contain media nodes? ───────
+// ── Detection: does this container currently contain playable media? ─────
 
-/**
- * Runtime DOM check only.
- * Whether a post should participate in lifecycle is controlled by hook options
- * (computed in HydratedEmbed from renderer + media_type hints).
- */
-const PLAYABLE_MEDIA_SELECTOR = 'video, audio, iframe';
+const PLAYABLE_MEDIA_SELECTOR = 'video, audio';
+const SUSPENDED_IFRAME_SELECTOR = 'iframe[data-aelix-suspended="1"]';
+const PLAYABLE_IFRAME_HINTS = [
+  'youtube.com',
+  'youtube-nocookie.com',
+  'open.spotify.com/embed',
+  'tiktok.com/embed',
+  'facebook.com/plugins/video.php',
+  '/video/',
+  '/reel/',
+  '/shorts/',
+  '/clips/',
+  'instagram.com/reel',
+  'instagram.com/reels',
+];
+
+function isPlayableIframe(iframe: HTMLIFrameElement): boolean {
+  const src = (iframe.getAttribute('src') || '').toLowerCase();
+  const allow = (iframe.getAttribute('allow') || '').toLowerCase();
+
+  if (!src || src === 'about:blank') return false;
+  if (allow.includes('autoplay')) return true;
+
+  return PLAYABLE_IFRAME_HINTS.some((hint) => src.includes(hint));
+}
 
 function hasPlayableMedia(root: HTMLElement): boolean {
-  return root.querySelector(PLAYABLE_MEDIA_SELECTOR) !== null;
+  if (root.querySelector(PLAYABLE_MEDIA_SELECTOR)) return true;
+  return Array.from(root.querySelectorAll<HTMLIFrameElement>('iframe')).some(isPlayableIframe);
+}
+
+function hasLifecycleTargets(root: HTMLElement): boolean {
+  return hasPlayableMedia(root) || root.querySelector(SUSPENDED_IFRAME_SELECTOR) !== null;
 }
 
 // ── Stage A helpers: soft pause / freeze ───────────────────────────────
@@ -71,9 +95,10 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
-/** Freeze non-API iframes by hiding them visually (stops rendering/playback in most browsers) */
+/** Freeze non-API playable iframes by hiding them visually (no reload) */
 function freezeIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (!isPlayableIframe(iframe)) return;
     // Skip iframes that have their own pause API
     if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
     // Skip already frozen or hard-suspended
@@ -111,6 +136,7 @@ function stageAResume(root: HTMLElement) {
 
 function hardSuspendIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (!isPlayableIframe(iframe)) return;
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
 
     const src = iframe.getAttribute('src');
@@ -204,8 +230,9 @@ export function useMediaPauseOnScroll(
       const currentEl = containerRef.current;
       if (!currentEl) return;
 
-      // Do not enter paused/suspended state before media nodes exist.
-      if (!hasPlayableMedia(currentEl)) {
+      // Never pause/suspend containers without playable media.
+      // But still allow active transitions so previously suspended iframes can restore.
+      if (!hasLifecycleTargets(currentEl) && target !== 'active') {
         stateRef.current = 'active';
         return;
       }
