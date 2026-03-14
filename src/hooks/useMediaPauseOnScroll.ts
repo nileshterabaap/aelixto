@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 
 /**
  * Pauses native <video>/<audio> and YouTube iframes when:
- * 1. The container scrolls out of the viewport (IntersectionObserver)
+ * 1. The container scrolls out of the viewport (IntersectionObserver + scroll fallback)
  * 2. The route changes (user switches nav tab)
  *
  * IMPORTANT: We intentionally do NOT touch non-YouTube iframe src attributes.
@@ -32,6 +32,19 @@ function pauseYouTubeIframes(root: HTMLElement | Document) {
   });
 }
 
+function pauseMediaInRoot(root: HTMLElement | Document) {
+  pauseNativeMedia(root);
+  pauseYouTubeIframes(root);
+}
+
+function isElementVisibleInViewport(el: HTMLElement) {
+  const rect = el.getBoundingClientRect();
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+
+  return rect.bottom > 0 && rect.right > 0 && rect.top < viewportHeight && rect.left < viewportWidth;
+}
+
 export function useMediaPauseOnScroll(
   containerRef: RefObject<HTMLElement | null>,
   observeKey?: string | number | boolean
@@ -39,27 +52,64 @@ export function useMediaPauseOnScroll(
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
 
-  // IntersectionObserver — pause when post leaves viewport.
-  // observeKey lets callers re-bind when the observed DOM node appears after hydration.
+  // Pause when leaving viewport (IO primary + scroll fallback for stubborn/mobile cases)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
+    let rafId: number | null = null;
+    let wasVisible = isElementVisibleInViewport(el);
+
+    const checkVisibility = () => {
+      const currentEl = containerRef.current;
+      if (!currentEl) return;
+
+      const isVisible = isElementVisibleInViewport(currentEl);
+      if (wasVisible && !isVisible) {
+        pauseMediaInRoot(currentEl);
+      }
+      wasVisible = isVisible;
+    };
+
+    const scheduleVisibilityCheck = () => {
+      if (rafId !== null) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = null;
+        checkVisibility();
+      });
+    };
+
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (!entry.isIntersecting) {
-            const target = entry.target as HTMLElement;
-            pauseNativeMedia(target);
-            pauseYouTubeIframes(target);
+          const target = entry.target as HTMLElement;
+          if (!entry.isIntersecting || entry.intersectionRatio <= 0) {
+            pauseMediaInRoot(target);
+            wasVisible = false;
+          } else {
+            wasVisible = true;
           }
         }
       },
-      { threshold: 0.1 }
+      { threshold: [0, 0.1] }
     );
 
     observer.observe(el);
-    return () => observer.disconnect();
+    document.addEventListener('scroll', scheduleVisibilityCheck, true);
+    window.addEventListener('resize', scheduleVisibilityCheck);
+    window.addEventListener('orientationchange', scheduleVisibilityCheck);
+
+    checkVisibility();
+
+    return () => {
+      observer.disconnect();
+      document.removeEventListener('scroll', scheduleVisibilityCheck, true);
+      window.removeEventListener('resize', scheduleVisibilityCheck);
+      window.removeEventListener('orientationchange', scheduleVisibilityCheck);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
   }, [containerRef, observeKey]);
 
   // Route change — pause everything in this container
@@ -67,8 +117,7 @@ export function useMediaPauseOnScroll(
     if (location.pathname !== prevPathRef.current) {
       const el = containerRef.current;
       if (el) {
-        pauseNativeMedia(el);
-        pauseYouTubeIframes(el);
+        pauseMediaInRoot(el);
       }
       prevPathRef.current = location.pathname;
     }
@@ -85,8 +134,7 @@ export function useGlobalMediaPauseOnNavigate() {
 
   useEffect(() => {
     if (location.pathname !== prevPathRef.current) {
-      pauseNativeMedia(document);
-      pauseYouTubeIframes(document);
+      pauseMediaInRoot(document);
       prevPathRef.current = location.pathname;
     }
   }, [location.pathname]);
