@@ -95,9 +95,10 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
-/** Freeze non-API iframes by hiding them visually (stops rendering/playback in most browsers) */
+/** Freeze non-API playable iframes by hiding them visually (no reload) */
 function freezeIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (!isPlayableIframe(iframe)) return;
     // Skip iframes that have their own pause API
     if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
     // Skip already frozen or hard-suspended
