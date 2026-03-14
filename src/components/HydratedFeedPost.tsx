@@ -10,7 +10,6 @@ import {
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
 import { useScrollVelocity } from "@/hooks/useScrollVelocity";
-import { useMediaPauseOnScroll } from "@/hooks/useMediaPauseOnScroll";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
@@ -204,10 +203,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
   // Resolve the embed type for rendering
   const r = resolveRenderer(post);
-  useMediaPauseOnScroll(
-    embedRef,
-    `${post.id}:${isHydrated ? 'hydrated' : 'placeholder'}:${r.kind}`
-  );
   
   // Derive thumbnail: prefer stored, then derive from URL
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);

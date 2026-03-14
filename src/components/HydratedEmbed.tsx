@@ -108,22 +108,24 @@ export const HydratedEmbed = memo(({
   // IMAGES: Load directly without play button (swift loading)
   if (r.kind === 'image' && r.url) {
     return (
-      <ImageViewTracker postId={post.id}>
-        <img 
-          src={r.url} 
-          alt="Post content" 
-          className="w-full h-auto object-cover" 
-          loading="eager"
-          decoding="async"
-        />
-      </ImageViewTracker>
+      <div ref={embedContainerRef} className="w-full">
+        <ImageViewTracker postId={post.id}>
+          <img 
+            src={r.url} 
+            alt="Post content" 
+            className="w-full h-auto object-cover" 
+            loading="eager"
+            decoding="async"
+          />
+        </ImageViewTracker>
+      </div>
     );
   }
   
   // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
   if (!shouldHydrate) {
     return (
-      <div className={`relative w-full bg-muted ${aspectClass}`}>
+      <div ref={embedContainerRef} className={`relative w-full bg-muted ${aspectClass}`}>
         {effectiveThumbnail && !imageError ? (
           <img
             src={effectiveThumbnail}
