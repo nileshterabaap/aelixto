@@ -2,24 +2,22 @@ import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 
 /**
- * Pauses/freezes media when posts scroll out of the viewport or on route change.
+ * Pauses/suspends media when posts scroll out of the viewport or on route change.
  *
  * Strategy per platform:
  * - Native <video>/<audio>: .pause()
  * - YouTube iframes: postMessage pauseVideo (requires enablejsapi=1)
- * - Spotify iframes: postMessage { command: 'pause' }
- * - All other iframes (Instagram, Facebook, Threads, X, TikTok, Pinterest, LinkedIn):
- *   Set visibility:hidden to suspend rendering. Most browsers stop media playback
- *   when an iframe is invisible. Restored when the post re-enters the viewport.
- *
- * IMPORTANT: We never blank iframe src — SDK embeds cannot survive that.
+ * - Spotify iframes: postMessage { command: 'pause' } + hard suspend fallback
+ * - Other cross-origin iframes (Instagram, Facebook, Threads, X, TikTok, Pinterest, LinkedIn):
+ *   hard suspend by swapping src -> about:blank off-screen, then restore original src on return.
  */
 
 const YOUTUBE_IFRAME_SELECTOR = 'iframe[src*="youtube.com"], iframe[src*="youtube-nocookie.com"]';
 const SPOTIFY_IFRAME_SELECTOR = 'iframe[src*="open.spotify.com"]';
+const HARD_SUSPEND_EXCLUDED_SELECTORS = YOUTUBE_IFRAME_SELECTOR;
 
-// Iframes we handle via postMessage — excluded from the generic freeze
-const API_CONTROLLED_SELECTORS = [YOUTUBE_IFRAME_SELECTOR, SPOTIFY_IFRAME_SELECTOR].join(', ');
+const SUSPENDED_FLAG = 'aelixSuspended';
+const SUSPENDED_SRC = 'aelixSuspendedSrc';
 
 function pauseNativeMedia(root: HTMLElement | Document) {
   root.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
@@ -47,22 +45,50 @@ function pauseSpotifyIframes(root: HTMLElement | Document) {
 }
 
 /**
- * For cross-origin iframes without a pause API (Instagram, Facebook, Threads,
- * X/Twitter, TikTok, Pinterest, LinkedIn), hide them to suspend browser rendering.
+ * Hard suspend cross-origin iframes while off-screen by swapping src to about:blank.
+ * This reliably stops playback for platforms without public pause APIs.
  */
-function freezeGenericIframes(root: HTMLElement | Document) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.matches(API_CONTROLLED_SELECTORS)) return;
+function suspendIframe(iframe: HTMLIFrameElement) {
+  if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
+
+  const src = iframe.getAttribute('src');
+  if (!src || src === 'about:blank') {
     iframe.style.visibility = 'hidden';
+    return;
+  }
+
+  iframe.dataset[SUSPENDED_SRC] = src;
+  iframe.dataset[SUSPENDED_FLAG] = '1';
+  iframe.setAttribute('src', 'about:blank');
+  iframe.style.visibility = 'hidden';
+}
+
+function restoreSuspendedIframe(iframe: HTMLIFrameElement) {
+  const shouldRestore = iframe.dataset[SUSPENDED_FLAG] === '1';
+  const storedSrc = iframe.dataset[SUSPENDED_SRC];
+
+  if (shouldRestore && storedSrc) {
+    iframe.setAttribute('src', storedSrc);
+  }
+
+  delete iframe.dataset[SUSPENDED_FLAG];
+  delete iframe.dataset[SUSPENDED_SRC];
+
+  if (iframe.style.visibility === 'hidden') {
+    iframe.style.visibility = '';
+  }
+}
+
+function suspendNonYouTubeIframes(root: HTMLElement | Document) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (iframe.matches(HARD_SUSPEND_EXCLUDED_SELECTORS)) return;
+    suspendIframe(iframe);
   });
 }
 
-function unfreezeGenericIframes(root: HTMLElement | Document) {
+function restoreSuspendedIframes(root: HTMLElement | Document) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.matches(API_CONTROLLED_SELECTORS)) return;
-    if (iframe.style.visibility === 'hidden') {
-      iframe.style.visibility = '';
-    }
+    restoreSuspendedIframe(iframe);
   });
 }
 
@@ -70,11 +96,11 @@ function pauseMediaInRoot(root: HTMLElement | Document) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  freezeGenericIframes(root);
+  suspendNonYouTubeIframes(root);
 }
 
 function resumeMediaInRoot(root: HTMLElement | Document) {
-  unfreezeGenericIframes(root);
+  restoreSuspendedIframes(root);
 }
 
 function isElementVisibleInViewport(el: HTMLElement) {
@@ -98,19 +124,20 @@ export function useMediaPauseOnScroll(
     if (!el) return;
 
     let rafId: number | null = null;
-    let wasVisible = isElementVisibleInViewport(el);
+    let hiddenMutationRaf: number | null = null;
+    let isVisibleNow = isElementVisibleInViewport(el);
 
     const checkVisibility = () => {
       const currentEl = containerRef.current;
       if (!currentEl) return;
 
       const isVisible = isElementVisibleInViewport(currentEl);
-      if (wasVisible && !isVisible) {
+      if (isVisibleNow && !isVisible) {
         pauseMediaInRoot(currentEl);
-      } else if (!wasVisible && isVisible) {
+      } else if (!isVisibleNow && isVisible) {
         resumeMediaInRoot(currentEl);
       }
-      wasVisible = isVisible;
+      isVisibleNow = isVisible;
     };
 
     const scheduleVisibilityCheck = () => {
@@ -121,23 +148,39 @@ export function useMediaPauseOnScroll(
       });
     };
 
+    const scheduleHiddenMutationPause = () => {
+      if (hiddenMutationRaf !== null) return;
+      hiddenMutationRaf = window.requestAnimationFrame(() => {
+        hiddenMutationRaf = null;
+        const currentEl = containerRef.current;
+        if (!currentEl || isVisibleNow) return;
+        pauseMediaInRoot(currentEl);
+      });
+    };
+
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           const target = entry.target as HTMLElement;
           if (!entry.isIntersecting || entry.intersectionRatio <= 0) {
             pauseMediaInRoot(target);
-            wasVisible = false;
+            isVisibleNow = false;
           } else {
             resumeMediaInRoot(target);
-            wasVisible = true;
+            isVisibleNow = true;
           }
         }
       },
       { threshold: [0, 0.1] }
     );
 
+    const mutationObserver = new MutationObserver(() => {
+      scheduleHiddenMutationPause();
+    });
+
     observer.observe(el);
+    mutationObserver.observe(el, { childList: true, subtree: true });
+
     document.addEventListener('scroll', scheduleVisibilityCheck, true);
     window.addEventListener('resize', scheduleVisibilityCheck);
     window.addEventListener('orientationchange', scheduleVisibilityCheck);
@@ -146,11 +189,17 @@ export function useMediaPauseOnScroll(
 
     return () => {
       observer.disconnect();
+      mutationObserver.disconnect();
+
       document.removeEventListener('scroll', scheduleVisibilityCheck, true);
       window.removeEventListener('resize', scheduleVisibilityCheck);
       window.removeEventListener('orientationchange', scheduleVisibilityCheck);
+
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
+      }
+      if (hiddenMutationRaf !== null) {
+        cancelAnimationFrame(hiddenMutationRaf);
       }
     };
   }, [containerRef, observeKey]);
