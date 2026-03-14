@@ -2,24 +2,22 @@ import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 
 /**
- * Pauses/freezes media when posts scroll out of the viewport or on route change.
+ * Pauses/suspends media when posts scroll out of the viewport or on route change.
  *
  * Strategy per platform:
  * - Native <video>/<audio>: .pause()
  * - YouTube iframes: postMessage pauseVideo (requires enablejsapi=1)
- * - Spotify iframes: postMessage { command: 'pause' }
- * - All other iframes (Instagram, Facebook, Threads, X, TikTok, Pinterest, LinkedIn):
- *   Set visibility:hidden to suspend rendering. Most browsers stop media playback
- *   when an iframe is invisible. Restored when the post re-enters the viewport.
- *
- * IMPORTANT: We never blank iframe src — SDK embeds cannot survive that.
+ * - Spotify iframes: postMessage { command: 'pause' } + hard suspend fallback
+ * - Other cross-origin iframes (Instagram, Facebook, Threads, X, TikTok, Pinterest, LinkedIn):
+ *   hard suspend by swapping src -> about:blank off-screen, then restore original src on return.
  */
 
 const YOUTUBE_IFRAME_SELECTOR = 'iframe[src*="youtube.com"], iframe[src*="youtube-nocookie.com"]';
 const SPOTIFY_IFRAME_SELECTOR = 'iframe[src*="open.spotify.com"]';
+const HARD_SUSPEND_EXCLUDED_SELECTORS = YOUTUBE_IFRAME_SELECTOR;
 
-// Iframes we handle via postMessage — excluded from the generic freeze
-const API_CONTROLLED_SELECTORS = [YOUTUBE_IFRAME_SELECTOR, SPOTIFY_IFRAME_SELECTOR].join(', ');
+const SUSPENDED_FLAG = 'aelixSuspended';
+const SUSPENDED_SRC = 'aelixSuspendedSrc';
 
 function pauseNativeMedia(root: HTMLElement | Document) {
   root.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
