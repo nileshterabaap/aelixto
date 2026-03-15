@@ -29,6 +29,7 @@ import mediumIcon from "@/assets/platforms/medium.svg";
 import threadsIcon from "@/assets/platforms/threads.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
+import { MediaFrame } from "@/components/MediaFrame";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { useMediaPauseOnScroll } from "@/hooks/useMediaPauseOnScroll";
@@ -285,13 +286,15 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
         <div ref={embedRef} style={{ contain: 'layout paint' }}>
-          <HydratedEmbed
-            post={post}
-            renderer={r}
-            thumbnailUrl={effectiveThumbnail}
-            isHydrated={isHydrated}
-            onPlayClick={handlePlayClick}
-          />
+          <MediaFrame platform={detectedPlatform || undefined}>
+            <HydratedEmbed
+              post={post}
+              renderer={r}
+              thumbnailUrl={effectiveThumbnail}
+              isHydrated={isHydrated}
+              onPlayClick={handlePlayClick}
+            />
+          </MediaFrame>
         </div>
       ) : (
         <div ref={embedRef} />
