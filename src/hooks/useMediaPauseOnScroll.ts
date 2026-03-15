@@ -142,7 +142,7 @@ export function useMediaPauseOnScroll(
     const postId = String(observeKey || el.id || Math.random());
 
     let currentPlayable = hasPlayableMedia(el);
-    console.log(`[MediaHook] MOUNT postId=${postId.slice(0,30)} playable=${currentPlayable} el=`, el.tagName);
+    console.log(`[MediaLifecycle] hook mounted`, observeKey, `playable=${currentPlayable}`);
 
     const onActiveChange = (active: boolean) => {
       const currentEl = containerRef.current;
