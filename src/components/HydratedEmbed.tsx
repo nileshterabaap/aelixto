@@ -97,7 +97,7 @@ export const HydratedEmbed = memo(({
   useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
-    { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 2.5 }
+    { enabled: mediaLifecycleEnabled }
   );
 
   const forceTwitterRenderer =
