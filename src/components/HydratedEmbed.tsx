@@ -1,4 +1,5 @@
 import { useState, memo, useCallback, useEffect, useRef } from 'react';
+import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import type { Post } from '@/data/demoData';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
@@ -71,8 +72,33 @@ export const HydratedEmbed = memo(({
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
 
-  // Media lifecycle is now managed at the HydratedFeedPost level via cardRef.
-  // No per-embed lifecycle hook needed here.
+  const isPlayableMediaPost =
+    mediaTypeHint === 'video' ||
+    mediaTypeHint === 'audio' ||
+    r.kind === 'video' ||
+    platformHint === 'youtube' ||
+    platformHint === 'spotify' ||
+    lowerUrl.includes('youtube.com/') ||
+    lowerUrl.includes('youtu.be/') ||
+    lowerUrl.includes('open.spotify.com/') ||
+    lowerUrl.includes('tiktok.com/') ||
+    lowerUrl.includes('/reel/') ||
+    lowerUrl.includes('/shorts/') ||
+    lowerUrl.includes('/video/');
+
+  const mediaLifecycleEnabled =
+    shouldHydrate &&
+    (isPlayableMediaPost ||
+      r.kind === 'raw' ||
+      r.kind === 'twitter' ||
+      r.kind === 'universal' ||
+      r.kind === 'pinterest');
+
+  useMediaPauseOnScroll(
+    embedContainerRef,
+    `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
+    { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 2.5 }
+  );
 
   const forceTwitterRenderer =
     r.kind === 'raw' &&

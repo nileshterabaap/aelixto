@@ -29,10 +29,8 @@ import mediumIcon from "@/assets/platforms/medium.svg";
 import threadsIcon from "@/assets/platforms/threads.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
-import { MediaFrame } from "@/components/MediaFrame";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
-import { useMediaPauseOnScroll } from "@/hooks/useMediaPauseOnScroll";
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -94,14 +92,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
-  const [cardEl, setCardEl] = useState<HTMLDivElement | null>(null);
-  const cardRef = useCallback((node: HTMLDivElement | null) => {
-    setCardEl(node);
-  }, []);
   const { isScrollingFast, velocity } = useScrollVelocity();
-
-  // Register with global MediaCoordinator at the post level
-  useMediaPauseOnScroll(cardEl, post.id);
   const hydrationResumeTimer = useRef<number | null>(null);
 
   // Track if embed is within viewport proximity (conservative 400px)
@@ -217,7 +208,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
   return (
-    <Card ref={cardRef} className="overflow-hidden border border-border rounded-xl">
+    <Card className="overflow-hidden border border-border rounded-xl">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
         <div className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
@@ -286,15 +277,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
         <div ref={embedRef} style={{ contain: 'layout paint' }}>
-          <MediaFrame platform={detectedPlatform || undefined}>
-            <HydratedEmbed
-              post={post}
-              renderer={r}
-              thumbnailUrl={effectiveThumbnail}
-              isHydrated={isHydrated}
-              onPlayClick={handlePlayClick}
-            />
-          </MediaFrame>
+          <HydratedEmbed
+            post={post}
+            renderer={r}
+            thumbnailUrl={effectiveThumbnail}
+            isHydrated={isHydrated}
+            onPlayClick={handlePlayClick}
+          />
         </div>
       ) : (
         <div ref={embedRef} />
