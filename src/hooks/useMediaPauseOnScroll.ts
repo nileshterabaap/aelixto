@@ -59,14 +59,24 @@ function hasPlayableMedia(root: HTMLElement): boolean {
 // ── Pause / Resume helpers ─────────────────────────────────────────────
 
 function pauseAllMedia(root: HTMLElement) {
-  // Native video/audio
-  root.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
-    if (!el.paused) el.pause();
+  const videos = root.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio');
+  const ytIframes = root.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR);
+  const spotifyIframes = root.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR);
+  const allIframes = root.querySelectorAll<HTMLIFrameElement>('iframe');
+
+  console.log(`[MediaPause] pauseAllMedia: videos=${videos.length} yt=${ytIframes.length} spotify=${spotifyIframes.length} iframes=${allIframes.length}`);
+  allIframes.forEach(f => console.log(`[MediaPause]   iframe src=${f.src?.slice(0,80)}`));
+
+  videos.forEach((el) => {
+    if (!el.paused) {
+      console.log(`[MediaPause] .pause() on <${el.tagName}>`);
+      el.pause();
+    }
   });
 
-  // YouTube postMessage
-  root.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
+  ytIframes.forEach((iframe) => {
     try {
+      console.log(`[MediaPause] postMessage pauseVideo → YouTube`);
       iframe.contentWindow?.postMessage(
         JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
         '*'
@@ -74,18 +84,18 @@ function pauseAllMedia(root: HTMLElement) {
     } catch { /* cross-origin */ }
   });
 
-  // Spotify postMessage
-  root.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
+  spotifyIframes.forEach((iframe) => {
     try {
+      console.log(`[MediaPause] postMessage pause → Spotify`);
       iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
     } catch { /* cross-origin */ }
   });
 
-  // Freeze other playable iframes (visibility hidden — no reload)
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+  allIframes.forEach((iframe) => {
     if (!isPlayableIframe(iframe)) return;
     if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
     if (iframe.dataset[FROZEN_FLAG] === '1') return;
+    console.log(`[MediaPause] FREEZE iframe src=${iframe.src?.slice(0,60)}`);
     iframe.dataset[FROZEN_FLAG] = '1';
     iframe.style.visibility = 'hidden';
   });
