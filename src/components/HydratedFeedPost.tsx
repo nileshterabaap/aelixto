@@ -212,7 +212,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
   return (
-    <Card className="overflow-hidden border border-border rounded-xl">
+    <Card ref={cardRef} className="overflow-hidden border border-border rounded-xl">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
         <div className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
