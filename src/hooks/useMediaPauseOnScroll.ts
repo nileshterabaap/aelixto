@@ -122,24 +122,28 @@ interface MediaLifecycleOptions {
 // ── Hook ───────────────────────────────────────────────────────────────
 
 export function useMediaPauseOnScroll(
-  containerRef: RefObject<HTMLElement | null>,
+  containerElOrRef: HTMLElement | null | RefObject<HTMLElement | null>,
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
+  // Accept either a direct element or a ref object
+  const element = containerElOrRef && 'current' in containerElOrRef
+    ? containerElOrRef.current
+    : containerElOrRef;
+
   const { enabled = true } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
   const isActiveRef = useRef(true);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el || !enabled) {
-      console.log(`[MediaLifecycle] hook SKIP mount: el=${!!el} enabled=${enabled} key=${observeKey}`);
+    if (!element || !enabled) {
+      console.log(`[MediaLifecycle] hook SKIP: el=${!!element} enabled=${enabled} key=${observeKey}`);
       return;
     }
 
     const coordinator = getMediaCoordinator();
-    const postId = String(observeKey || el.id || Math.random());
+    const postId = String(observeKey || element.id || Math.random());
 
     let currentPlayable = hasPlayableMedia(el);
     console.log(`[MediaLifecycle] hook mounted`, observeKey, `playable=${currentPlayable}`);

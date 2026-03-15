@@ -93,12 +93,14 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const [cardEl, setCardEl] = useState<HTMLDivElement | null>(null);
+  const cardRef = useCallback((node: HTMLDivElement | null) => {
+    setCardEl(node);
+  }, []);
   const { isScrollingFast, velocity } = useScrollVelocity();
 
   // Register with global MediaCoordinator at the post level
-  console.log(`[MediaLifecycle] HydratedFeedPost render`, post.id);
-  useMediaPauseOnScroll(cardRef, post.id);
+  useMediaPauseOnScroll(cardEl, post.id);
   const hydrationResumeTimer = useRef<number | null>(null);
 
   // Track if embed is within viewport proximity (conservative 400px)
