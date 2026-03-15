@@ -145,38 +145,32 @@ export function useMediaPauseOnScroll(
     const coordinator = getMediaCoordinator();
     const postId = String(observeKey || element.id || Math.random());
 
-    let currentPlayable = hasPlayableMedia(el);
-    console.log(`[MediaLifecycle] hook mounted`, observeKey, `playable=${currentPlayable}`);
+    let currentPlayable = hasPlayableMedia(element);
+    console.log(`[MediaLifecycle] hook mounted postId=${postId.slice(0,30)} playable=${currentPlayable}`);
 
     const onActiveChange = (active: boolean) => {
-      const currentEl = containerRef.current;
-      if (!currentEl) return;
       isActiveRef.current = active;
       console.log(`[MediaHook] onActiveChange postId=${postId.slice(0,30)} active=${active}`);
 
       if (active) {
-        resumeAllMedia(currentEl);
+        resumeAllMedia(element);
       } else {
-        pauseAllMedia(currentEl);
+        pauseAllMedia(element);
       }
     };
 
-    coordinator.register(postId, el, currentPlayable, onActiveChange);
+    coordinator.register(postId, element, currentPlayable, onActiveChange);
 
     // Watch for late-injected media elements (SDK hydration)
-    // childList+subtree: catches new elements added by SDKs
-    // attributes on iframes: catches src being set after insertion
     const mutationObserver = new MutationObserver(() => {
-      const currentEl = containerRef.current;
-      if (!currentEl) return;
-      const nowPlayable = hasPlayableMedia(currentEl);
+      const nowPlayable = hasPlayableMedia(element);
       if (nowPlayable !== currentPlayable) {
         console.log(`[MediaHook] PLAYABLE STATUS CHANGED postId=${postId.slice(0,30)} ${currentPlayable} → ${nowPlayable}`);
         currentPlayable = nowPlayable;
         coordinator.updatePlayableStatus(postId, nowPlayable);
       }
     });
-    mutationObserver.observe(el, {
+    mutationObserver.observe(element, {
       childList: true,
       subtree: true,
       attributes: true,
@@ -187,7 +181,7 @@ export function useMediaPauseOnScroll(
       mutationObserver.disconnect();
       coordinator.unregister(postId);
     };
-  }, [containerRef, observeKey, enabled]);
+  }, [element, observeKey, enabled]);
 
   // Route change — pause media via coordinator
   useEffect(() => {
