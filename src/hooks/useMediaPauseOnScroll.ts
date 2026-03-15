@@ -1,46 +1,43 @@
-import { useEffect, useRef, useCallback, RefObject } from 'react';
+import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getMediaCoordinator } from './useMediaCoordinator';
 
 /**
- * Media lifecycle hook — v2 (coordinator-based).
+ * Media lifecycle hook — coordinator-based.
  *
- * Registers the post container with a global MediaCoordinator that uses
- * a single IntersectionObserver across all posts. Only one post is "active"
- * at a time (the one with the highest viewport visibility).
+ * One global coordinator determines the single active media post (highest
+ * viewport ratio, minimum 50%). Non-active posts are paused immediately.
  *
- * When a post becomes inactive:
- *   – Native <video>/<audio> are paused.
- *   – YouTube iframes receive a postMessage "pauseVideo".
- *   – Spotify iframes receive a postMessage { command: 'pause' }.
- *   – Other playable iframes get visibility:hidden (no src change, no reload).
- *
- * Hard-suspend (about:blank swap) has been removed entirely to prevent
- * embed reload flicker.
+ * Hard-suspend (about:blank swap) is intentionally removed to avoid reload flicker.
  */
 
-// ── Selectors ──────────────────────────────────────────────────────────
-
-const YOUTUBE_SELECTOR = 'iframe[src*="youtube.com"], iframe[src*="youtube-nocookie.com"]';
-const SPOTIFY_SELECTOR = 'iframe[src*="open.spotify.com"]';
-const API_PAUSABLE_SELECTOR = [YOUTUBE_SELECTOR, SPOTIFY_SELECTOR].join(', ');
-
 const FROZEN_FLAG = 'aelixFrozen';
-
-// ── Playable media detection ───────────────────────────────────────────
 
 const PLAYABLE_IFRAME_HINTS = [
   'youtube.com',
   'youtube-nocookie.com',
   'open.spotify.com/embed',
+  'tiktok.com/player',
   'tiktok.com/embed',
+  'vm.tiktok.com',
+  'instagram.com/reel',
+  'instagram.com/reels',
   'facebook.com/plugins/video.php',
+  'platform.twitter.com',
+  'x.com/i/status',
+  'threads.net/embed',
   '/video/',
   '/reel/',
   '/shorts/',
   '/clips/',
-  'instagram.com/reel',
-  'instagram.com/reels',
+];
+
+const PAUSE_MESSAGES: unknown[] = [
+  JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }), // YouTube
+  { command: 'pause' }, // Spotify
+  { method: 'pause' }, // Vimeo-style
+  { 'x-tiktok-player': true, type: 'pause', value: null }, // TikTok Embed Player
+  { type: 'pause' }, // Generic
 ];
 
 function isPlayableIframe(iframe: HTMLIFrameElement): boolean {
@@ -56,60 +53,49 @@ function hasPlayableMedia(root: HTMLElement): boolean {
   return Array.from(root.querySelectorAll<HTMLIFrameElement>('iframe')).some(isPlayableIframe);
 }
 
-// ── Pause / Resume helpers ─────────────────────────────────────────────
+function sendPauseSignals(iframe: HTMLIFrameElement) {
+  const win = iframe.contentWindow;
+  if (!win) return;
 
-function pauseAllMedia(root: HTMLElement) {
-  // Native video/audio
+  for (const message of PAUSE_MESSAGES) {
+    try {
+      win.postMessage(message, '*');
+    } catch {
+      // cross-origin/no-op
+    }
+  }
+}
+
+function pauseMediaInRoot(root: ParentNode) {
   root.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
     if (!el.paused) el.pause();
   });
 
-  // YouTube postMessage
-  root.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
-    try {
-      iframe.contentWindow?.postMessage(
-        JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
-        '*'
-      );
-    } catch { /* cross-origin */ }
-  });
-
-  // Spotify postMessage
-  root.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
-    try {
-      iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
-    } catch { /* cross-origin */ }
-  });
-
-  // Freeze other playable iframes (visibility hidden — no reload)
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (!isPlayableIframe(iframe)) return;
-    if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
+
+    sendPauseSignals(iframe);
+
     if (iframe.dataset[FROZEN_FLAG] === '1') return;
     iframe.dataset[FROZEN_FLAG] = '1';
     iframe.style.visibility = 'hidden';
+    iframe.style.pointerEvents = 'none';
   });
 }
 
-function resumeAllMedia(root: HTMLElement) {
-  // Unfreeze iframes
+function resumeMediaInRoot(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (iframe.dataset[FROZEN_FLAG] !== '1') return;
     delete iframe.dataset[FROZEN_FLAG];
     iframe.style.visibility = '';
+    iframe.style.pointerEvents = '';
   });
 }
 
-// ── Hook options ───────────────────────────────────────────────────────
-
 interface MediaLifecycleOptions {
-  /** Enable lifecycle for this post. Should be true only for playable media posts. */
   enabled?: boolean;
-  /** Keep post coordinated even if iframe heuristics miss the platform URL pattern. */
   assumePlayable?: boolean;
 }
-
-// ── Hook ───────────────────────────────────────────────────────────────
 
 export function useMediaPauseOnScroll(
   containerRef: RefObject<HTMLElement | null>,
@@ -127,7 +113,6 @@ export function useMediaPauseOnScroll(
     const coordinator = getMediaCoordinator();
     const postId = String(observeKey || el.id || Math.random());
 
-    // Detect playable media now (may update later via MutationObserver)
     let currentPlayable = assumePlayable || hasPlayableMedia(el);
 
     const onActiveChange = (active: boolean) => {
@@ -135,24 +120,25 @@ export function useMediaPauseOnScroll(
       if (!currentEl) return;
 
       if (active) {
-        resumeAllMedia(currentEl);
+        resumeMediaInRoot(currentEl);
       } else {
-        pauseAllMedia(currentEl);
+        pauseMediaInRoot(currentEl);
       }
     };
 
     coordinator.register(postId, el, currentPlayable, onActiveChange);
 
-    // Watch for late-injected media elements (SDK hydration)
     const mutationObserver = new MutationObserver(() => {
       const currentEl = containerRef.current;
       if (!currentEl) return;
+
       const nowPlayable = assumePlayable || hasPlayableMedia(currentEl);
-      if (nowPlayable !== currentPlayable) {
-        currentPlayable = nowPlayable;
-        coordinator.updatePlayableStatus(postId, nowPlayable);
-      }
+      if (nowPlayable === currentPlayable) return;
+
+      currentPlayable = nowPlayable;
+      coordinator.updatePlayableStatus(postId, nowPlayable);
     });
+
     mutationObserver.observe(el, { childList: true, subtree: true });
 
     return () => {
@@ -161,7 +147,6 @@ export function useMediaPauseOnScroll(
     };
   }, [containerRef, observeKey, enabled, assumePlayable]);
 
-  // Route change — pause media via coordinator
   useEffect(() => {
     if (!enabled) {
       prevPathRef.current = location.pathname;
@@ -175,39 +160,15 @@ export function useMediaPauseOnScroll(
   }, [enabled, location.pathname]);
 }
 
-/**
- * Global route-change media killer.
- * Mount once at app level to pause ALL playable media on any navigation.
- */
 export function useGlobalMediaPauseOnNavigate() {
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
 
   useEffect(() => {
-    if (location.pathname !== prevPathRef.current) {
-      getMediaCoordinator().pauseAll();
+    if (location.pathname === prevPathRef.current) return;
 
-      // Also directly pause any native media (in case not registered)
-      document.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
-        if (!el.paused) el.pause();
-      });
-      // YouTube
-      document.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
-        try {
-          iframe.contentWindow?.postMessage(
-            JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
-            '*'
-          );
-        } catch { /* cross-origin */ }
-      });
-      // Spotify
-      document.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
-        try {
-          iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
-        } catch { /* cross-origin */ }
-      });
-
-      prevPathRef.current = location.pathname;
-    }
+    getMediaCoordinator().pauseAll();
+    pauseMediaInRoot(document);
+    prevPathRef.current = location.pathname;
   }, [location.pathname]);
 }

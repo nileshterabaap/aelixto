@@ -5,10 +5,6 @@
  * The post with the highest viewport coverage among those flagged
  * as "playable" becomes the sole active media post.
  *
- * When the active post changes:
- *   – Previous active post receives `false` → its media is paused.
- *   – New active post receives `true`      → its media resumes.
- *
  * No hard-suspend (about:blank) is ever performed.
  */
 
@@ -19,6 +15,7 @@ interface TrackedPost {
   ratio: number;
   hasPlayableMedia: boolean;
   callback: ActiveChangeCallback;
+  isActive: boolean;
 }
 
 class MediaCoordinator {
@@ -42,44 +39,67 @@ class MediaCoordinator {
     hasPlayableMedia: boolean,
     callback: ActiveChangeCallback
   ) {
-    // Clean up previous registration for same postId
     const prev = this.posts.get(postId);
     if (prev && prev.element !== element) {
       this.observer.unobserve(prev.element);
     }
 
     element.setAttribute('data-media-post-id', postId);
-    this.posts.set(postId, { element, ratio: 0, hasPlayableMedia, callback });
+    this.posts.set(postId, {
+      element,
+      ratio: prev?.element === element ? prev.ratio : 0,
+      hasPlayableMedia,
+      callback,
+      isActive: prev?.isActive ?? false,
+    });
+
     this.observer.observe(element);
+    this.scheduleRecalc();
   }
 
   unregister(postId: string) {
     const entry = this.posts.get(postId);
     if (!entry) return;
 
+    if (entry.isActive) {
+      entry.isActive = false;
+      entry.callback(false);
+    }
+
     this.observer.unobserve(entry.element);
     this.posts.delete(postId);
 
     if (this.activePostId === postId) {
       this.activePostId = null;
-      this.scheduleRecalc();
     }
+
+    this.scheduleRecalc();
   }
 
   /** Update the playable-media flag for a post (e.g. after late SDK hydration). */
   updatePlayableStatus(postId: string, hasPlayableMedia: boolean) {
     const entry = this.posts.get(postId);
     if (!entry || entry.hasPlayableMedia === hasPlayableMedia) return;
+
     entry.hasPlayableMedia = hasPlayableMedia;
+
+    if (!hasPlayableMedia && entry.isActive) {
+      entry.isActive = false;
+      entry.callback(false);
+      if (this.activePostId === postId) this.activePostId = null;
+    }
+
     this.scheduleRecalc();
   }
 
   /** Pause all media globally (used on route change). */
   pauseAll() {
-    const prevId = this.activePostId;
     this.activePostId = null;
-    if (prevId) {
-      this.posts.get(prevId)?.callback(false);
+
+    for (const entry of this.posts.values()) {
+      if (!entry.isActive) continue;
+      entry.isActive = false;
+      entry.callback(false);
     }
   }
 
@@ -120,18 +140,13 @@ class MediaCoordinator {
     // Require minimum 50% visibility to be considered active
     if (bestRatio < MediaCoordinator.MIN_ACTIVE_RATIO) bestId = null;
 
-    if (bestId === this.activePostId) return;
-
-    const prevId = this.activePostId;
     this.activePostId = bestId;
 
-    // Notify previous post it's no longer active → pause
-    if (prevId) {
-      this.posts.get(prevId)?.callback(false);
-    }
-    // Notify new active post → resume
-    if (bestId) {
-      this.posts.get(bestId)?.callback(true);
+    for (const [id, entry] of this.posts) {
+      const shouldBeActive = entry.hasPlayableMedia && id === bestId;
+      if (entry.isActive === shouldBeActive) continue;
+      entry.isActive = shouldBeActive;
+      entry.callback(shouldBeActive);
     }
   }
 }
