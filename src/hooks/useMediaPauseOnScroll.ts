@@ -1,40 +1,34 @@
-import { useEffect, useRef, RefObject } from 'react';
+import { useEffect, useRef, useCallback, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
+import { getMediaCoordinator } from './useMediaCoordinator';
 
 /**
- * Two-stage media lifecycle for playable media only.
+ * Media lifecycle hook — v2 (coordinator-based).
  *
- * Stage A (near viewport, 0–1 viewport away):
- *   - Pause native <video>/<audio> via .pause()
- *   - Pause YouTube via postMessage pauseVideo
- *   - Pause Spotify via postMessage { command: 'pause' }
- *   - Freeze other iframes via visibility:hidden (no src change)
+ * Registers the post container with a global MediaCoordinator that uses
+ * a single IntersectionObserver across all posts. Only one post is "active"
+ * at a time (the one with the highest viewport visibility).
  *
- * Stage B (far from viewport, 2–3 viewport heights away):
- *   - Hard-suspend iframes: swap src → about:blank, store original
+ * When a post becomes inactive:
+ *   – Native <video>/<audio> are paused.
+ *   – YouTube iframes receive a postMessage "pauseVideo".
+ *   – Spotify iframes receive a postMessage { command: 'pause' }.
+ *   – Other playable iframes get visibility:hidden (no src change, no reload).
  *
- * Only applies to containers with playable media (video, audio, YouTube,
- * Spotify, TikTok, Instagram reels, etc.). Static embeds are ignored.
+ * Hard-suspend (about:blank swap) has been removed entirely to prevent
+ * embed reload flicker.
  */
 
 // ── Selectors ──────────────────────────────────────────────────────────
 
 const YOUTUBE_SELECTOR = 'iframe[src*="youtube.com"], iframe[src*="youtube-nocookie.com"]';
 const SPOTIFY_SELECTOR = 'iframe[src*="open.spotify.com"]';
-
-/** Iframes that have their own postMessage pause API — never hard-suspend these in stage A */
 const API_PAUSABLE_SELECTOR = [YOUTUBE_SELECTOR, SPOTIFY_SELECTOR].join(', ');
 
-// ── Data attributes for hard-suspend bookkeeping ───────────────────────
-
-const SUSPENDED_FLAG = 'aelixSuspended';
-const SUSPENDED_SRC = 'aelixSuspendedSrc';
 const FROZEN_FLAG = 'aelixFrozen';
 
-// ── Detection: does this container currently contain playable media? ─────
+// ── Playable media detection ───────────────────────────────────────────
 
-const PLAYABLE_MEDIA_SELECTOR = 'video, audio';
-const SUSPENDED_IFRAME_SELECTOR = 'iframe[data-aelix-suspended="1"]';
 const PLAYABLE_IFRAME_HINTS = [
   'youtube.com',
   'youtube-nocookie.com',
@@ -52,31 +46,25 @@ const PLAYABLE_IFRAME_HINTS = [
 function isPlayableIframe(iframe: HTMLIFrameElement): boolean {
   const src = (iframe.getAttribute('src') || '').toLowerCase();
   const allow = (iframe.getAttribute('allow') || '').toLowerCase();
-
   if (!src || src === 'about:blank') return false;
   if (allow.includes('autoplay')) return true;
-
   return PLAYABLE_IFRAME_HINTS.some((hint) => src.includes(hint));
 }
 
 function hasPlayableMedia(root: HTMLElement): boolean {
-  if (root.querySelector(PLAYABLE_MEDIA_SELECTOR)) return true;
+  if (root.querySelector('video, audio')) return true;
   return Array.from(root.querySelectorAll<HTMLIFrameElement>('iframe')).some(isPlayableIframe);
 }
 
-function hasLifecycleTargets(root: HTMLElement): boolean {
-  return hasPlayableMedia(root) || root.querySelector(SUSPENDED_IFRAME_SELECTOR) !== null;
-}
+// ── Pause / Resume helpers ─────────────────────────────────────────────
 
-// ── Stage A helpers: soft pause / freeze ───────────────────────────────
-
-function pauseNativeMedia(root: HTMLElement) {
+function pauseAllMedia(root: HTMLElement) {
+  // Native video/audio
   root.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
     if (!el.paused) el.pause();
   });
-}
 
-function pauseYouTubeIframes(root: HTMLElement) {
+  // YouTube postMessage
   root.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
     try {
       iframe.contentWindow?.postMessage(
@@ -85,99 +73,38 @@ function pauseYouTubeIframes(root: HTMLElement) {
       );
     } catch { /* cross-origin */ }
   });
-}
 
-function pauseSpotifyIframes(root: HTMLElement) {
+  // Spotify postMessage
   root.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
     try {
       iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
     } catch { /* cross-origin */ }
   });
-}
 
-/** Freeze non-API playable iframes by hiding them visually (no reload) */
-function freezeIframes(root: HTMLElement) {
+  // Freeze other playable iframes (visibility hidden — no reload)
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (!isPlayableIframe(iframe)) return;
-    // Skip iframes that have their own pause API
     if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
-    // Skip already frozen or hard-suspended
-    if (iframe.dataset[FROZEN_FLAG] === '1' || iframe.dataset[SUSPENDED_FLAG] === '1') return;
-
+    if (iframe.dataset[FROZEN_FLAG] === '1') return;
     iframe.dataset[FROZEN_FLAG] = '1';
     iframe.style.visibility = 'hidden';
   });
 }
 
-/** Unfreeze iframes that were only soft-frozen (not hard-suspended) */
-function unfreezeIframes(root: HTMLElement) {
+function resumeAllMedia(root: HTMLElement) {
+  // Unfreeze iframes
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (iframe.dataset[FROZEN_FLAG] !== '1') return;
-
     delete iframe.dataset[FROZEN_FLAG];
     iframe.style.visibility = '';
   });
 }
 
-/** Stage A: soft pause everything */
-function stageAPause(root: HTMLElement) {
-  pauseNativeMedia(root);
-  pauseYouTubeIframes(root);
-  pauseSpotifyIframes(root);
-  freezeIframes(root);
-}
-
-/** Undo Stage A freeze (restore visibility) */
-function stageAResume(root: HTMLElement) {
-  unfreezeIframes(root);
-}
-
-// ── Stage B helpers: hard suspend / restore ────────────────────────────
-
-function hardSuspendIframes(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (!isPlayableIframe(iframe)) return;
-    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
-
-    const src = iframe.getAttribute('src');
-    if (!src || src === 'about:blank') return;
-
-    // Store original src
-    iframe.dataset[SUSPENDED_SRC] = src;
-    iframe.dataset[SUSPENDED_FLAG] = '1';
-    // Also clear frozen flag since we're escalating
-    delete iframe.dataset[FROZEN_FLAG];
-
-    iframe.setAttribute('src', 'about:blank');
-    iframe.style.visibility = 'hidden';
-  });
-}
-
-function restoreHardSuspended(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.dataset[SUSPENDED_FLAG] !== '1') return;
-
-    const storedSrc = iframe.dataset[SUSPENDED_SRC];
-    if (storedSrc) {
-      iframe.setAttribute('src', storedSrc);
-    }
-
-    delete iframe.dataset[SUSPENDED_FLAG];
-    delete iframe.dataset[SUSPENDED_SRC];
-    delete iframe.dataset[FROZEN_FLAG];
-    iframe.style.visibility = '';
-  });
-}
-
-// ── Lifecycle states ───────────────────────────────────────────────────
-
-type LifecycleState = 'active' | 'paused' | 'suspended';
+// ── Hook options ───────────────────────────────────────────────────────
 
 interface MediaLifecycleOptions {
   /** Enable lifecycle for this post. Should be true only for playable media posts. */
   enabled?: boolean;
-  /** Stage B threshold in viewport heights. Default: 2.5vh away from viewport. */
-  hardSuspendDistanceVh?: number;
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────
@@ -187,141 +114,54 @@ export function useMediaPauseOnScroll(
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
-  const { enabled = true, hardSuspendDistanceVh = 2.5 } = options;
+  const { enabled = true } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
-  const stateRef = useRef<LifecycleState>('active');
+  const isActiveRef = useRef(true);
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el || !enabled) return;
 
-    // If lifecycle is disabled for this post, always keep media active/restored.
-    if (!enabled) {
-      restoreHardSuspended(el);
-      stageAResume(el);
-      stateRef.current = 'active';
-      return;
-    }
+    const coordinator = getMediaCoordinator();
+    const postId = String(observeKey || el.id || Math.random());
 
-    let rafId: number | null = null;
-    let mutationRaf: number | null = null;
+    // Detect playable media now (may update later via MutationObserver)
+    let currentPlayable = hasPlayableMedia(el);
 
-    // Determine viewport-relative distance zones
-    const computeZone = (): 'visible' | 'near' | 'far' => {
-      const rect = el.getBoundingClientRect();
-      const vh = window.innerHeight || document.documentElement.clientHeight;
-
-      // Visible = intersecting viewport
-      if (rect.bottom > 0 && rect.top < vh) return 'visible';
-
-      // Near = within configurable 2–3 viewport-height band
-      const nearMargin = vh * Math.max(2, hardSuspendDistanceVh);
-      if (rect.bottom > -nearMargin && rect.top < vh + nearMargin) return 'near';
-
-      // Far = beyond nearMargin
-      return 'far';
-    };
-
-    const transition = (target: LifecycleState) => {
-      const current = stateRef.current;
-      if (current === target) return;
-
+    const onActiveChange = (active: boolean) => {
       const currentEl = containerRef.current;
       if (!currentEl) return;
+      isActiveRef.current = active;
 
-      // Never pause/suspend containers without playable media.
-      // But still allow active transitions so previously suspended iframes can restore.
-      if (!hasLifecycleTargets(currentEl) && target !== 'active') {
-        stateRef.current = 'active';
-        return;
+      if (active) {
+        resumeAllMedia(currentEl);
+      } else {
+        pauseAllMedia(currentEl);
       }
+    };
 
-      if (target === 'active') {
-        if (current === 'suspended') {
-          restoreHardSuspended(currentEl);
-        }
-        stageAResume(currentEl);
-      } else if (target === 'paused') {
-        if (current === 'suspended') {
-          // Far -> near: restore iframe src once, then apply Stage A freeze/pause.
-          restoreHardSuspended(currentEl);
-          stageAPause(currentEl);
-        } else if (current === 'active') {
-          stageAPause(currentEl);
-        }
-      } else if (target === 'suspended') {
-        if (current === 'active') {
-          stageAPause(currentEl);
-        }
-        hardSuspendIframes(currentEl);
+    coordinator.register(postId, el, currentPlayable, onActiveChange);
+
+    // Watch for late-injected media elements (SDK hydration)
+    const mutationObserver = new MutationObserver(() => {
+      const currentEl = containerRef.current;
+      if (!currentEl) return;
+      const nowPlayable = hasPlayableMedia(currentEl);
+      if (nowPlayable !== currentPlayable) {
+        currentPlayable = nowPlayable;
+        coordinator.updatePlayableStatus(postId, nowPlayable);
       }
-
-      stateRef.current = target;
-    };
-
-    const reconcile = () => {
-      const zone = computeZone();
-      if (zone === 'visible') transition('active');
-      else if (zone === 'near') transition('paused');
-      else transition('suspended');
-    };
-
-    const scheduleReconcile = () => {
-      if (rafId !== null) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        reconcile();
-      });
-    };
-
-    const scheduleMutationCheck = () => {
-      if (mutationRaf !== null) return;
-      mutationRaf = requestAnimationFrame(() => {
-        mutationRaf = null;
-        const currentEl = containerRef.current;
-        if (!currentEl) return;
-
-        // Reconcile whenever media nodes are injected (late hydration / SDK render).
-        if (hasPlayableMedia(currentEl)) {
-          reconcile();
-        }
-      });
-    };
-
-    const nearObserver = new IntersectionObserver(() => scheduleReconcile(), {
-      rootMargin: `${Math.round(Math.max(2, hardSuspendDistanceVh) * 100)}% 0px`,
     });
-
-    const viewportObserver = new IntersectionObserver(() => scheduleReconcile(), {
-      threshold: [0, 0.1],
-    });
-
-    const mutationObserver = new MutationObserver(() => scheduleMutationCheck());
-
-    nearObserver.observe(el);
-    viewportObserver.observe(el);
     mutationObserver.observe(el, { childList: true, subtree: true });
 
-    // Scroll/resize fallback for edge cases
-    document.addEventListener('scroll', scheduleReconcile, true);
-    window.addEventListener('resize', scheduleReconcile);
-
-    // Initial state
-    reconcile();
-
     return () => {
-      nearObserver.disconnect();
-      viewportObserver.disconnect();
       mutationObserver.disconnect();
-      document.removeEventListener('scroll', scheduleReconcile, true);
-      window.removeEventListener('resize', scheduleReconcile);
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      if (mutationRaf !== null) cancelAnimationFrame(mutationRaf);
+      coordinator.unregister(postId);
     };
-  }, [containerRef, observeKey, enabled, hardSuspendDistanceVh]);
+  }, [containerRef, observeKey, enabled]);
 
-  // Route change — pause everything in this container (playable posts only)
+  // Route change — pause media via coordinator
   useEffect(() => {
     if (!enabled) {
       prevPathRef.current = location.pathname;
@@ -329,15 +169,10 @@ export function useMediaPauseOnScroll(
     }
 
     if (location.pathname !== prevPathRef.current) {
-      const el = containerRef.current;
-      if (el && hasPlayableMedia(el)) {
-        stageAPause(el);
-        hardSuspendIframes(el);
-        stateRef.current = 'suspended';
-      }
+      getMediaCoordinator().pauseAll();
       prevPathRef.current = location.pathname;
     }
-  }, [enabled, location.pathname, containerRef]);
+  }, [enabled, location.pathname]);
 }
 
 /**
@@ -350,11 +185,13 @@ export function useGlobalMediaPauseOnNavigate() {
 
   useEffect(() => {
     if (location.pathname !== prevPathRef.current) {
-      // Pause native media
+      getMediaCoordinator().pauseAll();
+
+      // Also directly pause any native media (in case not registered)
       document.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
         if (!el.paused) el.pause();
       });
-      // Pause YouTube
+      // YouTube
       document.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
         try {
           iframe.contentWindow?.postMessage(
@@ -363,12 +200,13 @@ export function useGlobalMediaPauseOnNavigate() {
           );
         } catch { /* cross-origin */ }
       });
-      // Pause Spotify
+      // Spotify
       document.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
         try {
           iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
         } catch { /* cross-origin */ }
       });
+
       prevPathRef.current = location.pathname;
     }
   }, [location.pathname]);
