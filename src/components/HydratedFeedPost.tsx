@@ -31,6 +31,7 @@ import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
+import { useMediaPauseOnScroll } from "@/hooks/useMediaPauseOnScroll";
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
