@@ -212,14 +212,20 @@ export function useMediaPauseOnScroll(
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight || document.documentElement.clientHeight;
 
-      // Visible = intersecting viewport
-      if (rect.bottom > 0 && rect.top < vh) return 'visible';
+      // Visible = at least 40% of the post is within the viewport
+      const visibleTop = Math.max(rect.top, 0);
+      const visibleBottom = Math.min(rect.bottom, vh);
+      const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+      const postHeight = rect.height || 1;
+      if (visibleHeight / postHeight > 0.4) return 'visible';
 
-      // Near = within configurable 2–3 viewport-height band
-      const nearMargin = vh * Math.max(2, hardSuspendDistanceVh);
+      // Near = just off-screen (within 150px) — soft pause, keep iframe alive
+      const nearMargin = 150;
       if (rect.bottom > -nearMargin && rect.top < vh + nearMargin) return 'near';
 
-      // Far = beyond nearMargin
+      // Far = more than 1 viewport height away — hard suspend
+      if (rect.bottom > -vh && rect.top < vh + vh) return 'near';
+
       return 'far';
     };
 
