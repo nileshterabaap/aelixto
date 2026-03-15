@@ -57,6 +57,7 @@ class MediaCoordinator {
 
     this.observer.unobserve(entry.element);
     this.posts.delete(postId);
+    console.log(`[MediaCoord] UNREGISTER postId=${postId} totalTracked=${this.posts.size}`);
 
     if (this.activePostId === postId) {
       this.activePostId = null;
