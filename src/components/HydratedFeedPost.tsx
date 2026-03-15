@@ -97,7 +97,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const { isScrollingFast, velocity } = useScrollVelocity();
 
   // Register with global MediaCoordinator at the post level
-  console.log(`[HydratedFeedPost] RENDER postId=${post.id.slice(0,8)} cardRef=${!!cardRef.current}`);
+  console.log(`[MediaLifecycle] HydratedFeedPost render`, post.id);
   useMediaPauseOnScroll(cardRef, post.id);
   const hydrationResumeTimer = useRef<number | null>(null);
 

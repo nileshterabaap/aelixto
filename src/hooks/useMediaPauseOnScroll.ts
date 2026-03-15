@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getMediaCoordinator } from './useMediaCoordinator';
 
-console.log('[MediaPauseOnScroll] MODULE LOADED');
+console.log('[MediaLifecycle] module loaded');
 
 /**
  * Media lifecycle hook — v2 (coordinator-based).
@@ -134,7 +134,7 @@ export function useMediaPauseOnScroll(
   useEffect(() => {
     const el = containerRef.current;
     if (!el || !enabled) {
-      console.log(`[MediaHook] SKIP mount: el=${!!el} enabled=${enabled} key=${observeKey}`);
+      console.log(`[MediaLifecycle] hook SKIP mount: el=${!!el} enabled=${enabled} key=${observeKey}`);
       return;
     }
 
@@ -142,7 +142,7 @@ export function useMediaPauseOnScroll(
     const postId = String(observeKey || el.id || Math.random());
 
     let currentPlayable = hasPlayableMedia(el);
-    console.log(`[MediaHook] MOUNT postId=${postId.slice(0,30)} playable=${currentPlayable} el=`, el.tagName);
+    console.log(`[MediaLifecycle] hook mounted`, observeKey, `playable=${currentPlayable}`);
 
     const onActiveChange = (active: boolean) => {
       const currentEl = containerRef.current;
