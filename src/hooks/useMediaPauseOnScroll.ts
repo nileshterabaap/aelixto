@@ -131,18 +131,22 @@ export function useMediaPauseOnScroll(
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el || !enabled) return;
+    if (!el || !enabled) {
+      console.log(`[MediaHook] SKIP mount: el=${!!el} enabled=${enabled} key=${observeKey}`);
+      return;
+    }
 
     const coordinator = getMediaCoordinator();
     const postId = String(observeKey || el.id || Math.random());
 
-    // Detect playable media now (may update later via MutationObserver)
     let currentPlayable = hasPlayableMedia(el);
+    console.log(`[MediaHook] MOUNT postId=${postId.slice(0,30)} playable=${currentPlayable} el=`, el.tagName);
 
     const onActiveChange = (active: boolean) => {
       const currentEl = containerRef.current;
       if (!currentEl) return;
       isActiveRef.current = active;
+      console.log(`[MediaHook] onActiveChange postId=${postId.slice(0,30)} active=${active}`);
 
       if (active) {
         resumeAllMedia(currentEl);
