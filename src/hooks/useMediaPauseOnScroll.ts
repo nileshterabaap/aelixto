@@ -158,16 +158,24 @@ export function useMediaPauseOnScroll(
     coordinator.register(postId, el, currentPlayable, onActiveChange);
 
     // Watch for late-injected media elements (SDK hydration)
+    // childList+subtree: catches new elements added by SDKs
+    // attributes on iframes: catches src being set after insertion
     const mutationObserver = new MutationObserver(() => {
       const currentEl = containerRef.current;
       if (!currentEl) return;
       const nowPlayable = hasPlayableMedia(currentEl);
       if (nowPlayable !== currentPlayable) {
+        console.log(`[MediaHook] PLAYABLE STATUS CHANGED postId=${postId.slice(0,30)} ${currentPlayable} → ${nowPlayable}`);
         currentPlayable = nowPlayable;
         coordinator.updatePlayableStatus(postId, nowPlayable);
       }
     });
-    mutationObserver.observe(el, { childList: true, subtree: true });
+    mutationObserver.observe(el, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['src', 'allow'],
+    });
 
     return () => {
       mutationObserver.disconnect();
