@@ -1,158 +1,67 @@
 /**
- * Global Media Coordinator — Singleton
+ * Simple Global Media Controller
  *
- * One IntersectionObserver tracks all registered post containers.
- * The post with the highest viewport coverage among those flagged
- * as "playable" becomes the sole active media post.
- *
- * When the active post changes:
- *   – Previous active post receives `false` → its media is paused.
- *   – New active post receives `true`      → its media resumes.
- *
- * No hard-suspend (about:blank) is ever performed.
+ * Rules:
+ * 1. Only one native media element plays at a time.
+ * 2. When a post leaves the viewport, all its native media is paused.
+ * 3. No iframe manipulation whatsoever — no src changes, no visibility toggling.
  */
 
-type ActiveChangeCallback = (active: boolean) => void;
+let currentPlayingMedia: HTMLMediaElement | null = null;
 
-interface TrackedPost {
-  element: HTMLElement;
-  ratio: number;
-  hasPlayableMedia: boolean;
-  callback: ActiveChangeCallback;
+function handlePlay(this: HTMLMediaElement) {
+  if (currentPlayingMedia && currentPlayingMedia !== this) {
+    try { currentPlayingMedia.pause(); } catch {}
+  }
+  currentPlayingMedia = this;
 }
 
-class MediaCoordinator {
-  private observer: IntersectionObserver;
-  private posts = new Map<string, TrackedPost>();
-  private activePostId: string | null = null;
-  private recalcRaf: number | null = null;
+/** Register a native media element so only one plays globally. */
+function registerPlayableMedia(el: HTMLMediaElement) {
+  el.removeEventListener('play', handlePlay); // prevent duplicates
+  el.addEventListener('play', handlePlay);
+}
 
-  constructor() {
-    this.observer = new IntersectionObserver(this.handleIntersection, {
-      // Granular thresholds for accurate "most visible" determination
-      threshold: [0, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 1.0],
-    });
-  }
+// ── Single global IntersectionObserver for post containers ──────────
 
-  register(
-    postId: string,
-    element: HTMLElement,
-    hasPlayableMedia: boolean,
-    callback: ActiveChangeCallback
-  ) {
-    const prev = this.posts.get(postId);
-    if (prev && prev.element !== element) {
-      this.observer.unobserve(prev.element);
-    }
-
-    element.setAttribute('data-media-post-id', postId);
-    this.posts.set(postId, { element, ratio: 0, hasPlayableMedia, callback });
-    this.observer.observe(element);
-    console.log(`[MediaCoord] REGISTER postId=${postId} playable=${hasPlayableMedia} totalTracked=${this.posts.size}`);
-  }
-
-  unregister(postId: string) {
-    const entry = this.posts.get(postId);
-    if (!entry) return;
-
-    this.observer.unobserve(entry.element);
-    this.posts.delete(postId);
-    console.log(`[MediaCoord] UNREGISTER postId=${postId} totalTracked=${this.posts.size}`);
-
-    if (this.activePostId === postId) {
-      this.activePostId = null;
-      this.scheduleRecalc();
-    }
-  }
-
-  /** Update the playable-media flag for a post (e.g. after late SDK hydration). */
-  updatePlayableStatus(postId: string, hasPlayableMedia: boolean) {
-    const entry = this.posts.get(postId);
-    if (!entry || entry.hasPlayableMedia === hasPlayableMedia) return;
-    entry.hasPlayableMedia = hasPlayableMedia;
-    this.scheduleRecalc();
-  }
-
-  /** Pause all media globally (used on route change). */
-  pauseAll() {
-    const prevId = this.activePostId;
-    this.activePostId = null;
-    if (prevId) {
-      this.posts.get(prevId)?.callback(false);
-    }
-  }
-
-  // ── Private ──────────────────────────────────────────────────────────
-
-  private handleIntersection = (entries: IntersectionObserverEntry[]) => {
+const observer = new IntersectionObserver(
+  (entries) => {
     for (const entry of entries) {
-      const postId = entry.target.getAttribute('data-media-post-id');
-      if (!postId) continue;
-      const tracked = this.posts.get(postId);
-      if (tracked) {
-        tracked.ratio = entry.intersectionRatio;
+      if (!entry.isIntersecting) {
+        entry.target.querySelectorAll<HTMLMediaElement>('video, audio').forEach((v) => {
+          try { v.pause(); } catch {}
+        });
       }
     }
-    this.scheduleRecalc();
-  };
+  },
+  { threshold: 0.2 }
+);
 
-  private scheduleRecalc() {
-    if (this.recalcRaf !== null) return;
-    this.recalcRaf = requestAnimationFrame(() => {
-      this.recalcRaf = null;
-      this.recalculate();
-    });
-  }
-
-  private recalculate() {
-    let bestId: string | null = null;
-    let bestRatio = 0;
-
-    const visiblePosts: string[] = [];
-    const playablePosts: string[] = [];
-
-    for (const [id, entry] of this.posts) {
-      if (entry.ratio > 0) visiblePosts.push(`${id.slice(0,8)}(r=${entry.ratio.toFixed(2)},p=${entry.hasPlayableMedia})`);
-      if (!entry.hasPlayableMedia) continue;
-      playablePosts.push(id.slice(0,8));
-      if (entry.ratio > bestRatio) {
-        bestRatio = entry.ratio;
-        bestId = id;
-      }
-    }
-
-    // Require minimum 20% visibility to be considered active
-    if (bestRatio < 0.2) bestId = null;
-
-    if (bestId === this.activePostId) return;
-
-    const prevId = this.activePostId;
-    this.activePostId = bestId;
-
-    console.log(`[MediaCoord] ACTIVE POST CHANGED: ${prevId?.slice(0,8) ?? 'none'} → ${bestId?.slice(0,8) ?? 'none'} (ratio=${bestRatio.toFixed(2)})`);
-    console.log(`[MediaCoord] VISIBLE POSTS: [${visiblePosts.join(', ')}]`);
-    console.log(`[MediaCoord] PLAYABLE POSTS: [${playablePosts.join(', ')}]`);
-
-    // Notify previous post it's no longer active → pause
-    if (prevId) {
-      console.log(`[MediaCoord] PAUSE COMMAND → ${prevId.slice(0,8)}`);
-      this.posts.get(prevId)?.callback(false);
-    }
-    // Notify new active post → resume
-    if (bestId) {
-      console.log(`[MediaCoord] RESUME COMMAND → ${bestId.slice(0,8)}`);
-      this.posts.get(bestId)?.callback(true);
-    }
-  }
+/** Observe a post container for viewport exit. */
+export function observePost(el: HTMLElement) {
+  observer.observe(el);
 }
 
-// ── Singleton ────────────────────────────────────────────────────────────
+/** Stop observing a post container. */
+export function unobservePost(el: HTMLElement) {
+  observer.unobserve(el);
+}
 
-let instance: MediaCoordinator | null = null;
+/**
+ * Scan a container for native media elements and register them.
+ * Call after mount and after SDK hydration injects new elements.
+ */
+export function scanAndRegisterMedia(container: HTMLElement) {
+  container.querySelectorAll<HTMLMediaElement>('video, audio').forEach(registerPlayableMedia);
+}
 
-export function getMediaCoordinator(): MediaCoordinator {
-  if (!instance) {
-    instance = new MediaCoordinator();
+/** Pause everything globally (e.g. on route change). */
+export function pauseAllMedia() {
+  if (currentPlayingMedia) {
+    try { currentPlayingMedia.pause(); } catch {}
+    currentPlayingMedia = null;
   }
-  return instance;
+  document.querySelectorAll<HTMLMediaElement>('video, audio').forEach((el) => {
+    try { if (!el.paused) el.pause(); } catch {}
+  });
 }
