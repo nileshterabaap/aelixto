@@ -159,7 +159,7 @@ export function useMediaPauseOnScroll(
       mutationObserver.disconnect();
       coordinator.unregister(postId);
     };
-  }, [containerRef, observeKey, enabled]);
+  }, [containerRef, observeKey, enabled, assumePlayable]);
 
   // Route change — pause media via coordinator
   useEffect(() => {
