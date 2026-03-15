@@ -212,30 +212,14 @@ export function useMediaPauseOnScroll(
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight || document.documentElement.clientHeight;
 
-      const visibleTop = Math.max(rect.top, 0);
-      const visibleBottom = Math.min(rect.bottom, vh);
-      const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-      const postHeight = rect.height || 1;
-      const visibleRatio = visibleHeight / postHeight;
+      // Visible = intersecting viewport
+      if (rect.bottom > 0 && rect.top < vh) return 'visible';
 
-      // Keep exactly one "primary" post active: the one crossing viewport center.
-      // This pauses Post 1 as soon as Post 2 becomes the primary card.
-      const viewportCenterY = vh * 0.5;
-      const crossesViewportCenter = rect.top <= viewportCenterY && rect.bottom >= viewportCenterY;
-      const minVisibleForCenter = Math.max(64, Math.min(vh, postHeight) * 0.25);
-      if (crossesViewportCenter && visibleHeight >= minVisibleForCenter) return 'visible';
-
-      // Fallback for very short cards fully shown on screen.
-      if (visibleRatio >= 0.6) return 'visible';
-
-      // Near = around viewport (soft pause only)
-      const nearMargin = 80;
+      // Near = within configurable 2–3 viewport-height band
+      const nearMargin = vh * Math.max(2, hardSuspendDistanceVh);
       if (rect.bottom > -nearMargin && rect.top < vh + nearMargin) return 'near';
 
-      // Far = hard-suspend when sufficiently distant
-      const farDistancePx = Math.max(1, hardSuspendDistanceVh) * vh;
-      if (rect.bottom > -farDistancePx && rect.top < vh + farDistancePx) return 'near';
-
+      // Far = beyond nearMargin
       return 'far';
     };
 
