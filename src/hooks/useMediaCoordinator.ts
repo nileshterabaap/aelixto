@@ -108,8 +108,13 @@ class MediaCoordinator {
     let bestId: string | null = null;
     let bestRatio = 0;
 
+    const visiblePosts: string[] = [];
+    const playablePosts: string[] = [];
+
     for (const [id, entry] of this.posts) {
+      if (entry.ratio > 0) visiblePosts.push(`${id.slice(0,8)}(r=${entry.ratio.toFixed(2)},p=${entry.hasPlayableMedia})`);
       if (!entry.hasPlayableMedia) continue;
+      playablePosts.push(id.slice(0,8));
       if (entry.ratio > bestRatio) {
         bestRatio = entry.ratio;
         bestId = id;
@@ -124,12 +129,18 @@ class MediaCoordinator {
     const prevId = this.activePostId;
     this.activePostId = bestId;
 
+    console.log(`[MediaCoord] ACTIVE POST CHANGED: ${prevId?.slice(0,8) ?? 'none'} → ${bestId?.slice(0,8) ?? 'none'} (ratio=${bestRatio.toFixed(2)})`);
+    console.log(`[MediaCoord] VISIBLE POSTS: [${visiblePosts.join(', ')}]`);
+    console.log(`[MediaCoord] PLAYABLE POSTS: [${playablePosts.join(', ')}]`);
+
     // Notify previous post it's no longer active → pause
     if (prevId) {
+      console.log(`[MediaCoord] PAUSE COMMAND → ${prevId.slice(0,8)}`);
       this.posts.get(prevId)?.callback(false);
     }
     // Notify new active post → resume
     if (bestId) {
+      console.log(`[MediaCoord] RESUME COMMAND → ${bestId.slice(0,8)}`);
       this.posts.get(bestId)?.callback(true);
     }
   }
