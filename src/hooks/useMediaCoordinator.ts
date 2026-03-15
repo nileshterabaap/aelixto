@@ -117,8 +117,8 @@ class MediaCoordinator {
       }
     }
 
-    // Require minimum 20% visibility to be considered active
-    if (bestRatio < 0.2) bestId = null;
+    // Require minimum 50% visibility to be considered active
+    if (bestRatio < MediaCoordinator.MIN_ACTIVE_RATIO) bestId = null;
 
     if (bestId === this.activePostId) return;
 
