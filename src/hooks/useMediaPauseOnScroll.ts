@@ -105,6 +105,8 @@ function resumeAllMedia(root: HTMLElement) {
 interface MediaLifecycleOptions {
   /** Enable lifecycle for this post. Should be true only for playable media posts. */
   enabled?: boolean;
+  /** Keep post coordinated even if iframe heuristics miss the platform URL pattern. */
+  assumePlayable?: boolean;
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────
@@ -114,10 +116,9 @@ export function useMediaPauseOnScroll(
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
-  const { enabled = true } = options;
+  const { enabled = true, assumePlayable = false } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
-  const isActiveRef = useRef(true);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -127,12 +128,11 @@ export function useMediaPauseOnScroll(
     const postId = String(observeKey || el.id || Math.random());
 
     // Detect playable media now (may update later via MutationObserver)
-    let currentPlayable = hasPlayableMedia(el);
+    let currentPlayable = assumePlayable || hasPlayableMedia(el);
 
     const onActiveChange = (active: boolean) => {
       const currentEl = containerRef.current;
       if (!currentEl) return;
-      isActiveRef.current = active;
 
       if (active) {
         resumeAllMedia(currentEl);
@@ -147,7 +147,7 @@ export function useMediaPauseOnScroll(
     const mutationObserver = new MutationObserver(() => {
       const currentEl = containerRef.current;
       if (!currentEl) return;
-      const nowPlayable = hasPlayableMedia(currentEl);
+      const nowPlayable = assumePlayable || hasPlayableMedia(currentEl);
       if (nowPlayable !== currentPlayable) {
         currentPlayable = nowPlayable;
         coordinator.updatePlayableStatus(postId, nowPlayable);
@@ -159,7 +159,7 @@ export function useMediaPauseOnScroll(
       mutationObserver.disconnect();
       coordinator.unregister(postId);
     };
-  }, [containerRef, observeKey, enabled]);
+  }, [containerRef, observeKey, enabled, assumePlayable]);
 
   // Route change — pause media via coordinator
   useEffect(() => {
