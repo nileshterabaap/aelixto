@@ -127,9 +127,9 @@ export function useMediaPauseOnScroll(
   options: MediaLifecycleOptions = {}
 ) {
   // Accept either a direct element or a ref object
-  const element = containerElOrRef && 'current' in containerElOrRef
+  const element: HTMLElement | null = containerElOrRef && 'current' in containerElOrRef
     ? containerElOrRef.current
-    : containerElOrRef;
+    : containerElOrRef as HTMLElement | null;
 
   const { enabled = true } = options;
   const location = useLocation();
