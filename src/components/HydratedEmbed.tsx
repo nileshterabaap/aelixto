@@ -1,5 +1,5 @@
 import { useState, memo, useCallback, useEffect, useRef } from 'react';
-import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
+import type { Post } from '@/data/demoData';
 import type { Post } from '@/data/demoData';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
