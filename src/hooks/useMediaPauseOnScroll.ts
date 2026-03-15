@@ -133,7 +133,6 @@ export function useMediaPauseOnScroll(
     const onActiveChange = (active: boolean) => {
       const currentEl = containerRef.current;
       if (!currentEl) return;
-      isActiveRef.current = active;
 
       if (active) {
         resumeAllMedia(currentEl);
