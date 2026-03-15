@@ -128,7 +128,7 @@ export function useMediaPauseOnScroll(
     const postId = String(observeKey || el.id || Math.random());
 
     // Detect playable media now (may update later via MutationObserver)
-    let currentPlayable = hasPlayableMedia(el);
+    let currentPlayable = assumePlayable || hasPlayableMedia(el);
 
     const onActiveChange = (active: boolean) => {
       const currentEl = containerRef.current;
