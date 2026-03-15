@@ -29,6 +29,7 @@ import mediumIcon from "@/assets/platforms/medium.svg";
 import threadsIcon from "@/assets/platforms/threads.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
+import { MediaFrame } from "@/components/MediaFrame";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { useMediaPauseOnScroll } from "@/hooks/useMediaPauseOnScroll";
