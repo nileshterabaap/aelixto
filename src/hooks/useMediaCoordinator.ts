@@ -22,6 +22,8 @@ interface TrackedPost {
 }
 
 class MediaCoordinator {
+  private static readonly MIN_ACTIVE_RATIO = 0.5;
+
   private observer: IntersectionObserver;
   private posts = new Map<string, TrackedPost>();
   private activePostId: string | null = null;
@@ -29,7 +31,7 @@ class MediaCoordinator {
 
   constructor() {
     this.observer = new IntersectionObserver(this.handleIntersection, {
-      // Granular thresholds for accurate "most visible" determination
+      // Granular thresholds centered around 50% visibility activation.
       threshold: [0, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 1.0],
     });
   }
