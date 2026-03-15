@@ -40,7 +40,6 @@ class MediaCoordinator {
     hasPlayableMedia: boolean,
     callback: ActiveChangeCallback
   ) {
-    // Clean up previous registration for same postId
     const prev = this.posts.get(postId);
     if (prev && prev.element !== element) {
       this.observer.unobserve(prev.element);
@@ -49,6 +48,7 @@ class MediaCoordinator {
     element.setAttribute('data-media-post-id', postId);
     this.posts.set(postId, { element, ratio: 0, hasPlayableMedia, callback });
     this.observer.observe(element);
+    console.log(`[MediaCoord] REGISTER postId=${postId} playable=${hasPlayableMedia} totalTracked=${this.posts.size}`);
   }
 
   unregister(postId: string) {
