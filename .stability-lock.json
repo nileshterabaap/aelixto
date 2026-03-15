@@ -5,15 +5,5 @@
     "src/lib/resolveRenderer.ts",
     "src/index.css"
   ],
-  "baseline": {
-    "src/components/RawEmbedRenderer.tsx": {
-      "hash": "placeholder_will_be_set_by_approve"
-    },
-    "src/lib/resolveRenderer.ts": {
-      "hash": "placeholder_will_be_set_by_approve"
-    },
-    "src/index.css": {
-      "hash": "placeholder_will_be_set_by_approve"
-    }
-  }
+  "baseline": {}
 }
