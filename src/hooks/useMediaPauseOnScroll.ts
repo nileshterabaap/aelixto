@@ -134,7 +134,7 @@ export function useMediaPauseOnScroll(
   useEffect(() => {
     const el = containerRef.current;
     if (!el || !enabled) {
-      console.log(`[MediaHook] SKIP mount: el=${!!el} enabled=${enabled} key=${observeKey}`);
+      console.log(`[MediaLifecycle] hook SKIP mount: el=${!!el} enabled=${enabled} key=${observeKey}`);
       return;
     }
 
