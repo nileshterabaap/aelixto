@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 import { getMediaCoordinator } from './useMediaCoordinator';
 
-console.log('[MediaPauseOnScroll] MODULE LOADED');
+console.log('[MediaLifecycle] module loaded');
 
 /**
  * Media lifecycle hook — v2 (coordinator-based).
