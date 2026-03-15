@@ -122,57 +122,55 @@ interface MediaLifecycleOptions {
 // ── Hook ───────────────────────────────────────────────────────────────
 
 export function useMediaPauseOnScroll(
-  containerRef: RefObject<HTMLElement | null>,
+  containerElOrRef: HTMLElement | null | RefObject<HTMLElement | null>,
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
+  // Accept either a direct element or a ref object
+  const element: HTMLElement | null = containerElOrRef && 'current' in containerElOrRef
+    ? containerElOrRef.current
+    : containerElOrRef as HTMLElement | null;
+
   const { enabled = true } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
   const isActiveRef = useRef(true);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el || !enabled) {
-      console.log(`[MediaLifecycle] hook SKIP mount: el=${!!el} enabled=${enabled} key=${observeKey}`);
+    if (!element || !enabled) {
+      console.log(`[MediaLifecycle] hook SKIP: el=${!!element} enabled=${enabled} key=${observeKey}`);
       return;
     }
 
     const coordinator = getMediaCoordinator();
-    const postId = String(observeKey || el.id || Math.random());
+    const postId = String(observeKey || element.id || Math.random());
 
-    let currentPlayable = hasPlayableMedia(el);
-    console.log(`[MediaLifecycle] hook mounted`, observeKey, `playable=${currentPlayable}`);
+    let currentPlayable = hasPlayableMedia(element);
+    console.log(`[MediaLifecycle] hook mounted postId=${postId.slice(0,30)} playable=${currentPlayable}`);
 
     const onActiveChange = (active: boolean) => {
-      const currentEl = containerRef.current;
-      if (!currentEl) return;
       isActiveRef.current = active;
       console.log(`[MediaHook] onActiveChange postId=${postId.slice(0,30)} active=${active}`);
 
       if (active) {
-        resumeAllMedia(currentEl);
+        resumeAllMedia(element);
       } else {
-        pauseAllMedia(currentEl);
+        pauseAllMedia(element);
       }
     };
 
-    coordinator.register(postId, el, currentPlayable, onActiveChange);
+    coordinator.register(postId, element, currentPlayable, onActiveChange);
 
     // Watch for late-injected media elements (SDK hydration)
-    // childList+subtree: catches new elements added by SDKs
-    // attributes on iframes: catches src being set after insertion
     const mutationObserver = new MutationObserver(() => {
-      const currentEl = containerRef.current;
-      if (!currentEl) return;
-      const nowPlayable = hasPlayableMedia(currentEl);
+      const nowPlayable = hasPlayableMedia(element);
       if (nowPlayable !== currentPlayable) {
         console.log(`[MediaHook] PLAYABLE STATUS CHANGED postId=${postId.slice(0,30)} ${currentPlayable} → ${nowPlayable}`);
         currentPlayable = nowPlayable;
         coordinator.updatePlayableStatus(postId, nowPlayable);
       }
     });
-    mutationObserver.observe(el, {
+    mutationObserver.observe(element, {
       childList: true,
       subtree: true,
       attributes: true,
@@ -183,7 +181,7 @@ export function useMediaPauseOnScroll(
       mutationObserver.disconnect();
       coordinator.unregister(postId);
     };
-  }, [containerRef, observeKey, enabled]);
+  }, [element, observeKey, enabled]);
 
   // Route change — pause media via coordinator
   useEffect(() => {
