@@ -147,7 +147,7 @@ export function useMediaPauseOnScroll(
     const mutationObserver = new MutationObserver(() => {
       const currentEl = containerRef.current;
       if (!currentEl) return;
-      const nowPlayable = hasPlayableMedia(currentEl);
+      const nowPlayable = assumePlayable || hasPlayableMedia(currentEl);
       if (nowPlayable !== currentPlayable) {
         currentPlayable = nowPlayable;
         coordinator.updatePlayableStatus(postId, nowPlayable);
