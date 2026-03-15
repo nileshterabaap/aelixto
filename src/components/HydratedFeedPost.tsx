@@ -31,6 +31,7 @@ import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
+import { useMediaPauseOnScroll } from "@/hooks/useMediaPauseOnScroll";
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -92,7 +93,11 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const { isScrollingFast, velocity } = useScrollVelocity();
+
+  // Register with global MediaCoordinator at the post level (not embed level)
+  useMediaPauseOnScroll(cardRef, post.id);
   const hydrationResumeTimer = useRef<number | null>(null);
 
   // Track if embed is within viewport proximity (conservative 400px)
@@ -208,7 +213,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
   return (
-    <Card className="overflow-hidden border border-border rounded-xl">
+    <Card ref={cardRef} className="overflow-hidden border border-border rounded-xl">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
         <div className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
