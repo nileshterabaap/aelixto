@@ -105,6 +105,8 @@ function resumeAllMedia(root: HTMLElement) {
 interface MediaLifecycleOptions {
   /** Enable lifecycle for this post. Should be true only for playable media posts. */
   enabled?: boolean;
+  /** Keep post coordinated even if iframe heuristics miss the platform URL pattern. */
+  assumePlayable?: boolean;
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────
@@ -114,10 +116,9 @@ export function useMediaPauseOnScroll(
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
-  const { enabled = true } = options;
+  const { enabled = true, assumePlayable = false } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
-  const isActiveRef = useRef(true);
 
   useEffect(() => {
     const el = containerRef.current;
