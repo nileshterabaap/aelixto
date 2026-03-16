@@ -646,13 +646,13 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
   if (embedHtml && !showFallback) {
     // For direct iframe embeds (Spotify, Instagram, LinkedIn, Threads), render without RawEmbedRenderer
-    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || (embedHtml.includes('threads.net') && embedHtml.includes('<iframe')) || (embedHtml.includes('facebook.com/plugins/') && embedHtml.includes('<iframe')) || (embedHtml.includes('tiktok.com/embed') && embedHtml.includes('<iframe'));
+      const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || (embedHtml.includes('threads.net') && embedHtml.includes('<iframe')) || (embedHtml.includes('facebook.com/plugins/') && embedHtml.includes('<iframe')) || (embedHtml.includes('tiktok.com/embed') && embedHtml.includes('<iframe'));
 
-    if (isDirectIframe) {
-      const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
-        ALLOWED_TAGS: ['iframe'],
-        ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'scrolling']
-      });
+      if (isDirectIframe) {
+        const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
+          ALLOWED_TAGS: ['iframe'],
+          ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'scrolling', 'title']
+        });
       const isInstagramIframe = embedHtml.includes('instagram.com');
       const isThreadsIframe = embedHtml.includes('threads.net');
       const isFacebookIframe = embedHtml.includes('facebook.com/plugins/');
