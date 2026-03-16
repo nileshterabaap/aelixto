@@ -4,14 +4,16 @@ import { useLocation } from 'react-router-dom';
 /**
  * Two-stage media lifecycle for playable media only.
  *
- * Stage A (near viewport, 0–1 viewport away):
+ * Stage A (near viewport):
  *   - Pause native <video>/<audio> via .pause()
  *   - Pause YouTube via postMessage pauseVideo
  *   - Pause Spotify via postMessage { command: 'pause' }
- *   - Freeze other iframes via visibility:hidden (no src change)
+ *   - Preserve non-API iframe visuals (do NOT hide or destroy them)
  *
- * Stage B (far from viewport, 2–3 viewport heights away):
- *   - Hard-suspend iframes: swap src → about:blank, store original
+ * Stage B (far from viewport):
+ *   - Hard-suspend playable iframes by swapping src → about:blank
+ *   - Restore them early when they come back near the viewport so they can load
+ *     before reaching the active center post again
  *
  * Only applies to containers with playable media (video, audio, YouTube,
  * Spotify, TikTok, Instagram reels, etc.). Static embeds are ignored.
@@ -21,20 +23,17 @@ import { useLocation } from 'react-router-dom';
 
 const YOUTUBE_SELECTOR = 'iframe[src*="youtube.com"], iframe[src*="youtube-nocookie.com"]';
 const SPOTIFY_SELECTOR = 'iframe[src*="open.spotify.com"]';
-
-/** Iframes that have their own postMessage pause API — never hard-suspend these in stage A */
-const API_PAUSABLE_SELECTOR = [YOUTUBE_SELECTOR, SPOTIFY_SELECTOR].join(', ');
+const SUSPENDED_IFRAME_SELECTOR = 'iframe[data-aelix-suspended="1"]';
+const HARD_SUSPEND_MIN_DISTANCE_PX = 2800;
 
 // ── Data attributes for hard-suspend bookkeeping ───────────────────────
 
 const SUSPENDED_FLAG = 'aelixSuspended';
 const SUSPENDED_SRC = 'aelixSuspendedSrc';
-const FROZEN_FLAG = 'aelixFrozen';
 
-// ── Detection: does this container currently contain playable media? ─────
+// ── Detection: does this container currently contain playable media? ───
 
 const PLAYABLE_MEDIA_SELECTOR = 'video, audio';
-const SUSPENDED_IFRAME_SELECTOR = 'iframe[data-aelix-suspended="1"]';
 const PLAYABLE_IFRAME_HINTS = [
   'youtube.com',
   'youtube-nocookie.com',
@@ -74,7 +73,12 @@ function hasLifecycleTargets(root: HTMLElement): boolean {
   return hasPlayableMedia(root) || root.querySelector(SUSPENDED_IFRAME_SELECTOR) !== null;
 }
 
-// ── Stage A helpers: soft pause / freeze ───────────────────────────────
+function getHardSuspendDistancePx(hardSuspendDistanceVh: number): number {
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  return Math.max(Math.round(hardSuspendDistanceVh * vh), HARD_SUSPEND_MIN_DISTANCE_PX);
+}
+
+// ── Stage A helpers: pause only, preserve visuals ──────────────────────
 
 function pauseNativeMedia(root: HTMLElement) {
   root.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
@@ -101,59 +105,11 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
-/** Freeze non-API playable iframes by hiding them visually (no reload) */
-function freezeIframes(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (!isPlayableIframe(iframe)) return;
-    // Skip iframes that have their own pause API
-    if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
-    // Skip already frozen or hard-suspended
-    if (iframe.dataset[FROZEN_FLAG] === '1' || iframe.dataset[SUSPENDED_FLAG] === '1') return;
-
-    iframe.dataset[FROZEN_FLAG] = '1';
-    iframe.style.visibility = 'hidden';
-  });
-}
-
-/** Unfreeze iframes that were only soft-frozen (not hard-suspended) */
-function unfreezeIframes(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.dataset[FROZEN_FLAG] !== '1') return;
-
-    delete iframe.dataset[FROZEN_FLAG];
-    iframe.style.visibility = '';
-  });
-}
-
-function hardSuspendNonApiIframes(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (!isPlayableIframe(iframe)) return;
-    if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
-    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
-
-    const src = iframe.getAttribute('src');
-    if (!src || src === 'about:blank') return;
-
-    iframe.dataset[SUSPENDED_SRC] = src;
-    iframe.dataset[SUSPENDED_FLAG] = '1';
-    delete iframe.dataset[FROZEN_FLAG];
-    iframe.setAttribute('src', 'about:blank');
-    iframe.style.visibility = 'hidden';
-  });
-}
-
-/** Stage A: pause native/API media and freeze (hide) other playable embeds — NO src swap */
+/** Stage A: pause native/API media only — keep non-API visuals mounted */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  freezeIframes(root);
-}
-
-/** Undo Stage A freeze (restore visibility) */
-function stageAResume(root: HTMLElement) {
-  restoreHardSuspended(root);
-  unfreezeIframes(root);
 }
 
 // ── Stage B helpers: hard suspend / restore ────────────────────────────
@@ -166,12 +122,8 @@ function hardSuspendIframes(root: HTMLElement) {
     const src = iframe.getAttribute('src');
     if (!src || src === 'about:blank') return;
 
-    // Store original src
     iframe.dataset[SUSPENDED_SRC] = src;
     iframe.dataset[SUSPENDED_FLAG] = '1';
-    // Also clear frozen flag since we're escalating
-    delete iframe.dataset[FROZEN_FLAG];
-
     iframe.setAttribute('src', 'about:blank');
     iframe.style.visibility = 'hidden';
   });
@@ -188,7 +140,6 @@ function restoreHardSuspended(root: HTMLElement) {
 
     delete iframe.dataset[SUSPENDED_FLAG];
     delete iframe.dataset[SUSPENDED_SRC];
-    delete iframe.dataset[FROZEN_FLAG];
     iframe.style.visibility = '';
   });
 }
@@ -200,7 +151,7 @@ type LifecycleState = 'active' | 'paused' | 'suspended';
 interface MediaLifecycleOptions {
   /** Enable lifecycle for this post. Should be true only for playable media posts. */
   enabled?: boolean;
-  /** Stage B threshold in viewport heights. Default: 6 viewport heights away. */
+  /** Stage B threshold in viewport heights. A pixel floor is also applied for tiny screens. */
   hardSuspendDistanceVh?: number;
 }
 
@@ -221,23 +172,21 @@ export function useMediaPauseOnScroll(
     const el = containerRef.current;
     if (!el) return;
 
-    // If lifecycle is disabled for this post, always keep media active/restored.
     if (!enabled) {
       restoreHardSuspended(el);
-      stageAResume(el);
       stateRef.current = 'active';
+      setLifecycleState('active');
       return;
     }
 
     let rafId: number | null = null;
     let mutationRaf: number | null = null;
 
-    // Determine viewport-relative distance zones.
-    // Only the post containing the viewport center stays active.
     const computeZone = (): 'visible' | 'near' | 'far' => {
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight || document.documentElement.clientHeight;
       const viewportCenterY = vh / 2;
+      const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
 
       const containsViewportCenter = rect.top <= viewportCenterY && rect.bottom >= viewportCenterY;
       if (containsViewportCenter) return 'visible';
@@ -247,8 +196,7 @@ export function useMediaPauseOnScroll(
       const visibleHeight = Math.max(0, visibleBottom - visibleTop);
       if (visibleHeight > 0) return 'near';
 
-      const nearDistancePx = Math.max(vh, Math.round(hardSuspendDistanceVh * vh));
-      if (rect.bottom > -nearDistancePx && rect.top < vh + nearDistancePx) return 'near';
+      if (rect.bottom > -hardSuspendDistancePx && rect.top < vh + hardSuspendDistancePx) return 'near';
 
       return 'far';
     };
@@ -260,8 +208,6 @@ export function useMediaPauseOnScroll(
       const currentEl = containerRef.current;
       if (!currentEl) return;
 
-      // Never pause/suspend containers without playable media.
-      // But still allow active transitions so previously suspended iframes can restore.
       if (!hasLifecycleTargets(currentEl) && target !== 'active') {
         stateRef.current = 'active';
         setLifecycleState('active');
@@ -270,10 +216,7 @@ export function useMediaPauseOnScroll(
 
       if (target === 'active') {
         restoreHardSuspended(currentEl);
-        stageAResume(currentEl);
       } else if (target === 'paused') {
-        // When a far-away post comes back near the viewport, restore it early so
-        // the embed is already loaded before it reaches the active center zone.
         if (current === 'suspended') {
           restoreHardSuspended(currentEl);
         }
@@ -311,15 +254,17 @@ export function useMediaPauseOnScroll(
         const currentEl = containerRef.current;
         if (!currentEl) return;
 
-        // Reconcile whenever media nodes are injected (late hydration / SDK render).
         if (hasPlayableMedia(currentEl)) {
           reconcile();
         }
       });
     };
 
+    const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
+
     const nearObserver = new IntersectionObserver(() => scheduleReconcile(), {
-      rootMargin: `${Math.round(Math.max(2, hardSuspendDistanceVh) * 100)}% 0px`,
+      rootMargin: `${hardSuspendDistancePx}px 0px ${hardSuspendDistancePx}px 0px`,
+      threshold: 0,
     });
 
     const viewportObserver = new IntersectionObserver(() => scheduleReconcile(), {
@@ -332,11 +277,9 @@ export function useMediaPauseOnScroll(
     viewportObserver.observe(el);
     mutationObserver.observe(el, { childList: true, subtree: true });
 
-    // Scroll/resize fallback for edge cases
     document.addEventListener('scroll', scheduleReconcile, true);
     window.addEventListener('resize', scheduleReconcile);
 
-    // Initial state
     reconcile();
 
     return () => {
@@ -350,7 +293,6 @@ export function useMediaPauseOnScroll(
     };
   }, [containerRef, observeKey, enabled, hardSuspendDistanceVh]);
 
-  // Route change — pause everything in this container (playable posts only)
   useEffect(() => {
     if (!enabled) {
       prevPathRef.current = location.pathname;
@@ -363,12 +305,15 @@ export function useMediaPauseOnScroll(
         stageAPause(el);
         hardSuspendIframes(el);
         stateRef.current = 'suspended';
+        setLifecycleState('suspended');
       }
       prevPathRef.current = location.pathname;
     }
   }, [enabled, location.pathname, containerRef]);
+
   return lifecycleState;
 }
+
 /**
  * Global route-change media killer.
  * Mount once at app level to pause ALL playable media on any navigation.
@@ -379,11 +324,10 @@ export function useGlobalMediaPauseOnNavigate() {
 
   useEffect(() => {
     if (location.pathname !== prevPathRef.current) {
-      // Pause native media
       document.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
         if (!el.paused) el.pause();
       });
-      // Pause YouTube
+
       document.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
         try {
           iframe.contentWindow?.postMessage(
@@ -392,12 +336,13 @@ export function useGlobalMediaPauseOnNavigate() {
           );
         } catch { /* cross-origin */ }
       });
-      // Pause Spotify
+
       document.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
         try {
           iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
         } catch { /* cross-origin */ }
       });
+
       prevPathRef.current = location.pathname;
     }
   }, [location.pathname]);
