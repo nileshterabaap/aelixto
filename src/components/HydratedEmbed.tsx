@@ -78,10 +78,27 @@ export const HydratedEmbed = memo(({
     r.kind === 'video' ||
     platformHint === 'youtube' ||
     platformHint === 'spotify' ||
+    platformHint === 'instagram' ||
+    platformHint === 'facebook' ||
+    platformHint === 'linkedin' ||
+    platformHint === 'threads' ||
+    platformHint === 'pinterest' ||
+    platformHint === 'twitter' ||
+    platformHint === 'x' ||
     lowerUrl.includes('youtube.com/') ||
     lowerUrl.includes('youtu.be/') ||
     lowerUrl.includes('open.spotify.com/') ||
     lowerUrl.includes('tiktok.com/') ||
+    lowerUrl.includes('instagram.com/') ||
+    lowerUrl.includes('facebook.com/') ||
+    lowerUrl.includes('fb.watch/') ||
+    lowerUrl.includes('linkedin.com/') ||
+    lowerUrl.includes('threads.net/') ||
+    lowerUrl.includes('threads.com/') ||
+    lowerUrl.includes('pinterest.com/') ||
+    lowerUrl.includes('pin.it/') ||
+    lowerUrl.includes('twitter.com/') ||
+    lowerUrl.includes('x.com/') ||
     lowerUrl.includes('/reel/') ||
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');

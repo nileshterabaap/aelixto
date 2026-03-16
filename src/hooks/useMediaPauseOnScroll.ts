@@ -40,7 +40,13 @@ const PLAYABLE_IFRAME_HINTS = [
   'youtube-nocookie.com',
   'open.spotify.com/embed',
   'tiktok.com/embed',
-  'facebook.com/plugins/video.php',
+  'facebook.com/plugins/',
+  'instagram.com/',
+  'linkedin.com/embed/',
+  'platform.twitter.com/',
+  'assets.pinterest.com/ext/embed.html',
+  'threads.net',
+  'threads.com',
   '/video/',
   '/reel/',
   '/shorts/',
@@ -119,16 +125,35 @@ function unfreezeIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: soft pause everything */
+function hardSuspendNonApiIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (!isPlayableIframe(iframe)) return;
+    if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
+    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
+
+    const src = iframe.getAttribute('src');
+    if (!src || src === 'about:blank') return;
+
+    iframe.dataset[SUSPENDED_SRC] = src;
+    iframe.dataset[SUSPENDED_FLAG] = '1';
+    delete iframe.dataset[FROZEN_FLAG];
+    iframe.setAttribute('src', 'about:blank');
+    iframe.style.visibility = 'hidden';
+  });
+}
+
+/** Stage A: pause native/API media and immediately suspend other playable embeds */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
+  hardSuspendNonApiIframes(root);
   freezeIframes(root);
 }
 
 /** Undo Stage A freeze (restore visibility) */
 function stageAResume(root: HTMLElement) {
+  restoreHardSuspended(root);
   unfreezeIframes(root);
 }
 
@@ -207,24 +232,23 @@ export function useMediaPauseOnScroll(
     let rafId: number | null = null;
     let mutationRaf: number | null = null;
 
-    // Determine viewport-relative distance zones
+    // Determine viewport-relative distance zones.
+    // Only the post containing the viewport center stays active.
     const computeZone = (): 'visible' | 'near' | 'far' => {
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight || document.documentElement.clientHeight;
+      const viewportCenterY = vh / 2;
 
-      // Visible = at least 40% of the post is within the viewport
+      const containsViewportCenter = rect.top <= viewportCenterY && rect.bottom >= viewportCenterY;
+      if (containsViewportCenter) return 'visible';
+
       const visibleTop = Math.max(rect.top, 0);
       const visibleBottom = Math.min(rect.bottom, vh);
       const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-      const postHeight = rect.height || 1;
-      if (visibleHeight / postHeight > 0.4) return 'visible';
+      if (visibleHeight > 0) return 'near';
 
-      // Near = just off-screen (within 150px) — soft pause, keep iframe alive
-      const nearMargin = 150;
-      if (rect.bottom > -nearMargin && rect.top < vh + nearMargin) return 'near';
-
-      // Far = more than 1 viewport height away — hard suspend
-      if (rect.bottom > -vh && rect.top < vh + vh) return 'near';
+      const nearDistancePx = Math.max(vh, Math.round(hardSuspendDistanceVh * vh));
+      if (rect.bottom > -nearDistancePx && rect.top < vh + nearDistancePx) return 'near';
 
       return 'far';
     };
@@ -244,9 +268,7 @@ export function useMediaPauseOnScroll(
       }
 
       if (target === 'active') {
-        if (current === 'suspended') {
-          restoreHardSuspended(currentEl);
-        }
+        restoreHardSuspended(currentEl);
         stageAResume(currentEl);
       } else if (target === 'paused') {
         if (current === 'suspended') {
