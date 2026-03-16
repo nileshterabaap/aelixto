@@ -195,25 +195,8 @@ export const HydratedEmbed = memo(({
   // HYDRATED STATE: Show skeleton → fade into actual embed
   return (
     <div ref={embedContainerRef} className="relative w-full" style={{ contain: 'layout paint' }}>
-      {showInactivePreview && (
-        <div className={`absolute inset-0 z-10 overflow-hidden bg-muted ${aspectClass}`}>
-          <img
-            src={effectiveThumbnail!}
-            alt="Content preview"
-            className="w-full h-full object-cover"
-            loading="eager"
-            decoding="async"
-          />
-        </div>
-      )}
+      <div className="w-full">
 
-      <div
-        className="w-full"
-        style={{
-          opacity: showInactivePreview ? 0 : 1,
-          pointerEvents: showInactivePreview ? 'none' : 'auto',
-        }}
-      >
         {/* YouTube video */}
         {r.kind === 'video' && post.platform === 'youtube' && r.url && (
           <SkeletonGate platform="youtube" cacheKey={`${post.id}:youtube-video`}>
