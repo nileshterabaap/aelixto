@@ -1,4 +1,4 @@
-import { useEffect, useRef, RefObject } from 'react';
+import { useEffect, useRef, useState, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 
 /**
