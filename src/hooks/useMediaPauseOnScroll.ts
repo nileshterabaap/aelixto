@@ -125,16 +125,35 @@ function unfreezeIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: soft pause everything */
+function hardSuspendNonApiIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (!isPlayableIframe(iframe)) return;
+    if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
+    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
+
+    const src = iframe.getAttribute('src');
+    if (!src || src === 'about:blank') return;
+
+    iframe.dataset[SUSPENDED_SRC] = src;
+    iframe.dataset[SUSPENDED_FLAG] = '1';
+    delete iframe.dataset[FROZEN_FLAG];
+    iframe.setAttribute('src', 'about:blank');
+    iframe.style.visibility = 'hidden';
+  });
+}
+
+/** Stage A: pause native/API media and immediately suspend other playable embeds */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
+  hardSuspendNonApiIframes(root);
   freezeIframes(root);
 }
 
 /** Undo Stage A freeze (restore visibility) */
 function stageAResume(root: HTMLElement) {
+  restoreHardSuspended(root);
   unfreezeIframes(root);
 }
 
