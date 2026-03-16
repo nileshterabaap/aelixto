@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
-import { useScrollVelocity } from "@/hooks/useScrollVelocity";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
@@ -92,60 +91,40 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
-  const { isScrollingFast, velocity } = useScrollVelocity();
-  const hydrationResumeTimer = useRef<number | null>(null);
-
-  // Track if embed is within viewport proximity (conservative 400px)
-  // Default to true so posts hydrate immediately on mount — IO corrects for off-screen posts
-  const [isNearViewport, setIsNearViewport] = useState(true);
+  const [isNearViewport, setIsNearViewport] = useState(startHydrated);
 
   useEffect(() => {
-    if (startHydrated) return;
+    if (startHydrated) {
+      setIsHydrated(true);
+      setIsNearViewport(true);
+      return;
+    }
+
     const el = embedRef.current;
     if (!el) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsNearViewport(entry.isIntersecting);
+        if (entry.isIntersecting) {
+          setIsNearViewport(true);
+          setIsHydrated(true);
+        }
       },
-      { rootMargin: '2000px', threshold: 0 }
+      {
+        rootMargin: '3200px 0px 3200px 0px',
+        threshold: 0,
+      }
     );
+
     observer.observe(el);
     return () => observer.disconnect();
   }, [startHydrated]);
 
-  // Gate hydration: hydrate when near viewport, suppress only during active fast scrolling.
-  // On idle / initial load, hydrate immediately (no debounce needed).
   useEffect(() => {
-    if (isHydrated || !isNearViewport) return;
-
-    // Only suppress during *active* fast scrolling
-    if (isScrollingFast) {
-      // Clear any pending hydration timer
-      if (hydrationResumeTimer.current) {
-        clearTimeout(hydrationResumeTimer.current);
-        hydrationResumeTimer.current = null;
-      }
-      return;
-    }
-
-    // If user is idle (direction === 'idle' or velocity === 0), hydrate immediately
-    if (velocity === 0) {
+    if (isNearViewport && !isHydrated) {
       setIsHydrated(true);
-      return;
     }
-
-    // User is scrolling slowly — hydrate quickly
-    hydrationResumeTimer.current = window.setTimeout(() => {
-      setIsHydrated(true);
-    }, 60);
-
-    return () => {
-      if (hydrationResumeTimer.current) {
-        clearTimeout(hydrationResumeTimer.current);
-      }
-    };
-  }, [isNearViewport, isScrollingFast, isHydrated, velocity]);
+  }, [isNearViewport, isHydrated]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
   
