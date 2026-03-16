@@ -142,12 +142,11 @@ function hardSuspendNonApiIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: pause native/API media and immediately suspend other playable embeds */
+/** Stage A: pause native/API media and freeze (hide) other playable embeds — NO src swap */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  hardSuspendNonApiIframes(root);
   freezeIframes(root);
 }
 
