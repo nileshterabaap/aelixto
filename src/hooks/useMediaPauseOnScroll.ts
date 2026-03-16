@@ -232,24 +232,23 @@ export function useMediaPauseOnScroll(
     let rafId: number | null = null;
     let mutationRaf: number | null = null;
 
-    // Determine viewport-relative distance zones
+    // Determine viewport-relative distance zones.
+    // Only the post containing the viewport center stays active.
     const computeZone = (): 'visible' | 'near' | 'far' => {
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight || document.documentElement.clientHeight;
+      const viewportCenterY = vh / 2;
 
-      // Visible = at least 40% of the post is within the viewport
+      const containsViewportCenter = rect.top <= viewportCenterY && rect.bottom >= viewportCenterY;
+      if (containsViewportCenter) return 'visible';
+
       const visibleTop = Math.max(rect.top, 0);
       const visibleBottom = Math.min(rect.bottom, vh);
       const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-      const postHeight = rect.height || 1;
-      if (visibleHeight / postHeight > 0.4) return 'visible';
+      if (visibleHeight > 0) return 'near';
 
-      // Near = just off-screen (within 150px) — soft pause, keep iframe alive
-      const nearMargin = 150;
-      if (rect.bottom > -nearMargin && rect.top < vh + nearMargin) return 'near';
-
-      // Far = more than 1 viewport height away — hard suspend
-      if (rect.bottom > -vh && rect.top < vh + vh) return 'near';
+      const nearDistancePx = Math.max(vh, Math.round(hardSuspendDistanceVh * vh));
+      if (rect.bottom > -nearDistancePx && rect.top < vh + nearDistancePx) return 'near';
 
       return 'far';
     };
