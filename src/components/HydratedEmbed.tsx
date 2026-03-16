@@ -147,11 +147,7 @@ export const HydratedEmbed = memo(({
   const aspectClass = post.platform === 'youtube' && r.url && isYouTubeShort(r.url)
     ? 'aspect-[9/16]'
     : 'aspect-video';
-  const showInactivePreview =
-    shouldHydrate &&
-    isPlayableMediaPost &&
-    lifecycleState !== 'active' &&
-    !!effectiveThumbnail;
+  
   
   // If no renderer or none type, show nothing (no placeholder/skeleton either)
   if (r.kind === 'none') return null;
