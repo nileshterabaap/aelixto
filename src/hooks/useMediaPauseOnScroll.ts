@@ -200,7 +200,7 @@ type LifecycleState = 'active' | 'paused' | 'suspended';
 interface MediaLifecycleOptions {
   /** Enable lifecycle for this post. Should be true only for playable media posts. */
   enabled?: boolean;
-  /** Stage B threshold in viewport heights. Default: 2.5vh away from viewport. */
+  /** Stage B threshold in viewport heights. Default: 6 viewport heights away. */
   hardSuspendDistanceVh?: number;
 }
 
