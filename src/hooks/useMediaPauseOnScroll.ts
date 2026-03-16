@@ -272,11 +272,12 @@ export function useMediaPauseOnScroll(
         restoreHardSuspended(currentEl);
         stageAResume(currentEl);
       } else if (target === 'paused') {
-        if (current === 'active') {
-          stageAPause(currentEl);
+        // When a far-away post comes back near the viewport, restore it early so
+        // the embed is already loaded before it reaches the active center zone.
+        if (current === 'suspended') {
+          restoreHardSuspended(currentEl);
         }
-        // If already suspended, keep it suspended while near the viewport.
-        // HydratedEmbed shows a stable preview until the post becomes active again.
+        stageAPause(currentEl);
       } else if (target === 'suspended') {
         if (current === 'active') {
           stageAPause(currentEl);
