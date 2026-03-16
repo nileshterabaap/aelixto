@@ -367,8 +367,8 @@ export function useMediaPauseOnScroll(
       prevPathRef.current = location.pathname;
     }
   }, [enabled, location.pathname, containerRef]);
+  return lifecycleState;
 }
-
 /**
  * Global route-change media killer.
  * Mount once at app level to pause ALL playable media on any navigation.
