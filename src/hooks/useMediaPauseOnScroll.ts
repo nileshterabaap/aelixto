@@ -1,4 +1,4 @@
-import { useEffect, useRef, RefObject } from 'react';
+import { useEffect, useRef, useState, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 
 /**
@@ -142,11 +142,12 @@ function hardSuspendNonApiIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: pause native/API media and freeze (hide) other playable embeds — NO src swap */
+/** Stage A: pause native/API media and immediately suspend other playable embeds */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
+  hardSuspendNonApiIframes(root);
   freezeIframes(root);
 }
 
@@ -214,6 +215,7 @@ export function useMediaPauseOnScroll(
   const { enabled = true, hardSuspendDistanceVh = 2.5 } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
+  const [lifecycleState, setLifecycleState] = useState<LifecycleState>('active');
   const stateRef = useRef<LifecycleState>('active');
 
   useEffect(() => {
@@ -263,6 +265,7 @@ export function useMediaPauseOnScroll(
       // But still allow active transitions so previously suspended iframes can restore.
       if (!hasLifecycleTargets(currentEl) && target !== 'active') {
         stateRef.current = 'active';
+        setLifecycleState('active');
         return;
       }
 
@@ -270,13 +273,11 @@ export function useMediaPauseOnScroll(
         restoreHardSuspended(currentEl);
         stageAResume(currentEl);
       } else if (target === 'paused') {
-        if (current === 'suspended') {
-          // Far -> near: restore iframe src once, then apply Stage A freeze/pause.
-          restoreHardSuspended(currentEl);
-          stageAPause(currentEl);
-        } else if (current === 'active') {
+        if (current === 'active') {
           stageAPause(currentEl);
         }
+        // If already suspended, keep it suspended while near the viewport.
+        // HydratedEmbed shows a stable preview until the post becomes active again.
       } else if (target === 'suspended') {
         if (current === 'active') {
           stageAPause(currentEl);
@@ -285,6 +286,7 @@ export function useMediaPauseOnScroll(
       }
 
       stateRef.current = target;
+      setLifecycleState(target);
     };
 
     const reconcile = () => {
@@ -365,8 +367,8 @@ export function useMediaPauseOnScroll(
       prevPathRef.current = location.pathname;
     }
   }, [enabled, location.pathname, containerRef]);
+  return lifecycleState;
 }
-
 /**
  * Global route-change media killer.
  * Mount once at app level to pause ALL playable media on any navigation.
