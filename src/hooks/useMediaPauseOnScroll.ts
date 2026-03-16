@@ -192,16 +192,19 @@ export function useMediaPauseOnScroll(
       const vh = window.innerHeight || document.documentElement.clientHeight;
       const viewportCenterY = vh / 2;
       const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
+      const activeDistancePx = getActiveDistancePx();
 
-      const containsViewportCenter = rect.top <= viewportCenterY && rect.bottom >= viewportCenterY;
-      if (containsViewportCenter) return 'visible';
+      const isOnScreen = rect.bottom > 0 && rect.top < vh;
+      const embedCenterY = rect.top + rect.height / 2;
+      const distanceToViewportCenter = Math.abs(embedCenterY - viewportCenterY);
 
-      const visibleTop = Math.max(rect.top, 0);
-      const visibleBottom = Math.min(rect.bottom, vh);
-      const visibleHeight = Math.max(0, visibleBottom - visibleTop);
-      if (visibleHeight > 0) return 'near';
+      if (isOnScreen && distanceToViewportCenter <= activeDistancePx) {
+        return 'visible';
+      }
 
-      if (rect.bottom > -hardSuspendDistancePx && rect.top < vh + hardSuspendDistancePx) return 'near';
+      if (rect.bottom > -hardSuspendDistancePx && rect.top < vh + hardSuspendDistancePx) {
+        return 'near';
+      }
 
       return 'far';
     };
