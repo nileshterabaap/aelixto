@@ -142,12 +142,11 @@ function hardSuspendNonApiIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: pause native/API media and immediately suspend other playable embeds */
+/** Stage A: pause native/API media and freeze (hide) other playable embeds — NO src swap */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  hardSuspendNonApiIframes(root);
   freezeIframes(root);
 }
 
@@ -212,7 +211,7 @@ export function useMediaPauseOnScroll(
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
-  const { enabled = true, hardSuspendDistanceVh = 2.5 } = options;
+  const { enabled = true, hardSuspendDistanceVh = 6 } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
   const [lifecycleState, setLifecycleState] = useState<LifecycleState>('active');
