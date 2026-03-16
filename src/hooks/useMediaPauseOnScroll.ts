@@ -265,6 +265,7 @@ export function useMediaPauseOnScroll(
       // But still allow active transitions so previously suspended iframes can restore.
       if (!hasLifecycleTargets(currentEl) && target !== 'active') {
         stateRef.current = 'active';
+        setLifecycleState('active');
         return;
       }
 
@@ -272,13 +273,11 @@ export function useMediaPauseOnScroll(
         restoreHardSuspended(currentEl);
         stageAResume(currentEl);
       } else if (target === 'paused') {
-        if (current === 'suspended') {
-          // Far -> near: restore iframe src once, then apply Stage A freeze/pause.
-          restoreHardSuspended(currentEl);
-          stageAPause(currentEl);
-        } else if (current === 'active') {
+        if (current === 'active') {
           stageAPause(currentEl);
         }
+        // If already suspended, keep it suspended while near the viewport.
+        // HydratedEmbed shows a stable preview until the post becomes active again.
       } else if (target === 'suspended') {
         if (current === 'active') {
           stageAPause(currentEl);
@@ -288,6 +287,7 @@ export function useMediaPauseOnScroll(
 
       stateRef.current = target;
       setLifecycleState(target);
+    };
 
     const reconcile = () => {
       const zone = computeZone();
