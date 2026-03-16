@@ -211,7 +211,7 @@ export function useMediaPauseOnScroll(
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
-  const { enabled = true, hardSuspendDistanceVh = 2.5 } = options;
+  const { enabled = true, hardSuspendDistanceVh = 6 } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
   const [lifecycleState, setLifecycleState] = useState<LifecycleState>('active');
