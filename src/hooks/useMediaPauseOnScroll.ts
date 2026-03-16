@@ -287,7 +287,7 @@ export function useMediaPauseOnScroll(
       }
 
       stateRef.current = target;
-    };
+      setLifecycleState(target);
 
     const reconcile = () => {
       const zone = computeZone();
