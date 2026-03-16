@@ -78,6 +78,11 @@ function getHardSuspendDistancePx(hardSuspendDistanceVh: number): number {
   return Math.max(Math.round(hardSuspendDistanceVh * vh), HARD_SUSPEND_MIN_DISTANCE_PX);
 }
 
+function getActiveDistancePx(): number {
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  return Math.min(Math.max(Math.round(vh * 0.45), 80), 220);
+}
+
 // ── Stage A helpers: pause only, preserve visuals ──────────────────────
 
 function pauseNativeMedia(root: HTMLElement) {
