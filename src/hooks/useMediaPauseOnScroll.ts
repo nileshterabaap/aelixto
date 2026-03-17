@@ -320,9 +320,11 @@ export function useMediaPauseOnScroll(
       const el = containerRef.current;
       if (el && hasPlayableMedia(el)) {
         stageAPause(el);
-        hardSuspendIframes(el);
-        stateRef.current = 'suspended';
-        setLifecycleState('suspended');
+        if (!disableHardSuspend) {
+          hardSuspendIframes(el);
+        }
+        stateRef.current = disableHardSuspend ? 'paused' : 'suspended';
+        setLifecycleState(disableHardSuspend ? 'paused' : 'suspended');
       }
       prevPathRef.current = location.pathname;
     }
