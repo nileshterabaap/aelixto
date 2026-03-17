@@ -232,6 +232,13 @@ export function useMediaPauseOnScroll(
         }
         stageAPause(currentEl);
       } else if (target === 'suspended') {
+        if (disableHardSuspend) {
+          // Skip hard-suspend — just pause media, keep embeds loaded
+          stageAPause(currentEl);
+          stateRef.current = 'paused';
+          setLifecycleState('paused');
+          return;
+        }
         if (current === 'active') {
           stageAPause(currentEl);
         }
