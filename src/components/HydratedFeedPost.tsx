@@ -92,8 +92,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
-  const { isScrollingFast, velocity } = useScrollVelocity();
-  const hydrationResumeTimer = useRef<number | null>(null);
 
   // Track if embed is within viewport proximity — symmetric for both scroll directions
   // Default to true so posts hydrate immediately on mount — IO corrects for off-screen posts
