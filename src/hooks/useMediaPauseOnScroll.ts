@@ -158,6 +158,8 @@ interface MediaLifecycleOptions {
   enabled?: boolean;
   /** Stage B threshold in viewport heights. A pixel floor is also applied for tiny screens. */
   hardSuspendDistanceVh?: number;
+  /** When true, skip Stage B (hard-suspend) entirely — embeds stay loaded for the session. */
+  disableHardSuspend?: boolean;
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────
@@ -167,7 +169,7 @@ export function useMediaPauseOnScroll(
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
-  const { enabled = true, hardSuspendDistanceVh = 6 } = options;
+  const { enabled = true, hardSuspendDistanceVh = 6, disableHardSuspend = false } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
   const [lifecycleState, setLifecycleState] = useState<LifecycleState>('active');
@@ -230,6 +232,13 @@ export function useMediaPauseOnScroll(
         }
         stageAPause(currentEl);
       } else if (target === 'suspended') {
+        if (disableHardSuspend) {
+          // Skip hard-suspend — just pause media, keep embeds loaded
+          stageAPause(currentEl);
+          stateRef.current = 'paused';
+          setLifecycleState('paused');
+          return;
+        }
         if (current === 'active') {
           stageAPause(currentEl);
         }
@@ -299,7 +308,7 @@ export function useMediaPauseOnScroll(
       if (rafId !== null) cancelAnimationFrame(rafId);
       if (mutationRaf !== null) cancelAnimationFrame(mutationRaf);
     };
-  }, [containerRef, observeKey, enabled, hardSuspendDistanceVh]);
+  }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, disableHardSuspend]);
 
   useEffect(() => {
     if (!enabled) {
@@ -311,13 +320,15 @@ export function useMediaPauseOnScroll(
       const el = containerRef.current;
       if (el && hasPlayableMedia(el)) {
         stageAPause(el);
-        hardSuspendIframes(el);
-        stateRef.current = 'suspended';
-        setLifecycleState('suspended');
+        if (!disableHardSuspend) {
+          hardSuspendIframes(el);
+        }
+        stateRef.current = disableHardSuspend ? 'paused' : 'suspended';
+        setLifecycleState(disableHardSuspend ? 'paused' : 'suspended');
       }
       prevPathRef.current = location.pathname;
     }
-  }, [enabled, location.pathname, containerRef]);
+  }, [enabled, location.pathname, containerRef, disableHardSuspend]);
 
   return lifecycleState;
 }
