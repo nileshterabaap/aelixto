@@ -308,7 +308,7 @@ export function useMediaPauseOnScroll(
       if (rafId !== null) cancelAnimationFrame(rafId);
       if (mutationRaf !== null) cancelAnimationFrame(mutationRaf);
     };
-  }, [containerRef, observeKey, enabled, hardSuspendDistanceVh]);
+  }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, disableHardSuspend]);
 
   useEffect(() => {
     if (!enabled) {
