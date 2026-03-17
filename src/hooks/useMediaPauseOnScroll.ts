@@ -158,6 +158,8 @@ interface MediaLifecycleOptions {
   enabled?: boolean;
   /** Stage B threshold in viewport heights. A pixel floor is also applied for tiny screens. */
   hardSuspendDistanceVh?: number;
+  /** When true, skip Stage B (hard-suspend) entirely — embeds stay loaded for the session. */
+  disableHardSuspend?: boolean;
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────
