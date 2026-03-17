@@ -328,7 +328,7 @@ export function useMediaPauseOnScroll(
       }
       prevPathRef.current = location.pathname;
     }
-  }, [enabled, location.pathname, containerRef]);
+  }, [enabled, location.pathname, containerRef, disableHardSuspend]);
 
   return lifecycleState;
 }
