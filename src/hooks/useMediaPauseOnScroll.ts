@@ -131,7 +131,7 @@ function hardSuspendNonApiIframes(root: HTMLElement) {
   });
 }
 
-/** Freeze all iframes (pointer-events + visibility hint) */
+/** Freeze all iframes (pointer-events only; keep visuals mounted when possible) */
 function freezeIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
@@ -150,13 +150,17 @@ function unfreezeIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: pause native/API media and immediately suspend other playable embeds */
+/** Stage A: pause native/API media, but keep embeds visually mounted */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  hardSuspendNonApiIframes(root);
   freezeIframes(root);
+}
+
+/** Immediate kill for non-API iframe audio when leaving the active post */
+function stageANonApiPause(root: HTMLElement) {
+  hardSuspendNonApiIframes(root);
 }
 
 /** Undo Stage A freeze (restore visibility) */
