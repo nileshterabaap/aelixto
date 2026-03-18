@@ -273,7 +273,7 @@ export function useMediaPauseOnScroll(
       }
 
       if (target === 'active') {
-        restoreHardSuspended(currentEl);
+        stageAResume(currentEl);
       } else if (target === 'paused') {
         if (current === 'suspended') {
           restoreHardSuspended(currentEl);
