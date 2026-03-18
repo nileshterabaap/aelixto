@@ -133,15 +133,35 @@ export const ProfilePlatformGrid = ({
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
-  const handlePostClick = (postId: string) => {
+  // Preload ALL grid thumbnails as soon as data arrives — the feed's "magic"
+  useEffect(() => {
+    if (!items.length) return;
+    
+    items.forEach((post, index) => {
+      const rawThumb = getPostThumb(post);
+      const src = maybeProxy(rawThumb, 480);
+      if (src && src !== "/placeholder.svg" && !loadedImageCache.has(src)) {
+        // First 6 thumbnails: high priority for instant above-fold display
+        if (index < 6) {
+          preloadImageHighPriority(src);
+        } else {
+          preloadImage(src);
+        }
+      }
+    });
+  }, [items]);
+
+  const handlePostClick = useCallback((postId: string) => {
     setSelectedPostId(postId);
     setViewerOpen(true);
-  };
+  }, []);
 
   if (loading && items.length === 0) {
     return (
-      <div className="text-center py-8">
-        <p className="text-sm text-muted-foreground">Loading posts...</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="rounded-2xl aspect-[3/4] bg-muted/50 animate-shimmer" />
+        ))}
       </div>
     );
   }
@@ -159,7 +179,7 @@ export const ProfilePlatformGrid = ({
       <div className="space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
           {items.map((post) => (
-            <PostCard
+            <MemoizedPostCard
               key={post.id}
               post={post}
               onClick={() => handlePostClick(post.id)}
