@@ -1,32 +1,8 @@
 import { useEffect, useRef, useState, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 
-/**
- * Two-stage media lifecycle for playable media only.
- *
- * Stage A (near viewport):
- *   - Pause native <video>/<audio> via .pause()
- *   - Pause YouTube via postMessage pauseVideo
- *   - Pause Spotify via postMessage { command: 'pause' }
- *   - Preserve non-API iframe visuals (do NOT hide or destroy them)
- *
- * Stage B (far from viewport):
- *   - Hard-suspend playable iframes by swapping src → about:blank
- *   - Restore them early when they come back near the viewport so they can load
- *     before reaching the active center post again
- *
- * Only applies to containers with playable media (video, audio, YouTube,
- * Spotify, TikTok, Instagram reels, etc.). Static embeds are ignored.
- */
-
 const YOUTUBE_SELECTOR = 'iframe[src*="youtube.com"], iframe[src*="youtube-nocookie.com"]';
 const SPOTIFY_SELECTOR = 'iframe[src*="open.spotify.com"]';
-const SUSPENDED_IFRAME_SELECTOR = 'iframe[data-aelix-suspended="1"]';
-const HARD_SUSPEND_MIN_DISTANCE_PX = 2800;
-
-const SUSPENDED_FLAG = 'aelixSuspended';
-const SUSPENDED_SRC = 'aelixSuspendedSrc';
-
 const PLAYABLE_MEDIA_SELECTOR = 'video, audio';
 const PLAYABLE_IFRAME_HINTS = [
   'youtube.com',
@@ -48,6 +24,25 @@ const PLAYABLE_IFRAME_HINTS = [
   'instagram.com/reels',
 ];
 
+type LifecycleState = 'active' | 'paused';
+
+interface MediaLifecycleOptions {
+  enabled?: boolean;
+  hardSuspendDistanceVh?: number;
+  disableHardSuspend?: boolean;
+}
+
+interface RegistryEntry {
+  id: symbol;
+  getElement: () => HTMLElement | null;
+  setState: (state: LifecycleState) => void;
+}
+
+const lifecycleRegistry = new Map<symbol, RegistryEntry>();
+let lifecycleFlushRaf: number | null = null;
+let listenersAttached = false;
+let mutationObserver: MutationObserver | null = null;
+
 function isPlayableIframe(iframe: HTMLIFrameElement): boolean {
   const src = (iframe.getAttribute('src') || '').toLowerCase();
   const allow = (iframe.getAttribute('allow') || '').toLowerCase();
@@ -63,27 +58,13 @@ function hasPlayableMedia(root: HTMLElement): boolean {
   return Array.from(root.querySelectorAll<HTMLIFrameElement>('iframe')).some(isPlayableIframe);
 }
 
-function hasLifecycleTargets(root: HTMLElement): boolean {
-  return hasPlayableMedia(root) || root.querySelector(SUSPENDED_IFRAME_SELECTOR) !== null;
-}
-
-function getHardSuspendDistancePx(hardSuspendDistanceVh: number): number {
-  const vh = window.innerHeight || document.documentElement.clientHeight;
-  return Math.max(Math.round(hardSuspendDistanceVh * vh), HARD_SUSPEND_MIN_DISTANCE_PX);
-}
-
-function getActiveDistancePx(): number {
-  const vh = window.innerHeight || document.documentElement.clientHeight;
-  return Math.min(Math.max(Math.round(vh * 0.45), 80), 220);
-}
-
-function pauseNativeMedia(root: HTMLElement) {
+function pauseNativeMedia(root: ParentNode) {
   root.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
     if (!el.paused) el.pause();
   });
 }
 
-function pauseYouTubeIframes(root: HTMLElement) {
+function pauseYouTubeIframes(root: ParentNode) {
   root.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
     try {
       iframe.contentWindow?.postMessage(
@@ -96,7 +77,7 @@ function pauseYouTubeIframes(root: HTMLElement) {
   });
 }
 
-function pauseSpotifyIframes(root: HTMLElement) {
+function pauseSpotifyIframes(root: ParentNode) {
   root.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
     try {
       iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
@@ -106,62 +87,26 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: pause native/API media only — keep non-API visuals mounted */
-function stageAPause(root: HTMLElement) {
+function pausePlayableMedia(root: ParentNode) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
 }
 
-function hardSuspendIframes(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (!isPlayableIframe(iframe)) return;
-    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
+function isEligibleElement(el: HTMLElement): boolean {
+  if (!el.isConnected) return false;
+  if (!hasPlayableMedia(el)) return false;
 
-    const src = iframe.getAttribute('src');
-    if (!src || src === 'about:blank') return;
-
-    iframe.dataset[SUSPENDED_SRC] = src;
-    iframe.dataset[SUSPENDED_FLAG] = '1';
-    iframe.setAttribute('src', 'about:blank');
-    iframe.style.visibility = 'hidden';
-  });
+  const rect = el.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
 }
 
-function restoreHardSuspended(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.dataset[SUSPENDED_FLAG] !== '1') return;
-
-    const storedSrc = iframe.dataset[SUSPENDED_SRC];
-    if (storedSrc) {
-      iframe.setAttribute('src', storedSrc);
-    }
-
-    delete iframe.dataset[SUSPENDED_FLAG];
-    delete iframe.dataset[SUSPENDED_SRC];
-    iframe.style.visibility = '';
-  });
+function getDistanceToViewportCenter(el: HTMLElement): number {
+  const rect = el.getBoundingClientRect();
+  const viewportCenterY = (window.innerHeight || document.documentElement.clientHeight) / 2;
+  const elementCenterY = rect.top + rect.height / 2;
+  return Math.abs(elementCenterY - viewportCenterY);
 }
-
-type LifecycleState = 'active' | 'paused' | 'suspended';
-type ZoneState = 'visible' | 'near' | 'far';
-
-interface MediaLifecycleOptions {
-  enabled?: boolean;
-  hardSuspendDistanceVh?: number;
-  disableHardSuspend?: boolean;
-}
-
-interface RegistryEntry {
-  id: symbol;
-  hasTargets: boolean;
-  zone: ZoneState;
-  distanceToViewportCenter: number;
-  applyState: (target: LifecycleState) => void;
-}
-
-const lifecycleRegistry = new Map<symbol, RegistryEntry>();
-let lifecycleFlushRaf: number | null = null;
 
 function flushLifecycleRegistry() {
   lifecycleFlushRaf = null;
@@ -170,30 +115,31 @@ function flushLifecycleRegistry() {
   let closestDistance = Number.POSITIVE_INFINITY;
 
   lifecycleRegistry.forEach((entry) => {
-    if (!entry.hasTargets || entry.zone !== 'visible') return;
-    if (entry.distanceToViewportCenter < closestDistance) {
-      closestDistance = entry.distanceToViewportCenter;
+    const el = entry.getElement();
+    if (!el || !isEligibleElement(el)) return;
+
+    const distance = getDistanceToViewportCenter(el);
+    if (distance < closestDistance) {
+      closestDistance = distance;
       activeEntryId = entry.id;
     }
   });
 
   lifecycleRegistry.forEach((entry) => {
-    if (!entry.hasTargets) {
-      entry.applyState('active');
+    const el = entry.getElement();
+    if (!el || !isEligibleElement(el)) {
+      if (el) pausePlayableMedia(el);
+      entry.setState('paused');
       return;
     }
 
     if (entry.id === activeEntryId) {
-      entry.applyState('active');
+      entry.setState('active');
       return;
     }
 
-    if (entry.zone === 'far') {
-      entry.applyState('suspended');
-      return;
-    }
-
-    entry.applyState('paused');
+    pausePlayableMedia(el);
+    entry.setState('paused');
   });
 }
 
@@ -202,186 +148,93 @@ function scheduleLifecycleFlush() {
   lifecycleFlushRaf = requestAnimationFrame(flushLifecycleRegistry);
 }
 
+function handleGlobalViewportChange() {
+  scheduleLifecycleFlush();
+}
+
+function attachGlobalCoordinator() {
+  if (!listenersAttached) {
+    listenersAttached = true;
+    document.addEventListener('scroll', handleGlobalViewportChange, true);
+    window.addEventListener('resize', handleGlobalViewportChange);
+  }
+
+  if (!mutationObserver) {
+    mutationObserver = new MutationObserver(() => {
+      scheduleLifecycleFlush();
+    });
+
+    mutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['src', 'style', 'class'],
+    });
+  }
+}
+
+function detachGlobalCoordinator() {
+  if (lifecycleRegistry.size > 0) return;
+
+  if (listenersAttached) {
+    listenersAttached = false;
+    document.removeEventListener('scroll', handleGlobalViewportChange, true);
+    window.removeEventListener('resize', handleGlobalViewportChange);
+  }
+
+  if (mutationObserver) {
+    mutationObserver.disconnect();
+    mutationObserver = null;
+  }
+}
+
 export function useMediaPauseOnScroll(
   containerRef: RefObject<HTMLElement | null>,
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
-  const { enabled = true, hardSuspendDistanceVh = 6, disableHardSuspend = false } = options;
-  const location = useLocation();
-  const prevPathRef = useRef(location.pathname);
-  const [lifecycleState, setLifecycleState] = useState<LifecycleState>('active');
-  const stateRef = useRef<LifecycleState>('active');
+  const enabled = options.enabled ?? true;
+  const [lifecycleState, setLifecycleState] = useState<LifecycleState>('paused');
+  const stateRef = useRef<LifecycleState>('paused');
   const registryIdRef = useRef(Symbol('media-lifecycle'));
 
   useEffect(() => {
-    const el = containerRef.current;
     const registryId = registryIdRef.current;
 
-    if (!el) return;
-
-    const transition = (target: LifecycleState) => {
-      const current = stateRef.current;
-      if (current === target) return;
-
-      const currentEl = containerRef.current;
-      if (!currentEl) return;
-
-      if (!hasLifecycleTargets(currentEl) && target !== 'active') {
-        stateRef.current = 'active';
-        setLifecycleState('active');
-        return;
-      }
-
-      if (target === 'active') {
-        restoreHardSuspended(currentEl);
-      } else if (target === 'paused') {
-        if (current === 'suspended') {
-          restoreHardSuspended(currentEl);
-        }
-        stageAPause(currentEl);
-      } else {
-        if (disableHardSuspend) {
-          stageAPause(currentEl);
-          stateRef.current = 'paused';
-          setLifecycleState('paused');
-          return;
-        }
-
-        if (current === 'active') {
-          stageAPause(currentEl);
-        }
-        hardSuspendIframes(currentEl);
-      }
-
-      stateRef.current = target;
-      setLifecycleState(target);
-    };
-
     if (!enabled) {
+      const el = containerRef.current;
+      if (el) pausePlayableMedia(el);
+
       lifecycleRegistry.delete(registryId);
-      restoreHardSuspended(el);
-      stateRef.current = 'active';
-      setLifecycleState('active');
+      detachGlobalCoordinator();
+      stateRef.current = 'paused';
+      setLifecycleState('paused');
       scheduleLifecycleFlush();
       return;
     }
 
-    let rafId: number | null = null;
-    let mutationRaf: number | null = null;
-
-    const computeMetrics = () => {
-      const rect = el.getBoundingClientRect();
-      const vh = window.innerHeight || document.documentElement.clientHeight;
-      const viewportCenterY = vh / 2;
-      const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
-      const activeDistancePx = getActiveDistancePx();
-      const isOnScreen = rect.bottom > 0 && rect.top < vh;
-      const embedCenterY = rect.top + rect.height / 2;
-      const distanceToViewportCenter = Math.abs(embedCenterY - viewportCenterY);
-
-      let zone: ZoneState = 'far';
-      if (isOnScreen && distanceToViewportCenter <= activeDistancePx) {
-        zone = 'visible';
-      } else if (rect.bottom > -hardSuspendDistancePx && rect.top < vh + hardSuspendDistancePx) {
-        zone = 'near';
-      }
-
-      return {
-        hasTargets: hasLifecycleTargets(el),
-        zone,
-        distanceToViewportCenter,
-      };
-    };
-
-    const reconcile = () => {
-      const metrics = computeMetrics();
-      lifecycleRegistry.set(registryId, {
-        id: registryId,
-        ...metrics,
-        applyState: transition,
-      });
-      scheduleLifecycleFlush();
-    };
-
-    const scheduleReconcile = () => {
-      if (rafId !== null) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        reconcile();
-      });
-    };
-
-    const scheduleMutationCheck = () => {
-      if (mutationRaf !== null) return;
-      mutationRaf = requestAnimationFrame(() => {
-        mutationRaf = null;
-        const currentEl = containerRef.current;
-        if (!currentEl) return;
-
-        if (hasLifecycleTargets(currentEl)) {
-          reconcile();
-        }
-      });
-    };
-
-    const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
-
-    const nearObserver = new IntersectionObserver(scheduleReconcile, {
-      rootMargin: `${hardSuspendDistancePx}px 0px ${hardSuspendDistancePx}px 0px`,
-      threshold: 0,
+    lifecycleRegistry.set(registryId, {
+      id: registryId,
+      getElement: () => containerRef.current,
+      setState: (nextState) => {
+        if (stateRef.current === nextState) return;
+        stateRef.current = nextState;
+        setLifecycleState(nextState);
+      },
     });
 
-    const viewportObserver = new IntersectionObserver(scheduleReconcile, {
-      threshold: [0, 0.1],
-    });
-
-    const mutationObserver = new MutationObserver(scheduleMutationCheck);
-
-    nearObserver.observe(el);
-    viewportObserver.observe(el);
-    mutationObserver.observe(el, { childList: true, subtree: true });
-
-    document.addEventListener('scroll', scheduleReconcile, true);
-    window.addEventListener('resize', scheduleReconcile);
-
-    reconcile();
+    attachGlobalCoordinator();
+    scheduleLifecycleFlush();
 
     return () => {
-      lifecycleRegistry.delete(registryId);
-      scheduleLifecycleFlush();
-      nearObserver.disconnect();
-      viewportObserver.disconnect();
-      mutationObserver.disconnect();
-      document.removeEventListener('scroll', scheduleReconcile, true);
-      window.removeEventListener('resize', scheduleReconcile);
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      if (mutationRaf !== null) cancelAnimationFrame(mutationRaf);
-    };
-  }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, disableHardSuspend]);
-
-  useEffect(() => {
-    if (!enabled) {
-      prevPathRef.current = location.pathname;
-      return;
-    }
-
-    if (location.pathname !== prevPathRef.current) {
       const el = containerRef.current;
-      const registryId = registryIdRef.current;
-      if (el && hasPlayableMedia(el)) {
-        stageAPause(el);
-        if (!disableHardSuspend) {
-          hardSuspendIframes(el);
-        }
-        stateRef.current = disableHardSuspend ? 'paused' : 'suspended';
-        setLifecycleState(disableHardSuspend ? 'paused' : 'suspended');
-      }
+      if (el) pausePlayableMedia(el);
+
       lifecycleRegistry.delete(registryId);
+      detachGlobalCoordinator();
       scheduleLifecycleFlush();
-      prevPathRef.current = location.pathname;
-    }
-  }, [enabled, location.pathname, containerRef, disableHardSuspend]);
+    };
+  }, [containerRef, observeKey, enabled]);
 
   return lifecycleState;
 }
@@ -392,30 +245,9 @@ export function useGlobalMediaPauseOnNavigate() {
 
   useEffect(() => {
     if (location.pathname !== prevPathRef.current) {
-      document.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
-        if (!el.paused) el.pause();
-      });
-
-      document.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
-        try {
-          iframe.contentWindow?.postMessage(
-            JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
-            '*'
-          );
-        } catch {
-          /* cross-origin */
-        }
-      });
-
-      document.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
-        try {
-          iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
-        } catch {
-          /* cross-origin */
-        }
-      });
-
+      pausePlayableMedia(document);
       prevPathRef.current = location.pathname;
+      scheduleLifecycleFlush();
     }
   }, [location.pathname]);
 }
