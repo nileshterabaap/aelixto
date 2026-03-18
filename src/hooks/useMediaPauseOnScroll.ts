@@ -283,10 +283,16 @@ export function useMediaPauseOnScroll(
           restoreHardSuspended(currentEl);
         }
         stageAPause(currentEl);
+        if (current === 'active') {
+          stageANonApiPause(currentEl);
+        }
       } else if (target === 'suspended') {
         if (disableHardSuspend) {
           // Skip hard-suspend — just pause media, keep embeds loaded
           stageAPause(currentEl);
+          if (current === 'active') {
+            stageANonApiPause(currentEl);
+          }
           stateRef.current = 'paused';
           setLifecycleState('paused');
           return;
