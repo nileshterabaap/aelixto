@@ -41,6 +41,7 @@ interface RegistryEntry {
 const lifecycleRegistry = new Map<symbol, RegistryEntry>();
 let lifecycleFlushRaf: number | null = null;
 let listenersAttached = false;
+let mutationObserver: MutationObserver | null = null;
 
 function isPlayableIframe(iframe: HTMLIFrameElement): boolean {
   const src = (iframe.getAttribute('src') || '').toLowerCase();
@@ -57,13 +58,13 @@ function hasPlayableMedia(root: HTMLElement): boolean {
   return Array.from(root.querySelectorAll<HTMLIFrameElement>('iframe')).some(isPlayableIframe);
 }
 
-function pauseNativeMedia(root: HTMLElement) {
+function pauseNativeMedia(root: ParentNode) {
   root.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
     if (!el.paused) el.pause();
   });
 }
 
-function pauseYouTubeIframes(root: HTMLElement) {
+function pauseYouTubeIframes(root: ParentNode) {
   root.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
     try {
       iframe.contentWindow?.postMessage(
@@ -76,7 +77,7 @@ function pauseYouTubeIframes(root: HTMLElement) {
   });
 }
 
-function pauseSpotifyIframes(root: HTMLElement) {
+function pauseSpotifyIframes(root: ParentNode) {
   root.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
     try {
       iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
@@ -86,17 +87,18 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
-function pausePlayableMedia(root: HTMLElement) {
+function pausePlayableMedia(root: ParentNode) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
 }
 
-function isMeasurableElement(el: HTMLElement): boolean {
+function isEligibleElement(el: HTMLElement): boolean {
   if (!el.isConnected) return false;
+  if (!hasPlayableMedia(el)) return false;
 
   const rect = el.getBoundingClientRect();
-  return rect.width > 0 || rect.height > 0;
+  return rect.width > 0 && rect.height > 0;
 }
 
 function getDistanceToViewportCenter(el: HTMLElement): number {
@@ -114,7 +116,7 @@ function flushLifecycleRegistry() {
 
   lifecycleRegistry.forEach((entry) => {
     const el = entry.getElement();
-    if (!el || !isMeasurableElement(el) || !hasPlayableMedia(el)) return;
+    if (!el || !isEligibleElement(el)) return;
 
     const distance = getDistanceToViewportCenter(el);
     if (distance < closestDistance) {
@@ -125,7 +127,7 @@ function flushLifecycleRegistry() {
 
   lifecycleRegistry.forEach((entry) => {
     const el = entry.getElement();
-    if (!el || !isMeasurableElement(el) || !hasPlayableMedia(el)) {
+    if (!el || !isEligibleElement(el)) {
       if (el) pausePlayableMedia(el);
       entry.setState('paused');
       return;
@@ -150,20 +152,40 @@ function handleGlobalViewportChange() {
   scheduleLifecycleFlush();
 }
 
-function attachGlobalListeners() {
-  if (listenersAttached) return;
-  listenersAttached = true;
+function attachGlobalCoordinator() {
+  if (!listenersAttached) {
+    listenersAttached = true;
+    document.addEventListener('scroll', handleGlobalViewportChange, true);
+    window.addEventListener('resize', handleGlobalViewportChange);
+  }
 
-  document.addEventListener('scroll', handleGlobalViewportChange, true);
-  window.addEventListener('resize', handleGlobalViewportChange);
+  if (!mutationObserver) {
+    mutationObserver = new MutationObserver(() => {
+      scheduleLifecycleFlush();
+    });
+
+    mutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['src', 'style', 'class'],
+    });
+  }
 }
 
-function detachGlobalListeners() {
-  if (!listenersAttached || lifecycleRegistry.size > 0) return;
-  listenersAttached = false;
+function detachGlobalCoordinator() {
+  if (lifecycleRegistry.size > 0) return;
 
-  document.removeEventListener('scroll', handleGlobalViewportChange, true);
-  window.removeEventListener('resize', handleGlobalViewportChange);
+  if (listenersAttached) {
+    listenersAttached = false;
+    document.removeEventListener('scroll', handleGlobalViewportChange, true);
+    window.removeEventListener('resize', handleGlobalViewportChange);
+  }
+
+  if (mutationObserver) {
+    mutationObserver.disconnect();
+    mutationObserver = null;
+  }
 }
 
 export function useMediaPauseOnScroll(
@@ -180,8 +202,11 @@ export function useMediaPauseOnScroll(
     const registryId = registryIdRef.current;
 
     if (!enabled) {
+      const el = containerRef.current;
+      if (el) pausePlayableMedia(el);
+
       lifecycleRegistry.delete(registryId);
-      detachGlobalListeners();
+      detachGlobalCoordinator();
       stateRef.current = 'paused';
       setLifecycleState('paused');
       scheduleLifecycleFlush();
@@ -198,7 +223,7 @@ export function useMediaPauseOnScroll(
       },
     });
 
-    attachGlobalListeners();
+    attachGlobalCoordinator();
     scheduleLifecycleFlush();
 
     return () => {
@@ -206,7 +231,7 @@ export function useMediaPauseOnScroll(
       if (el) pausePlayableMedia(el);
 
       lifecycleRegistry.delete(registryId);
-      detachGlobalListeners();
+      detachGlobalCoordinator();
       scheduleLifecycleFlush();
     };
   }, [containerRef, observeKey, enabled]);
@@ -220,33 +245,7 @@ export function useGlobalMediaPauseOnNavigate() {
 
   useEffect(() => {
     if (location.pathname !== prevPathRef.current) {
-      document.querySelectorAll<HTMLElement>('[data-feed-post], article, [data-post-id]').forEach((el) => {
-        pausePlayableMedia(el);
-      });
-
-      document.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
-        if (!el.paused) el.pause();
-      });
-
-      document.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
-        try {
-          iframe.contentWindow?.postMessage(
-            JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
-            '*'
-          );
-        } catch {
-          /* cross-origin */
-        }
-      });
-
-      document.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
-        try {
-          iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
-        } catch {
-          /* cross-origin */
-        }
-      });
-
+      pausePlayableMedia(document);
       prevPathRef.current = location.pathname;
       scheduleLifecycleFlush();
     }
