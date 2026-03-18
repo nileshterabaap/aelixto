@@ -1,7 +1,8 @@
 import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
+import { preloadImage, preloadImageHighPriority } from "@/lib/preloadImages";
 import InstagramIcon from "@/assets/platforms/instagram.svg";
 import FacebookIcon from "@/assets/platforms/facebook.svg";
 import YoutubeIcon from "@/assets/platforms/youtube.svg";
@@ -10,6 +11,9 @@ import XIcon from "@/assets/platforms/x.svg";
 import BlogIcon from "@/assets/platforms/blog.svg";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 import { PlatformPostViewer } from "./PlatformPostViewer";
+
+// Track which images have been loaded for instant re-display
+const loadedImageCache = new Set<string>();
 
 function PostCard({ post, onClick }: { 
   post: PlatformPost; 
