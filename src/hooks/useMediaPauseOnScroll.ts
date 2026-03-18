@@ -30,6 +30,9 @@ const HARD_SUSPEND_MIN_DISTANCE_PX = 2800;
 
 const SUSPENDED_FLAG = 'aelixSuspended';
 const SUSPENDED_SRC = 'aelixSuspendedSrc';
+const FROZEN_FLAG = 'aelixFrozen';
+
+const API_PAUSABLE_SELECTOR = [YOUTUBE_SELECTOR, SPOTIFY_SELECTOR].join(', ');
 
 // ── Detection: does this container currently contain playable media? ───
 
@@ -110,11 +113,56 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: pause native/API media only — keep non-API visuals mounted */
+/** Suspend non-API playable iframes (Instagram, TikTok, Threads, etc.) by swapping src */
+function hardSuspendNonApiIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (!isPlayableIframe(iframe)) return;
+    if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
+    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
+
+    const src = iframe.getAttribute('src');
+    if (!src || src === 'about:blank') return;
+
+    iframe.dataset[SUSPENDED_SRC] = src;
+    iframe.dataset[SUSPENDED_FLAG] = '1';
+    delete iframe.dataset[FROZEN_FLAG];
+    iframe.setAttribute('src', 'about:blank');
+    iframe.style.visibility = 'hidden';
+  });
+}
+
+/** Freeze all iframes (pointer-events + visibility hint) */
+function freezeIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
+    if (iframe.dataset[FROZEN_FLAG] === '1') return;
+    iframe.dataset[FROZEN_FLAG] = '1';
+    iframe.style.pointerEvents = 'none';
+  });
+}
+
+/** Unfreeze all iframes */
+function unfreezeIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (iframe.dataset[FROZEN_FLAG] !== '1') return;
+    delete iframe.dataset[FROZEN_FLAG];
+    iframe.style.pointerEvents = '';
+  });
+}
+
+/** Stage A: pause native/API media and immediately suspend other playable embeds */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
+  hardSuspendNonApiIframes(root);
+  freezeIframes(root);
+}
+
+/** Undo Stage A freeze (restore visibility) */
+function stageAResume(root: HTMLElement) {
+  restoreHardSuspended(root);
+  unfreezeIframes(root);
 }
 
 // ── Stage B helpers: hard suspend / restore ────────────────────────────
@@ -225,7 +273,7 @@ export function useMediaPauseOnScroll(
       }
 
       if (target === 'active') {
-        restoreHardSuspended(currentEl);
+        stageAResume(currentEl);
       } else if (target === 'paused') {
         if (current === 'suspended') {
           restoreHardSuspended(currentEl);
