@@ -21,6 +21,18 @@ function PostCard({ post, onClick }: {
 }) {
   const [imageError, setImageError] = useState(false);
   
+  const rawThumb = getPostThumb(post);
+  const src = imageError ? null : maybeProxy(rawThumb, 480);
+  
+  // Check if already in our loaded cache for instant display
+  const alreadyCached = src ? loadedImageCache.has(src) : false;
+  const [imageLoaded, setImageLoaded] = useState(alreadyCached);
+  
+  const handleImageLoad = useCallback(() => {
+    setImageLoaded(true);
+    if (src) loadedImageCache.add(src);
+  }, [src]);
+
   // YouTube uses 16:9, all others use 3:4 portrait
   const getAspectRatio = () => post.platform === "youtube" ? "aspect-video" : "aspect-[3/4]";
 
@@ -48,9 +60,6 @@ function PostCard({ post, onClick }: {
     }
   };
 
-  // Try to get thumbnail - prioritize stored thumbnails
-  const rawThumb = getPostThumb(post);
-  const src = imageError ? null : maybeProxy(rawThumb, 480);
   const Icon = getPlatformIcon();
 
   // Show platform-branded fallback when no thumbnail or image error
@@ -72,16 +81,24 @@ function PostCard({ post, onClick }: {
       onClick={onClick}
       className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} bg-muted/50 group`}
     >
+      {/* Shimmer skeleton underneath until image loads */}
+      {!imageLoaded && (
+        <div className="absolute inset-0 bg-muted/50 animate-shimmer" />
+      )}
+
       <img
         src={src}
         alt=""
+        onLoad={handleImageLoad}
         onError={() => setImageError(true)}
-        className="w-full h-full object-cover"
+        className={`w-full h-full object-cover transition-opacity duration-300 ${
+          imageLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
         loading="lazy"
       />
 
       {/* Play button overlay for videos */}
-      {post.media_type === "video" && (
+      {post.media_type === "video" && imageLoaded && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <div className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm grid place-items-center">
             <div className="w-0 h-0 border-l-[14px] border-l-white border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent ml-1" />
@@ -91,6 +108,10 @@ function PostCard({ post, onClick }: {
     </button>
   );
 }
+
+const MemoizedPostCard = memo(PostCard, (prev, next) =>
+  prev.post.id === next.post.id && prev.post.thumbnail_url === next.post.thumbnail_url
+);
 
 interface ProfilePlatformGridProps {
   userId: string;
