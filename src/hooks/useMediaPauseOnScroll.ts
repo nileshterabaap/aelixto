@@ -30,6 +30,9 @@ const HARD_SUSPEND_MIN_DISTANCE_PX = 2800;
 
 const SUSPENDED_FLAG = 'aelixSuspended';
 const SUSPENDED_SRC = 'aelixSuspendedSrc';
+const FROZEN_FLAG = 'aelixFrozen';
+
+const API_PAUSABLE_SELECTOR = [YOUTUBE_SELECTOR, SPOTIFY_SELECTOR].join(', ');
 
 // ── Detection: does this container currently contain playable media? ───
 
