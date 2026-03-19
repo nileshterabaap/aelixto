@@ -80,7 +80,8 @@ function getHardSuspendDistancePx(hardSuspendDistanceVh: number): number {
 
 function getActiveDistancePx(): number {
   const vh = window.innerHeight || document.documentElement.clientHeight;
-  return Math.min(Math.max(Math.round(vh * 0.45), 80), 220);
+  // Tight band (~15% of viewport) so only ONE post is active at a time
+  return Math.min(Math.max(Math.round(vh * 0.15), 60), 130);
 }
 
 // ── Stage A helpers: pause only, preserve visuals ──────────────────────
