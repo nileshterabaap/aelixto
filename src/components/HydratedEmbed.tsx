@@ -75,7 +75,6 @@ export const HydratedEmbed = memo(({
 
   // Track if embed is mostly off-screen (< 20% visible) for overlay
   const isInView = useInView(embedContainerRef, { threshold: 0.2 });
-  const lowerUrl = (mediaUrl || '').toLowerCase();
 
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
