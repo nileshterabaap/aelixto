@@ -51,6 +51,7 @@ prefetchCoreData(queryClient);
 const AnimatedRoutes = () => {
   const location = useLocation();
   useGlobalMediaPauseOnNavigate();
+  useGlobalScrollMediaPause();
   
   // Disable browser's automatic scroll restoration
   useEffect(() => {
