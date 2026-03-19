@@ -1,5 +1,6 @@
-import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, memo, useCallback, useEffect, useRef } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
+import { useInView } from '@/hooks/useInView';
 import type { Post } from '@/data/demoData';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
@@ -71,6 +72,9 @@ export const HydratedEmbed = memo(({
   const platformHint = (post.platform || '').toLowerCase();
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
+
+  // Track if embed is mostly off-screen (< 20% visible) for overlay
+  const isInView = useInView(embedContainerRef, { threshold: 0.2 });
 
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
@@ -192,6 +196,22 @@ export const HydratedEmbed = memo(({
     );
   }
   
+  // Determine if this is a non-API embed (can't be paused programmatically)
+  const isNonApiEmbed =
+    r.kind === 'raw' ||
+    r.kind === 'universal' ||
+    r.kind === 'reddit' ||
+    r.kind === 'article' ||
+    (r.kind === 'twitter') ||
+    (r.kind === 'pinterest') ||
+    // Also catch forced renderers
+    forceTwitterRenderer ||
+    forcePinterestRenderer ||
+    forceUniversalRenderer;
+
+  // Show dim overlay when scrolled away for non-API embeds
+  const showScrolledAwayOverlay = shouldHydrate && !isInView && isNonApiEmbed;
+
   // HYDRATED STATE: Show skeleton → fade into actual embed
   return (
     <div ref={embedContainerRef} className="relative w-full" style={{ contain: 'layout paint' }}>
@@ -321,6 +341,14 @@ export const HydratedEmbed = memo(({
           </SkeletonGate>
         )}
       </div>
+
+      {/* Dim overlay for non-API embeds when scrolled away — blocks interaction without disrupting layout */}
+      <div
+        className={`absolute inset-0 bg-background/60 pointer-events-auto transition-opacity duration-300 ${
+          showScrolledAwayOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+        aria-hidden="true"
+      />
     </div>
   );
 });
