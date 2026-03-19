@@ -349,12 +349,12 @@ export const HydratedEmbed = memo(({
       </div>
 
       {/* Dim overlay for non-API embeds when scrolled away — blocks interaction without disrupting layout */}
-      <div
-        className={`absolute inset-0 bg-background/60 pointer-events-auto transition-opacity duration-300 ${
-          showScrolledAwayOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
-        aria-hidden="true"
-      />
+      {showScrolledAwayOverlay && (
+        <div
+          className="absolute inset-0 bg-background/60 pointer-events-auto transition-opacity duration-300 opacity-100"
+          aria-hidden="true"
+        />
+      )}
     </div>
   );
 });
