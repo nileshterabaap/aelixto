@@ -94,12 +94,7 @@ function pauseNativeMedia(root: HTMLElement) {
 
 function pauseYouTubeIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
-    try {
-      iframe.contentWindow?.postMessage(
-        JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
-        '*'
-      );
-    } catch { /* cross-origin */ }
+    sendYouTubePause(iframe);
   });
 }
 
