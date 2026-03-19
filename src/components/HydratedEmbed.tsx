@@ -176,7 +176,7 @@ export const HydratedEmbed = memo(({
   // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
   if (!shouldHydrate) {
     return (
-      <div ref={embedContainerRef} className={`relative w-full bg-muted ${aspectClass}`}>
+      <div ref={embedContainerRef} className={`relative w-full bg-muted ${aspectClass} cursor-pointer`} onClick={onPlayClick}>
         {effectiveThumbnail && !imageError ? (
           <img
             src={effectiveThumbnail}
@@ -192,6 +192,12 @@ export const HydratedEmbed = memo(({
         ) : (
           <div className="w-full h-full animate-pulse bg-muted" />
         )}
+        {/* Play button overlay */}
+        <div className="absolute inset-0 grid place-items-center pointer-events-none">
+          <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-sm grid place-items-center">
+            <div className="w-0 h-0 border-l-[16px] border-l-white border-t-[11px] border-t-transparent border-b-[11px] border-b-transparent ml-1" />
+          </div>
+        </div>
       </div>
     );
   }
