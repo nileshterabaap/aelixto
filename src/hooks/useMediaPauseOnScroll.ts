@@ -94,12 +94,7 @@ function pauseNativeMedia(root: HTMLElement) {
 
 function pauseYouTubeIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
-    try {
-      iframe.contentWindow?.postMessage(
-        JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
-        '*'
-      );
-    } catch { /* cross-origin */ }
+    sendYouTubePause(iframe);
   });
 }
 
@@ -344,26 +339,105 @@ export function useGlobalMediaPauseOnNavigate() {
 
   useEffect(() => {
     if (location.pathname !== prevPathRef.current) {
-      document.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
-        if (!el.paused) el.pause();
-      });
-
-      document.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
-        try {
-          iframe.contentWindow?.postMessage(
-            JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] }),
-            '*'
-          );
-        } catch { /* cross-origin */ }
-      });
-
-      document.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
-        try {
-          iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
-        } catch { /* cross-origin */ }
-      });
-
+      pauseAllGlobalMedia();
       prevPathRef.current = location.pathname;
     }
   }, [location.pathname]);
+}
+
+// ── Shared global pause helper ────────────────────────────────────────
+
+function pauseAllGlobalMedia() {
+  document.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
+    if (!el.paused) el.pause();
+  });
+
+  document.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
+    sendYouTubePause(iframe);
+  });
+
+  document.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
+    try {
+      iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
+    } catch { /* cross-origin */ }
+  });
+}
+
+function sendYouTubePause(iframe: HTMLIFrameElement) {
+  try {
+    const msg = JSON.stringify({ event: 'command', func: 'pauseVideo', args: [] });
+    iframe.contentWindow?.postMessage(msg, '*');
+    // Retry twice — YT sometimes ignores the first message
+    setTimeout(() => {
+      try { iframe.contentWindow?.postMessage(msg, '*'); } catch {}
+    }, 150);
+    setTimeout(() => {
+      try { iframe.contentWindow?.postMessage(msg, '*'); } catch {}
+    }, 400);
+  } catch { /* cross-origin */ }
+}
+
+// ── Global scroll-based media pauser ──────────────────────────────────
+//
+// Supplements per-post hooks. On every scroll tick (RAF-throttled) it
+// pauses any media whose center is far from the viewport center.
+// This catches cases where per-post hooks' zone math fails on small
+// viewports or when refs are misaligned.
+
+export function useGlobalScrollMediaPause() {
+  useEffect(() => {
+    let rafId: number | null = null;
+
+    const pauseOffscreen = () => {
+      rafId = null;
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      const centerY = vh / 2;
+      // A media element must be within 40% of viewport height from center to stay active
+      const threshold = vh * 0.4;
+
+      // Native video/audio
+      document.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
+        if (el.paused) return;
+        const rect = el.getBoundingClientRect();
+        const elCenter = rect.top + rect.height / 2;
+        if (Math.abs(elCenter - centerY) > threshold) {
+          el.pause();
+        }
+      });
+
+      // YouTube iframes
+      document.querySelectorAll<HTMLIFrameElement>(YOUTUBE_SELECTOR).forEach((iframe) => {
+        const rect = iframe.getBoundingClientRect();
+        const elCenter = rect.top + rect.height / 2;
+        if (Math.abs(elCenter - centerY) > threshold) {
+          sendYouTubePause(iframe);
+        }
+      });
+
+      // Spotify iframes
+      document.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
+        const rect = iframe.getBoundingClientRect();
+        const elCenter = rect.top + rect.height / 2;
+        if (Math.abs(elCenter - centerY) > threshold) {
+          try {
+            iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
+          } catch { /* cross-origin */ }
+        }
+      });
+    };
+
+    const onScroll = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(pauseOffscreen);
+    };
+
+    document.addEventListener('scroll', onScroll, true);
+    window.addEventListener('scroll', onScroll);
+
+    return () => {
+      document.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('scroll', onScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
 }
