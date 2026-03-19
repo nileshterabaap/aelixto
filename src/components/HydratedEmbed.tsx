@@ -73,6 +73,10 @@ export const HydratedEmbed = memo(({
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
 
+  // Track if embed is mostly off-screen (< 20% visible) for overlay
+  const isInView = useInView(embedContainerRef, { threshold: 0.2 });
+  const lowerUrl = (mediaUrl || '').toLowerCase();
+
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
     mediaTypeHint === 'audio' ||
