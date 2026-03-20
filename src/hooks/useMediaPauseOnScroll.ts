@@ -54,6 +54,11 @@ const PLAYABLE_IFRAME_HINTS = [
   'instagram.com/reels',
 ];
 
+function isApiControllableIframe(iframe: HTMLIFrameElement): boolean {
+  const src = (iframe.getAttribute('src') || '').toLowerCase();
+  return src.includes('youtube.com') || src.includes('youtube-nocookie.com') || src.includes('open.spotify.com');
+}
+
 function isPlayableIframe(iframe: HTMLIFrameElement): boolean {
   const src = (iframe.getAttribute('src') || '').toLowerCase();
   const allow = (iframe.getAttribute('allow') || '').toLowerCase();
@@ -67,6 +72,12 @@ function isPlayableIframe(iframe: HTMLIFrameElement): boolean {
 function hasPlayableMedia(root: HTMLElement): boolean {
   if (root.querySelector(PLAYABLE_MEDIA_SELECTOR)) return true;
   return Array.from(root.querySelectorAll<HTMLIFrameElement>('iframe')).some(isPlayableIframe);
+}
+
+function hasNonApiPlayableIframe(root: HTMLElement): boolean {
+  return Array.from(root.querySelectorAll<HTMLIFrameElement>('iframe')).some(
+    (iframe) => isPlayableIframe(iframe) && !isApiControllableIframe(iframe)
+  );
 }
 
 function hasLifecycleTargets(root: HTMLElement): boolean {
@@ -123,6 +134,21 @@ function stageAPause(root: HTMLElement) {
 function hardSuspendIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (!isPlayableIframe(iframe)) return;
+    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
+
+    const src = iframe.getAttribute('src');
+    if (!src || src === 'about:blank') return;
+
+    iframe.dataset[SUSPENDED_SRC] = src;
+    iframe.dataset[SUSPENDED_FLAG] = '1';
+    iframe.setAttribute('src', 'about:blank');
+    iframe.style.visibility = 'hidden';
+  });
+}
+
+function hardSuspendNonApiIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (!isPlayableIframe(iframe) || isApiControllableIframe(iframe)) return;
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
 
     const src = iframe.getAttribute('src');
@@ -205,6 +231,10 @@ export function useMediaPauseOnScroll(
         return 'visible';
       }
 
+      if (!isOnScreen && hasNonApiPlayableIframe(el)) {
+        return 'far';
+      }
+
       if (rect.bottom > -hardSuspendDistancePx && rect.top < vh + hardSuspendDistancePx) {
         return 'near';
       }
@@ -233,7 +263,9 @@ export function useMediaPauseOnScroll(
         }
         stageAPause(currentEl);
       } else if (target === 'suspended') {
-        if (disableHardSuspend) {
+        const shouldForceSuspendNonApi = hasNonApiPlayableIframe(currentEl);
+
+        if (disableHardSuspend && !shouldForceSuspendNonApi) {
           // Skip hard-suspend — just pause media, keep embeds loaded
           stageAPause(currentEl);
           stateRef.current = 'paused';
@@ -243,7 +275,11 @@ export function useMediaPauseOnScroll(
         if (current === 'active') {
           stageAPause(currentEl);
         }
-        hardSuspendIframes(currentEl);
+        if (disableHardSuspend && shouldForceSuspendNonApi) {
+          hardSuspendNonApiIframes(currentEl);
+        } else {
+          hardSuspendIframes(currentEl);
+        }
       }
 
       stateRef.current = target;
@@ -323,9 +359,12 @@ export function useMediaPauseOnScroll(
         stageAPause(el);
         if (!disableHardSuspend) {
           hardSuspendIframes(el);
+        } else if (hasNonApiPlayableIframe(el)) {
+          hardSuspendNonApiIframes(el);
         }
-        stateRef.current = disableHardSuspend ? 'paused' : 'suspended';
-        setLifecycleState(disableHardSuspend ? 'paused' : 'suspended');
+        const nextState = disableHardSuspend && !hasNonApiPlayableIframe(el) ? 'paused' : 'suspended';
+        stateRef.current = nextState;
+        setLifecycleState(nextState);
       }
       prevPathRef.current = location.pathname;
     }
