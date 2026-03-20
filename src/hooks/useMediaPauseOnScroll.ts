@@ -122,18 +122,11 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: pause native/API media, soft-mute non-API iframes via visibility */
+/** Stage A: pause native/API media only — keep non-API embeds rendered */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  // Soft-mute non-API iframes: hiding stops audio in most browsers
-  // without destroying the iframe (no 2-3s reload on scroll-back)
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (!isPlayableIframe(iframe) || isApiControllableIframe(iframe)) return;
-    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
-    iframe.style.visibility = 'hidden';
-  });
 }
 
 // ── Stage B helpers: hard suspend / restore ────────────────────────────
