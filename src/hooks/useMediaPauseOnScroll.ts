@@ -25,6 +25,7 @@ const YOUTUBE_SELECTOR = 'iframe[src*="youtube.com"], iframe[src*="youtube-nocoo
 const SPOTIFY_SELECTOR = 'iframe[src*="open.spotify.com"]';
 const SUSPENDED_IFRAME_SELECTOR = 'iframe[data-aelix-suspended="1"]';
 const HARD_SUSPEND_MIN_DISTANCE_PX = 2800;
+const NON_API_HARD_SUSPEND_DELAY_MS = 180;
 
 // ── Data attributes for hard-suspend bookkeeping ───────────────────────
 
@@ -201,6 +202,7 @@ export function useMediaPauseOnScroll(
   const prevPathRef = useRef(location.pathname);
   const [lifecycleState, setLifecycleState] = useState<LifecycleState>('active');
   const stateRef = useRef<LifecycleState>('active');
+  const suspendTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -215,6 +217,13 @@ export function useMediaPauseOnScroll(
 
     let rafId: number | null = null;
     let mutationRaf: number | null = null;
+
+    const clearSuspendTimer = () => {
+      if (suspendTimerRef.current !== null) {
+        window.clearTimeout(suspendTimerRef.current);
+        suspendTimerRef.current = null;
+      }
+    };
 
     const computeZone = (): 'visible' | 'near' | 'far' => {
       const rect = el.getBoundingClientRect();
@@ -250,14 +259,17 @@ export function useMediaPauseOnScroll(
       if (!currentEl) return;
 
       if (!hasLifecycleTargets(currentEl) && target !== 'active') {
+        clearSuspendTimer();
         stateRef.current = 'active';
         setLifecycleState('active');
         return;
       }
 
       if (target === 'active') {
+        clearSuspendTimer();
         restoreHardSuspended(currentEl);
       } else if (target === 'paused') {
+        clearSuspendTimer();
         if (current === 'suspended') {
           restoreHardSuspended(currentEl);
         }
@@ -266,20 +278,43 @@ export function useMediaPauseOnScroll(
         const shouldForceSuspendNonApi = hasNonApiPlayableIframe(currentEl);
 
         if (disableHardSuspend && !shouldForceSuspendNonApi) {
+          clearSuspendTimer();
           // Skip hard-suspend — just pause media, keep embeds loaded
           stageAPause(currentEl);
           stateRef.current = 'paused';
           setLifecycleState('paused');
           return;
         }
+
+        if (shouldForceSuspendNonApi) {
+          clearSuspendTimer();
+          if (current !== 'active') {
+            stateRef.current = 'paused';
+            setLifecycleState('paused');
+          }
+
+          suspendTimerRef.current = window.setTimeout(() => {
+            suspendTimerRef.current = null;
+            const latestEl = containerRef.current;
+            if (!latestEl || !hasNonApiPlayableIframe(latestEl)) return;
+
+            const rect = latestEl.getBoundingClientRect();
+            const vh = window.innerHeight || document.documentElement.clientHeight;
+            const isOnScreen = rect.bottom > 0 && rect.top < vh;
+            if (isOnScreen) return;
+
+            hardSuspendNonApiIframes(latestEl);
+            stateRef.current = 'suspended';
+            setLifecycleState('suspended');
+          }, NON_API_HARD_SUSPEND_DELAY_MS);
+          return;
+        }
+
         if (current === 'active') {
           stageAPause(currentEl);
         }
-        if (disableHardSuspend && shouldForceSuspendNonApi) {
-          hardSuspendNonApiIframes(currentEl);
-        } else {
-          hardSuspendIframes(currentEl);
-        }
+        clearSuspendTimer();
+        hardSuspendIframes(currentEl);
       }
 
       stateRef.current = target;
@@ -344,6 +379,7 @@ export function useMediaPauseOnScroll(
       window.removeEventListener('resize', scheduleReconcile);
       if (rafId !== null) cancelAnimationFrame(rafId);
       if (mutationRaf !== null) cancelAnimationFrame(mutationRaf);
+      clearSuspendTimer();
     };
   }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, disableHardSuspend]);
 
@@ -354,6 +390,11 @@ export function useMediaPauseOnScroll(
     }
 
     if (location.pathname !== prevPathRef.current) {
+      if (suspendTimerRef.current !== null) {
+        window.clearTimeout(suspendTimerRef.current);
+        suspendTimerRef.current = null;
+      }
+
       const el = containerRef.current;
       if (el && hasPlayableMedia(el)) {
         stageAPause(el);
