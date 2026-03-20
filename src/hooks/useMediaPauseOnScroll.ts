@@ -262,6 +262,10 @@ export function useMediaPauseOnScroll(
 
       if (target === 'active') {
         restoreHardSuspended(currentEl);
+        // Restore soft-muted non-API iframes
+        currentEl.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+          iframe.style.visibility = '';
+        });
       } else if (target === 'paused') {
         if (current === 'suspended') {
           restoreHardSuspended(currentEl);
