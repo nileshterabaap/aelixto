@@ -1,23 +1,20 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
 import { PostSkeleton } from "@/components/PostSkeleton";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
-import { PullToRefresh } from "@/components/PullToRefresh";
 import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
-
-import { useQueryClient } from "@tanstack/react-query";
+import { useActivePostTracker } from "@/hooks/useActivePostTracker";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
   const hasRenderedOnce = useRef(false);
-  const queryClient = useQueryClient();
   
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
@@ -27,8 +24,6 @@ const Index = () => {
     items: followingPosts,
     empty: followingEmpty,
     loading: followingLoading,
-    loadMore,
-    hasMore,
   } = useFollowingFeed();
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -112,6 +107,10 @@ const Index = () => {
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
   
+  // Track which posts are near the viewport for smart hydration
+  const { registerPost, isActive } = useActivePostTracker(
+    useMemo(() => allPosts.map((p) => p.id), [allPosts])
+  );
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
@@ -130,29 +129,6 @@ const Index = () => {
       hasRenderedOnce.current = true;
     }
   }, [allPosts.length]);
-
-  const handleRefresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
-  }, [queryClient, showDemoFeed]);
-
-  // Prefetch next page when user is within last 5 posts
-  const prefetchSentinelRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!hasMore || showDemoFeed) return;
-    const el = prefetchSentinelRef.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          loadMore();
-        }
-      },
-      { rootMargin: '1500px', threshold: 0 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasMore, loadMore, showDemoFeed, allPosts.length]);
 
   // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
@@ -178,49 +154,44 @@ const Index = () => {
     <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
-      <PullToRefresh onRefresh={handleRefresh}>
-        <main className="mx-auto max-w-2xl px-4 py-6">
-          {!showDemoFeed && followingEmpty ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <h2 className="text-xl font-semibold">No posts yet</h2>
-              <p className="text-sm text-muted-foreground mt-2">
-                Posts from people you follow will appear here once they share something.
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Start by following creators you like to fill your feed ✨
-              </p>
-              <Link
-                to="/discover"
-                className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
+      <main className="mx-auto max-w-2xl px-4 py-6">
+        {!showDemoFeed && followingEmpty ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <h2 className="text-xl font-semibold">No posts yet</h2>
+            <p className="text-sm text-muted-foreground mt-2">
+              Posts from people you follow will appear here once they share something.
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Start by following creators you like to fill your feed ✨
+            </p>
+            <Link
+              to="/discover"
+              className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
+            >
+              Discover people to follow
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {allPosts.map((post) => (
+              <div 
+                key={post.id} 
+                ref={(el) => {
+                  registerItem(post.id)(el);
+                  registerPost(post.id)(el);
+                }}
+                data-feed-item-id={post.id}
               >
-                Discover people to follow
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {allPosts.map((post, index) => (
-                <div 
-                  key={post.id} 
-                  ref={(el) => {
-                    registerItem(post.id)(el);
-                  }}
-                  data-feed-item-id={post.id}
-                >
-                  <FeedPost 
-                    post={post} 
-                    userId={user?.id} 
-                    startHydrated={index < 8}
-                  />
-                </div>
-              ))}
-              {/* Sentinel for prefetching next page ahead of scroll */}
-              {hasMore && !showDemoFeed && (
-                <div ref={prefetchSentinelRef} style={{ height: 1 }} />
-              )}
-            </div>
-          )}
-        </main>
-      </PullToRefresh>
+                <FeedPost 
+                  post={post} 
+                  userId={user?.id} 
+                  isActive={isActive(post.id)}
+                />
+              </div>
+            ))}
+          </div>
+        )}
+      </main>
 
       <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 

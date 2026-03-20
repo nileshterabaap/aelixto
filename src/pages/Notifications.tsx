@@ -1,9 +1,8 @@
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
-import { PullToRefresh } from "@/components/PullToRefresh";
 import { Heart, MessageCircle, Repeat2, Bell, Check } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -116,7 +115,7 @@ const NotificationSkeleton = () => (
 
 const Notifications = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const { notifications, isLoading, markAllRead, markAsRead, isMarkingAllRead, refetch } = useNotifications();
+  const { notifications, isLoading, markAllRead, markAsRead, isMarkingAllRead } = useNotifications();
   const navigate = useNavigate();
 
   const handleNotificationClick = (notification: Notification) => {
@@ -127,62 +126,56 @@ const Notifications = () => {
     }
   };
 
-  const handleRefresh = useCallback(async () => {
-    await refetch();
-  }, [refetch]);
-
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
     <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
-      <PullToRefresh onRefresh={handleRefresh}>
-        <main className="mx-auto max-w-2xl px-4 py-6">
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold">Notifications</h1>
-            {unreadCount > 0 && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => markAllRead()}
-                disabled={isMarkingAllRead}
-                className="text-primary hover:text-primary"
-              >
-                <Check className="h-4 w-4 mr-1" />
-                Mark all read
-              </Button>
-            )}
-          </div>
-          
-          {isLoading ? (
-            <div className="space-y-2">
-              {[...Array(5)].map((_, i) => (
-                <NotificationSkeleton key={i} />
-              ))}
-            </div>
-          ) : notifications.length === 0 ? (
-            <div className="text-center py-12">
-              <Bell className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <p className="text-muted-foreground">No notifications yet</p>
-              <p className="text-sm text-muted-foreground/70 mt-1">
-                When someone interacts with your posts, you'll see it here
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {notifications.map((notification) => (
-                <NotificationItem
-                  key={notification.id}
-                  notification={notification}
-                  onMarkAsRead={markAsRead}
-                  onClick={() => handleNotificationClick(notification)}
-                />
-              ))}
-            </div>
+      <main className="mx-auto max-w-2xl px-4 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold">Notifications</h1>
+          {unreadCount > 0 && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => markAllRead()}
+              disabled={isMarkingAllRead}
+              className="text-primary hover:text-primary"
+            >
+              <Check className="h-4 w-4 mr-1" />
+              Mark all read
+            </Button>
           )}
-        </main>
-      </PullToRefresh>
+        </div>
+        
+        {isLoading ? (
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <NotificationSkeleton key={i} />
+            ))}
+          </div>
+        ) : notifications.length === 0 ? (
+          <div className="text-center py-12">
+            <Bell className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+            <p className="text-muted-foreground">No notifications yet</p>
+            <p className="text-sm text-muted-foreground/70 mt-1">
+              When someone interacts with your posts, you'll see it here
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {notifications.map((notification) => (
+              <NotificationItem
+                key={notification.id}
+                notification={notification}
+                onMarkAsRead={markAsRead}
+                onClick={() => handleNotificationClick(notification)}
+              />
+            ))}
+          </div>
+        )}
+      </main>
 
       <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 

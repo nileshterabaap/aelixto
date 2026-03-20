@@ -177,16 +177,11 @@ export const useNotifications = () => {
     },
   });
 
-  const refetch = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["notifications", user?.id] });
-  };
-
   return {
     notifications,
     isLoading,
     markAllRead: markAllReadMutation.mutate,
     markAsRead: markAsReadMutation.mutate,
     isMarkingAllRead: markAllReadMutation.isPending,
-    refetch,
   };
 };

@@ -1,238 +1,8 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
-
-const THREADS_MIN_HEIGHT = 260;
-const THREADS_MAX_HEIGHT = 1400;
-const THREADS_DEFAULT_HEIGHT = 520;
-
-const clampThreadsHeight = (height: number) =>
-  Math.min(THREADS_MAX_HEIGHT, Math.max(THREADS_MIN_HEIGHT, Math.round(height)));
-
-const parseThreadsHeightFromMessage = (data: unknown): number | null => {
-  let payload: unknown = data;
-
-  if (typeof payload === 'number' && Number.isFinite(payload)) {
-    return payload;
-  }
-
-  if (typeof payload === 'string') {
-    try {
-      payload = JSON.parse(payload);
-    } catch {
-      return null;
-    }
-  }
-
-  const queue: unknown[] = [payload];
-  const visited = new Set<unknown>();
-
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current || typeof current !== 'object' || visited.has(current)) continue;
-
-    visited.add(current);
-    const record = current as Record<string, unknown>;
-
-    const directHeightCandidates = [
-      record.height,
-      record.iframeHeight,
-      record.frameHeight,
-      (record.dimensions as Record<string, unknown> | undefined)?.height,
-      (record.size as Record<string, unknown> | undefined)?.height,
-    ];
-
-    for (const candidate of directHeightCandidates) {
-      if (typeof candidate === 'number' && Number.isFinite(candidate)) {
-        return candidate;
-      }
-    }
-
-    Object.values(record).forEach((value) => {
-      if (value && typeof value === 'object') {
-        queue.push(value);
-      }
-    });
-  }
-
-  return null;
-};
-
-/**
- * Threads iframe that listens for resize messages and adapts height per post.
- */
-const ThreadsIframeEmbed = ({
-  src,
-  expandedUrl,
-  fallbackData,
-}: {
-  src: string;
-  expandedUrl: string;
-  fallbackData: { title?: string; image?: string; description?: string } | null;
-}) => {
-  const [failed, setFailed] = useState(false);
-  const [height, setHeight] = useState(THREADS_DEFAULT_HEIGHT);
-  const [hasLoaded, setHasLoaded] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      const iframeWindow = iframeRef.current?.contentWindow;
-      if (!iframeWindow || event.source !== iframeWindow) return;
-
-      const isThreadsOrigin =
-        event.origin.includes('threads.net') || event.origin.includes('threads.com');
-      if (!isThreadsOrigin) return;
-
-      const nextHeight = parseThreadsHeightFromMessage(event.data);
-      if (!nextHeight) return;
-
-      const clampedHeight = clampThreadsHeight(nextHeight);
-      setHeight((prev) => (Math.abs(prev - clampedHeight) > 2 ? clampedHeight : prev));
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (!hasLoaded) {
-        setFailed(true);
-      }
-    }, 12000);
-
-    return () => clearTimeout(timeout);
-  }, [hasLoaded]);
-
-  if (failed) {
-    return (
-      <OgCardFallback
-        url={expandedUrl}
-        title={fallbackData?.title}
-        image={fallbackData?.image}
-        description={fallbackData?.description}
-        platform="Threads"
-      />
-    );
-  }
-
-  return (
-    <div
-      className="relative w-full overflow-hidden"
-      style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
-    >
-      <iframe
-        ref={iframeRef}
-        src={src}
-        scrolling="no"
-        allowFullScreen
-        allow="encrypted-media"
-        loading="lazy"
-        onLoad={() => setHasLoaded(true)}
-        onError={() => setFailed(true)}
-        style={{
-          border: 'none',
-          width: '100%',
-          height: '100%',
-          display: 'block',
-          margin: 0,
-          padding: 0,
-          background: 'transparent',
-        }}
-      />
-    </div>
-  );
-};
-/**
- * Facebook iframe that auto-sizes to its content height.
- * Falls back to a generous min-height, then listens for the Facebook
- * plugins cross-origin resize message to snap to exact content height.
- */
-const FacebookIframeEmbed = ({
-  html,
-  expandedUrl,
-  fallbackData,
-}: {
-  html: string;
-  expandedUrl: string;
-  fallbackData: { title?: string; image?: string; description?: string } | null;
-}) => {
-  const [failed, setFailed] = useState(false);
-  const [height, setHeight] = useState(520); // sensible default
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  const srcMatch = html.match(/src="([^"]+)"/);
-  const iframeSrc = srcMatch ? srcMatch[1] : '';
-
-  // Listen for Facebook's cross-origin resize messages
-  useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      if (typeof e.data === 'string') {
-        try {
-          const parsed = JSON.parse(e.data);
-          // Facebook plugin sends {"type":"resize","height":XXX}
-          if (parsed?.type === 'resize' && typeof parsed.height === 'number' && parsed.height > 50) {
-            setHeight(parsed.height);
-          }
-        } catch {
-          // not JSON, ignore
-        }
-      }
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, []);
-
-  // Fallback: if iframe doesn't render in 12s, show OG card
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      if (iframeRef.current) {
-        const rect = iframeRef.current.getBoundingClientRect();
-        if (rect.height < 50) setFailed(true);
-      }
-    }, 12000);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  if (failed) {
-    return (
-      <OgCardFallback
-        url={expandedUrl}
-        title={fallbackData?.title}
-        image={fallbackData?.image}
-        description={fallbackData?.description}
-        platform="Facebook"
-      />
-    );
-  }
-
-  return (
-    <div
-      className="relative w-full overflow-hidden"
-      style={{ touchAction: 'pan-y' }}
-    >
-      <iframe
-        ref={iframeRef}
-        src={iframeSrc}
-        scrolling="no"
-        allowFullScreen
-        allow="encrypted-media"
-        loading="lazy"
-        onError={() => setFailed(true)}
-        style={{
-          border: 'none',
-          width: '100%',
-          height: `${height}px`,
-          overflow: 'hidden',
-          display: 'block',
-        }}
-      />
-    </div>
-  );
-};
 
 interface UniversalMetaEmbedProps {
   url: string;
@@ -301,11 +71,11 @@ const buildInstagramEmbed = (url: string): string => {
     // Clean the path - remove trailing slash, add /embed/
     let embedPath = u.pathname.replace(/\/$/, '') + '/embed/';
     const embedUrl = `https://www.instagram.com${embedPath}`;
-    return `<iframe src="${embedUrl}" style="border:0;width:100%;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
+    return `<iframe src="${embedUrl}" style="border:0;width:100%;min-height:500px;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
   } catch {
     // Fallback: just append /embed/ to the URL
     const cleanUrl = url.split('?')[0].replace(/\/$/, '');
-    return `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
+    return `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;min-height:500px;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
   }
 };
 
@@ -358,26 +128,13 @@ const normalizeFacebookUrl = (raw: string): string => {
   return url;
 };
 
-// Build Facebook embed using direct iframe (bypasses slow SDK)
-const buildFacebookEmbed = (url: string): string | null => {
+// Build Facebook embed using SDK approach (XFBML)
+const buildFacebookEmbed = (url: string): string => {
   const canonical = normalizeFacebookUrl(url);
-  // Share URLs (e.g. /share/v/..., /share/r/...) redirect and won't render in
-  // facebook plugins directly. Skip immediate render — let URL expansion resolve them first.
-  if (canonical.includes('/share/')) return null;
 
-  const isVideo =
-    canonical.includes('/reel/') ||
-    canonical.includes('/videos/') ||
-    canonical.includes('/watch/') ||
-    canonical.includes('fb.watch');
 
-  const pluginEndpoint = isVideo ? 'video.php' : 'post.php';
-  const encodedUrl = encodeURIComponent(canonical);
-  const query = isVideo
-    ? `href=${encodedUrl}&width=500`
-    : `href=${encodedUrl}&show_text=true&width=500`;
-
-  return `<iframe src="https://www.facebook.com/plugins/${pluginEndpoint}?${query}" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+  // IMPORTANT: do not hardcode data-width (breaks mobile sizing). Let CSS control width.
+  return `<div class="fb-post" data-href="${canonical}" data-show-text="true"></div>`;
 };
 
 // Check if Spotify URL is embeddable (not wrapped-share or other special pages)
@@ -414,7 +171,7 @@ const buildLinkedInEmbed = (url: string): string | null => {
     const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
     if (feedMatch) {
       const urn = feedMatch[1];
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
@@ -424,13 +181,13 @@ const buildLinkedInEmbed = (url: string): string | null => {
       const id = postMatch[1];
       const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
       const type = typeMatch ? typeMatch[1] : 'ugcPost';
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 3: /posts/username_slug-share-ID-hash
     const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
     if (shareMatch) {
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" height="600" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through to null
@@ -438,15 +195,15 @@ const buildLinkedInEmbed = (url: string): string | null => {
   return null;
 };
 
-// Build Threads embed HTML using direct iframe (reliable in SPAs, no SDK needed)
+// Build Threads embed HTML using official blockquote + embed.js (auto-sizes)
 const buildThreadsEmbed = (url: string): string | null => {
   try {
     const u = new URL(url);
     const postMatch = u.pathname.match(/\/@([^/]+)\/post\/([A-Za-z0-9_-]+)/);
     if (postMatch) {
       const cleanPath = u.pathname.replace(/\/$/, '');
-      const embedUrl = `https://www.threads.net${cleanPath}/embed`.replace('threads.com', 'threads.net');
-      return `<iframe src="${embedUrl}" style="border:none;position:absolute;top:0;left:0;right:0;width:100%;max-width:100%;height:600px;display:block;margin:0;padding:0;background:transparent;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+      const postUrl = `https://www.threads.net${cleanPath}`.replace('threads.com', 'threads.net');
+      return `<blockquote class="text-post-media" data-text-post-permalink="${postUrl}" data-text-post-version="0" style="background:#fff;border-width:1px;border-style:solid;border-color:#00000026;border-radius:16px;max-width:540px;margin:0 auto;padding:0;width:calc(100% - 2px);"><a href="${postUrl}" target="_blank" rel="noopener noreferrer">View on Threads</a></blockquote><script async src="https://www.threads.net/embed.js"></script>`;
     }
   } catch {
     // Fall through
@@ -454,15 +211,14 @@ const buildThreadsEmbed = (url: string): string | null => {
   return null;
 };
 
-// Build TikTok embed HTML using direct iframe (fastest, no SDK needed)
+// Build TikTok embed HTML using oEmbed blockquote approach
 const buildTikTokEmbed = (url: string): string | null => {
   try {
     const u = new URL(url);
-    // TikTok video URLs: /@user/video/ID
-    const videoMatch = u.pathname.match(/\/@[^/]+\/video\/(\d+)/);
+    // TikTok video URLs: /@user/video/ID or /t/ID
+    const videoMatch = u.pathname.match(/\/@[^/]+\/video\/(\d+)/) || u.pathname.match(/\/t\/([A-Za-z0-9]+)/);
     if (videoMatch) {
-      const videoId = videoMatch[1];
-      return `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" style="border:none;width:100%;height:740px;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
+      return `<blockquote class="tiktok-embed" cite="${url}" data-video-id="${videoMatch[1]}" style="max-width:605px;min-width:325px;"><section><a target="_blank" href="${url}" rel="noopener noreferrer">View on TikTok</a></section></blockquote><script async src="https://www.tiktok.com/embed.js"></script>`;
     }
   } catch {
     // Fall through
@@ -531,9 +287,6 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
           url.includes('fb.me') ||
           url.includes('bit.ly') ||
           url.includes('pin.it') ||
-          url.includes('vm.tiktok.com') ||
-          url.includes('vt.tiktok.com') ||
-          (url.includes('tiktok.com') && url.includes('/t/')) ||
           (url.includes('facebook.com') && url.includes('/share/'));
 
         if (needsExpansion) {
@@ -646,42 +399,45 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
   if (embedHtml && !showFallback) {
     // For direct iframe embeds (Spotify, Instagram, LinkedIn, Threads), render without RawEmbedRenderer
-      const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed') || (embedHtml.includes('threads.net') && embedHtml.includes('<iframe')) || (embedHtml.includes('facebook.com/plugins/') && embedHtml.includes('<iframe')) || (embedHtml.includes('tiktok.com/embed') && embedHtml.includes('<iframe'));
+    const isDirectIframe = embedHtml.includes('open.spotify.com/embed') || (embedHtml.includes('instagram.com') && embedHtml.includes('<iframe')) || embedHtml.includes('linkedin.com/embed');
 
-      if (isDirectIframe) {
-        const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
-          ALLOWED_TAGS: ['iframe'],
-          ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'scrolling', 'title']
-        });
+    if (isDirectIframe) {
+      const sanitizedHtml = DOMPurify.sanitize(embedHtml, {
+        ALLOWED_TAGS: ['iframe'],
+        ALLOWED_ATTR: ['src', 'style', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'scrolling']
+      });
       const isInstagramIframe = embedHtml.includes('instagram.com');
-      const isThreadsIframe = embedHtml.includes('threads.net');
-      const isFacebookIframe = embedHtml.includes('facebook.com/plugins/');
-
-      if (isFacebookIframe) {
-        return (
-          <FacebookIframeEmbed
-            html={sanitizedHtml}
-            expandedUrl={expandedUrl}
-            fallbackData={fallbackData}
-          />
-        );
-      }
 
       if (isInstagramIframe) {
         // Extract the src URL from the sanitized iframe HTML
         const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
         const iframeSrc = srcMatch ? srcMatch[1] : '';
 
+        // Viewport-lock strategy:
+        // - Container has overflow:hidden to clip native action buttons
+        // - Iframe renders at natural position (header + media + "View more" visible)
+        // - Extra height pushes action buttons outside the clipped container
         return (
           <div
             className="relative w-full overflow-hidden"
-            style={{ aspectRatio: '3 / 5', touchAction: 'pan-y' }}
+            style={{ aspectRatio: '3 / 4', touchAction: 'pan-y' }}
           >
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                zIndex: 2,
+                touchAction: 'pan-y',
+              }}
+            />
             <iframe
               src={iframeSrc}
               scrolling="no"
               allowFullScreen
-              allow="encrypted-media; autoplay"
+              allow="encrypted-media"
               loading="lazy"
               style={{
                 border: 'none',
@@ -689,27 +445,15 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
                 top: 0,
                 left: 0,
                 width: '100%',
-                height: 'calc(100% + 500px)',
+                height: 'calc(100% + 400px)',
                 overflow: 'hidden',
+                pointerEvents: 'none',
               }}
             />
           </div>
         );
       }
 
-      // Threads iframe: render with onError fallback
-      if (isThreadsIframe) {
-        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
-        const iframeSrc = srcMatch ? srcMatch[1] : '';
-
-        return (
-          <ThreadsIframeEmbed
-            src={iframeSrc}
-            expandedUrl={expandedUrl}
-            fallbackData={fallbackData}
-          />
-        );
-      }
 
       return (
         <div

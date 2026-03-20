@@ -58,7 +58,7 @@ export const LazyEmbed = ({
         });
       },
       {
-        rootMargin: '600px', // Conservative margin - velocity gating handles the rest
+        rootMargin: '2000px', // Large margin for preloading
         threshold: 0.01
       }
     );
@@ -108,7 +108,7 @@ export const LazyEmbed = ({
   // CRITICAL FIX: Never unmount content once loaded!
   // Content stays in DOM, wrapped in SkeletonGate for smooth fade-in.
   return (
-    <div ref={containerRef} style={{ contain: 'layout paint' }}>
+    <div ref={containerRef}>
       {shouldLoad && (
         <SkeletonGate platform={platform}>
           {children}

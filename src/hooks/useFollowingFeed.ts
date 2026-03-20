@@ -1,7 +1,7 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect } from 'react';
 
 interface FeedPost {
   id: string;
@@ -35,6 +35,12 @@ interface UseFollowingFeedResult {
   loadMore: () => void;
   hasMore: boolean;
 }
+
+const fetchFollowingCount = async () => {
+  const { data, error } = await supabase.rpc('get_following_count');
+  if (error) throw error;
+  return data as number;
+};
 
 const fetchFeedPage = async (cursor?: string) => {
   const { data, error } = await supabase.rpc('get_following_feed', {
@@ -79,9 +85,24 @@ const fetchFeedPage = async (cursor?: string) => {
 };
 
 export const useFollowingFeed = (): UseFollowingFeedResult => {
+  const queryClient = useQueryClient();
   const preloadedRef = useRef(false);
 
-  // Fetch feed directly — no count gate, single RPC call
+  // Check following count first
+  const { data: followingCount, isLoading: countLoading } = useQuery({
+    queryKey: ['following-count'],
+    queryFn: fetchFollowingCount,
+    // prevent a "blank" first render on navigation by seeding from cache
+    initialData: () => queryClient.getQueryData(['following-count']) as number | undefined,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+
+  const hasFollowing = (followingCount ?? 0) > 0;
+
+  // Fetch feed with infinite query for pagination
   const {
     data,
     isLoading: feedLoading,
@@ -94,19 +115,17 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
-    gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: true, // refetch if stale on mount/page reload
-    refetchOnReconnect: true,
-    structuralSharing: true,
+    enabled: hasFollowing,
+    staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
+    gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache
+    refetchOnWindowFocus: false, // Don't refetch on window focus
+    refetchOnMount: false, // Don't refetch on mount if data exists
+    refetchOnReconnect: false, // Don't refetch on reconnect
+    structuralSharing: true, // Prevent unnecessary re-renders
   });
 
   // Flatten all pages into single array - stable reference
-  const items = useMemo(
-    () => data?.pages.flatMap((page) => page.posts) ?? [],
-    [data?.pages]
-  );
+  const items = data?.pages.flatMap((page) => page.posts) ?? [];
 
   // Aggressively preload ALL thumbnails once on data arrival
   useEffect(() => {
@@ -143,8 +162,8 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
 
   return {
     items,
-    empty: !feedLoading && items.length === 0,
-    loading: feedLoading,
+    empty: !countLoading && !hasFollowing,
+    loading: countLoading || (hasFollowing && feedLoading),
     error: feedError?.message ?? null,
     loadMore,
     hasMore: hasNextPage ?? false,

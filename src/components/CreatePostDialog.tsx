@@ -7,7 +7,6 @@ import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
-import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -23,7 +22,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [showThumbnailInput, setShowThumbnailInput] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [embedHtml, setEmbedHtml] = useState("");
-  const [ogType, setOgType] = useState<string | null>(null);
   const createPost = useCreatePost();
 
   const handleLinkSubmit = async () => {
@@ -56,6 +54,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
           }
         }
       } else if (linkUrl.includes("reddit.com") || linkUrl.includes("redd.it")) {
+        // Reddit - use server-side edge function to avoid CORS
         console.log('[CreatePostDialog] Fetching Reddit thumbnail via edge function');
         try {
           const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
@@ -64,25 +63,30 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
           if (!error && ogData) {
             videoTitle = ogData.title || "";
             thumbnail = ogData.image || "";
-            if (ogData.og_type) setOgType(ogData.og_type);
+            console.log('[CreatePostDialog] Got Reddit thumbnail:', thumbnail?.substring(0, 60));
           }
         } catch (error) {
           console.error('[CreatePostDialog] Reddit fetch failed:', error);
         }
       } else if (linkUrl.includes("instagram.com") || linkUrl.includes("facebook.com") || linkUrl.includes("fb.watch") || linkUrl.includes("fb.me")) {
+        // Instagram/Facebook - use server-side Meta API for reliable thumbnails
         const platform = linkUrl.includes("instagram.com") ? "instagram" : "facebook";
         try {
+          console.log(`[CreatePostDialog] Fetching ${platform} thumbnail via edge function`);
           const { data, error } = await supabase.functions.invoke('fetch-meta-thumbnail', {
             body: { url: linkUrl, platform }
           });
           if (!error && data) {
             videoTitle = data.title || "";
             thumbnail = data.thumbnail || "";
+            console.log(`[CreatePostDialog] Got ${platform} thumbnail:`, thumbnail?.substring(0, 60));
           }
         } catch (error) {
           console.error(`[CreatePostDialog] ${platform} thumbnail fetch failed:`, error);
         }
       } else if (linkUrl.includes("pinterest.com") || linkUrl.includes("pin.it")) {
+        // Pinterest - fetch OG data for thumbnail
+        console.log('[CreatePostDialog] Fetching Pinterest thumbnail via OG');
         try {
           const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
             body: { url: linkUrl }
@@ -90,12 +94,14 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
           if (!error && ogData) {
             videoTitle = ogData.title || "";
             thumbnail = ogData.image || "";
-            if (ogData.og_type) setOgType(ogData.og_type);
+            console.log('[CreatePostDialog] Got Pinterest thumbnail:', thumbnail?.substring(0, 60));
           }
         } catch (error) {
           console.error('[CreatePostDialog] Pinterest OG fetch failed:', error);
         }
       } else if (linkUrl.includes("spotify.com") || linkUrl.includes("open.spotify.com")) {
+        // Spotify - fetch OG data for thumbnail
+        console.log('[CreatePostDialog] Fetching Spotify thumbnail via OG');
         try {
           const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
             body: { url: linkUrl }
@@ -103,11 +109,14 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
           if (!error && ogData) {
             videoTitle = ogData.title || "";
             thumbnail = ogData.image || "";
+            console.log('[CreatePostDialog] Got Spotify thumbnail:', thumbnail?.substring(0, 60));
           }
         } catch (error) {
           console.error('[CreatePostDialog] Spotify OG fetch failed:', error);
         }
       } else if (linkUrl.includes("twitter.com") || linkUrl.includes("x.com")) {
+        // Twitter/X - try OG data (Twitter oEmbed doesn't provide images)
+        console.log('[CreatePostDialog] Fetching Twitter thumbnail via OG');
         try {
           const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
             body: { url: linkUrl }
@@ -115,6 +124,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
           if (!error && ogData) {
             videoTitle = ogData.title || "";
             thumbnail = ogData.image || "";
+            console.log('[CreatePostDialog] Got Twitter thumbnail:', thumbnail?.substring(0, 60));
           }
         } catch (error) {
           console.error('[CreatePostDialog] Twitter OG fetch failed:', error);
@@ -133,7 +143,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
             console.log('[CreatePostDialog] OG data received:', ogData);
             if (!videoTitle && ogData.title) videoTitle = ogData.title;
             if (ogData.image) thumbnail = ogData.image;
-            if (ogData.og_type) setOgType(ogData.og_type);
           } else {
             console.error('[CreatePostDialog] OG fetch error:', error);
           }
@@ -156,6 +165,8 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
         console.error('[CreatePostDialog] oEmbed fetch failed:', error);
       }
 
+      console.log('[CreatePostDialog] Setting thumbnail:', thumbnail);
+      console.log('[CreatePostDialog] Setting title:', videoTitle);
       setThumbnailUrl(thumbnail);
       setTitle(videoTitle);
       setStep(2);
@@ -167,16 +178,51 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const handlePost = () => {
     if (!linkUrl.trim()) return;
 
-    // Use centralised classification
-    const platform = classifyUrl(linkUrl, ogType);
-    const mediaType = deriveMediaType(linkUrl, platform);
+    // Detect platform and media type
+    let platform = "";
+    let mediaType = "none"; // Default to "none" for articles/blogs
+    
+    if (linkUrl.includes("youtube.com") || linkUrl.includes("youtu.be")) {
+      platform = "youtube";
+      mediaType = "video";
+    } else if (linkUrl.includes("tiktok.com")) {
+      platform = "tiktok";
+      mediaType = "video";
+    } else if (linkUrl.includes("instagram.com")) {
+      platform = "instagram";
+      mediaType = "image";
+      if (linkUrl.includes("/reel/") || linkUrl.includes("/reels/")) {
+        mediaType = "video";
+      }
+    } else if (linkUrl.includes("reddit.com")) {
+      platform = "reddit";
+      mediaType = "none";
+    } else if (linkUrl.includes("twitter.com") || linkUrl.includes("x.com")) {
+      platform = "twitter";
+      mediaType = "video";
+    } else if (linkUrl.includes("pinterest.com") || linkUrl.includes("pin.it")) {
+      platform = "pinterest";
+      mediaType = "image";
+    } else if (linkUrl.includes("medium.com")) {
+      platform = "medium";
+      mediaType = "none";
+    } else if (linkUrl.includes("quora.com")) {
+      platform = "quora";
+      mediaType = "none";
+    } else if (linkUrl.includes("facebook.com") || linkUrl.includes("fb.watch") || linkUrl.includes("fb.me")) {
+      platform = "facebook";
+      mediaType = "none";
+    } else if (linkUrl.includes("spotify.com") || linkUrl.includes("open.spotify.com")) {
+      platform = "spotify";
+      mediaType = "none";
+    }
 
     console.log('[CreatePostDialog] Creating post with data:', {
       title: title.trim(),
       content: caption.trim(),
       media_type: mediaType,
       media_url: linkUrl,
-      platform,
+      platform: platform,
       thumbnail_url: thumbnailUrl,
       embed_html: embedHtml ? `${embedHtml.length} chars` : 'none',
     });
@@ -186,7 +232,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       content: caption.trim() || "",
       media_type: mediaType,
       media_url: linkUrl,
-      platform: platform,
+      platform: platform || undefined,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
     });
@@ -199,7 +245,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setCaption("");
     setShowThumbnailInput(false);
     setEmbedHtml("");
-    setOgType(null);
     onOpenChange(false);
   };
 
@@ -214,10 +259,14 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setThumbnailUrl("");
     setTitle("");
     setCaption("");
+    setStep(1);
+    setLinkUrl("");
+    setThumbnailUrl("");
+    setTitle("");
+    setCaption("");
     setShowThumbnailInput(false);
     setIsLoadingPreview(false);
     setEmbedHtml("");
-    setOgType(null);
     onOpenChange(false);
   };
 

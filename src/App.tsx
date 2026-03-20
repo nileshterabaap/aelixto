@@ -8,7 +8,6 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { preloadEmbedSDKs } from "@/lib/ScriptLoader";
 import { prefetchCoreData } from "@/lib/prefetch";
-import { useGlobalMediaPauseOnNavigate } from "@/hooks/useMediaPauseOnScroll";
 import { PageTransition } from "@/components/PageTransition";
 import { KeepAliveRoutes } from "@/components/KeepAliveRoutes";
 import { persistOptions } from "@/lib/queryPersister";
@@ -50,7 +49,6 @@ prefetchCoreData(queryClient);
 
 const AnimatedRoutes = () => {
   const location = useLocation();
-  useGlobalMediaPauseOnNavigate();
   
   // Disable browser's automatic scroll restoration
   useEffect(() => {

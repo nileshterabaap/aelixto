@@ -19,8 +19,8 @@ const sanitizeEmbedHtml = (html: string): string => {
   let processedHtml = stripInstagramCaption(html);
   
   return DOMPurify.sanitize(processedHtml, {
-    ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img', 'svg', 'path', 'title', 'section'],
-    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling', 'data-text-post-permalink', 'data-text-post-version', 'id', 'viewBox', 'xmlns', 'role', 'fill', 'd', 'aria-label', 'cite', 'data-video-id', 'rel'],
+    ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img', 'svg', 'path', 'title'],
+    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling', 'data-text-post-permalink', 'data-text-post-version', 'id', 'viewBox', 'xmlns', 'role', 'fill', 'd', 'aria-label'],
     ALLOW_DATA_ATTR: true
   });
 };
@@ -65,31 +65,19 @@ const isInstagramEmbed = (html: string): boolean => {
 };
 
 // Detect platform for SDK processing purposes
-const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-iframe' | 'threads' | 'tiktok' | 'unknown' => {
-  // Instagram iframes don't need SDK processing
+const detectPlatform = (html: string): 'instagram' | 'facebook' | 'threads' | 'unknown' => {
+  // Instagram iframes don't need SDK processing, but are still Instagram for rendering
   if (html.includes('instagram.com') && html.includes('<iframe')) {
-    return 'unknown';
+    return 'unknown'; // Skip SDK, but isInstagramEmbed() still returns true
   }
   if (html.includes('instagram.com') || html.includes('instagram-media')) {
     return 'instagram';
   }
-  // Facebook iframes — need error monitoring but not SDK processing
-  if (html.includes('facebook.com/plugins/') && html.includes('<iframe')) {
-    return 'facebook-iframe';
-  }
   if (html.includes('facebook.com') || html.includes('fb-post') || html.includes('fb-video')) {
     return 'facebook';
   }
-  // Threads iframes don't need SDK processing
-  if ((html.includes('threads.net') && html.includes('<iframe'))) {
-    return 'unknown';
-  }
   if (html.includes('text-post-media') || html.includes('threads.net')) {
     return 'threads';
-  }
-  // TikTok blockquote embeds need SDK
-  if (html.includes('tiktok-embed') || html.includes('tiktok.com/embed')) {
-    return 'tiktok';
   }
   return 'unknown';
 };
@@ -237,27 +225,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             checkFacebookError(3000);
             checkFacebookError(6000);
           }
-      } else if (platform === 'facebook-iframe') {
-          // Monitor Facebook iframe for load failures
-          const checkIframe = (timeout: number) => {
-            setTimeout(() => {
-              if (!containerRef.current) return;
-              const iframe = containerRef.current.querySelector('iframe');
-              if (!iframe) {
-                setEmbedFailed(true);
-                onError?.();
-                return;
-              }
-              // Check if iframe has reasonable dimensions (not collapsed)
-              const rect = iframe.getBoundingClientRect();
-              if (rect.height < 50) {
-                setEmbedFailed(true);
-                onError?.();
-              }
-            }, timeout);
-          };
-          checkIframe(5000);
-          checkIframe(10000);
       } else if (platform === 'threads') {
           await loadThreadsEmbed();
           
@@ -312,20 +279,13 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     return (
       <div
         className="relative w-full overflow-hidden"
-        style={{ aspectRatio: '3 / 5', touchAction: 'pan-y' }}
+        style={{ maxHeight: '85vh' }}
       >
         <div
           ref={containerRef}
           onClick={handleDoubleTap}
           className="embed-container w-full max-w-full [&>*]:!m-0"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: 'calc(100% + 500px)',
-            overflow: 'hidden',
-          }}
+          style={{ marginBottom: '-10px' }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       </div>
@@ -334,19 +294,14 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
 
 
   // Threads embeds: tighter container, hide fallback link only when iframe loads
-  // Height-contained wrapper clips extra vertical space injected by Threads SDK
   if (platform === 'threads') {
     return (
       <div
-        style={{ width: '100%', maxHeight: 520, overflow: 'hidden', position: 'relative' }}
-      >
-        <div
-          ref={containerRef}
-          className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&>iframe~*]:!hidden"
-          style={{ overflow: 'hidden' }}
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-        />
-      </div>
+        ref={containerRef}
+        className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&>iframe~*]:!hidden"
+        style={{ overflow: 'hidden' }}
+        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+      />
     );
   }
 

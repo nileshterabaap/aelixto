@@ -9,11 +9,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
-
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
-import { SaveToCollectionSheet } from "@/components/saved/SaveToCollectionSheet";
 import { CollapsibleCaption } from "@/components/CollapsibleCaption";
 import { UsernameLink } from "@/components/UsernameLink";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
@@ -36,7 +34,6 @@ interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
   userId?: string;
   isActive?: boolean; // Controlled by parent - whether this post is near viewport
-  startHydrated?: boolean; // Skip IntersectionObserver, hydrate immediately
 }
 
 const formatTimestamp = (date: Date) => {
@@ -84,43 +81,30 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
-export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
+export const HydratedFeedPost = ({ post, userId, isActive = true }: HydratedFeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(startHydrated);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
 
-  // Track if embed is within viewport proximity — symmetric for both scroll directions
-  // Default to true so posts hydrate immediately on mount — IO corrects for off-screen posts
-  const [isNearViewport, setIsNearViewport] = useState(true);
-
+  // Tight auto-hydration observer: only hydrate when within ~400px of viewport
+  // This limits concurrent embeds to ~2-3, keeping scrolling butter-smooth
   useEffect(() => {
-    if (startHydrated) return;
     const el = embedRef.current;
     if (!el) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsNearViewport(entry.isIntersecting);
+        if (entry.isIntersecting) {
+          setIsHydrated(true);
+        }
       },
-      // Symmetric margin: 3000px above AND below the viewport
-      // Ensures posts are ready before entering view in BOTH scroll directions
-      { rootMargin: '3000px 0px', threshold: 0 }
+      { rootMargin: '900px', threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [startHydrated]);
-
-  // Hydrate immediately when near viewport — no velocity gating.
-  // Since disableHardSuspend keeps embeds alive forever, eager hydration has no cost.
-  // Once hydrated, stays hydrated (isHydrated only goes false→true).
-  useEffect(() => {
-    if (isHydrated || !isNearViewport) return;
-    setIsHydrated(true);
-  }, [isNearViewport, isHydrated]);
+  }, []);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
   
@@ -249,20 +233,16 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
 
-      {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
-      {r.kind !== 'none' ? (
-        <div ref={embedRef} style={{ contain: 'layout paint' }}>
-          <HydratedEmbed
-            post={post}
-            renderer={r}
-            thumbnailUrl={effectiveThumbnail}
-            isHydrated={isHydrated}
-            onPlayClick={handlePlayClick}
-          />
-        </div>
-      ) : (
-        <div ref={embedRef} />
-      )}
+      {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed */}
+      <div ref={embedRef}>
+        <HydratedEmbed
+          post={post}
+          renderer={r}
+          thumbnailUrl={effectiveThumbnail}
+          isHydrated={isHydrated}
+          onPlayClick={handlePlayClick}
+        />
+      </div>
 
       {/* Title for video/image posts */}
       {post.title && (r.kind === 'image' || r.kind === 'video') && (
@@ -272,8 +252,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
       {/* Interaction Bar - tight spacing, professional layout */}
-      {/* For Instagram: pull bar up to cover native action buttons */}
-      <div className={`flex items-center justify-around px-3 py-3 relative z-10 bg-background ${detectedPlatform === 'instagram' ? '-mt-10' : ''}`}>
+      <div className="flex items-center justify-around px-3 py-3">
         <button
           onClick={handleLikeClick}
           className="action-btn p-1.5 active:scale-90 transition-transform flex items-center gap-1"
@@ -315,13 +294,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </button>
         <button
           onClick={() => toggleSave()}
-          onPointerDown={() => {
-            longPressTimer.current = setTimeout(() => {
-              if (canUseActions) setCollectionSheetOpen(true);
-            }, 500);
-          }}
-          onPointerUp={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
-          onPointerLeave={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
           className="action-btn p-1.5 active:scale-90 transition-transform"
         >
           <Bookmark className={`h-6 w-6 stroke-[1.5] ${isSaved ? 'fill-current' : 'fill-none'}`} />
@@ -336,15 +308,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           postAuthorId={(post as any).user_id}
         />
       )}
-
-      {post.isRealPost && userId && (
-        <SaveToCollectionSheet
-          open={collectionSheetOpen}
-          onOpenChange={setCollectionSheetOpen}
-          postId={post.id}
-          userId={userId}
-        />
-      )}
     </Card>
   );
 };
@@ -353,7 +316,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 const arePropsEqual = (prev: HydratedFeedPostProps, next: HydratedFeedPostProps) => {
   if (prev.userId !== next.userId) return false;
   if (prev.isActive !== next.isActive) return false;
-  if (prev.startHydrated !== next.startHydrated) return false;
   if (prev.post.id !== next.post.id) return false;
   
   const p = prev.post;
