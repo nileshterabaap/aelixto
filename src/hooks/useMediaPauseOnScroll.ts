@@ -231,7 +231,9 @@ export function useMediaPauseOnScroll(
         return 'visible';
       }
 
-      // No aggressive kill for non-API iframes — they follow normal lifecycle
+      if (!isOnScreen && hasNonApiPlayableIframe(el)) {
+        return 'far';
+      }
 
       if (rect.bottom > -hardSuspendDistancePx && rect.top < vh + hardSuspendDistancePx) {
         return 'near';
