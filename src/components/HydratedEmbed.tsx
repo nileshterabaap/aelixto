@@ -115,7 +115,7 @@ export const HydratedEmbed = memo(({
       r.kind === 'universal' ||
       r.kind === 'pinterest');
 
-  const lifecycleState = useMediaPauseOnScroll(
+  useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
     { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: true }
