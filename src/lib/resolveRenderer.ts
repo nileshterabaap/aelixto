@@ -18,18 +18,21 @@ export function isRedditUrl(u?: string) {
 }
 
 export function resolveRenderer(post: any): Renderer {
-  // 1) raw embed wins
-  if (post?.embed_html) return { kind: 'raw', html: post.embed_html };
-
   const url: string | undefined = post?.mediaUrl;
+
+  // 1) Platform-specific renderers that need their own SDKs — BEFORE raw HTML
+  if (isRedditUrl(url)) return { kind: 'reddit', url: url! };
+  if (url && post?.platform === 'twitter') return { kind: 'twitter', url };
+  if (url && post?.platform === 'pinterest') return { kind: 'pinterest', url };
+  if (url && (post?.platform === 'threads' || post?.platform === 'linkedin'))
+    return { kind: 'universal', url };
+
+  // 2) raw embed for remaining platforms (Instagram, Facebook, Spotify, TikTok, etc.)
+  if (post?.embed_html) {
+    return { kind: 'raw', html: post.embed_html };
+  }
+
   if (!url) return { kind: 'none' };
-
-  // 2) reddit wins before everything else
-  if (isRedditUrl(url)) return { kind: 'reddit', url };
-
-  // 3) platform-specific embeds next
-  if (post?.platform === 'twitter') return { kind: 'twitter', url };
-  if (post?.platform === 'pinterest') return { kind: 'pinterest', url };
 
   // 4) article extractor for blogs/quora/medium/etc (never reddit)
   const blocked = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','twitter.com','x.com','pinterest.com','youtube.com','youtu.be','tiktok.com','reddit.com','redd.it','threads.net','threads.com','linkedin.com'];

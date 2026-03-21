@@ -209,6 +209,11 @@ export const PlatformPostViewer = ({
                 <HydratedFeedPost
                   post={transformPost(post, profileData || undefined)}
                   userId={user?.id}
+                  startHydrated={(() => {
+                    const idx = items.findIndex(p => p.id === initialPostId);
+                    const postIdx = items.findIndex(p => p.id === post.id);
+                    return idx >= 0 && Math.abs(postIdx - idx) <= 1;
+                  })()}
                 />
               </div>
             ))

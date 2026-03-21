@@ -9,6 +9,10 @@ export const setScrollPosition = (routeKey: string, position: number) => {
   scrollPositions.set(routeKey, position);
 };
 
+export const getScrollPosition = (routeKey: string) => {
+  return scrollPositions.get(routeKey);
+};
+
 // Debug logging
 const DEBUG = false;
 const log = (...args: unknown[]) => DEBUG && console.log('[ScrollRestoration]', ...args);
