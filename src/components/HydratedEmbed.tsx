@@ -67,7 +67,6 @@ export const HydratedEmbed = memo(({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
-  const [showVisualHold, setShowVisualHold] = useState(false);
   const shouldHydrate = isHydrated || hydratedPostIds.has(post.id);
   const mediaUrl = post.mediaUrl || (post as any).media_url || r.url;
   const platformHint = (post.platform || '').toLowerCase();
