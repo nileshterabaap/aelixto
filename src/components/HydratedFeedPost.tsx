@@ -106,9 +106,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       ([entry]) => {
         setIsNearViewport(entry.isIntersecting);
       },
-      // Symmetric margin: 3000px above AND below the viewport
-      // Ensures posts are ready before entering view in BOTH scroll directions
-      { rootMargin: '3000px 0px', threshold: 0 }
+      // Symmetric margin: 5000px above AND below the viewport
+      // Ensures posts are fully hydrated long before entering view
+      { rootMargin: '5000px 0px', threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();

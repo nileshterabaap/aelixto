@@ -58,7 +58,7 @@ export const LazyEmbed = ({
         });
       },
       {
-        rootMargin: '600px', // Conservative margin - velocity gating handles the rest
+        rootMargin: '3000px', // Aggressive margin — preload embeds much earlier
         threshold: 0.01
       }
     );
