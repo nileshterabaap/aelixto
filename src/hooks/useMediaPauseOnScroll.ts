@@ -243,15 +243,11 @@ export function useMediaPauseOnScroll(
         return 'visible';
       }
 
-      if (!isOnScreen && hasNonApiPlayableIframe(el)) {
-        return 'far';
-      }
-
-      if (rect.bottom > -hardSuspendDistancePx && rect.top < vh + hardSuspendDistancePx) {
+      // Non-API iframes: never hard-suspend — keep them loaded for stability
+      // Only pause API-controllable media
+      if (!isOnScreen) {
         return 'near';
       }
-
-      return 'far';
     };
 
     const transition = (target: LifecycleState) => {

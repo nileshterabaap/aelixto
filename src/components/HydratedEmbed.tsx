@@ -67,7 +67,6 @@ export const HydratedEmbed = memo(({
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
-  const [showVisualHold, setShowVisualHold] = useState(false);
   const shouldHydrate = isHydrated || hydratedPostIds.has(post.id);
   const mediaUrl = post.mediaUrl || (post as any).media_url || r.url;
   const platformHint = (post.platform || '').toLowerCase();
@@ -116,7 +115,7 @@ export const HydratedEmbed = memo(({
       r.kind === 'universal' ||
       r.kind === 'pinterest');
 
-  const lifecycleState = useMediaPauseOnScroll(
+  useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
     { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: true }
@@ -140,42 +139,6 @@ export const HydratedEmbed = memo(({
     rememberHydratedPost(post.id);
   }, [post.id, shouldHydrate]);
 
-  useEffect(() => {
-    const container = embedContainerRef.current;
-    if (!container) return;
-
-    if (lifecycleState === 'suspended') {
-      setShowVisualHold(true);
-      return;
-    }
-
-    if (!showVisualHold) return;
-
-    const iframes = Array.from(container.querySelectorAll<HTMLIFrameElement>('iframe'));
-    if (iframes.length === 0) {
-      setShowVisualHold(false);
-      return;
-    }
-
-    let released = false;
-    const release = () => {
-      if (released) return;
-      released = true;
-      setShowVisualHold(false);
-    };
-
-    const fallbackTimer = window.setTimeout(release, 1200);
-    const onLoad = () => {
-      window.setTimeout(release, 120);
-    };
-
-    iframes.forEach((iframe) => iframe.addEventListener('load', onLoad, { once: true }));
-
-    return () => {
-      window.clearTimeout(fallbackTimer);
-      iframes.forEach((iframe) => iframe.removeEventListener('load', onLoad));
-    };
-  }, [lifecycleState, showVisualHold]);
 
   const handleRawEmbedError = useCallback(() => {
     setRawEmbedFailed(true);
@@ -254,8 +217,7 @@ export const HydratedEmbed = memo(({
     forceUniversalRenderer;
 
   // Show dim overlay when scrolled away for non-API embeds
-  const showScrolledAwayOverlay = shouldHydrate && !isInView && isNonApiEmbed && !showVisualHold;
-  const showPosterHold = showVisualHold && !!effectiveThumbnail && !imageError;
+  const showScrolledAwayOverlay = shouldHydrate && !isInView && isNonApiEmbed;
 
   // HYDRATED STATE: Show skeleton → fade into actual embed
   return (
@@ -386,18 +348,6 @@ export const HydratedEmbed = memo(({
           </SkeletonGate>
         )}
       </div>
-
-      {showPosterHold && (
-        <div className="absolute inset-0 pointer-events-none bg-muted">
-          <img
-            src={effectiveThumbnail}
-            alt="Content preview"
-            className="w-full h-full object-cover"
-            loading="eager"
-            decoding="async"
-          />
-        </div>
-      )}
 
       {/* Dim overlay for non-API embeds when scrolled away — blocks interaction without disrupting layout */}
       {showScrolledAwayOverlay && (
