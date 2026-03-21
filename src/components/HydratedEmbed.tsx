@@ -349,18 +349,6 @@ export const HydratedEmbed = memo(({
         )}
       </div>
 
-      {showPosterHold && (
-        <div className="absolute inset-0 pointer-events-none bg-muted">
-          <img
-            src={effectiveThumbnail}
-            alt="Content preview"
-            className="w-full h-full object-cover"
-            loading="eager"
-            decoding="async"
-          />
-        </div>
-      )}
-
       {/* Dim overlay for non-API embeds when scrolled away — blocks interaction without disrupting layout */}
       {showScrolledAwayOverlay && (
         <div
