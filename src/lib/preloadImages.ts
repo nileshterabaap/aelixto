@@ -76,7 +76,7 @@ export const preloadAllFeedImages = (posts: Array<{
 }>): void => {
   // Use requestIdleCallback for non-blocking batch loading
   const loadBatch = (startIdx: number) => {
-    const batchSize = 20; // Larger batches for faster coverage
+    const batchSize = 10;
     const endIdx = Math.min(startIdx + batchSize, posts.length);
     
     for (let i = startIdx; i < endIdx; i++) {
@@ -89,32 +89,32 @@ export const preloadAllFeedImages = (posts: Array<{
       }
     }
     
-    // Continue with next batch immediately
+    // Continue with next batch
     if (endIdx < posts.length) {
       if ('requestIdleCallback' in window) {
-        requestIdleCallback(() => loadBatch(endIdx), { timeout: 50 });
+        requestIdleCallback(() => loadBatch(endIdx), { timeout: 100 });
       } else {
-        setTimeout(() => loadBatch(endIdx), 0);
+        setTimeout(() => loadBatch(endIdx), 16);
       }
     }
   };
   
   // Start loading immediately
   if (posts.length > 0) {
-    // First 10 posts: high priority for instant display
-    posts.slice(0, 10).forEach((post, index) => {
-      const isHighPriority = index < 6;
+    // First 5 posts: high priority for instant display
+    posts.slice(0, 5).forEach((post, index) => {
+      const isHighPriority = index < 3;
       const preloadFn = isHighPriority ? preloadImageHighPriority : preloadImage;
       if (post.profiles?.avatar_url) preloadFn(post.profiles.avatar_url);
       if (post.thumbnail_url) preloadFn(post.thumbnail_url);
     });
     
-    // Rest: background load all remaining with tighter scheduling
-    if (posts.length > 10) {
+    // Rest: background load all remaining
+    if (posts.length > 5) {
       if ('requestIdleCallback' in window) {
-        requestIdleCallback(() => loadBatch(10), { timeout: 30 });
+        requestIdleCallback(() => loadBatch(5), { timeout: 50 });
       } else {
-        setTimeout(() => loadBatch(10), 0);
+        setTimeout(() => loadBatch(5), 0);
       }
     }
   }
