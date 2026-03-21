@@ -139,42 +139,6 @@ export const HydratedEmbed = memo(({
     rememberHydratedPost(post.id);
   }, [post.id, shouldHydrate]);
 
-  useEffect(() => {
-    const container = embedContainerRef.current;
-    if (!container) return;
-
-    if (lifecycleState === 'suspended') {
-      setShowVisualHold(true);
-      return;
-    }
-
-    if (!showVisualHold) return;
-
-    const iframes = Array.from(container.querySelectorAll<HTMLIFrameElement>('iframe'));
-    if (iframes.length === 0) {
-      setShowVisualHold(false);
-      return;
-    }
-
-    let released = false;
-    const release = () => {
-      if (released) return;
-      released = true;
-      setShowVisualHold(false);
-    };
-
-    const fallbackTimer = window.setTimeout(release, 1200);
-    const onLoad = () => {
-      window.setTimeout(release, 120);
-    };
-
-    iframes.forEach((iframe) => iframe.addEventListener('load', onLoad, { once: true }));
-
-    return () => {
-      window.clearTimeout(fallbackTimer);
-      iframes.forEach((iframe) => iframe.removeEventListener('load', onLoad));
-    };
-  }, [lifecycleState, showVisualHold]);
 
   const handleRawEmbedError = useCallback(() => {
     setRawEmbedFailed(true);
