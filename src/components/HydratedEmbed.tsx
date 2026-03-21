@@ -217,8 +217,7 @@ export const HydratedEmbed = memo(({
     forceUniversalRenderer;
 
   // Show dim overlay when scrolled away for non-API embeds
-  const showScrolledAwayOverlay = shouldHydrate && !isInView && isNonApiEmbed && !showVisualHold;
-  const showPosterHold = showVisualHold && !!effectiveThumbnail && !imageError;
+  const showScrolledAwayOverlay = shouldHydrate && !isInView && isNonApiEmbed;
 
   // HYDRATED STATE: Show skeleton → fade into actual embed
   return (
