@@ -216,11 +216,34 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
   // Resolve the embed type for rendering
   const r = resolveRenderer(post);
+
+  // Posts with no embed are immediately loaded
+  const noEmbed = r.kind === 'none';
+  const cardVisible = noEmbed || isLoaded;
   
   // Derive thumbnail: prefer stored, then derive from URL
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
+  // Fire onLoaded immediately for no-embed posts
+  useEffect(() => {
+    if (noEmbed && !isLoaded) {
+      setIsLoaded(true);
+      setShowPost(true);
+      onLoaded?.();
+    }
+  }, [noEmbed, isLoaded, onLoaded]);
+
   return (
+    <div
+      style={{
+        visibility: cardVisible ? 'visible' : 'hidden',
+        height: cardVisible ? 'auto' : 0,
+        overflow: cardVisible ? 'visible' : 'hidden',
+        margin: cardVisible ? undefined : 0,
+        opacity: cardVisible ? 1 : 0,
+        transition: 'opacity 0.3s ease',
+      }}
+    >
     <Card className="overflow-hidden border border-border rounded-xl">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
