@@ -170,10 +170,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     };
   }, [isHydrated, embedReady]);
 
-  // When embed is ready, keep skeleton mounted for 400ms fade-out, then unmount
+  // When embed is ready, reveal card and schedule skeleton unmount
   useEffect(() => {
     if (!embedReady) return;
-    const timer = setTimeout(() => setSkeletonVisible(false), 450);
+    // Trigger card fade-in on next frame so the transition runs
+    requestAnimationFrame(() => setCardRevealed(true));
+    const timer = setTimeout(() => setSkeletonVisible(false), 400);
     return () => clearTimeout(timer);
   }, [embedReady]);
 
