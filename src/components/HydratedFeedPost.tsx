@@ -149,11 +149,15 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     return () => { observer.disconnect(); clearTimeout(fallback); };
   }, [isHydrated, embedReady]);
 
-  // When embed ready, trigger fade-in on next frame
+  // When embed ready, trigger fade-in on next frame and notify parent
   useEffect(() => {
     if (!embedReady) return;
-    requestAnimationFrame(() => setShowPost(true));
-  }, [embedReady]);
+    requestAnimationFrame(() => {
+      setShowPost(true);
+      setIsLoaded(true);
+      onLoaded?.();
+    });
+  }, [embedReady, onLoaded]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
 
