@@ -124,7 +124,57 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setIsHydrated(true);
   }, [isNearViewport, isHydrated]);
 
+  // Detect when embed content is ready (iframe load, SDK process, or DOM content)
+  useEffect(() => {
+    if (!isHydrated || embedReady) return;
+    const el = embedRef.current;
+    if (!el) return;
+
+    const markReady = () => setEmbedReady(true);
+
+    const handleIframes = () => {
+      const iframes = el.querySelectorAll('iframe');
+      if (iframes.length > 0) {
+        iframes.forEach((iframe) => {
+          iframe.addEventListener('load', markReady, { once: true });
+          iframe.addEventListener('error', markReady, { once: true });
+        });
+        // Safety: cross-origin iframes may never fire load
+        setTimeout(markReady, 3000);
+        return true;
+      }
+      return false;
+    };
+
+    // Check for already-present content
+    if (handleIframes()) return;
+
+    // For non-iframe content (images, cards), check for meaningful DOM
+    const checkContent = () => {
+      if (el.querySelector('img, video, [class*="card"], [class*="preview"]')) {
+        markReady();
+        return true;
+      }
+      return handleIframes();
+    };
+
+    if (checkContent()) return;
+
+    // Watch for SDK-injected content (Instagram, etc.)
+    const observer = new MutationObserver(() => { checkContent(); });
+    observer.observe(el, { childList: true, subtree: true });
+
+    // Global safety fallback
+    const fallback = setTimeout(markReady, 4000);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(fallback);
+    };
+  }, [isHydrated, embedReady]);
+
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
+
   
   // Normalize field access
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
