@@ -209,8 +209,6 @@ const Index = () => {
             <div className="space-y-6">
               {allPosts.map((post, index) => {
                 const isPostLoaded = loadedPosts.has(post.id);
-                const nextPost = allPosts[index + 1];
-                const isNextLoaded = nextPost ? loadedPosts.has(nextPost.id) : true;
 
                 return (
                   <div key={post.id}>
