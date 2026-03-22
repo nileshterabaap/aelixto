@@ -204,6 +204,25 @@ function unmuteNonApiIframes(root: HTMLElement) {
   });
 }
 
+/** Freeze all iframes (pointer-events) */
+function freezeIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
+    if (iframe.dataset[FROZEN_FLAG] === '1') return;
+    iframe.dataset[FROZEN_FLAG] = '1';
+    iframe.style.pointerEvents = 'none';
+  });
+}
+
+/** Unfreeze all iframes */
+function unfreezeIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (iframe.dataset[FROZEN_FLAG] !== '1') return;
+    delete iframe.dataset[FROZEN_FLAG];
+    iframe.style.pointerEvents = '';
+  });
+}
+
 /** Stage A: pause native/API media and mute other playable embeds */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
