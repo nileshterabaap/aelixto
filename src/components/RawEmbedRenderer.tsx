@@ -97,6 +97,7 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-ifra
 export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<number>(0);
+  const hasProcessedRef = useRef(false);
   const [embedFailed, setEmbedFailed] = useState(false);
   const platform = detectPlatform(embedHtml);
   const isInstagram = isInstagramEmbed(embedHtml);
