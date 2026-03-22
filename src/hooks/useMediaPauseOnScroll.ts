@@ -25,7 +25,6 @@ const YOUTUBE_SELECTOR = 'iframe[src*="youtube.com"], iframe[src*="youtube-nocoo
 const SPOTIFY_SELECTOR = 'iframe[src*="open.spotify.com"]';
 const SUSPENDED_IFRAME_SELECTOR = 'iframe[data-aelix-suspended="1"]';
 const HARD_SUSPEND_MIN_DISTANCE_PX = 2800;
-const NON_API_HARD_SUSPEND_DELAY_MS = 180;
 
 // ── Data attributes for hard-suspend bookkeeping ───────────────────────
 
@@ -55,11 +54,6 @@ const PLAYABLE_IFRAME_HINTS = [
   'instagram.com/reels',
 ];
 
-function isApiControllableIframe(iframe: HTMLIFrameElement): boolean {
-  const src = (iframe.getAttribute('src') || '').toLowerCase();
-  return src.includes('youtube.com') || src.includes('youtube-nocookie.com') || src.includes('open.spotify.com');
-}
-
 function isPlayableIframe(iframe: HTMLIFrameElement): boolean {
   const src = (iframe.getAttribute('src') || '').toLowerCase();
   const allow = (iframe.getAttribute('allow') || '').toLowerCase();
@@ -75,12 +69,6 @@ function hasPlayableMedia(root: HTMLElement): boolean {
   return Array.from(root.querySelectorAll<HTMLIFrameElement>('iframe')).some(isPlayableIframe);
 }
 
-function hasNonApiPlayableIframe(root: HTMLElement): boolean {
-  return Array.from(root.querySelectorAll<HTMLIFrameElement>('iframe')).some(
-    (iframe) => isPlayableIframe(iframe) && !isApiControllableIframe(iframe)
-  );
-}
-
 function hasLifecycleTargets(root: HTMLElement): boolean {
   return hasPlayableMedia(root) || root.querySelector(SUSPENDED_IFRAME_SELECTOR) !== null;
 }
@@ -92,8 +80,7 @@ function getHardSuspendDistancePx(hardSuspendDistanceVh: number): number {
 
 function getActiveDistancePx(): number {
   const vh = window.innerHeight || document.documentElement.clientHeight;
-  // Tight band (~15% of viewport) so only ONE post is active at a time
-  return Math.min(Math.max(Math.round(vh * 0.15), 60), 130);
+  return Math.min(Math.max(Math.round(vh * 0.45), 80), 220);
 }
 
 // ── Stage A helpers: pause only, preserve visuals ──────────────────────
@@ -123,7 +110,7 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: pause native/API media only — keep non-API embeds rendered */
+/** Stage A: pause native/API media only — keep non-API visuals mounted */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
@@ -135,21 +122,6 @@ function stageAPause(root: HTMLElement) {
 function hardSuspendIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (!isPlayableIframe(iframe)) return;
-    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
-
-    const src = iframe.getAttribute('src');
-    if (!src || src === 'about:blank') return;
-
-    iframe.dataset[SUSPENDED_SRC] = src;
-    iframe.dataset[SUSPENDED_FLAG] = '1';
-    iframe.setAttribute('src', 'about:blank');
-    iframe.style.visibility = 'hidden';
-  });
-}
-
-function hardSuspendNonApiIframes(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (!isPlayableIframe(iframe) || isApiControllableIframe(iframe)) return;
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
 
     const src = iframe.getAttribute('src');
@@ -202,7 +174,6 @@ export function useMediaPauseOnScroll(
   const prevPathRef = useRef(location.pathname);
   const [lifecycleState, setLifecycleState] = useState<LifecycleState>('active');
   const stateRef = useRef<LifecycleState>('active');
-  const suspendTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -218,13 +189,6 @@ export function useMediaPauseOnScroll(
     let rafId: number | null = null;
     let mutationRaf: number | null = null;
 
-    const clearSuspendTimer = () => {
-      if (suspendTimerRef.current !== null) {
-        window.clearTimeout(suspendTimerRef.current);
-        suspendTimerRef.current = null;
-      }
-    };
-
     const computeZone = (): 'visible' | 'near' | 'far' => {
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight || document.documentElement.clientHeight;
@@ -238,10 +202,6 @@ export function useMediaPauseOnScroll(
 
       if (isOnScreen && distanceToViewportCenter <= activeDistancePx) {
         return 'visible';
-      }
-
-      if (!isOnScreen && hasNonApiPlayableIframe(el)) {
-        return 'far';
       }
 
       if (rect.bottom > -hardSuspendDistancePx && rect.top < vh + hardSuspendDistancePx) {
@@ -259,61 +219,29 @@ export function useMediaPauseOnScroll(
       if (!currentEl) return;
 
       if (!hasLifecycleTargets(currentEl) && target !== 'active') {
-        clearSuspendTimer();
         stateRef.current = 'active';
         setLifecycleState('active');
         return;
       }
 
       if (target === 'active') {
-        clearSuspendTimer();
         restoreHardSuspended(currentEl);
       } else if (target === 'paused') {
-        clearSuspendTimer();
         if (current === 'suspended') {
           restoreHardSuspended(currentEl);
         }
         stageAPause(currentEl);
       } else if (target === 'suspended') {
-        const shouldForceSuspendNonApi = hasNonApiPlayableIframe(currentEl);
-
-        if (disableHardSuspend && !shouldForceSuspendNonApi) {
-          clearSuspendTimer();
+        if (disableHardSuspend) {
           // Skip hard-suspend — just pause media, keep embeds loaded
           stageAPause(currentEl);
           stateRef.current = 'paused';
           setLifecycleState('paused');
           return;
         }
-
-        if (shouldForceSuspendNonApi) {
-          clearSuspendTimer();
-          if (current !== 'active') {
-            stateRef.current = 'paused';
-            setLifecycleState('paused');
-          }
-
-          suspendTimerRef.current = window.setTimeout(() => {
-            suspendTimerRef.current = null;
-            const latestEl = containerRef.current;
-            if (!latestEl || !hasNonApiPlayableIframe(latestEl)) return;
-
-            const rect = latestEl.getBoundingClientRect();
-            const vh = window.innerHeight || document.documentElement.clientHeight;
-            const isOnScreen = rect.bottom > 0 && rect.top < vh;
-            if (isOnScreen) return;
-
-            hardSuspendNonApiIframes(latestEl);
-            stateRef.current = 'suspended';
-            setLifecycleState('suspended');
-          }, NON_API_HARD_SUSPEND_DELAY_MS);
-          return;
-        }
-
         if (current === 'active') {
           stageAPause(currentEl);
         }
-        clearSuspendTimer();
         hardSuspendIframes(currentEl);
       }
 
@@ -379,7 +307,6 @@ export function useMediaPauseOnScroll(
       window.removeEventListener('resize', scheduleReconcile);
       if (rafId !== null) cancelAnimationFrame(rafId);
       if (mutationRaf !== null) cancelAnimationFrame(mutationRaf);
-      clearSuspendTimer();
     };
   }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, disableHardSuspend]);
 
@@ -390,22 +317,14 @@ export function useMediaPauseOnScroll(
     }
 
     if (location.pathname !== prevPathRef.current) {
-      if (suspendTimerRef.current !== null) {
-        window.clearTimeout(suspendTimerRef.current);
-        suspendTimerRef.current = null;
-      }
-
       const el = containerRef.current;
       if (el && hasPlayableMedia(el)) {
         stageAPause(el);
         if (!disableHardSuspend) {
           hardSuspendIframes(el);
-        } else if (hasNonApiPlayableIframe(el)) {
-          hardSuspendNonApiIframes(el);
         }
-        const nextState = disableHardSuspend && !hasNonApiPlayableIframe(el) ? 'paused' : 'suspended';
-        stateRef.current = nextState;
-        setLifecycleState(nextState);
+        stateRef.current = disableHardSuspend ? 'paused' : 'suspended';
+        setLifecycleState(disableHardSuspend ? 'paused' : 'suspended');
       }
       prevPathRef.current = location.pathname;
     }
