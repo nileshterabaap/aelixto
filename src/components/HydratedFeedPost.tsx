@@ -281,23 +281,26 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
 
-      {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
+      {/* FLUSH CONTENT: Edge-to-edge embed with buffering spinner */}
       {r.kind !== 'none' ? (
-        <div ref={embedRef} className="relative" style={{ contain: 'layout paint' }}>
-          {/* Skeleton layer — fades out when embed is ready */}
-          {isHydrated && skeletonVisible && (
-            <div
-              className="absolute inset-0 z-10 transition-opacity duration-[400ms] ease-in-out"
-              style={{ opacity: embedReady ? 0 : 1, pointerEvents: 'none' }}
-            >
-              <EmbedSkeleton platform={detectedPlatform || undefined} />
+        <div className="relative">
+          {/* Buffering spinner — shown until embed is ready */}
+          {!showPost && isHydrated && (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           )}
 
-          {/* Embed layer — fades in when ready */}
+          {/* Post content — hidden until ready, then fades in */}
           <div
-            className="transition-opacity duration-[400ms] ease-in-out"
-            style={{ opacity: embedReady || !isHydrated ? 1 : 0 }}
+            ref={embedRef}
+            style={{
+              visibility: showPost ? 'visible' : 'hidden',
+              height: showPost ? 'auto' : 0,
+              overflow: showPost ? 'visible' : 'hidden',
+              opacity: showPost ? 1 : 0,
+              transition: 'opacity 0.3s ease',
+            }}
           >
             <HydratedEmbed
               post={post}
