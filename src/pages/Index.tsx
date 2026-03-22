@@ -198,21 +198,39 @@ const Index = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {allPosts.map((post, index) => (
-                <div 
-                  key={post.id} 
-                  ref={(el) => {
-                    registerItem(post.id)(el);
-                  }}
-                  data-feed-item-id={post.id}
-                >
-                  <FeedPost 
-                    post={post} 
-                    userId={user?.id} 
-                    startHydrated={index < 8}
-                  />
-                </div>
-              ))}
+              {allPosts.map((post, index) => {
+                const isPostLoaded = loadedPosts.has(post.id);
+                const nextPost = allPosts[index + 1];
+                const isNextLoaded = nextPost ? loadedPosts.has(nextPost.id) : true;
+
+                return (
+                  <div key={post.id}>
+                    {/* Spinner shown while this post is loading */}
+                    {!isPostLoaded && (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                      </div>
+                    )}
+                    <div
+                      ref={(el) => { registerItem(post.id)(el); }}
+                      data-feed-item-id={post.id}
+                    >
+                      <FeedPost 
+                        post={post} 
+                        userId={user?.id} 
+                        startHydrated={index < 8}
+                        onLoaded={useCallback(() => {
+                          setLoadedPosts(prev => {
+                            const next = new Set(prev);
+                            next.add(post.id);
+                            return next;
+                          });
+                        }, [post.id])}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
               {/* Sentinel for prefetching next page ahead of scroll */}
               {hasMore && !showDemoFeed && (
                 <div ref={prefetchSentinelRef} style={{ height: 1 }} />
