@@ -140,17 +140,14 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           iframe.addEventListener('load', markReady, { once: true });
           iframe.addEventListener('error', markReady, { once: true });
         });
-        // Safety: cross-origin iframes may never fire load
         setTimeout(markReady, 3000);
         return true;
       }
       return false;
     };
 
-    // Check for already-present content
     if (handleIframes()) return;
 
-    // For non-iframe content (images, cards), check for meaningful DOM
     const checkContent = () => {
       if (el.querySelector('img, video, [class*="card"], [class*="preview"]')) {
         markReady();
@@ -161,11 +158,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
     if (checkContent()) return;
 
-    // Watch for SDK-injected content (Instagram, etc.)
     const observer = new MutationObserver(() => { checkContent(); });
     observer.observe(el, { childList: true, subtree: true });
 
-    // Global safety fallback
     const fallback = setTimeout(markReady, 4000);
 
     return () => {
@@ -173,6 +168,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       clearTimeout(fallback);
     };
   }, [isHydrated, embedReady]);
+
+  // When embed is ready, keep skeleton mounted for 400ms fade-out, then unmount
+  useEffect(() => {
+    if (!embedReady) return;
+    const timer = setTimeout(() => setSkeletonVisible(false), 450);
+    return () => clearTimeout(timer);
+  }, [embedReady]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
 
