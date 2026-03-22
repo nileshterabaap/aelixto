@@ -90,6 +90,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated);
   const [embedReady, setEmbedReady] = useState(false);
+  const [cardRevealed, setCardRevealed] = useState(false);
   const [skeletonVisible, setSkeletonVisible] = useState(true);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
