@@ -308,7 +308,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {r.kind !== 'none' ? (
         <div ref={embedRef} className="relative" style={{ contain: 'layout paint' }}>
           {/* Skeleton layer — fades out when embed is ready */}
-          {isHydrated && !embedReady && (
+          {isHydrated && skeletonVisible && (
             <div
               className="absolute inset-0 z-10 transition-opacity duration-[400ms] ease-in-out"
               style={{ opacity: embedReady ? 0 : 1, pointerEvents: 'none' }}
