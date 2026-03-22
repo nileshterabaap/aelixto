@@ -1,4 +1,21 @@
 import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play } from "lucide-react";
+
+// Inject shimmer keyframes once
+if (typeof document !== 'undefined' && !document.getElementById('skeleton-shimmer-style')) {
+  const style = document.createElement('style');
+  style.id = 'skeleton-shimmer-style';
+  style.textContent = `
+    @keyframes skeletonSweep {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+    .skeleton-shimmer {
+      background: linear-gradient(90deg, transparent 0%, hsl(var(--muted) / 0.6) 50%, transparent 100%);
+      animation: skeletonSweep 1.5s ease-in-out infinite;
+    }
+  `;
+  document.head.appendChild(style);
+}
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
