@@ -179,11 +179,15 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
 
       try {
         if (platform === 'instagram') {
+          // Skip if already processed — prevents white flash on re-mount/re-render
+          if (hasProcessedRef.current) return;
+
           await loadInstagramEmbed();
           
           // Process immediately if ready
           if (window.instgrm?.Embeds?.process) {
             window.instgrm.Embeds.process();
+            hasProcessedRef.current = true;
             
             // Check if embed rendered successfully after a longer delay
             setTimeout(() => {
@@ -196,6 +200,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
                   }
                   setTimeout(() => {
                     if (containerRef.current && !containerRef.current.querySelector('iframe')) {
+                      hasProcessedRef.current = false;
                       setEmbedFailed(true);
                       onError?.();
                     }
