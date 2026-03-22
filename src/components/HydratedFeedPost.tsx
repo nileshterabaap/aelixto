@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
-import { EmbedSkeleton } from "@/components/EmbedSkeleton";
 
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
@@ -90,49 +89,37 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated);
   const [embedReady, setEmbedReady] = useState(false);
-  const [skeletonVisible, setSkeletonVisible] = useState(true);
+  const [showPost, setShowPost] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
 
-  // Track if embed is within viewport proximity — symmetric for both scroll directions
-  // Default to true so posts hydrate immediately on mount — IO corrects for off-screen posts
   const [isNearViewport, setIsNearViewport] = useState(true);
 
   useEffect(() => {
     if (startHydrated) return;
     const el = embedRef.current;
     if (!el) return;
-
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsNearViewport(entry.isIntersecting);
-      },
-      // Symmetric margin: 3000px above AND below the viewport
-      // Ensures posts are ready before entering view in BOTH scroll directions
+      ([entry]) => { setIsNearViewport(entry.isIntersecting); },
       { rootMargin: '3000px 0px', threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, [startHydrated]);
 
-  // Hydrate immediately when near viewport — no velocity gating.
-  // Since disableHardSuspend keeps embeds alive forever, eager hydration has no cost.
-  // Once hydrated, stays hydrated (isHydrated only goes false→true).
   useEffect(() => {
     if (isHydrated || !isNearViewport) return;
     setIsHydrated(true);
   }, [isNearViewport, isHydrated]);
 
-  // Detect when embed content is ready (iframe load, SDK process, or DOM content)
+  // Detect when embed content is ready
   useEffect(() => {
     if (!isHydrated || embedReady) return;
     const el = embedRef.current;
     if (!el) return;
-
     const markReady = () => setEmbedReady(true);
-
     const handleIframes = () => {
       const iframes = el.querySelectorAll('iframe');
       if (iframes.length > 0) {
@@ -145,9 +132,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       }
       return false;
     };
-
     if (handleIframes()) return;
-
     const checkContent = () => {
       if (el.querySelector('img, video, [class*="card"], [class*="preview"]')) {
         markReady();
@@ -155,25 +140,17 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       }
       return handleIframes();
     };
-
     if (checkContent()) return;
-
     const observer = new MutationObserver(() => { checkContent(); });
     observer.observe(el, { childList: true, subtree: true });
-
     const fallback = setTimeout(markReady, 4000);
-
-    return () => {
-      observer.disconnect();
-      clearTimeout(fallback);
-    };
+    return () => { observer.disconnect(); clearTimeout(fallback); };
   }, [isHydrated, embedReady]);
 
-  // When embed is ready, keep skeleton mounted for 400ms fade-out, then unmount
+  // When embed ready, trigger fade-in on next frame
   useEffect(() => {
     if (!embedReady) return;
-    const timer = setTimeout(() => setSkeletonVisible(false), 450);
-    return () => clearTimeout(timer);
+    requestAnimationFrame(() => setShowPost(true));
   }, [embedReady]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
@@ -304,23 +281,26 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
 
-      {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
+      {/* FLUSH CONTENT: Edge-to-edge embed with buffering spinner */}
       {r.kind !== 'none' ? (
-        <div ref={embedRef} className="relative" style={{ contain: 'layout paint' }}>
-          {/* Skeleton layer — fades out when embed is ready */}
-          {isHydrated && skeletonVisible && (
-            <div
-              className="absolute inset-0 z-10 transition-opacity duration-[400ms] ease-in-out"
-              style={{ opacity: embedReady ? 0 : 1, pointerEvents: 'none' }}
-            >
-              <EmbedSkeleton platform={detectedPlatform || undefined} />
+        <div className="relative">
+          {/* Buffering spinner — shown until embed is ready */}
+          {!showPost && isHydrated && (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           )}
 
-          {/* Embed layer — fades in when ready */}
+          {/* Post content — hidden until ready, then fades in */}
           <div
-            className="transition-opacity duration-[400ms] ease-in-out"
-            style={{ opacity: embedReady || !isHydrated ? 1 : 0 }}
+            ref={embedRef}
+            style={{
+              visibility: showPost ? 'visible' : 'hidden',
+              height: showPost ? 'auto' : 0,
+              overflow: showPost ? 'visible' : 'hidden',
+              opacity: showPost ? 1 : 0,
+              transition: 'opacity 0.3s ease',
+            }}
           >
             <HydratedEmbed
               post={post}
