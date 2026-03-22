@@ -90,6 +90,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated);
   const [embedReady, setEmbedReady] = useState(false);
+  const [cardRevealed, setCardRevealed] = useState(false);
   const [skeletonVisible, setSkeletonVisible] = useState(true);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
@@ -169,10 +170,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     };
   }, [isHydrated, embedReady]);
 
-  // When embed is ready, keep skeleton mounted for 400ms fade-out, then unmount
+  // When embed is ready, reveal card and schedule skeleton unmount
   useEffect(() => {
     if (!embedReady) return;
-    const timer = setTimeout(() => setSkeletonVisible(false), 450);
+    // Trigger card fade-in on next frame so the transition runs
+    requestAnimationFrame(() => setCardRevealed(true));
+    const timer = setTimeout(() => setSkeletonVisible(false), 400);
     return () => clearTimeout(timer);
   }, [embedReady]);
 
@@ -237,7 +240,30 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   // Derive thumbnail: prefer stored, then derive from URL
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
+  // For text-only posts (no embed), reveal immediately
+  const isTextOnly = r.kind === 'none';
+  const showCard = isTextOnly || cardRevealed;
+
   return (
+    <div className="relative">
+      {/* Skeleton placeholder — occupies space until card reveals */}
+      {!isTextOnly && skeletonVisible && (
+        <div
+          className="rounded-xl overflow-hidden transition-opacity duration-[350ms] ease-in-out"
+          style={{ opacity: showCard ? 0 : 1, pointerEvents: showCard ? 'none' : 'auto' }}
+        >
+          <EmbedSkeleton platform={detectedPlatform || undefined} />
+        </div>
+      )}
+
+      {/* Real card — hidden until embed loads, then fades in */}
+      <div
+        className={`transition-opacity duration-[350ms] ease-in-out ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
+        style={{
+          opacity: showCard ? 1 : 0,
+          visibility: showCard ? 'visible' : 'hidden',
+        }}
+      >
     <Card className="overflow-hidden border border-border rounded-xl">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
@@ -417,6 +443,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         />
       )}
     </Card>
+      </div>
+    </div>
   );
 };
 
