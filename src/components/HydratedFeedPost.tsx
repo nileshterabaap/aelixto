@@ -37,6 +37,7 @@ interface HydratedFeedPostProps {
   userId?: string;
   isActive?: boolean; // Controlled by parent - whether this post is near viewport
   startHydrated?: boolean; // Skip IntersectionObserver, hydrate immediately
+  onLoaded?: () => void; // Fires when embed is fully loaded and visible
 }
 
 const formatTimestamp = (date: Date) => {
@@ -84,12 +85,13 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
-export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
+export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false, onLoaded }: HydratedFeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated);
   const [embedReady, setEmbedReady] = useState(false);
   const [showPost, setShowPost] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -147,11 +149,15 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     return () => { observer.disconnect(); clearTimeout(fallback); };
   }, [isHydrated, embedReady]);
 
-  // When embed ready, trigger fade-in on next frame
+  // When embed ready, trigger fade-in on next frame and notify parent
   useEffect(() => {
     if (!embedReady) return;
-    requestAnimationFrame(() => setShowPost(true));
-  }, [embedReady]);
+    requestAnimationFrame(() => {
+      setShowPost(true);
+      setIsLoaded(true);
+      onLoaded?.();
+    });
+  }, [embedReady, onLoaded]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
 
@@ -210,11 +216,34 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
   // Resolve the embed type for rendering
   const r = resolveRenderer(post);
+
+  // Posts with no embed are immediately loaded
+  const noEmbed = r.kind === 'none';
+  const cardVisible = noEmbed || isLoaded;
   
   // Derive thumbnail: prefer stored, then derive from URL
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
+  // Fire onLoaded immediately for no-embed posts
+  useEffect(() => {
+    if (noEmbed && !isLoaded) {
+      setIsLoaded(true);
+      setShowPost(true);
+      onLoaded?.();
+    }
+  }, [noEmbed, isLoaded, onLoaded]);
+
   return (
+    <div
+      style={{
+        visibility: cardVisible ? 'visible' : 'hidden',
+        height: cardVisible ? 'auto' : 0,
+        overflow: cardVisible ? 'visible' : 'hidden',
+        margin: cardVisible ? undefined : 0,
+        opacity: cardVisible ? 1 : 0,
+        transition: 'opacity 0.3s ease',
+      }}
+    >
     <Card className="overflow-hidden border border-border rounded-xl">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
@@ -397,6 +426,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         />
       )}
     </Card>
+    </div>
   );
 };
 
