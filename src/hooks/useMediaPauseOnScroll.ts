@@ -131,7 +131,7 @@ function hardSuspendNonApiIframes(root: HTMLElement) {
   });
 }
 
-/** Freeze all iframes (pointer-events only; keep visuals mounted when possible) */
+/** Freeze all iframes (pointer-events + visibility hint) */
 function freezeIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
@@ -150,17 +150,13 @@ function unfreezeIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: pause native/API media, but keep embeds visually mounted */
+/** Stage A: pause native/API media and immediately suspend other playable embeds */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  freezeIframes(root);
-}
-
-/** Immediate kill for non-API iframe audio when leaving the active post */
-function stageANonApiPause(root: HTMLElement) {
   hardSuspendNonApiIframes(root);
+  freezeIframes(root);
 }
 
 /** Undo Stage A freeze (restore visibility) */
@@ -283,16 +279,10 @@ export function useMediaPauseOnScroll(
           restoreHardSuspended(currentEl);
         }
         stageAPause(currentEl);
-        if (current === 'active') {
-          stageANonApiPause(currentEl);
-        }
       } else if (target === 'suspended') {
         if (disableHardSuspend) {
           // Skip hard-suspend — just pause media, keep embeds loaded
           stageAPause(currentEl);
-          if (current === 'active') {
-            stageANonApiPause(currentEl);
-          }
           stateRef.current = 'paused';
           setLifecycleState('paused');
           return;
