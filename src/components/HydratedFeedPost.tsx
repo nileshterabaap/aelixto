@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
+import { EmbedSkeleton } from "@/components/EmbedSkeleton";
 
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
@@ -88,6 +89,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated);
+  const [embedReady, setEmbedReady] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,7 +124,57 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setIsHydrated(true);
   }, [isNearViewport, isHydrated]);
 
+  // Detect when embed content is ready (iframe load, SDK process, or DOM content)
+  useEffect(() => {
+    if (!isHydrated || embedReady) return;
+    const el = embedRef.current;
+    if (!el) return;
+
+    const markReady = () => setEmbedReady(true);
+
+    const handleIframes = () => {
+      const iframes = el.querySelectorAll('iframe');
+      if (iframes.length > 0) {
+        iframes.forEach((iframe) => {
+          iframe.addEventListener('load', markReady, { once: true });
+          iframe.addEventListener('error', markReady, { once: true });
+        });
+        // Safety: cross-origin iframes may never fire load
+        setTimeout(markReady, 3000);
+        return true;
+      }
+      return false;
+    };
+
+    // Check for already-present content
+    if (handleIframes()) return;
+
+    // For non-iframe content (images, cards), check for meaningful DOM
+    const checkContent = () => {
+      if (el.querySelector('img, video, [class*="card"], [class*="preview"]')) {
+        markReady();
+        return true;
+      }
+      return handleIframes();
+    };
+
+    if (checkContent()) return;
+
+    // Watch for SDK-injected content (Instagram, etc.)
+    const observer = new MutationObserver(() => { checkContent(); });
+    observer.observe(el, { childList: true, subtree: true });
+
+    // Global safety fallback
+    const fallback = setTimeout(markReady, 4000);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(fallback);
+    };
+  }, [isHydrated, embedReady]);
+
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
+
   
   // Normalize field access
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
@@ -251,14 +303,30 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
-        <div ref={embedRef} style={{ contain: 'layout paint' }}>
-          <HydratedEmbed
-            post={post}
-            renderer={r}
-            thumbnailUrl={effectiveThumbnail}
-            isHydrated={isHydrated}
-            onPlayClick={handlePlayClick}
-          />
+        <div ref={embedRef} className="relative" style={{ contain: 'layout paint' }}>
+          {/* Skeleton layer — fades out when embed is ready */}
+          {isHydrated && !embedReady && (
+            <div
+              className="absolute inset-0 z-10 transition-opacity duration-[400ms] ease-in-out"
+              style={{ opacity: embedReady ? 0 : 1, pointerEvents: 'none' }}
+            >
+              <EmbedSkeleton platform={detectedPlatform || undefined} />
+            </div>
+          )}
+
+          {/* Embed layer — fades in when ready */}
+          <div
+            className="transition-opacity duration-[400ms] ease-in-out"
+            style={{ opacity: embedReady || !isHydrated ? 1 : 0 }}
+          >
+            <HydratedEmbed
+              post={post}
+              renderer={r}
+              thumbnailUrl={effectiveThumbnail}
+              isHydrated={isHydrated}
+              onPlayClick={handlePlayClick}
+            />
+          </div>
         </div>
       ) : (
         <div ref={embedRef} />
