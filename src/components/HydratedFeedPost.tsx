@@ -1,4 +1,21 @@
 import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play } from "lucide-react";
+
+// Inject shimmer keyframes once
+if (typeof document !== 'undefined' && !document.getElementById('skeleton-shimmer-style')) {
+  const style = document.createElement('style');
+  style.id = 'skeleton-shimmer-style';
+  style.textContent = `
+    @keyframes skeletonSweep {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+    .skeleton-shimmer {
+      background: linear-gradient(90deg, transparent 0%, hsl(var(--muted) / 0.6) 50%, transparent 100%);
+      animation: skeletonSweep 1.5s ease-in-out infinite;
+    }
+  `;
+  document.head.appendChild(style);
+}
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,10 +105,54 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated);
+  const [embedLoaded, setEmbedLoaded] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
+  const embedLoadedRef = useRef(false);
+  const handledIframesRef = useRef(new WeakSet<HTMLIFrameElement>());
+
+  // Detect when embed content finishes loading (iframe onload / mutation fallback)
+  const markEmbedLoaded = useCallback(() => {
+    if (embedLoadedRef.current) return;
+    embedLoadedRef.current = true;
+    setEmbedLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated || embedLoadedRef.current) return;
+    const el = embedRef.current;
+    if (!el) return;
+
+    const attachIframe = (iframe: HTMLIFrameElement) => {
+      if (handledIframesRef.current.has(iframe)) return;
+      handledIframesRef.current.add(iframe);
+      iframe.addEventListener('load', markEmbedLoaded);
+      iframe.addEventListener('error', markEmbedLoaded);
+      // Safety: cross-origin iframes may never fire load
+      setTimeout(markEmbedLoaded, 3000);
+    };
+
+    const check = () => {
+      const iframes = el.querySelectorAll('iframe');
+      if (iframes.length > 0) {
+        iframes.forEach(f => attachIframe(f as HTMLIFrameElement));
+        return;
+      }
+      // Non-iframe content (images, cards): any rendered child means ready
+      if (el.querySelector('img, video, [class*="card"]')) {
+        markEmbedLoaded();
+      }
+    };
+
+    check();
+    const observer = new MutationObserver(() => check());
+    observer.observe(el, { childList: true, subtree: true });
+    // Global fallback
+    const fallback = setTimeout(markEmbedLoaded, 4000);
+    return () => { observer.disconnect(); clearTimeout(fallback); };
+  }, [isHydrated, markEmbedLoaded]);
 
   // Track if embed is within viewport proximity — symmetric for both scroll directions
   // Default to true so posts hydrate immediately on mount — IO corrects for off-screen posts
@@ -251,14 +312,47 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
-        <div ref={embedRef} style={{ contain: 'layout paint' }}>
-          <HydratedEmbed
-            post={post}
-            renderer={r}
-            thumbnailUrl={effectiveThumbnail}
-            isHydrated={isHydrated}
-            onPlayClick={handlePlayClick}
-          />
+        <div className="relative" style={{ contain: 'layout paint' }}>
+          {/* Inline skeleton — visible while embed loads */}
+          <div
+            className="absolute inset-0 z-10 pointer-events-none"
+            style={{
+              opacity: embedLoaded ? 0 : 1,
+              transition: 'opacity 0.4s ease',
+            }}
+          >
+            <div className="p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-muted overflow-hidden relative">
+                  <div className="absolute inset-0 skeleton-shimmer" />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-28 rounded bg-muted overflow-hidden relative"><div className="absolute inset-0 skeleton-shimmer" /></div>
+                  <div className="h-2.5 w-20 rounded bg-muted overflow-hidden relative"><div className="absolute inset-0 skeleton-shimmer" /></div>
+                </div>
+              </div>
+              <div className="w-full aspect-video rounded-xl bg-muted overflow-hidden relative">
+                <div className="absolute inset-0 skeleton-shimmer" />
+              </div>
+            </div>
+          </div>
+
+          {/* Real embed — fades in when loaded */}
+          <div
+            ref={embedRef}
+            style={{
+              opacity: embedLoaded ? 1 : 0,
+              transition: 'opacity 0.4s ease',
+            }}
+          >
+            <HydratedEmbed
+              post={post}
+              renderer={r}
+              thumbnailUrl={effectiveThumbnail}
+              isHydrated={isHydrated}
+              onPlayClick={handlePlayClick}
+            />
+          </div>
         </div>
       ) : (
         <div ref={embedRef} />
