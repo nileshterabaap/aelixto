@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
+import { PostSkeleton } from "@/components/PostSkeleton";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { usePosts } from "@/hooks/usePosts";
@@ -12,14 +12,12 @@ import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 
 import { useQueryClient } from "@tanstack/react-query";
-
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
-  const [loadedPosts, setLoadedPosts] = useState<Set<string>>(new Set());
   
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
@@ -134,17 +132,8 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    setLoadedPosts(new Set());
     await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
   }, [queryClient, showDemoFeed]);
-
-  const handlePostLoaded = useCallback((postId: string) => {
-    setLoadedPosts(prev => {
-      const next = new Set(prev);
-      next.add(postId);
-      return next;
-    });
-  }, []);
 
   // Prefetch next page when user is within last 5 posts
   const prefetchSentinelRef = useRef<HTMLDivElement>(null);
@@ -174,8 +163,10 @@ const Index = () => {
       <div className="min-h-screen bg-background pb-20">
         <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
         <main className="mx-auto max-w-2xl px-4 py-6">
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <PostSkeleton key={i} />
+            ))}
           </div>
         </main>
         <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
@@ -207,31 +198,21 @@ const Index = () => {
             </div>
           ) : (
             <div className="space-y-6">
-              {allPosts.map((post, index) => {
-                const isPostLoaded = loadedPosts.has(post.id);
-
-                return (
-                  <div key={post.id}>
-                    {/* Spinner shown while this post is loading */}
-                    {!isPostLoaded && (
-                      <div className="flex items-center justify-center py-12">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                      </div>
-                    )}
-                    <div
-                      ref={(el) => { registerItem(post.id)(el); }}
-                      data-feed-item-id={post.id}
-                    >
-                      <FeedPost 
-                        post={post} 
-                        userId={user?.id} 
-                        startHydrated={index < 8}
-                        onLoaded={() => handlePostLoaded(post.id)}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+              {allPosts.map((post, index) => (
+                <div 
+                  key={post.id} 
+                  ref={(el) => {
+                    registerItem(post.id)(el);
+                  }}
+                  data-feed-item-id={post.id}
+                >
+                  <FeedPost 
+                    post={post} 
+                    userId={user?.id} 
+                    startHydrated={index < 8}
+                  />
+                </div>
+              ))}
               {/* Sentinel for prefetching next page ahead of scroll */}
               {hasMore && !showDemoFeed && (
                 <div ref={prefetchSentinelRef} style={{ height: 1 }} />
