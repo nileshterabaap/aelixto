@@ -134,8 +134,17 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
+    setLoadedPosts(new Set());
     await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
   }, [queryClient, showDemoFeed]);
+
+  const handlePostLoaded = useCallback((postId: string) => {
+    setLoadedPosts(prev => {
+      const next = new Set(prev);
+      next.add(postId);
+      return next;
+    });
+  }, []);
 
   // Prefetch next page when user is within last 5 posts
   const prefetchSentinelRef = useRef<HTMLDivElement>(null);
