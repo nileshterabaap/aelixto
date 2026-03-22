@@ -37,6 +37,7 @@ interface HydratedFeedPostProps {
   userId?: string;
   isActive?: boolean; // Controlled by parent - whether this post is near viewport
   startHydrated?: boolean; // Skip IntersectionObserver, hydrate immediately
+  onLoaded?: () => void; // Fires when embed is fully loaded and visible
 }
 
 const formatTimestamp = (date: Date) => {
