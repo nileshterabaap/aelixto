@@ -228,13 +228,7 @@ const Index = () => {
                         post={post} 
                         userId={user?.id} 
                         startHydrated={index < 8}
-                        onLoaded={useCallback(() => {
-                          setLoadedPosts(prev => {
-                            const next = new Set(prev);
-                            next.add(post.id);
-                            return next;
-                          });
-                        }, [post.id])}
+                        onLoaded={() => handlePostLoaded(post.id)}
                       />
                     </div>
                   </div>
