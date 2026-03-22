@@ -144,7 +144,6 @@ function hardSuspendIframes(root: HTMLElement) {
     iframe.dataset[SUSPENDED_FLAG] = '1';
     iframe.setAttribute('src', 'about:blank');
     iframe.style.visibility = 'hidden';
-    iframe.style.pointerEvents = 'none';
   });
 }
 
@@ -160,7 +159,6 @@ function hardSuspendNonApiIframes(root: HTMLElement) {
     iframe.dataset[SUSPENDED_FLAG] = '1';
     iframe.setAttribute('src', 'about:blank');
     iframe.style.visibility = 'hidden';
-    iframe.style.pointerEvents = 'none';
   });
 }
 
@@ -176,7 +174,6 @@ function restoreHardSuspended(root: HTMLElement) {
     delete iframe.dataset[SUSPENDED_FLAG];
     delete iframe.dataset[SUSPENDED_SRC];
     iframe.style.visibility = '';
-    iframe.style.pointerEvents = '';
   });
 }
 
