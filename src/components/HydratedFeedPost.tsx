@@ -237,10 +237,30 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   // Resolve the embed type for rendering
   const r = resolveRenderer(post);
   
-  // Derive thumbnail: prefer stored, then derive from URL
-  const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
+  // For text-only posts (no embed), reveal immediately
+  const isTextOnly = r.kind === 'none';
+  const showCard = isTextOnly || cardRevealed;
 
   return (
+    <div className="relative">
+      {/* Skeleton placeholder — occupies space until card reveals */}
+      {!isTextOnly && skeletonVisible && (
+        <div
+          className="rounded-xl overflow-hidden transition-opacity duration-[350ms] ease-in-out"
+          style={{ opacity: showCard ? 0 : 1, pointerEvents: showCard ? 'none' : 'auto' }}
+        >
+          <EmbedSkeleton platform={detectedPlatform || undefined} />
+        </div>
+      )}
+
+      {/* Real card — hidden until embed loads, then fades in */}
+      <div
+        className={`transition-opacity duration-[350ms] ease-in-out ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
+        style={{
+          opacity: showCard ? 1 : 0,
+          visibility: showCard ? 'visible' : 'hidden',
+        }}
+      >
     <Card className="overflow-hidden border border-border rounded-xl">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
