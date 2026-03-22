@@ -312,7 +312,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
-        <div className="relative" style={{ contain: 'layout paint' }}>
+        <div className="relative" style={{ contain: 'layout paint', minHeight: embedLoaded ? undefined : 400, transition: 'min-height 0.4s ease' }}>
           {/* Inline skeleton — visible while embed loads */}
           <div
             className="absolute inset-0 z-10 pointer-events-none"
