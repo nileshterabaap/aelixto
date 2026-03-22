@@ -303,14 +303,30 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
-        <div ref={embedRef} style={{ contain: 'layout paint' }}>
-          <HydratedEmbed
-            post={post}
-            renderer={r}
-            thumbnailUrl={effectiveThumbnail}
-            isHydrated={isHydrated}
-            onPlayClick={handlePlayClick}
-          />
+        <div ref={embedRef} className="relative" style={{ contain: 'layout paint' }}>
+          {/* Skeleton layer — fades out when embed is ready */}
+          {isHydrated && !embedReady && (
+            <div
+              className="absolute inset-0 z-10 transition-opacity duration-[400ms] ease-in-out"
+              style={{ opacity: embedReady ? 0 : 1, pointerEvents: 'none' }}
+            >
+              <EmbedSkeleton platform={detectedPlatform || undefined} />
+            </div>
+          )}
+
+          {/* Embed layer — fades in when ready */}
+          <div
+            className="transition-opacity duration-[400ms] ease-in-out"
+            style={{ opacity: embedReady || !isHydrated ? 1 : 0 }}
+          >
+            <HydratedEmbed
+              post={post}
+              renderer={r}
+              thumbnailUrl={effectiveThumbnail}
+              isHydrated={isHydrated}
+              onPlayClick={handlePlayClick}
+            />
+          </div>
         </div>
       ) : (
         <div ref={embedRef} />
