@@ -295,14 +295,47 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
-        <div ref={embedRef} style={{ contain: 'layout paint' }}>
-          <HydratedEmbed
-            post={post}
-            renderer={r}
-            thumbnailUrl={effectiveThumbnail}
-            isHydrated={isHydrated}
-            onPlayClick={handlePlayClick}
-          />
+        <div className="relative" style={{ contain: 'layout paint' }}>
+          {/* Inline skeleton — visible while embed loads */}
+          <div
+            className="absolute inset-0 z-10 pointer-events-none"
+            style={{
+              opacity: embedLoaded ? 0 : 1,
+              transition: 'opacity 0.4s ease',
+            }}
+          >
+            <div className="p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-muted overflow-hidden relative">
+                  <div className="absolute inset-0 skeleton-shimmer" />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-28 rounded bg-muted overflow-hidden relative"><div className="absolute inset-0 skeleton-shimmer" /></div>
+                  <div className="h-2.5 w-20 rounded bg-muted overflow-hidden relative"><div className="absolute inset-0 skeleton-shimmer" /></div>
+                </div>
+              </div>
+              <div className="w-full aspect-video rounded-xl bg-muted overflow-hidden relative">
+                <div className="absolute inset-0 skeleton-shimmer" />
+              </div>
+            </div>
+          </div>
+
+          {/* Real embed — fades in when loaded */}
+          <div
+            ref={embedRef}
+            style={{
+              opacity: embedLoaded ? 1 : 0,
+              transition: 'opacity 0.4s ease',
+            }}
+          >
+            <HydratedEmbed
+              post={post}
+              renderer={r}
+              thumbnailUrl={effectiveThumbnail}
+              isHydrated={isHydrated}
+              onPlayClick={handlePlayClick}
+            />
+          </div>
         </div>
       ) : (
         <div ref={embedRef} />
