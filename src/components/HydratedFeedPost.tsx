@@ -237,6 +237,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   // Resolve the embed type for rendering
   const r = resolveRenderer(post);
   
+  // Derive thumbnail: prefer stored, then derive from URL
+  const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
+
   // For text-only posts (no embed), reveal immediately
   const isTextOnly = r.kind === 'none';
   const showCard = isTextOnly || cardRevealed;
