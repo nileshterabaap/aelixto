@@ -89,6 +89,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated);
+  const [embedReady, setEmbedReady] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
