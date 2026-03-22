@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
-import { EmbedSkeleton } from "@/components/EmbedSkeleton";
 
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
