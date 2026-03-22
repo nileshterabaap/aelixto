@@ -88,10 +88,54 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated);
+  const [embedLoaded, setEmbedLoaded] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
+  const embedLoadedRef = useRef(false);
+  const handledIframesRef = useRef(new WeakSet<HTMLIFrameElement>());
+
+  // Detect when embed content finishes loading (iframe onload / mutation fallback)
+  const markEmbedLoaded = useCallback(() => {
+    if (embedLoadedRef.current) return;
+    embedLoadedRef.current = true;
+    setEmbedLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isHydrated || embedLoadedRef.current) return;
+    const el = embedRef.current;
+    if (!el) return;
+
+    const attachIframe = (iframe: HTMLIFrameElement) => {
+      if (handledIframesRef.current.has(iframe)) return;
+      handledIframesRef.current.add(iframe);
+      iframe.addEventListener('load', markEmbedLoaded);
+      iframe.addEventListener('error', markEmbedLoaded);
+      // Safety: cross-origin iframes may never fire load
+      setTimeout(markEmbedLoaded, 3000);
+    };
+
+    const check = () => {
+      const iframes = el.querySelectorAll('iframe');
+      if (iframes.length > 0) {
+        iframes.forEach(f => attachIframe(f as HTMLIFrameElement));
+        return;
+      }
+      // Non-iframe content (images, cards): any rendered child means ready
+      if (el.querySelector('img, video, [class*="card"]')) {
+        markEmbedLoaded();
+      }
+    };
+
+    check();
+    const observer = new MutationObserver(() => check());
+    observer.observe(el, { childList: true, subtree: true });
+    // Global fallback
+    const fallback = setTimeout(markEmbedLoaded, 4000);
+    return () => { observer.disconnect(); clearTimeout(fallback); };
+  }, [isHydrated, markEmbedLoaded]);
 
   // Track if embed is within viewport proximity — symmetric for both scroll directions
   // Default to true so posts hydrate immediately on mount — IO corrects for off-screen posts
