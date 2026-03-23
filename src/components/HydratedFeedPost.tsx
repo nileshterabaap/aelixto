@@ -254,7 +254,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {/* Skeleton placeholder — occupies space until card reveals */}
       {!isTextOnly && skeletonVisible && (
         <div
-          className="rounded-xl overflow-hidden transition-opacity duration-[350ms] ease-in-out"
+          className="rounded-xl overflow-hidden transition-opacity duration-[1000ms] ease-in-out"
           style={{ opacity: showCard ? 0 : 1, pointerEvents: showCard ? 'none' : 'auto' }}
         >
           <EmbedSkeleton platform={detectedPlatform || undefined} />
