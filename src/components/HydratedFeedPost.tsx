@@ -180,7 +180,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         if (!cancelled) setCardRevealed(true);
       });
     });
-    const timer = setTimeout(() => setSkeletonVisible(false), 500);
+    const timer = setTimeout(() => setSkeletonVisible(false), 1100);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [embedReady]);
 
@@ -254,7 +254,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {/* Skeleton placeholder — occupies space until card reveals */}
       {!isTextOnly && skeletonVisible && (
         <div
-          className="rounded-xl overflow-hidden transition-opacity duration-[350ms] ease-in-out"
+          className="rounded-xl overflow-hidden transition-opacity duration-[1000ms] ease-in-out"
           style={{ opacity: showCard ? 0 : 1, pointerEvents: showCard ? 'none' : 'auto' }}
         >
           <EmbedSkeleton platform={detectedPlatform || undefined} />
@@ -263,7 +263,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* Real card — hidden until embed loads, then fades in */}
       <div
-        className={`transition-opacity duration-[350ms] ease-in-out ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
+        className={`transition-opacity duration-[1000ms] ease-in-out ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',

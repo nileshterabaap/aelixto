@@ -179,15 +179,15 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
 
       try {
         if (platform === 'instagram') {
-          // Skip if already processed — prevents white flash on re-mount/re-render
+          // Only call process() once per embed instance — skip on re-render / viewport re-entry
           if (hasProcessedRef.current) return;
+          hasProcessedRef.current = true;
 
           await loadInstagramEmbed();
           
           // Process immediately if ready
           if (window.instgrm?.Embeds?.process) {
             window.instgrm.Embeds.process();
-            hasProcessedRef.current = true;
             
             // Check if embed rendered successfully after a longer delay
             setTimeout(() => {
@@ -210,6 +210,10 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             }, 4000);
           }
         } else if (platform === 'facebook') {
+          // Only call parse() once per embed instance — skip on re-render / viewport re-entry
+          if (hasProcessedRef.current) return;
+          hasProcessedRef.current = true;
+
           await loadFacebookSDK();
           
           // Parse immediately
