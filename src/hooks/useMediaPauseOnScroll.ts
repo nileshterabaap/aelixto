@@ -189,6 +189,8 @@ function unmuteNonApiIframe(iframe: HTMLIFrameElement) {
     unmutedSrc = removeParam(src, 'autoplay');
   } else if (lower.includes('twitter.com') || lower.includes('platform.twitter.com')) {
     unmutedSrc = removeParam(src, 'autoplay');
+  } else if (lower.includes('linkedin.com')) {
+    unmutedSrc = removeParam(src, 'autoplay');
   }
 
   delete iframe.dataset[MUTE_FLAG];
