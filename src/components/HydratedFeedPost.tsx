@@ -263,7 +263,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* Real card — hidden until embed loads, then fades in */}
       <div
-        className={`transition-opacity duration-[350ms] ease-in-out ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
+        className={`transition-opacity duration-[1000ms] ease-in-out ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',
