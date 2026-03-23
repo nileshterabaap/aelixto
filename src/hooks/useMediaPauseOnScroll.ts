@@ -181,10 +181,12 @@ function unmuteNonApiIframe(iframe: HTMLIFrameElement) {
     unmutedSrc = removeParam(src, 'autoplay');
   } else if (lower.includes('facebook.com')) {
     unmutedSrc = removeParam(removeParam(src, 'autoplay'), 'mute');
+  } else if (lower.includes('threads.net') || lower.includes('threads.com')) {
+    unmutedSrc = removeParam(src, 'autoplay');
+  } else if (lower.includes('pinterest.com')) {
+    unmutedSrc = removeParam(src, 'autoplay');
   } else if (lower.includes('twitter.com') || lower.includes('platform.twitter.com')) {
-    iframe.style.pointerEvents = '';
-    delete iframe.dataset[MUTE_FLAG];
-    return;
+    unmutedSrc = removeParam(src, 'autoplay');
   }
 
   delete iframe.dataset[MUTE_FLAG];
