@@ -171,12 +171,17 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   }, [isHydrated, embedReady]);
 
   // When embed is ready, reveal card and schedule skeleton unmount
+  // Double-rAF ensures the browser paints opacity:0 before we transition to opacity:1
   useEffect(() => {
     if (!embedReady) return;
-    // Trigger card fade-in on next frame so the transition runs
-    requestAnimationFrame(() => setCardRevealed(true));
-    const timer = setTimeout(() => setSkeletonVisible(false), 400);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) setCardRevealed(true);
+      });
+    });
+    const timer = setTimeout(() => setSkeletonVisible(false), 500);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [embedReady]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
