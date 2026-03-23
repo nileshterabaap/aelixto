@@ -162,7 +162,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     const observer = new MutationObserver(() => { checkContent(); });
     observer.observe(el, { childList: true, subtree: true });
 
-    const fallback = setTimeout(markReady, 4000);
+    const fallbackMs = (detectedPlatform === 'instagram' || detectedPlatform === 'facebook') ? 6000 : 4000;
+    const fallback = setTimeout(markReady, fallbackMs);
 
     return () => {
       observer.disconnect();
