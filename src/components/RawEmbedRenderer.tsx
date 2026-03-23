@@ -188,7 +188,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           // Process immediately if ready
           if (window.instgrm?.Embeds?.process) {
             window.instgrm.Embeds.process();
-            hasProcessedRef.current = true;
             
             // Check if embed rendered successfully after a longer delay
             setTimeout(() => {
