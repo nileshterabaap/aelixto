@@ -46,50 +46,55 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
       className="sticky top-0 z-50 w-full bg-background border-b transition-transform duration-300 ease-out"
       style={{ transform: hidden ? "translateY(-100%)" : "translateY(0)" }}
     >
-      <div className="flex flex-col">
-        <div className="flex h-16 items-center justify-between px-6">
-          <h1
-            className="text-3xl font-bold tracking-tight cursor-pointer"
-            onClick={() => navigate('/')}
-          >
-            Aelixto
-          </h1>
-          <div className="flex items-center gap-2">
-            {user && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10"
-                onClick={() => navigate('/saved')}
-              >
-                <Bookmark className="h-8 w-8 stroke-[2.5]" />
-              </Button>
-            )}
-            {user && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 relative"
-                onClick={() => navigate('/messages')}
-              >
-                <MessageCircle className="h-8 w-8 stroke-[2.5]" />
-                {totalUnreadMessages > 0 && (
-                  <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive text-[11px] font-bold text-destructive-foreground flex items-center justify-center">
-                    {totalUnreadMessages}
-                  </div>
-                )}
-              </Button>
-            )}
-            {!user && (
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => navigate('/auth')}
-              >
-                Sign In
-              </Button>
-            )}
-          </div>
+      <div className="flex h-16 items-center justify-between px-6">
+        {/* Left: Save button or spacer */}
+        <div className="flex items-center w-10">
+          {user && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10"
+              onClick={() => navigate('/saved')}
+            >
+              <Bookmark className="h-8 w-8 stroke-[2.5]" />
+            </Button>
+          )}
+        </div>
+
+        {/* Center: Title */}
+        <h1
+          className="text-3xl font-bold tracking-tight cursor-pointer"
+          onClick={() => navigate('/')}
+        >
+          Aelixto
+        </h1>
+
+        {/* Right: Messages or Sign In */}
+        <div className="flex items-center w-10 justify-end">
+          {user && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 relative"
+              onClick={() => navigate('/messages')}
+            >
+              <MessageCircle className="h-8 w-8 stroke-[2.5]" />
+              {totalUnreadMessages > 0 && (
+                <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive text-[11px] font-bold text-destructive-foreground flex items-center justify-center">
+                  {totalUnreadMessages}
+                </div>
+              )}
+            </Button>
+          )}
+          {!user && (
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => navigate('/auth')}
+            >
+              Sign In
+            </Button>
+          )}
         </div>
       </div>
     </header>

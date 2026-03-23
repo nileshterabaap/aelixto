@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
+import { EmbedSkeleton } from "@/components/EmbedSkeleton";
 
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
@@ -88,6 +89,10 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated);
+  const [embedReady, setEmbedReady] = useState(false);
+  const [cardRevealed, setCardRevealed] = useState(false);
+  const [cardPainted, setCardPainted] = useState(false);
+  const [skeletonVisible, setSkeletonVisible] = useState(true);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -122,7 +127,68 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setIsHydrated(true);
   }, [isNearViewport, isHydrated]);
 
+  // Detect when embed content is ready (iframe load, SDK process, or DOM content)
+  useEffect(() => {
+    if (!isHydrated || embedReady) return;
+    const el = embedRef.current;
+    if (!el) return;
+
+    const markReady = () => setEmbedReady(true);
+
+    const handleIframes = () => {
+      const iframes = el.querySelectorAll('iframe');
+      if (iframes.length > 0) {
+        iframes.forEach((iframe) => {
+          iframe.addEventListener('load', markReady, { once: true });
+          iframe.addEventListener('error', markReady, { once: true });
+        });
+        setTimeout(markReady, 3000);
+        return true;
+      }
+      return false;
+    };
+
+    if (handleIframes()) return;
+
+    const checkContent = () => {
+      if (el.querySelector('img, video, [class*="card"], [class*="preview"]')) {
+        markReady();
+        return true;
+      }
+      return handleIframes();
+    };
+
+    if (checkContent()) return;
+
+    const observer = new MutationObserver(() => { checkContent(); });
+    observer.observe(el, { childList: true, subtree: true });
+
+    const fallbackMs = (detectedPlatform === 'instagram' || detectedPlatform === 'facebook') ? 6000 : 4000;
+    const fallback = setTimeout(markReady, fallbackMs);
+
+    return () => {
+      observer.disconnect();
+      clearTimeout(fallback);
+    };
+  }, [isHydrated, embedReady]);
+
+  // When embed is ready, reveal card and schedule skeleton unmount
+  // Double-rAF ensures the browser paints opacity:0 before we transition to opacity:1
+  useEffect(() => {
+    if (!embedReady) return;
+    let cancelled = false;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!cancelled) setCardRevealed(true);
+      });
+    });
+    const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 300);
+    const timer = setTimeout(() => setSkeletonVisible(false), 1400);
+    return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); };
+  }, [embedReady]);
+
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
+
   
   // Normalize field access
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
@@ -182,7 +248,30 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   // Derive thumbnail: prefer stored, then derive from URL
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
+  // For text-only posts (no embed), reveal immediately
+  const isTextOnly = r.kind === 'none';
+  const showCard = isTextOnly || cardPainted;
+
   return (
+    <div className="relative">
+      {/* Skeleton placeholder — occupies space until card reveals */}
+      {!isTextOnly && skeletonVisible && (
+        <div
+          className="rounded-xl overflow-hidden transition-opacity duration-[1000ms] ease-in-out"
+          style={{ opacity: showCard ? 0 : 1, pointerEvents: showCard ? 'none' : 'auto' }}
+        >
+          <EmbedSkeleton platform={detectedPlatform || undefined} />
+        </div>
+      )}
+
+      {/* Real card — hidden until embed loads, then fades in */}
+      <div
+        className={`transition-opacity duration-[1000ms] ease-in-out ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
+        style={{
+          opacity: showCard ? 1 : 0,
+          visibility: showCard ? 'visible' : 'hidden',
+        }}
+      >
     <Card className="overflow-hidden border border-border rounded-xl">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
@@ -251,14 +340,30 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
-        <div ref={embedRef} style={{ contain: 'layout paint' }}>
-          <HydratedEmbed
-            post={post}
-            renderer={r}
-            thumbnailUrl={effectiveThumbnail}
-            isHydrated={isHydrated}
-            onPlayClick={handlePlayClick}
-          />
+        <div ref={embedRef} className="relative" style={{ contain: 'layout paint' }}>
+          {/* Skeleton layer — fades out when embed is ready */}
+          {isHydrated && skeletonVisible && (
+            <div
+              className="absolute inset-0 z-10 transition-opacity duration-[400ms] ease-in-out"
+              style={{ opacity: embedReady ? 0 : 1, pointerEvents: 'none' }}
+            >
+              <EmbedSkeleton platform={detectedPlatform || undefined} />
+            </div>
+          )}
+
+          {/* Embed layer — fades in when ready */}
+          <div
+            className="transition-opacity duration-[400ms] ease-in-out"
+            style={{ opacity: embedReady || !isHydrated ? 1 : 0 }}
+          >
+            <HydratedEmbed
+              post={post}
+              renderer={r}
+              thumbnailUrl={effectiveThumbnail}
+              isHydrated={isHydrated}
+              onPlayClick={handlePlayClick}
+            />
+          </div>
         </div>
       ) : (
         <div ref={embedRef} />
@@ -346,6 +451,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         />
       )}
     </Card>
+      </div>
+    </div>
   );
 };
 
