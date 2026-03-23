@@ -250,7 +250,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
   // For text-only posts (no embed), reveal immediately
   const isTextOnly = r.kind === 'none';
-  const showCard = isTextOnly || cardRevealed;
+  const showCard = isTextOnly || cardPainted;
 
   return (
     <div className="relative">
