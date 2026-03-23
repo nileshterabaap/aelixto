@@ -182,8 +182,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         if (!cancelled) setCardRevealed(true);
       });
     });
-    const timer = setTimeout(() => setSkeletonVisible(false), 1100);
-    return () => { cancelled = true; clearTimeout(timer); };
+    const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 300);
+    const timer = setTimeout(() => setSkeletonVisible(false), 1400);
+    return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); };
   }, [embedReady]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
