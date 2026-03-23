@@ -159,6 +159,8 @@ function muteNonApiIframe(iframe: HTMLIFrameElement) {
     mutedSrc = addParam(src, 'autoplay', '0');
   } else if (lower.includes('twitter.com') || lower.includes('platform.twitter.com')) {
     mutedSrc = addParam(src, 'autoplay', '0');
+  } else if (lower.includes('linkedin.com')) {
+    mutedSrc = addParam(src, 'autoplay', '0');
   } else {
     return; // Not a known non-API embed
   }
