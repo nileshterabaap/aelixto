@@ -91,6 +91,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [isHydrated, setIsHydrated] = useState(startHydrated);
   const [embedReady, setEmbedReady] = useState(false);
   const [cardRevealed, setCardRevealed] = useState(false);
+  const [cardPainted, setCardPainted] = useState(false);
   const [skeletonVisible, setSkeletonVisible] = useState(true);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
@@ -162,7 +163,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     const observer = new MutationObserver(() => { checkContent(); });
     observer.observe(el, { childList: true, subtree: true });
 
-    const fallback = setTimeout(markReady, 4000);
+    const fallbackMs = (detectedPlatform === 'instagram' || detectedPlatform === 'facebook') ? 6000 : 4000;
+    const fallback = setTimeout(markReady, fallbackMs);
 
     return () => {
       observer.disconnect();
@@ -180,8 +182,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         if (!cancelled) setCardRevealed(true);
       });
     });
-    const timer = setTimeout(() => setSkeletonVisible(false), 1100);
-    return () => { cancelled = true; clearTimeout(timer); };
+    const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 300);
+    const timer = setTimeout(() => setSkeletonVisible(false), 1400);
+    return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); };
   }, [embedReady]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
@@ -247,7 +250,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
   // For text-only posts (no embed), reveal immediately
   const isTextOnly = r.kind === 'none';
-  const showCard = isTextOnly || cardRevealed;
+  const showCard = isTextOnly || cardPainted;
 
   return (
     <div className="relative">
