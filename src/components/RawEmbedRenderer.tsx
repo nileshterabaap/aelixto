@@ -179,8 +179,9 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
 
       try {
         if (platform === 'instagram') {
-          // Skip if already processed — prevents white flash on re-mount/re-render
+          // Only call process() once per embed instance — skip on re-render / viewport re-entry
           if (hasProcessedRef.current) return;
+          hasProcessedRef.current = true;
 
           await loadInstagramEmbed();
           
