@@ -153,11 +153,12 @@ function muteNonApiIframe(iframe: HTMLIFrameElement) {
     mutedSrc = addParam(src, 'autoplay', '0');
   } else if (lower.includes('facebook.com')) {
     mutedSrc = addParam(addParam(src, 'autoplay', '0'), 'mute', '1');
+  } else if (lower.includes('threads.net') || lower.includes('threads.com')) {
+    mutedSrc = addParam(src, 'autoplay', '0');
+  } else if (lower.includes('pinterest.com')) {
+    mutedSrc = addParam(src, 'autoplay', '0');
   } else if (lower.includes('twitter.com') || lower.includes('platform.twitter.com')) {
-    // Twitter embeds don't support mute params; freeze pointer events only
-    iframe.style.pointerEvents = 'none';
-    iframe.dataset[MUTE_FLAG] = '1';
-    return;
+    mutedSrc = addParam(src, 'autoplay', '0');
   } else {
     return; // Not a known non-API embed
   }
