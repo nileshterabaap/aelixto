@@ -180,7 +180,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         if (!cancelled) setCardRevealed(true);
       });
     });
-    const timer = setTimeout(() => setSkeletonVisible(false), 500);
+    const timer = setTimeout(() => setSkeletonVisible(false), 1100);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [embedReady]);
 

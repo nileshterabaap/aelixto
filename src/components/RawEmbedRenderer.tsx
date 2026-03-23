@@ -210,6 +210,10 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             }, 4000);
           }
         } else if (platform === 'facebook') {
+          // Only call parse() once per embed instance — skip on re-render / viewport re-entry
+          if (hasProcessedRef.current) return;
+          hasProcessedRef.current = true;
+
           await loadFacebookSDK();
           
           // Parse immediately
