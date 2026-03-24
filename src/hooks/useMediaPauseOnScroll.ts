@@ -268,6 +268,7 @@ export function useMediaPauseOnScroll(
 
       if (target === 'active') {
         clearSuspendTimer();
+        hasBeenVisibleSet.add(currentEl);
         restoreHardSuspended(currentEl);
       } else if (target === 'paused') {
         clearSuspendTimer();
