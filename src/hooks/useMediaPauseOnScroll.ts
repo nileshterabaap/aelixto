@@ -180,6 +180,10 @@ function restoreHardSuspended(root: HTMLElement) {
   });
 }
 
+// ── Visibility tracking — prevents muting iframes that haven't been seen yet ──
+
+const hasBeenVisibleSet = new WeakSet<HTMLElement>();
+
 // ── Lifecycle states ───────────────────────────────────────────────────
 
 type LifecycleState = 'active' | 'paused' | 'suspended';
@@ -243,11 +247,9 @@ export function useMediaPauseOnScroll(
         return 'visible';
       }
 
-      // Non-API iframes: never hard-suspend — keep them loaded for stability
-      // Only pause API-controllable media
-      if (!isOnScreen) {
-        return 'near';
-      }
+      // On-screen but not centered → near (pause but keep loaded)
+      // Off-screen → also near (never hard-suspend for stability)
+      return 'near';
     };
 
     const transition = (target: LifecycleState) => {
@@ -266,6 +268,7 @@ export function useMediaPauseOnScroll(
 
       if (target === 'active') {
         clearSuspendTimer();
+        hasBeenVisibleSet.add(currentEl);
         restoreHardSuspended(currentEl);
       } else if (target === 'paused') {
         clearSuspendTimer();
@@ -274,7 +277,7 @@ export function useMediaPauseOnScroll(
         }
         stageAPause(currentEl);
       } else if (target === 'suspended') {
-        const shouldForceSuspendNonApi = hasNonApiPlayableIframe(currentEl);
+        const shouldForceSuspendNonApi = hasBeenVisibleSet.has(currentEl) && hasNonApiPlayableIframe(currentEl);
 
         if (disableHardSuspend && !shouldForceSuspendNonApi) {
           clearSuspendTimer();
