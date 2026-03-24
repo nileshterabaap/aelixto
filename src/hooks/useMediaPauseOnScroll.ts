@@ -123,12 +123,17 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: pause native/API media only — keep non-API embeds rendered */
+/** Stage A: pause native/API media only — hard-suspend non-API iframes only if previously visible */
 function stageAPause(root: HTMLElement) {
-  console.log('[stageAPause] fired, hasBeenVisible:', hasBeenVisibleSet.has(root), 'hasNonApi:', hasNonApiPlayableIframe(root));
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
+
+  // Only suspend non-API iframes (TikTok, Instagram, Facebook, X) if the post
+  // was already active — prevents first-entry flicker
+  if (hasBeenVisibleSet.has(root) && hasNonApiPlayableIframe(root)) {
+    hardSuspendNonApiIframes(root);
+  }
 }
 
 // ── Stage B helpers: hard suspend / restore ────────────────────────────
