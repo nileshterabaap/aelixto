@@ -248,8 +248,10 @@ export function useMediaPauseOnScroll(
       }
 
       // On-screen but not centered → near (pause but keep loaded)
-      // Off-screen → also near (never hard-suspend for stability)
-      return 'near';
+      if (isOnScreen) return 'near';
+
+      // Off-screen → far (eligible for hard-suspend of non-API playable iframes)
+      return 'far';
     };
 
     const transition = (target: LifecycleState) => {
