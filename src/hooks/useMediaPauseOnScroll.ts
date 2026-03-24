@@ -125,6 +125,7 @@ function pauseSpotifyIframes(root: HTMLElement) {
 
 /** Stage A: pause native/API media only — keep non-API embeds rendered */
 function stageAPause(root: HTMLElement) {
+  console.log('[stageAPause] fired, hasBeenVisible:', hasBeenVisibleSet.has(root), 'hasNonApi:', hasNonApiPlayableIframe(root));
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
