@@ -30,9 +30,6 @@ const HARD_SUSPEND_MIN_DISTANCE_PX = 2800;
 
 const SUSPENDED_FLAG = 'aelixSuspended';
 const SUSPENDED_SRC = 'aelixSuspendedSrc';
-const FROZEN_FLAG = 'aelixFrozen';
-
-const API_PAUSABLE_SELECTOR = [YOUTUBE_SELECTOR, SPOTIFY_SELECTOR].join(', ');
 
 // ── Detection: does this container currently contain playable media? ───
 
@@ -113,97 +110,11 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
-// ── Mute/unmute helpers for non-API iframes ────────────────────────────
-
-const MUTE_FLAG = 'aelixMuted';
-
-function addParam(url: string, key: string, value: string): string {
-  try {
-    const u = new URL(url);
-    u.searchParams.set(key, value);
-    return u.toString();
-  } catch {
-    // Fallback for relative or malformed URLs
-    const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}${key}=${value}`;
-  }
-}
-
-function removeParam(url: string, key: string): string {
-  try {
-    const u = new URL(url);
-    u.searchParams.delete(key);
-    return u.toString();
-  } catch {
-    return url.replace(new RegExp(`[?&]${key}=[^&#]*`, 'g'), '').replace(/\?$/, '');
-  }
-}
-
-function muteNonApiIframe(iframe: HTMLIFrameElement) {
-  if (iframe.dataset[MUTE_FLAG] === '1') return;
-  const src = iframe.getAttribute('src');
-  if (!src || src === 'about:blank') return;
-
-  iframe.dataset[MUTE_FLAG] = '1';
-  iframe.style.visibility = 'hidden';
-  iframe.style.pointerEvents = 'none';
-}
-
-function unmuteNonApiIframe(iframe: HTMLIFrameElement) {
-  if (iframe.dataset[MUTE_FLAG] !== '1') return;
-
-  delete iframe.dataset[MUTE_FLAG];
-  iframe.style.visibility = '';
-  iframe.style.pointerEvents = '';
-}
-
-function muteNonApiIframes(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (!isPlayableIframe(iframe)) return;
-    if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
-    muteNonApiIframe(iframe);
-  });
-}
-
-function unmuteNonApiIframes(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    unmuteNonApiIframe(iframe);
-  });
-}
-
-/** Freeze all iframes (pointer-events) */
-function freezeIframes(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
-    if (iframe.dataset[FROZEN_FLAG] === '1') return;
-    iframe.dataset[FROZEN_FLAG] = '1';
-    iframe.style.pointerEvents = 'none';
-  });
-}
-
-/** Unfreeze all iframes */
-function unfreezeIframes(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.dataset[FROZEN_FLAG] !== '1') return;
-    delete iframe.dataset[FROZEN_FLAG];
-    iframe.style.pointerEvents = '';
-  });
-}
-
-/** Stage A: pause native/API media and mute other playable embeds */
+/** Stage A: pause native/API media only — keep non-API visuals mounted */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  muteNonApiIframes(root);
-  freezeIframes(root);
-}
-
-/** Undo Stage A (unmute + unfreeze) */
-function stageAResume(root: HTMLElement) {
-  restoreHardSuspended(root);
-  unmuteNonApiIframes(root);
-  unfreezeIframes(root);
 }
 
 // ── Stage B helpers: hard suspend / restore ────────────────────────────
@@ -261,8 +172,8 @@ export function useMediaPauseOnScroll(
   const { enabled = true, hardSuspendDistanceVh = 6, disableHardSuspend = false } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
-  const [lifecycleState, setLifecycleState] = useState<LifecycleState>('paused');
-  const stateRef = useRef<LifecycleState>('paused');
+  const [lifecycleState, setLifecycleState] = useState<LifecycleState>('active');
+  const stateRef = useRef<LifecycleState>('active');
 
   useEffect(() => {
     const el = containerRef.current;
@@ -314,7 +225,7 @@ export function useMediaPauseOnScroll(
       }
 
       if (target === 'active') {
-        stageAResume(currentEl);
+        restoreHardSuspended(currentEl);
       } else if (target === 'paused') {
         if (current === 'suspended') {
           restoreHardSuspended(currentEl);

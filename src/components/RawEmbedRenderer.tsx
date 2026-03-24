@@ -97,7 +97,6 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-ifra
 export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<number>(0);
-  const hasProcessedRef = useRef(false);
   const [embedFailed, setEmbedFailed] = useState(false);
   const platform = detectPlatform(embedHtml);
   const isInstagram = isInstagramEmbed(embedHtml);
@@ -179,10 +178,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
 
       try {
         if (platform === 'instagram') {
-          // Only call process() once per embed instance — skip on re-render / viewport re-entry
-          if (hasProcessedRef.current) return;
-          hasProcessedRef.current = true;
-
           await loadInstagramEmbed();
           
           // Process immediately if ready
@@ -200,7 +195,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
                   }
                   setTimeout(() => {
                     if (containerRef.current && !containerRef.current.querySelector('iframe')) {
-                      hasProcessedRef.current = false;
                       setEmbedFailed(true);
                       onError?.();
                     }
@@ -210,10 +204,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             }, 4000);
           }
         } else if (platform === 'facebook') {
-          // Only call parse() once per embed instance — skip on re-render / viewport re-entry
-          if (hasProcessedRef.current) return;
-          hasProcessedRef.current = true;
-
           await loadFacebookSDK();
           
           // Parse immediately
