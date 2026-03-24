@@ -277,7 +277,7 @@ export function useMediaPauseOnScroll(
         }
         stageAPause(currentEl);
       } else if (target === 'suspended') {
-        const shouldForceSuspendNonApi = hasNonApiPlayableIframe(currentEl);
+        const shouldForceSuspendNonApi = hasBeenVisibleSet.has(currentEl) && hasNonApiPlayableIframe(currentEl);
 
         if (disableHardSuspend && !shouldForceSuspendNonApi) {
           clearSuspendTimer();
