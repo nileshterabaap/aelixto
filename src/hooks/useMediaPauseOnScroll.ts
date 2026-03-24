@@ -151,30 +151,10 @@ function muteNonApiIframe(iframe: HTMLIFrameElement) {
 
 function unmuteNonApiIframe(iframe: HTMLIFrameElement) {
   if (iframe.dataset[MUTE_FLAG] !== '1') return;
-  const src = iframe.getAttribute('src');
-  if (!src || src === 'about:blank') return;
-
-  const lower = src.toLowerCase();
-  let unmutedSrc = src;
-
-  if (lower.includes('tiktok.com')) {
-    unmutedSrc = removeParam(src, 'mute');
-  } else if (lower.includes('instagram.com')) {
-    unmutedSrc = removeParam(src, 'autoplay');
-  } else if (lower.includes('facebook.com')) {
-    unmutedSrc = removeParam(removeParam(src, 'autoplay'), 'mute');
-  } else if (lower.includes('threads.net') || lower.includes('threads.com')) {
-    unmutedSrc = removeParam(src, 'autoplay');
-  } else if (lower.includes('pinterest.com')) {
-    unmutedSrc = removeParam(src, 'autoplay');
-  } else if (lower.includes('twitter.com') || lower.includes('platform.twitter.com')) {
-    unmutedSrc = removeParam(src, 'autoplay');
-  } else if (lower.includes('linkedin.com')) {
-    unmutedSrc = removeParam(src, 'autoplay');
-  }
 
   delete iframe.dataset[MUTE_FLAG];
-  iframe.setAttribute('src', unmutedSrc);
+  iframe.style.visibility = '';
+  iframe.style.pointerEvents = '';
 }
 
 function muteNonApiIframes(root: HTMLElement) {
