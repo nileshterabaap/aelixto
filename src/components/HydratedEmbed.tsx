@@ -1,5 +1,6 @@
-import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, memo, useCallback, useEffect, useRef } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
+import { useInView } from '@/hooks/useInView';
 import type { Post } from '@/data/demoData';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
@@ -72,6 +73,9 @@ export const HydratedEmbed = memo(({
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
 
+  // Track if embed is mostly off-screen (< 20% visible) for overlay
+  const isInView = useInView(embedContainerRef, { threshold: 0.2 });
+
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
     mediaTypeHint === 'audio' ||
@@ -111,7 +115,7 @@ export const HydratedEmbed = memo(({
       r.kind === 'universal' ||
       r.kind === 'pinterest');
 
-  const lifecycleState = useMediaPauseOnScroll(
+  useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
     { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: true }
@@ -134,6 +138,7 @@ export const HydratedEmbed = memo(({
     if (!shouldHydrate) return;
     rememberHydratedPost(post.id);
   }, [post.id, shouldHydrate]);
+
 
   const handleRawEmbedError = useCallback(() => {
     setRawEmbedFailed(true);
@@ -172,7 +177,7 @@ export const HydratedEmbed = memo(({
   // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
   if (!shouldHydrate) {
     return (
-      <div ref={embedContainerRef} className={`relative w-full bg-muted ${aspectClass}`}>
+      <div ref={embedContainerRef} className={`relative w-full bg-muted ${aspectClass} cursor-pointer`} onClick={onPlayClick}>
         {effectiveThumbnail && !imageError ? (
           <img
             src={effectiveThumbnail}
@@ -188,10 +193,32 @@ export const HydratedEmbed = memo(({
         ) : (
           <div className="w-full h-full animate-pulse bg-muted" />
         )}
+        {/* Play button overlay */}
+        <div className="absolute inset-0 grid place-items-center pointer-events-none">
+          <div className="w-14 h-14 rounded-full bg-black/50 backdrop-blur-sm grid place-items-center">
+            <div className="w-0 h-0 border-l-[16px] border-l-white border-t-[11px] border-t-transparent border-b-[11px] border-b-transparent ml-1" />
+          </div>
+        </div>
       </div>
     );
   }
   
+  // Determine if this is a non-API embed (can't be paused programmatically)
+  const isNonApiEmbed =
+    r.kind === 'raw' ||
+    r.kind === 'universal' ||
+    r.kind === 'reddit' ||
+    r.kind === 'article' ||
+    (r.kind === 'twitter') ||
+    (r.kind === 'pinterest') ||
+    // Also catch forced renderers
+    forceTwitterRenderer ||
+    forcePinterestRenderer ||
+    forceUniversalRenderer;
+
+  // Show dim overlay when scrolled away for non-API embeds
+  const showScrolledAwayOverlay = shouldHydrate && !isInView && isNonApiEmbed;
+
   // HYDRATED STATE: Show skeleton → fade into actual embed
   return (
     <div ref={embedContainerRef} className="relative w-full" style={{ contain: 'layout paint' }}>
@@ -321,6 +348,14 @@ export const HydratedEmbed = memo(({
           </SkeletonGate>
         )}
       </div>
+
+      {/* Dim overlay for non-API embeds when scrolled away — blocks interaction without disrupting layout */}
+      {showScrolledAwayOverlay && (
+        <div
+          className="absolute inset-0 bg-background/60 pointer-events-auto transition-opacity duration-300 opacity-100"
+          aria-hidden="true"
+        />
+      )}
     </div>
   );
 });
