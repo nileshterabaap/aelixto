@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { EmbedSkeleton } from '@/components/EmbedSkeleton';
 
-const MIN_SKELETON_MS = 80; // Shorter minimum — content is usually preloaded
-const IFRAME_LOAD_TIMEOUT = 2500; // Reduced — cross-origin iframes often never fire load
+const MIN_SKELETON_MS = 150;
+const IFRAME_LOAD_TIMEOUT = 3000; // Reduced from 12s — cross-origin iframes often never fire load
 const readyCache = new Set<string>();
 
 /**

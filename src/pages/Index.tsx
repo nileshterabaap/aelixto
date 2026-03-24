@@ -209,7 +209,7 @@ const Index = () => {
                   <FeedPost 
                     post={post} 
                     userId={user?.id} 
-                    startHydrated={index < 15}
+                    startHydrated={index < 8}
                   />
                 </div>
               ))}
