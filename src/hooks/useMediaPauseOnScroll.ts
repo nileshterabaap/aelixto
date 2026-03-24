@@ -247,11 +247,9 @@ export function useMediaPauseOnScroll(
         return 'visible';
       }
 
-      // Non-API iframes: never hard-suspend — keep them loaded for stability
-      // Only pause API-controllable media
-      if (!isOnScreen) {
-        return 'near';
-      }
+      // On-screen but not centered → near (pause but keep loaded)
+      // Off-screen → also near (never hard-suspend for stability)
+      return 'near';
     };
 
     const transition = (target: LifecycleState) => {
