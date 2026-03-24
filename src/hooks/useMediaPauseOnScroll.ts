@@ -301,8 +301,8 @@ export function useMediaPauseOnScroll(
   const { enabled = true, hardSuspendDistanceVh = 6, disableHardSuspend = false } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
-  const [lifecycleState, setLifecycleState] = useState<LifecycleState>('paused');
-  const stateRef = useRef<LifecycleState>('paused');
+  const [lifecycleState, setLifecycleState] = useState<LifecycleState>('active');
+  const stateRef = useRef<LifecycleState>('active');
 
   useEffect(() => {
     const el = containerRef.current;
