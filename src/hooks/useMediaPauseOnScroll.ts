@@ -180,6 +180,10 @@ function restoreHardSuspended(root: HTMLElement) {
   });
 }
 
+// ── Visibility tracking — prevents muting iframes that haven't been seen yet ──
+
+const hasBeenVisibleSet = new WeakSet<HTMLElement>();
+
 // ── Lifecycle states ───────────────────────────────────────────────────
 
 type LifecycleState = 'active' | 'paused' | 'suspended';
