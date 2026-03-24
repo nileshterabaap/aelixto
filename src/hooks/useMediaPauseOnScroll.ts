@@ -30,6 +30,9 @@ const HARD_SUSPEND_MIN_DISTANCE_PX = 2800;
 
 const SUSPENDED_FLAG = 'aelixSuspended';
 const SUSPENDED_SRC = 'aelixSuspendedSrc';
+const FROZEN_FLAG = 'aelixFrozen';
+
+const API_PAUSABLE_SELECTOR = [YOUTUBE_SELECTOR, SPOTIFY_SELECTOR].join(', ');
 
 // ── Detection: does this container currently contain playable media? ───
 
@@ -110,11 +113,130 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: pause native/API media only — keep non-API visuals mounted */
+// ── Mute/unmute helpers for non-API iframes ────────────────────────────
+
+const MUTE_FLAG = 'aelixMuted';
+
+function addParam(url: string, key: string, value: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.set(key, value);
+    return u.toString();
+  } catch {
+    // Fallback for relative or malformed URLs
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}${key}=${value}`;
+  }
+}
+
+function removeParam(url: string, key: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete(key);
+    return u.toString();
+  } catch {
+    return url.replace(new RegExp(`[?&]${key}=[^&#]*`, 'g'), '').replace(/\?$/, '');
+  }
+}
+
+function muteNonApiIframe(iframe: HTMLIFrameElement) {
+  if (iframe.dataset[MUTE_FLAG] === '1') return;
+  const src = iframe.getAttribute('src');
+  if (!src || src === 'about:blank') return;
+
+  const lower = src.toLowerCase();
+  let mutedSrc = src;
+
+  if (lower.includes('tiktok.com')) {
+    mutedSrc = addParam(src, 'mute', '1');
+  } else if (lower.includes('instagram.com')) {
+    mutedSrc = addParam(src, 'autoplay', '0');
+  } else if (lower.includes('facebook.com')) {
+    mutedSrc = addParam(addParam(src, 'autoplay', '0'), 'mute', '1');
+  } else if (lower.includes('twitter.com') || lower.includes('platform.twitter.com')) {
+    // Twitter embeds don't support mute params; freeze pointer events only
+    iframe.style.pointerEvents = 'none';
+    iframe.dataset[MUTE_FLAG] = '1';
+    return;
+  } else {
+    return; // Not a known non-API embed
+  }
+
+  iframe.dataset[MUTE_FLAG] = '1';
+  iframe.setAttribute('src', mutedSrc);
+}
+
+function unmuteNonApiIframe(iframe: HTMLIFrameElement) {
+  if (iframe.dataset[MUTE_FLAG] !== '1') return;
+  const src = iframe.getAttribute('src');
+  if (!src || src === 'about:blank') return;
+
+  const lower = src.toLowerCase();
+  let unmutedSrc = src;
+
+  if (lower.includes('tiktok.com')) {
+    unmutedSrc = removeParam(src, 'mute');
+  } else if (lower.includes('instagram.com')) {
+    unmutedSrc = removeParam(src, 'autoplay');
+  } else if (lower.includes('facebook.com')) {
+    unmutedSrc = removeParam(removeParam(src, 'autoplay'), 'mute');
+  } else if (lower.includes('twitter.com') || lower.includes('platform.twitter.com')) {
+    iframe.style.pointerEvents = '';
+    delete iframe.dataset[MUTE_FLAG];
+    return;
+  }
+
+  delete iframe.dataset[MUTE_FLAG];
+  iframe.setAttribute('src', unmutedSrc);
+}
+
+function muteNonApiIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (!isPlayableIframe(iframe)) return;
+    if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
+    muteNonApiIframe(iframe);
+  });
+}
+
+function unmuteNonApiIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    unmuteNonApiIframe(iframe);
+  });
+}
+
+/** Freeze all iframes (pointer-events) */
+function freezeIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
+    if (iframe.dataset[FROZEN_FLAG] === '1') return;
+    iframe.dataset[FROZEN_FLAG] = '1';
+    iframe.style.pointerEvents = 'none';
+  });
+}
+
+/** Unfreeze all iframes */
+function unfreezeIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (iframe.dataset[FROZEN_FLAG] !== '1') return;
+    delete iframe.dataset[FROZEN_FLAG];
+    iframe.style.pointerEvents = '';
+  });
+}
+
+/** Stage A: pause native/API media and mute other playable embeds */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
+  muteNonApiIframes(root);
+  freezeIframes(root);
+}
+
+/** Undo Stage A (unmute + unfreeze) */
+function stageAResume(root: HTMLElement) {
+  restoreHardSuspended(root);
+  unmuteNonApiIframes(root);
+  unfreezeIframes(root);
 }
 
 // ── Stage B helpers: hard suspend / restore ────────────────────────────
@@ -225,7 +347,7 @@ export function useMediaPauseOnScroll(
       }
 
       if (target === 'active') {
-        restoreHardSuspended(currentEl);
+        stageAResume(currentEl);
       } else if (target === 'paused') {
         if (current === 'suspended') {
           restoreHardSuspended(currentEl);
