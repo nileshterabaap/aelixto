@@ -123,8 +123,8 @@ function isOnScreen(root: HTMLElement): boolean {
   return rect.bottom > 0 && rect.top < vh;
 }
 
-function isFullyOffScreen(root: HTMLElement): boolean {
-  const rect = root.getBoundingClientRect();
+function isElementFullyOffScreen(element: Element): boolean {
+  const rect = element.getBoundingClientRect();
   const vh = window.innerHeight || document.documentElement.clientHeight;
   return rect.bottom <= 0 || rect.top >= vh;
 }
@@ -175,6 +175,7 @@ function muteNonApiIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (!isPlayableIframe(iframe)) return;
     if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
+    if (!isElementFullyOffScreen(iframe)) return;
     muteNonApiIframe(iframe);
   });
 }
@@ -203,7 +204,7 @@ function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  if (root.dataset.aelixHasBeenActive && isFullyOffScreen(root)) {
+  if (root.dataset.aelixHasBeenActive) {
     muteNonApiIframes(root);
   }
   freezeIframes(root);
