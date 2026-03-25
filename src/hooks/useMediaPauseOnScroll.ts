@@ -299,11 +299,16 @@ export function useMediaPauseOnScroll(
     };
 
     const transition = (target: LifecycleState) => {
-      const current = stateRef.current;
-      if (current === target) return;
-
       const currentEl = containerRef.current;
       if (!currentEl) return;
+
+      const current = stateRef.current;
+      if (current === target) {
+        if (target === 'active' && hasLifecycleTargets(currentEl)) {
+          stageAResume(currentEl);
+        }
+        return;
+      }
 
       if (!hasLifecycleTargets(currentEl) && target !== 'active') {
         stateRef.current = 'active';
