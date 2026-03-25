@@ -232,6 +232,7 @@ function unfreezeIframes(root: HTMLElement) {
 
 /** Stage A: pause native/API media and mute other playable embeds */
 function stageAPause(root: HTMLElement) {
+  root.dataset.aelixHasBeenActive = 'true';
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
@@ -242,7 +243,9 @@ function stageAPause(root: HTMLElement) {
 /** Undo Stage A (unmute + unfreeze) */
 function stageAResume(root: HTMLElement) {
   restoreHardSuspended(root);
-  unmuteNonApiIframes(root);
+  if (root.dataset.aelixHasBeenActive) {
+    unmuteNonApiIframes(root);
+  }
   unfreezeIframes(root);
 }
 
