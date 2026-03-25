@@ -244,9 +244,8 @@ function stageAPause(root: HTMLElement) {
 /** Undo Stage A (unmute + unfreeze) */
 function stageAResume(root: HTMLElement) {
   restoreHardSuspended(root);
-  if (root.dataset.aelixHasBeenActive) {
-    unmuteNonApiIframes(root);
-  }
+  root.dataset.aelixHasBeenActive = 'true';
+  unmuteNonApiIframes(root);
   unfreezeIframes(root);
 }
 
