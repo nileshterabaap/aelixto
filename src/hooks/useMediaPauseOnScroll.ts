@@ -117,6 +117,18 @@ function pauseSpotifyIframes(root: HTMLElement) {
 
 const MUTE_FLAG = 'aelixMuted';
 
+function isOnScreen(root: HTMLElement): boolean {
+  const rect = root.getBoundingClientRect();
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  return rect.bottom > 0 && rect.top < vh;
+}
+
+function isFullyOffScreen(root: HTMLElement): boolean {
+  const rect = root.getBoundingClientRect();
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  return rect.bottom <= 0 || rect.top >= vh;
+}
+
 function addParam(url: string, key: string, value: string): string {
   try {
     const u = new URL(url);
@@ -191,7 +203,7 @@ function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  if (root.dataset.aelixHasBeenActive) {
+  if (root.dataset.aelixHasBeenActive && isFullyOffScreen(root)) {
     muteNonApiIframes(root);
   }
   freezeIframes(root);
@@ -342,6 +354,10 @@ export function useMediaPauseOnScroll(
     };
 
     const reconcile = () => {
+      if (isOnScreen(el)) {
+        el.dataset.aelixHasBeenActive = 'true';
+      }
+
       const zone = computeZone();
       if (zone === 'visible') transition('active');
       else if (zone === 'near') transition('paused');
