@@ -245,7 +245,8 @@ function stageAPause(root: HTMLElement) {
 function stageAResume(root: HTMLElement) {
   restoreHardSuspended(root);
   root.dataset.aelixHasBeenActive = 'true';
-  unmuteNonApiIframes(root);
+  // Do NOT unmute — once muted, stay muted to avoid src-rewrite flicker.
+  // User can interact manually to replay.
   unfreezeIframes(root);
 }
 
