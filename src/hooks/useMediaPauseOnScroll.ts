@@ -117,18 +117,6 @@ function pauseSpotifyIframes(root: HTMLElement) {
 
 const MUTE_FLAG = 'aelixMuted';
 
-function isOnScreen(root: HTMLElement): boolean {
-  const rect = root.getBoundingClientRect();
-  const vh = window.innerHeight || document.documentElement.clientHeight;
-  return rect.bottom > 0 && rect.top < vh;
-}
-
-function isElementFullyOffScreen(element: Element): boolean {
-  const rect = element.getBoundingClientRect();
-  const vh = window.innerHeight || document.documentElement.clientHeight;
-  return rect.bottom <= 0 || rect.top >= vh;
-}
-
 function addParam(url: string, key: string, value: string): string {
   try {
     const u = new URL(url);
@@ -138,6 +126,16 @@ function addParam(url: string, key: string, value: string): string {
     // Fallback for relative or malformed URLs
     const sep = url.includes('?') ? '&' : '?';
     return `${url}${sep}${key}=${value}`;
+  }
+}
+
+function removeParam(url: string, key: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete(key);
+    return u.toString();
+  } catch {
+    return url.replace(new RegExp(`[?&]${key}=[^&#]*`, 'g'), '').replace(/\?$/, '');
   }
 }
 
@@ -171,12 +169,45 @@ function muteNonApiIframe(iframe: HTMLIFrameElement) {
   iframe.setAttribute('src', mutedSrc);
 }
 
+function unmuteNonApiIframe(iframe: HTMLIFrameElement) {
+  if (iframe.dataset[MUTE_FLAG] !== '1') return;
+  const src = iframe.getAttribute('src');
+  if (!src || src === 'about:blank') return;
+
+  const lower = src.toLowerCase();
+  let unmutedSrc = src;
+
+  if (lower.includes('tiktok.com')) {
+    unmutedSrc = removeParam(src, 'mute');
+  } else if (lower.includes('instagram.com')) {
+    unmutedSrc = removeParam(src, 'autoplay');
+  } else if (lower.includes('facebook.com')) {
+    unmutedSrc = removeParam(removeParam(src, 'autoplay'), 'mute');
+  } else if (lower.includes('threads.net') || lower.includes('threads.com')) {
+    unmutedSrc = removeParam(src, 'autoplay');
+  } else if (lower.includes('pinterest.com')) {
+    unmutedSrc = removeParam(src, 'autoplay');
+  } else if (lower.includes('twitter.com') || lower.includes('platform.twitter.com')) {
+    unmutedSrc = removeParam(src, 'autoplay');
+  } else if (lower.includes('linkedin.com')) {
+    unmutedSrc = removeParam(src, 'autoplay');
+  }
+
+  delete iframe.dataset[MUTE_FLAG];
+  iframe.setAttribute('src', unmutedSrc);
+}
+
 function muteNonApiIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (!isPlayableIframe(iframe)) return;
     if (iframe.matches(API_PAUSABLE_SELECTOR)) return;
-    if (!isElementFullyOffScreen(iframe)) return;
     muteNonApiIframe(iframe);
+  });
+}
+
+function unmuteNonApiIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    unmuteNonApiIframe(iframe);
   });
 }
 
@@ -210,10 +241,11 @@ function stageAPause(root: HTMLElement) {
   freezeIframes(root);
 }
 
-/** Undo Stage A freezing only; paused non-API embeds stay paused until manual user action */
+/** Undo Stage A (unmute + unfreeze) */
 function stageAResume(root: HTMLElement) {
   restoreHardSuspended(root);
   root.dataset.aelixHasBeenActive = 'true';
+  unmuteNonApiIframes(root);
   unfreezeIframes(root);
 }
 
@@ -312,16 +344,11 @@ export function useMediaPauseOnScroll(
     };
 
     const transition = (target: LifecycleState) => {
+      const current = stateRef.current;
+      if (current === target) return;
+
       const currentEl = containerRef.current;
       if (!currentEl) return;
-
-      const current = stateRef.current;
-      if (current === target) {
-        if (target === 'active' && hasLifecycleTargets(currentEl)) {
-          stageAResume(currentEl);
-        }
-        return;
-      }
 
       if (!hasLifecycleTargets(currentEl) && target !== 'active') {
         stateRef.current = 'active';
@@ -355,10 +382,6 @@ export function useMediaPauseOnScroll(
     };
 
     const reconcile = () => {
-      if (isOnScreen(el)) {
-        el.dataset.aelixHasBeenActive = 'true';
-      }
-
       const zone = computeZone();
       if (zone === 'visible') transition('active');
       else if (zone === 'near') transition('paused');
