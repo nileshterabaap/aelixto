@@ -215,7 +215,12 @@ const Index = () => {
               ))}
               {/* Sentinel for prefetching next page ahead of scroll */}
               {hasMore && !showDemoFeed && (
-                <div ref={prefetchSentinelRef} style={{ height: 1 }} />
+                <>
+                  <div ref={prefetchSentinelRef} style={{ height: 1 }} />
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                </>
               )}
             </div>
           )}
