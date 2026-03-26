@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
@@ -215,7 +216,12 @@ const Index = () => {
               ))}
               {/* Sentinel for prefetching next page ahead of scroll */}
               {hasMore && !showDemoFeed && (
-                <div ref={prefetchSentinelRef} style={{ height: 1 }} />
+                <>
+                  <div ref={prefetchSentinelRef} style={{ height: 1 }} />
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                </>
               )}
             </div>
           )}
