@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";

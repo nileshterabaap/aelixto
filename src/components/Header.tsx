@@ -64,7 +64,13 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
         {/* Center: Title */}
         <h1
           className="text-3xl font-bold tracking-tight cursor-pointer"
-          onClick={() => navigate('/')}
+          onClick={() => {
+            if (window.location.pathname === '/') {
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+              navigate('/');
+            }
+          }}
         >
           Aelixto
         </h1>
