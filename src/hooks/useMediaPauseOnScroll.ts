@@ -241,12 +241,15 @@ function stageAPause(root: HTMLElement) {
   freezeIframes(root);
 }
 
-/** Undo Stage A (unmute + unfreeze) */
+/** Undo Stage A (unfreeze + reset mute flags for next pause cycle) */
 function stageAResume(root: HTMLElement) {
   restoreHardSuspended(root);
   root.dataset.aelixHasBeenActive = 'true';
-  // Do NOT unmute — once muted, stay muted to avoid src-rewrite flicker.
-  // User can interact manually to replay.
+  // Clear mute flags so next stageAPause can re-apply muting.
+  // Do NOT change iframe src here — that causes flicker.
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    delete iframe.dataset[MUTE_FLAG];
+  });
   unfreezeIframes(root);
 }
 
