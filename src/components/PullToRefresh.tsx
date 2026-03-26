@@ -95,15 +95,14 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       onTouchEnd={handleTouchEnd}
       className="relative"
     >
-      {/* Pull indicator */}
+      {/* Pull indicator - overlays content, doesn't push it */}
       <motion.div
         className="absolute left-0 right-0 flex justify-center pointer-events-none z-50"
-        style={{ top: -40, y: pullY }}
+        style={{ top: 8, opacity: spinnerOpacity }}
       >
         <motion.div
           className="h-10 w-10 rounded-full bg-background border border-border shadow-lg flex items-center justify-center"
           style={{
-            opacity: spinnerOpacity,
             scale: spinnerScale,
           }}
         >
@@ -117,8 +116,8 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
         </motion.div>
       </motion.div>
 
-      {/* Content */}
-      <motion.div style={{ y: pullY }}>{children}</motion.div>
+      {/* Content - no vertical shift */}
+      {children}
     </div>
   );
 };
