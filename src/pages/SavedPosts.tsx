@@ -95,8 +95,10 @@ export default function SavedPosts() {
 
   if (loading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="min-h-screen pb-20">
+        <Header onCreatePost={() => setCreatePostOpen(true)} />
+        <SavedSkeleton />
+        <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
       </div>
     );
   }

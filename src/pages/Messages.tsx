@@ -45,9 +45,7 @@ const Messages = () => {
 
           {/* Conversations List */}
           {loading ? (
-            <div className="text-center py-8 text-muted-foreground">
-              Loading conversations...
-            </div>
+            <MessagesSkeleton />
           ) : conversations.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No conversations yet
