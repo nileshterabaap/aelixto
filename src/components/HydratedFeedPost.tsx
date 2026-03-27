@@ -85,14 +85,18 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
+// Cache of post IDs that have fully revealed — survives remounts
+const revealedPostsCache = new Set<string>();
+
 export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
+  const alreadyRevealed = revealedPostsCache.has(post.id);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(startHydrated);
-  const [embedReady, setEmbedReady] = useState(false);
-  const [cardRevealed, setCardRevealed] = useState(false);
-  const [cardPainted, setCardPainted] = useState(false);
-  const [skeletonVisible, setSkeletonVisible] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(startHydrated || alreadyRevealed);
+  const [embedReady, setEmbedReady] = useState(alreadyRevealed);
+  const [cardRevealed, setCardRevealed] = useState(alreadyRevealed);
+  const [cardPainted, setCardPainted] = useState(alreadyRevealed);
+  const [skeletonVisible, setSkeletonVisible] = useState(!alreadyRevealed);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
