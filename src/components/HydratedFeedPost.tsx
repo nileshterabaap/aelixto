@@ -405,12 +405,15 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </button>
         <button 
           onClick={handleRepostClick}
-          className="action-btn p-1.5 active:scale-90 transition-transform"
+          className="action-btn p-1.5 active:scale-90 transition-transform flex items-center gap-1"
         >
           <Repeat2 
             className={`h-7 w-7 stroke-[2] ${repostAnimating ? 'animate-repost-spin' : ''}`}
             style={{ color: isReposted ? '#22c55e' : 'currentColor' }}
           />
+          {(post as any).reposts_count > 0 && (
+            <span className="text-xs text-muted-foreground">{(post as any).reposts_count}</span>
+          )}
         </button>
         <button 
           onClick={handleShare}
