@@ -10,6 +10,7 @@ import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { SavedThumbnailGrid } from "@/components/saved/SavedThumbnailGrid";
 import { CollectionGrid } from "@/components/saved/CollectionGrid";
 import { useCollections } from "@/hooks/useCollections";
+import { SavedSkeleton } from "@/components/saved/SavedSkeleton";
 
 export default function SavedPosts() {
   const { session, loading } = useSession();
