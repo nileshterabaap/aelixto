@@ -80,6 +80,8 @@ export const SavedPostViewer = ({
                     ...post,
                     likes_count: post.likes || 0,
                     comments_count: post.comments || 0,
+                    reposts_count: post.shares || 0,
+                    saves_count: post.saves || 0,
                   } as any}
                   userId={userId}
                   startHydrated={shouldHydrate}
