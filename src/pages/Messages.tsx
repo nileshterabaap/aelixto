@@ -10,6 +10,7 @@ import { Search } from "lucide-react";
 import { useConversations } from "@/hooks/useConversations";
 import { formatDistanceToNow } from "date-fns";
 import { useSession } from "@/hooks/useSession";
+import { MessagesSkeleton } from "@/components/messages/MessagesSkeleton";
 
 const Messages = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
