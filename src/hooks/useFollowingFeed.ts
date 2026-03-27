@@ -10,6 +10,8 @@ interface FeedPost {
   created_at: string;
   likes_count: number;
   saves_count: number;
+  comments_count: number | null;
+  reposts_count: number | null;
   media_type: string | null;
   media_url: string | null;
   platform: string | null;
