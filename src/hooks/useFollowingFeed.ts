@@ -56,6 +56,8 @@ const fetchFeedPage = async (cursor?: string) => {
     created_at: item.created_at,
     likes_count: item.likes_count,
     saves_count: item.saves_count,
+    comments_count: item.comments_count,
+    reposts_count: item.reposts_count,
     media_type: item.media_type,
     media_url: item.media_url,
     platform: item.platform,
