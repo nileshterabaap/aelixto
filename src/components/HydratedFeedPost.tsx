@@ -95,6 +95,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [skeletonVisible, setSkeletonVisible] = useState(true);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
+  const [displayLikeCount, setDisplayLikeCount] = useState<number>(Number((post as any).likes_count ?? (post as any).likes ?? 0));
+  const [displayCommentCount] = useState<number>(Number((post as any).comments_count ?? (post as any).comments ?? 0));
+  const [displayRepostCount, setDisplayRepostCount] = useState<number>(Number((post as any).reposts_count ?? (post as any).shares ?? 0));
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
 
@@ -224,19 +227,26 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost, isDeleting } = postActions;
   const { isReposted, toggleRepost } = repostActions;
 
+  useEffect(() => {
+    setDisplayLikeCount(Number((post as any).likes_count ?? (post as any).likes ?? 0));
+    setDisplayRepostCount(Number((post as any).reposts_count ?? (post as any).shares ?? 0));
+  }, [post.id, (post as any).likes_count, (post as any).likes, (post as any).reposts_count, (post as any).shares]);
+
   const handleLikeClick = useCallback(() => {
     if (!canUseActions) return;
     setLikeAnimating(true);
+    setDisplayLikeCount((current) => Math.max(0, current + (isLiked ? -1 : 1)));
     toggleLike();
     setTimeout(() => setLikeAnimating(false), 400);
-  }, [canUseActions, toggleLike]);
+  }, [canUseActions, isLiked, toggleLike]);
 
   const handleRepostClick = useCallback(() => {
     if (!canUseActions) return;
     setRepostAnimating(true);
+    setDisplayRepostCount((current) => Math.max(0, current + (isReposted ? -1 : 1)));
     toggleRepost();
     setTimeout(() => setRepostAnimating(false), 500);
-  }, [canUseActions, toggleRepost]);
+  }, [canUseActions, isReposted, toggleRepost]);
 
   const handlePlayClick = useCallback(() => {
     setIsHydrated(true);
@@ -390,8 +400,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
               color: isLiked ? '#ef4444' : 'currentColor'
             }}
           />
-          {!(post as any).hide_likes && (post as any).likes_count > 0 && (
-            <span className="text-xs text-muted-foreground">{(post as any).likes_count}</span>
+          {!(post as any).hide_likes && displayLikeCount > 0 && (
+            <span className="text-xs text-muted-foreground">{displayLikeCount}</span>
           )}
         </button>
         <button 
@@ -399,8 +409,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           className="action-btn p-1.5 active:scale-90 transition-transform flex items-center gap-1"
         >
           <MessageCircle className="h-6 w-6 stroke-[1.5] fill-none" />
-          {(post as any).comments_count > 0 && (
-            <span className="text-xs text-muted-foreground">{(post as any).comments_count}</span>
+          {displayCommentCount > 0 && (
+            <span className="text-xs text-muted-foreground">{displayCommentCount}</span>
           )}
         </button>
         <button 
@@ -411,8 +421,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
             className={`h-7 w-7 stroke-[2] ${repostAnimating ? 'animate-repost-spin' : ''}`}
             style={{ color: isReposted ? '#22c55e' : 'currentColor' }}
           />
-          {(post as any).reposts_count > 0 && (
-            <span className="text-xs text-muted-foreground">{(post as any).reposts_count}</span>
+          {displayRepostCount > 0 && (
+            <span className="text-xs text-muted-foreground">{displayRepostCount}</span>
           )}
         </button>
         <button 
