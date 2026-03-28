@@ -401,7 +401,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
             }}
           />
           {!(post as any).hide_likes && displayLikeCount > 0 && (
-            <span className="text-xs text-muted-foreground">{displayLikeCount}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{displayLikeCount}</span>
           )}
         </button>
         <button 
@@ -410,7 +410,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         >
           <MessageCircle className="h-6 w-6 stroke-[1.5] fill-none" />
           {displayCommentCount > 0 && (
-            <span className="text-xs text-muted-foreground">{displayCommentCount}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{displayCommentCount}</span>
           )}
         </button>
         <button 
@@ -422,7 +422,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
             style={{ color: isReposted ? '#22c55e' : 'currentColor' }}
           />
           {displayRepostCount > 0 && (
-            <span className="text-xs text-muted-foreground">{displayRepostCount}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{displayRepostCount}</span>
           )}
         </button>
         <button 
