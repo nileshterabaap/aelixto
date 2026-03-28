@@ -94,8 +94,10 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [cardRevealed, setCardRevealed] = useState(false);
   const [cardPainted, setCardPainted] = useState(false);
   const [skeletonVisible, setSkeletonVisible] = useState(true);
-  const [likeAnimating, setLikeAnimating] = useState(false);
-  const [repostAnimating, setRepostAnimating] = useState(false);
+  const likeControls = useAnimation();
+  const repostControls = useAnimation();
+  const commentControls = useAnimation();
+  const saveControls = useAnimation();
   const [displayLikeCount, setDisplayLikeCount] = useState<number>(Number((post as any).likes_count ?? (post as any).likes ?? 0));
   const [displayCommentCount] = useState<number>(Number((post as any).comments_count ?? (post as any).comments ?? 0));
   const [displayRepostCount, setDisplayRepostCount] = useState<number>(Number((post as any).reposts_count ?? (post as any).shares ?? 0));
