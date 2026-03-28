@@ -394,50 +394,69 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {/* Interaction Bar - tight spacing, professional layout */}
       {/* For Instagram: pull bar up to cover native action buttons */}
       <div className={`flex items-center justify-around px-3 py-3 relative z-10 bg-background ${detectedPlatform === 'instagram' ? '-mt-10' : ''}`}>
-        <button
+        <motion.button
           onClick={handleLikeClick}
-          className="action-btn p-1.5 active:scale-90 transition-transform flex items-center gap-1"
+          animate={likeControls}
+          whileTap={{ scale: 0.9 }}
+          className="action-btn p-1.5 flex items-center gap-1"
         >
           <Heart 
-            className={`h-6 w-6 stroke-[1.5] ${likeAnimating ? 'animate-like-pop' : ''}`}
+            className="h-6 w-6 stroke-[1.5]"
             style={{ 
               fill: isLiked ? '#ef4444' : 'none',
-              color: isLiked ? '#ef4444' : 'currentColor'
+              color: isLiked ? '#ef4444' : 'currentColor',
+              transition: 'fill 200ms ease, color 200ms ease',
             }}
           />
           {!(post as any).hide_likes && displayLikeCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground">{displayLikeCount}</span>
           )}
-        </button>
-        <button 
-          onClick={() => setCommentsOpen(true)}
-          className="action-btn p-1.5 active:scale-90 transition-transform flex items-center gap-1"
+        </motion.button>
+        <motion.button 
+          onClick={() => {
+            setCommentsOpen(true);
+            commentControls.start({ scale: [1, 1.2, 1], transition: { duration: 0.2, ease: 'easeOut' } });
+          }}
+          animate={commentControls}
+          whileTap={{ scale: 0.9 }}
+          className="action-btn p-1.5 flex items-center gap-1"
         >
           <MessageCircle className="h-6 w-6 stroke-[1.5] fill-none" />
           {displayCommentCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground">{displayCommentCount}</span>
           )}
-        </button>
-        <button 
+        </motion.button>
+        <motion.button 
           onClick={handleRepostClick}
-          className="action-btn p-1.5 active:scale-90 transition-transform flex items-center gap-1"
+          animate={repostControls}
+          whileTap={{ scale: 0.9 }}
+          className="action-btn p-1.5 flex items-center gap-1"
         >
           <Repeat2 
-            className={`h-7 w-7 stroke-[2] ${repostAnimating ? 'animate-repost-spin' : ''}`}
-            style={{ color: isReposted ? '#22c55e' : 'currentColor' }}
+            className="h-7 w-7 stroke-[2]"
+            style={{ 
+              color: isReposted ? '#22c55e' : 'currentColor',
+              transition: 'color 200ms ease',
+            }}
           />
           {displayRepostCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground">{displayRepostCount}</span>
           )}
-        </button>
-        <button 
+        </motion.button>
+        <motion.button 
           onClick={handleShare}
-          className="action-btn p-1.5 active:scale-90 transition-transform"
+          whileTap={{ scale: 0.9 }}
+          className="action-btn p-1.5"
         >
           <Share className="h-6 w-6 stroke-[1.5]" />
-        </button>
-        <button
-          onClick={() => toggleSave()}
+        </motion.button>
+        <motion.button
+          onClick={() => {
+            toggleSave();
+            saveControls.start({ scale: [1, 1.3, 1], transition: { type: 'spring', stiffness: 500, damping: 15, duration: 0.3 } });
+          }}
+          animate={saveControls}
+          whileTap={{ scale: 0.9 }}
           onPointerDown={() => {
             longPressTimer.current = setTimeout(() => {
               if (canUseActions) setCollectionSheetOpen(true);
@@ -445,10 +464,16 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           }}
           onPointerUp={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
           onPointerLeave={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
-          className="action-btn p-1.5 active:scale-90 transition-transform"
+          className="action-btn p-1.5"
         >
-          <Bookmark className={`h-6 w-6 stroke-[1.5] ${isSaved ? 'fill-current' : 'fill-none'}`} />
-        </button>
+          <Bookmark 
+            className="h-6 w-6 stroke-[1.5]"
+            style={{
+              fill: isSaved ? 'currentColor' : 'none',
+              transition: 'fill 200ms ease',
+            }}
+          />
+        </motion.button>
       </div>
       
       {post.isRealPost && (
