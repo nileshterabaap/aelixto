@@ -401,7 +401,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
             }}
           />
           {!(post as any).hide_likes && displayLikeCount > 0 && (
-            <span className="text-xs text-muted-foreground">{displayLikeCount}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{displayLikeCount}</span>
           )}
         </button>
         <button 
