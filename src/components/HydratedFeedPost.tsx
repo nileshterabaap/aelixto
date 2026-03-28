@@ -410,7 +410,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         >
           <MessageCircle className="h-6 w-6 stroke-[1.5] fill-none" />
           {displayCommentCount > 0 && (
-            <span className="text-xs text-muted-foreground">{displayCommentCount}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{displayCommentCount}</span>
           )}
         </button>
         <button 
