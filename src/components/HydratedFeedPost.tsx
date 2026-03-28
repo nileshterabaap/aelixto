@@ -422,7 +422,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
             style={{ color: isReposted ? '#22c55e' : 'currentColor' }}
           />
           {displayRepostCount > 0 && (
-            <span className="text-xs text-muted-foreground">{displayRepostCount}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{displayRepostCount}</span>
           )}
         </button>
         <button 
