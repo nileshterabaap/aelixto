@@ -94,6 +94,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [cardRevealed, setCardRevealed] = useState(false);
   const [cardPainted, setCardPainted] = useState(false);
   const [skeletonVisible, setSkeletonVisible] = useState(true);
+  const [showDoubleTapHeart, setShowDoubleTapHeart] = useState(false);
+  const lastTapTimeRef = useRef(0);
   const likeControls = useAnimation();
   const repostControls = useAnimation();
   const commentControls = useAnimation();
