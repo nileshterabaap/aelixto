@@ -43,8 +43,8 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
 
   return (
     <header
-      className="sticky top-0 z-50 w-full glass-surface border-b border-border/30 transition-transform duration-300 ease-out"
-      style={{ transform: hidden ? "translateY(-100%)" : "translateY(0)", backgroundColor: `hsl(var(--background) / var(--glass-opacity))` }}
+      className="sticky top-0 z-50 w-full bg-background border-b transition-transform duration-300 ease-out"
+      style={{ transform: hidden ? "translateY(-100%)" : "translateY(0)" }}
     >
       <div className="flex h-16 items-center justify-between px-6">
         {/* Left: Save button or spacer */}
