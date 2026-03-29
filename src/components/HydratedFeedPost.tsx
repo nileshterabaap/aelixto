@@ -94,6 +94,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [cardRevealed, setCardRevealed] = useState(false);
   const [cardPainted, setCardPainted] = useState(false);
   const [skeletonVisible, setSkeletonVisible] = useState(true);
+  const [showDoubleTapHeart, setShowDoubleTapHeart] = useState(false);
+  const lastTapTimeRef = useRef(0);
   const likeControls = useAnimation();
   const repostControls = useAnimation();
   const commentControls = useAnimation();
@@ -246,6 +248,26 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     }
   }, [canUseActions, isLiked, toggleLike, likeControls]);
 
+  // Double-tap to like on content area (Instagram-style)
+  const handleContentDoubleTap = useCallback(() => {
+    if (!canUseActions) return;
+    const now = Date.now();
+    const diff = now - lastTapTimeRef.current;
+    lastTapTimeRef.current = now;
+
+    if (diff < 300 && diff > 0) {
+      // Double tap detected
+      if (!isLiked) {
+        setDisplayLikeCount((current) => current + 1);
+        toggleLike();
+        likeControls.start({ scale: [1, 1.4, 1], transition: { type: 'spring', stiffness: 500, damping: 15, duration: 0.3 } });
+      }
+      // Show heart overlay regardless
+      setShowDoubleTapHeart(true);
+      setTimeout(() => setShowDoubleTapHeart(false), 1000);
+    }
+  }, [canUseActions, isLiked, toggleLike, likeControls]);
+
   const handleRepostClick = useCallback(() => {
     if (!canUseActions) return;
     setDisplayRepostCount((current) => Math.max(0, current + (isReposted ? -1 : 1)));
@@ -287,7 +309,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           visibility: showCard ? 'visible' : 'hidden',
         }}
       >
-    <Card className="overflow-hidden border border-border rounded-xl">
+    <Card className="overflow-hidden border border-border/50 rounded-xl card-premium">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
         <div className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
@@ -298,7 +320,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       
       {/* Standardized Header: avatar, bold username, timestamp + platform icon top-right */}
       <div className="flex items-center gap-3 px-5 pt-4 pb-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full overflow-hidden bg-muted">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full overflow-hidden bg-muted ring-2 ring-border/30">
           <img 
             src={post.author.avatar} 
             alt={post.author.username}
@@ -355,7 +377,14 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
-        <div ref={embedRef} className="relative" style={{ contain: 'layout paint' }}>
+        <div ref={embedRef} className="relative" style={{ contain: 'layout paint' }} onClick={handleContentDoubleTap}>
+          {/* Double-tap heart overlay */}
+          {showDoubleTapHeart && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+              <Heart className="h-24 w-24 text-white drop-shadow-lg animate-heart-burst" fill="white" />
+            </div>
+          )}
+
           {/* Skeleton layer — fades out when embed is ready */}
           {isHydrated && skeletonVisible && (
             <div
@@ -391,9 +420,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       )}
 
-      {/* Interaction Bar - tight spacing, professional layout */}
-      {/* For Instagram: pull bar up to cover native action buttons */}
-      <div className={`flex items-center justify-around px-3 py-3 relative z-10 bg-background ${detectedPlatform === 'instagram' ? '-mt-10' : ''}`}>
+      {/* Interaction Bar */}
+      <div className={`flex items-center justify-around px-3 py-2.5 relative z-10 bg-card border-t border-border/30 ${detectedPlatform === 'instagram' ? '-mt-10' : ''}`}>
         <motion.button
           onClick={handleLikeClick}
           animate={likeControls}
