@@ -377,7 +377,14 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
-        <div ref={embedRef} className="relative" style={{ contain: 'layout paint' }}>
+        <div ref={embedRef} className="relative" style={{ contain: 'layout paint' }} onClick={handleContentDoubleTap}>
+          {/* Double-tap heart overlay */}
+          {showDoubleTapHeart && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+              <Heart className="h-24 w-24 text-white drop-shadow-lg animate-heart-burst" fill="white" />
+            </div>
+          )}
+
           {/* Skeleton layer — fades out when embed is ready */}
           {isHydrated && skeletonVisible && (
             <div
