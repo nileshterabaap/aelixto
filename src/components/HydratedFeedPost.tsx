@@ -309,7 +309,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           visibility: showCard ? 'visible' : 'hidden',
         }}
       >
-    <Card className="overflow-hidden border border-border rounded-xl">
+    <Card className="overflow-hidden border border-border/50 rounded-xl card-premium">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
         <div className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
