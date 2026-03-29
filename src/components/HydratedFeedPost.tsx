@@ -320,7 +320,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       
       {/* Standardized Header: avatar, bold username, timestamp + platform icon top-right */}
       <div className="flex items-center gap-3 px-5 pt-4 pb-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full overflow-hidden bg-muted">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full overflow-hidden bg-muted ring-2 ring-border/30">
           <img 
             src={post.author.avatar} 
             alt={post.author.username}
