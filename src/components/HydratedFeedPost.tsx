@@ -248,6 +248,26 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     }
   }, [canUseActions, isLiked, toggleLike, likeControls]);
 
+  // Double-tap to like on content area (Instagram-style)
+  const handleContentDoubleTap = useCallback(() => {
+    if (!canUseActions) return;
+    const now = Date.now();
+    const diff = now - lastTapTimeRef.current;
+    lastTapTimeRef.current = now;
+
+    if (diff < 300 && diff > 0) {
+      // Double tap detected
+      if (!isLiked) {
+        setDisplayLikeCount((current) => current + 1);
+        toggleLike();
+        likeControls.start({ scale: [1, 1.4, 1], transition: { type: 'spring', stiffness: 500, damping: 15, duration: 0.3 } });
+      }
+      // Show heart overlay regardless
+      setShowDoubleTapHeart(true);
+      setTimeout(() => setShowDoubleTapHeart(false), 1000);
+    }
+  }, [canUseActions, isLiked, toggleLike, likeControls]);
+
   const handleRepostClick = useCallback(() => {
     if (!canUseActions) return;
     setDisplayRepostCount((current) => Math.max(0, current + (isReposted ? -1 : 1)));
