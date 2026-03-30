@@ -240,9 +240,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setDisplayLikeCount((current) => Math.max(0, current + (isLiked ? -1 : 1)));
     toggleLike();
     if (isLiked) {
-      likeControls.start({ scale: [1, 0.85, 1], transition: { duration: 0.3, ease: 'easeOut' } });
+      likeControls.start({ scale: [1, 0.85, 1], transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] } });
     } else {
-      likeControls.start({ scale: [1, 1.4, 1], transition: { type: 'spring', stiffness: 500, damping: 15, duration: 0.3 } });
+      likeControls.start({ scale: [1, 1.35, 1], transition: { type: 'spring', stiffness: 600, damping: 12, duration: 0.25 } });
     }
   }, [canUseActions, isLiked, toggleLike, likeControls]);
 
@@ -250,7 +250,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     if (!canUseActions) return;
     setDisplayRepostCount((current) => Math.max(0, current + (isReposted ? -1 : 1)));
     toggleRepost();
-    repostControls.start({ rotate: [0, 360], transition: { duration: 0.4, ease: 'easeOut' } });
+    repostControls.start({ rotate: [0, 360], transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } });
   }, [canUseActions, isReposted, toggleRepost, repostControls]);
 
   const handlePlayClick = useCallback(() => {
@@ -268,7 +268,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const showCard = isTextOnly || cardPainted;
 
   return (
-    <div className="relative">
+    <motion.div 
+      className="relative"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 400, damping: 30, mass: 0.8 }}
+    >
       {/* Skeleton placeholder — occupies space until card reveals */}
       {!isTextOnly && skeletonVisible && (
         <div
@@ -495,7 +500,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
     </Card>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
