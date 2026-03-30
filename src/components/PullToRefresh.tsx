@@ -71,19 +71,19 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     const currentPull = pullY.get();
 
     if (currentPull >= THRESHOLD && !refreshing) {
-      // Snap to a loading position
-      animate(pullY, 60, { type: "spring", stiffness: 300, damping: 30 });
+      // Snap to loading position with Apple-like spring
+      animate(pullY, 60, { type: "spring", stiffness: 400, damping: 35, mass: 0.8 });
       setRefreshing(true);
 
       try {
         await onRefresh();
       } finally {
         setRefreshing(false);
-        animate(pullY, 0, { type: "spring", stiffness: 300, damping: 30 });
+        animate(pullY, 0, { type: "spring", stiffness: 500, damping: 35, mass: 0.6 });
       }
     } else {
-      // Snap back
-      animate(pullY, 0, { type: "spring", stiffness: 400, damping: 30 });
+      // Snap back with tight spring — no wobble
+      animate(pullY, 0, { type: "spring", stiffness: 500, damping: 40, mass: 0.6 });
     }
   }, [pullY, refreshing, onRefresh]);
 
