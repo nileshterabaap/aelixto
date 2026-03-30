@@ -34,26 +34,21 @@ export const PageTransition = ({ children }: PageTransitionProps) => {
   const pageVariants = {
     initial: {
       opacity: 0,
-      x: direction * 30,
-      scale: 0.98,
+      x: direction * 50,
     },
     in: {
       opacity: 1,
       x: 0,
-      scale: 1,
     },
     out: {
       opacity: 0,
-      scale: 0.98,
     },
   };
 
   const pageTransition = {
-    type: "spring" as const,
-    stiffness: 380,
-    damping: 35,
-    mass: 0.8,
-    restDelta: 0.001,
+    type: "tween" as const,
+    ease: [0.4, 0, 0.2, 1] as const,
+    duration: 0.25,
   };
 
   return (

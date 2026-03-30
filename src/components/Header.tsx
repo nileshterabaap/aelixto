@@ -1,5 +1,4 @@
 import { MessageCircle, Bookmark } from "lucide-react";
-import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,9 +18,6 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
 
-  // Spring-driven header offset for buttery smooth hide/show
-  const headerY = useSpring(0, { stiffness: 300, damping: 30, mass: 0.8 });
-
   const totalUnreadMessages = conversations.reduce((total, conv) => total + conv.unread_count, 0);
 
   useEffect(() => {
@@ -32,13 +28,10 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
         const y = window.scrollY;
         if (y <= 10) {
           setHidden(false);
-          headerY.set(0);
         } else if (y > lastScrollY.current + 5) {
           setHidden(true);
-          headerY.set(-100);
         } else if (y < lastScrollY.current - 5) {
           setHidden(false);
-          headerY.set(0);
         }
         lastScrollY.current = y;
         ticking.current = false;
@@ -46,12 +39,12 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, [headerY]);
+  }, []);
 
   return (
-    <motion.header
-      className="sticky top-0 z-50 w-full bg-background border-b"
-      style={{ y: headerY }}
+    <header
+      className="sticky top-0 z-50 w-full bg-background border-b transition-transform duration-300 ease-out"
+      style={{ transform: hidden ? "translateY(-100%)" : "translateY(0)" }}
     >
       <div className="flex h-16 items-center justify-between px-6">
         {/* Left: Save button or spacer */}
@@ -110,6 +103,6 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
           )}
         </div>
       </div>
-    </motion.header>
+    </header>
   );
 };
