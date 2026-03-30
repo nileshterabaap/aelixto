@@ -1,4 +1,5 @@
 import { MessageCircle, Bookmark } from "lucide-react";
+import { motion, useMotionValue, useTransform, useSpring } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
