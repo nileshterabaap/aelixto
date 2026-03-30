@@ -268,7 +268,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const showCard = isTextOnly || cardPainted;
 
   return (
-    <div className="relative">
+    <motion.div 
+      className="relative"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ type: "spring", stiffness: 400, damping: 30, mass: 0.8 }}
+    >
       {/* Skeleton placeholder — occupies space until card reveals */}
       {!isTextOnly && skeletonVisible && (
         <div
