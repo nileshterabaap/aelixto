@@ -110,11 +110,10 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
         {/* 5 columns: 1=home, 2=discover, 3=empty (for FAB), 4=notifications, 5=profile */}
         <div className="grid grid-cols-5 place-items-center h-14 px-4">
           {/* Home */}
-          <Button
+          <motion.button
             aria-label="Home"
-            variant="ghost"
-            size="icon"
-            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
+            whileTap={navTapSpring}
+            className="h-14 w-14 flex flex-col items-center justify-center gap-1 overflow-hidden relative bg-transparent border-0 outline-none"
             onClick={handleHomeClick}
             onMouseEnter={() => handlePrefetch("/")}
             onTouchStart={() => handleTouchStart("/")}
@@ -131,14 +130,13 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               className={`${baseIcon} ${isActive("/") ? activeIcon : inactiveIcon}`}
             />
             {isActive("/") && <span className="absolute bottom-2 w-5 h-0.5 bg-foreground rounded-full animate-underline-slide" />}
-          </Button>
+          </motion.button>
 
           {/* Search/Discover */}
-          <Button
+          <motion.button
             aria-label="Search"
-            variant="ghost"
-            size="icon"
-            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
+            whileTap={navTapSpring}
+            className="h-14 w-14 flex flex-col items-center justify-center gap-1 overflow-hidden relative bg-transparent border-0 outline-none"
             onClick={(e) => handleClick(e, "/discover", "discover")}
             onMouseEnter={() => handlePrefetch("/discover")}
             onTouchStart={() => handleTouchStart("/discover")}
@@ -155,17 +153,16 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               className={`${baseIcon} ${isActive("/discover") ? activeIcon : inactiveIcon}`}
             />
             {isActive("/discover") && <span className="absolute bottom-2 w-5 h-0.5 bg-foreground rounded-full animate-underline-slide" />}
-          </Button>
+          </motion.button>
 
           {/* spacer for center FAB */}
           <div aria-hidden className="h-8 w-8" />
 
           {/* Notifications */}
-          <Button
+          <motion.button
             aria-label="Notifications"
-            variant="ghost"
-            size="icon"
-            className="relative h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden"
+            whileTap={navTapSpring}
+            className="relative h-14 w-14 flex flex-col items-center justify-center gap-1 overflow-hidden bg-transparent border-0 outline-none"
             onClick={(e) => handleClick(e, "/notifications", "notifications")}
           >
             {ripples.notifications?.map(ripple => (
@@ -180,19 +177,17 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               className={`${baseIcon} ${isActive("/notifications") ? activeIcon : inactiveIcon}`}
             />
             {isActive("/notifications") && <span className="absolute bottom-2 w-5 h-0.5 bg-foreground rounded-full animate-underline-slide" />}
-            {/* red badge - only show if there are unread notifications */}
             {notificationCount > 0 && (
               <span className="absolute top-1 right-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-[5px] text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-background z-10 animate-scale-in">
                 {notificationCount > 99 ? '99+' : notificationCount}
               </span>
             )}
-          </Button>
+          </motion.button>
 
-          <Button
+          <motion.button
             aria-label="Profile"
-            variant="ghost"
-            size="icon"
-            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
+            whileTap={navTapSpring}
+            className="h-14 w-14 flex flex-col items-center justify-center gap-1 overflow-hidden relative bg-transparent border-0 outline-none"
             onClick={(e) => handleClick(e, "/profile", "profile")}
             onMouseEnter={() => handlePrefetch("/profile")}
             onTouchStart={() => handleTouchStart("/profile")}
@@ -210,7 +205,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               className={`${baseIcon} ${isActive("/profile") ? activeIcon : inactiveIcon}`}
             />
             {isActive("/profile") && <span className="absolute bottom-2 w-5 h-0.5 bg-foreground rounded-full animate-underline-slide" />}
-          </Button>
+          </motion.button>
         </div>
 
         {/* Floating center + button (rounded square) */}
