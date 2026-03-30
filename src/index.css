@@ -105,10 +105,27 @@ All colors MUST be HSL.
 @layer base {
   * {
     @apply border-border;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    scroll-behavior: auto; /* JS-controlled, not CSS smooth */
+    -webkit-overflow-scrolling: touch;
   }
 
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior-y: contain; /* Prevent browser bounce on overscroll */
+  }
+
+  /* GPU-accelerate scrollable containers */
+  .scroll-gpu {
+    will-change: scroll-position;
+    -webkit-overflow-scrolling: touch;
+    transform: translateZ(0);
   }
 }
 

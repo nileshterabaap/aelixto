@@ -34,9 +34,11 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   // Track last home tap time to detect double-tap for refresh
   const lastHomeTapRef = useRef<number>(0);
 
-  const baseIcon = "text-foreground transition-all duration-200";
+  const baseIcon = "text-foreground transition-opacity duration-200";
   const activeIcon = "h-9 w-9 opacity-100";
   const inactiveIcon = "h-7 w-7 opacity-50 hover:opacity-80";
+
+  const navTapSpring = { scale: 0.85, transition: { type: "spring" as const, stiffness: 600, damping: 20 } };
 
   const createRipple = useCallback((e: MouseEvent<HTMLButtonElement>, key: string) => {
     const button = e.currentTarget;
