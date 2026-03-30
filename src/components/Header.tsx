@@ -110,6 +110,6 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
           )}
         </div>
       </div>
-    </header>
+    </motion.header>
   );
 };
