@@ -495,7 +495,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
     </Card>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
