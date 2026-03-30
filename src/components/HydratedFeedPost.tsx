@@ -240,9 +240,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setDisplayLikeCount((current) => Math.max(0, current + (isLiked ? -1 : 1)));
     toggleLike();
     if (isLiked) {
-      likeControls.start({ scale: [1, 0.85, 1], transition: { duration: 0.3, ease: 'easeOut' } });
+      likeControls.start({ scale: [1, 0.85, 1], transition: { duration: 0.25, ease: [0.22, 1, 0.36, 1] } });
     } else {
-      likeControls.start({ scale: [1, 1.4, 1], transition: { type: 'spring', stiffness: 500, damping: 15, duration: 0.3 } });
+      likeControls.start({ scale: [1, 1.35, 1], transition: { type: 'spring', stiffness: 600, damping: 12, duration: 0.25 } });
     }
   }, [canUseActions, isLiked, toggleLike, likeControls]);
 
