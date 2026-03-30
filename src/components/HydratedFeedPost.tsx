@@ -250,7 +250,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     if (!canUseActions) return;
     setDisplayRepostCount((current) => Math.max(0, current + (isReposted ? -1 : 1)));
     toggleRepost();
-    repostControls.start({ rotate: [0, 360], transition: { duration: 0.4, ease: 'easeOut' } });
+    repostControls.start({ rotate: [0, 360], transition: { duration: 0.35, ease: [0.22, 1, 0.36, 1] } });
   }, [canUseActions, isReposted, toggleRepost, repostControls]);
 
   const handlePlayClick = useCallback(() => {
