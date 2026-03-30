@@ -215,11 +215,12 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
           <div className="absolute left-1/2 top-[32px] -translate-x-1/2 h-3 w-16 rounded-full bg-foreground/10 blur-lg" />
         </div>
 
-        <button
+        <motion.button
           aria-label="Create post"
           onClick={onCreatePost}
-          className="absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-2xl bg-foreground text-background 
-                     hover:scale-105 active:scale-95 transition-transform"
+          whileTap={{ scale: 0.9, transition: { type: "spring", stiffness: 600, damping: 20 } }}
+          whileHover={{ scale: 1.05 }}
+          className="absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-2xl bg-foreground text-background"
         >
           <Plus className="mx-auto h-5 w-5 stroke-[3] text-background" />
         </button>
