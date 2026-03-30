@@ -1,4 +1,5 @@
 import { Home, Search, Plus, Bell, User, Bookmark } from "lucide-react";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useState, useCallback, MouseEvent, useRef } from "react";
