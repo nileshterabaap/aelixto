@@ -54,8 +54,8 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       const diff = currentY - touchStartY.current;
 
       if (diff > 0 && isAtTop()) {
-        // Rubber-band effect: diminishing returns as you pull further
-        const dampened = Math.min(diff * 0.45, MAX_PULL);
+        // Rubber-band effect: aggressive damping like iOS
+        const dampened = Math.min(diff * 0.4, MAX_PULL);
         pullY.set(dampened);
       } else {
         pullY.set(0);
