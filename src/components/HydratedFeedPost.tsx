@@ -142,7 +142,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
   // Detect when embed content is ready (iframe load, SDK process, or DOM content)
   useEffect(() => {
-    if (!isHydrated || embedReady) return;
+    if (!isHydrated || embedReady || alreadyRevealed) return;
     const el = embedRef.current;
     if (!el) return;
 
