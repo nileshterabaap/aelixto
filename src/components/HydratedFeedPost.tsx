@@ -188,7 +188,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   // When embed is ready, reveal card and schedule skeleton unmount
   // Double-rAF ensures the browser paints opacity:0 before we transition to opacity:1
   useEffect(() => {
-    if (!embedReady) return;
+    if (!embedReady || alreadyRevealed) return;
     let cancelled = false;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -196,9 +196,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       });
     });
     const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 300);
-    const timer = setTimeout(() => setSkeletonVisible(false), 1400);
+    const timer = setTimeout(() => {
+      setSkeletonVisible(false);
+      // Remember this post as fully revealed — future renders skip all transitions
+      revealedPostsCache.add(post.id);
+    }, 1400);
     return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); };
-  }, [embedReady]);
+  }, [embedReady, alreadyRevealed, post.id]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
 
