@@ -34,6 +34,10 @@ import { HydratedEmbed } from "@/components/HydratedEmbed";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 
+// Module-level cache: posts that have already completed their reveal cycle
+// skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
+const revealedPostsCache = new Set<string>();
+
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
   userId?: string;
