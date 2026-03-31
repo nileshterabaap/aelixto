@@ -195,12 +195,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         if (!cancelled) setCardRevealed(true);
       });
     });
-    const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 300);
+    const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 100);
     const timer = setTimeout(() => {
       setSkeletonVisible(false);
       // Remember this post as fully revealed — future renders skip all transitions
       revealedPostsCache.add(post.id);
-    }, 1400);
+    }, 400);
     return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); };
   }, [embedReady, alreadyRevealed, post.id]);
 
