@@ -91,13 +91,16 @@ const detectPlatformFromUrl = (url?: string) => {
 };
 
 export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
+  // If this post was already revealed in a previous render, skip ALL skeleton/transition work
+  const alreadyRevealed = revealedPostsCache.has(post.id);
+
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(startHydrated);
-  const [embedReady, setEmbedReady] = useState(false);
-  const [cardRevealed, setCardRevealed] = useState(false);
-  const [cardPainted, setCardPainted] = useState(false);
-  const [skeletonVisible, setSkeletonVisible] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(startHydrated || alreadyRevealed);
+  const [embedReady, setEmbedReady] = useState(alreadyRevealed);
+  const [cardRevealed, setCardRevealed] = useState(alreadyRevealed);
+  const [cardPainted, setCardPainted] = useState(alreadyRevealed);
+  const [skeletonVisible, setSkeletonVisible] = useState(!alreadyRevealed);
   const likeControls = useAnimation();
   const repostControls = useAnimation();
   const commentControls = useAnimation();
