@@ -380,11 +380,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           {/* Embed layer — fades in when ready */}
           <div
             className="transition-opacity duration-[400ms] ease-in-out"
-            style={{
-              opacity: embedReady || !isHydrated ? 1 : 0,
-              filter: embedReady || !isHydrated ? 'blur(0px)' : 'blur(8px)',
-              transition: 'opacity 400ms ease-in-out, filter 400ms ease-in-out',
-            }}
+            style={{ opacity: embedReady || !isHydrated ? 1 : 0 }}
           >
             <HydratedEmbed
               post={post}
