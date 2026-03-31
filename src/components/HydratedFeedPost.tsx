@@ -34,6 +34,10 @@ import { HydratedEmbed } from "@/components/HydratedEmbed";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 
+// Module-level cache: posts that have already completed their reveal cycle
+// skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
+const revealedPostsCache = new Set<string>();
+
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
   userId?: string;
@@ -87,13 +91,16 @@ const detectPlatformFromUrl = (url?: string) => {
 };
 
 export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
+  // If this post was already revealed in a previous render, skip ALL skeleton/transition work
+  const alreadyRevealed = revealedPostsCache.has(post.id);
+
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(startHydrated);
-  const [embedReady, setEmbedReady] = useState(false);
-  const [cardRevealed, setCardRevealed] = useState(false);
-  const [cardPainted, setCardPainted] = useState(false);
-  const [skeletonVisible, setSkeletonVisible] = useState(true);
+  const [isHydrated, setIsHydrated] = useState(startHydrated || alreadyRevealed);
+  const [embedReady, setEmbedReady] = useState(alreadyRevealed);
+  const [cardRevealed, setCardRevealed] = useState(alreadyRevealed);
+  const [cardPainted, setCardPainted] = useState(alreadyRevealed);
+  const [skeletonVisible, setSkeletonVisible] = useState(!alreadyRevealed);
   const likeControls = useAnimation();
   const repostControls = useAnimation();
   const commentControls = useAnimation();
@@ -109,7 +116,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [isNearViewport, setIsNearViewport] = useState(true);
 
   useEffect(() => {
-    if (startHydrated) return;
+    if (startHydrated || alreadyRevealed) return;
     const el = embedRef.current;
     if (!el) return;
 
@@ -123,7 +130,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [startHydrated]);
+  }, [startHydrated, alreadyRevealed]);
 
   // Hydrate immediately when near viewport — no velocity gating.
   // Since disableHardSuspend keeps embeds alive forever, eager hydration has no cost.
@@ -135,7 +142,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
   // Detect when embed content is ready (iframe load, SDK process, or DOM content)
   useEffect(() => {
-    if (!isHydrated || embedReady) return;
+    if (!isHydrated || embedReady || alreadyRevealed) return;
     const el = embedRef.current;
     if (!el) return;
 
@@ -181,7 +188,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   // When embed is ready, reveal card and schedule skeleton unmount
   // Double-rAF ensures the browser paints opacity:0 before we transition to opacity:1
   useEffect(() => {
-    if (!embedReady) return;
+    if (!embedReady || alreadyRevealed) return;
     let cancelled = false;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -189,9 +196,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       });
     });
     const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 300);
-    const timer = setTimeout(() => setSkeletonVisible(false), 1400);
+    const timer = setTimeout(() => {
+      setSkeletonVisible(false);
+      // Remember this post as fully revealed — future renders skip all transitions
+      revealedPostsCache.add(post.id);
+    }, 1400);
     return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); };
-  }, [embedReady]);
+  }, [embedReady, alreadyRevealed, post.id]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
 
