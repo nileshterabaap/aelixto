@@ -116,7 +116,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [isNearViewport, setIsNearViewport] = useState(true);
 
   useEffect(() => {
-    if (startHydrated) return;
+    if (startHydrated || alreadyRevealed) return;
     const el = embedRef.current;
     if (!el) return;
 
@@ -130,7 +130,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [startHydrated]);
+  }, [startHydrated, alreadyRevealed]);
 
   // Hydrate immediately when near viewport — no velocity gating.
   // Since disableHardSuspend keeps embeds alive forever, eager hydration has no cost.
