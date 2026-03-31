@@ -101,6 +101,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [cardRevealed, setCardRevealed] = useState(alreadyRevealed);
   const [cardPainted, setCardPainted] = useState(alreadyRevealed);
   const [skeletonVisible, setSkeletonVisible] = useState(!alreadyRevealed);
+  const [isSharpened, setIsSharpened] = useState(alreadyRevealed);
+  const cardMeasureRef = useRef<HTMLDivElement>(null);
+  const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
   const likeControls = useAnimation();
   const repostControls = useAnimation();
   const commentControls = useAnimation();
