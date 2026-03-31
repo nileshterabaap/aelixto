@@ -141,32 +141,11 @@ function removeParam(url: string, key: string): string {
 
 function muteNonApiIframe(iframe: HTMLIFrameElement) {
   if (iframe.dataset[MUTE_FLAG] === '1') return;
-  const src = iframe.getAttribute('src');
-  if (!src || src === 'about:blank') return;
-
-  const lower = src.toLowerCase();
-  let mutedSrc = src;
-
-  if (lower.includes('tiktok.com')) {
-    mutedSrc = addParam(src, 'mute', '1');
-  } else if (lower.includes('instagram.com')) {
-    mutedSrc = addParam(src, 'autoplay', '0');
-  } else if (lower.includes('facebook.com')) {
-    mutedSrc = addParam(addParam(src, 'autoplay', '0'), 'mute', '1');
-  } else if (lower.includes('threads.net') || lower.includes('threads.com')) {
-    mutedSrc = addParam(src, 'autoplay', '0');
-  } else if (lower.includes('pinterest.com')) {
-    mutedSrc = addParam(src, 'autoplay', '0');
-  } else if (lower.includes('twitter.com') || lower.includes('platform.twitter.com')) {
-    mutedSrc = addParam(src, 'autoplay', '0');
-  } else if (lower.includes('linkedin.com')) {
-    mutedSrc = addParam(src, 'autoplay', '0');
-  } else {
-    return; // Not a known non-API embed
-  }
-
+  // CSS-only suppression — never touch src to avoid iframe reload/flicker
   iframe.dataset[MUTE_FLAG] = '1';
-  iframe.setAttribute('src', mutedSrc);
+  iframe.style.pointerEvents = 'none';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.tabIndex = -1;
 }
 
 function unmuteNonApiIframe(iframe: HTMLIFrameElement) {
