@@ -124,9 +124,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       ([entry]) => {
         setIsNearViewport(entry.isIntersecting);
       },
-      // Symmetric margin: 3000px above AND below the viewport
-      // Ensures posts are ready before entering view in BOTH scroll directions
-      { rootMargin: '3000px 0px', threshold: 0 }
+      // Huge margin: start hydration ~5 screens away so the entire reveal
+      // cycle (embed load + skeleton fade) finishes before the post is visible
+      { rootMargin: '8000px 0px', threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -195,12 +195,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         if (!cancelled) setCardRevealed(true);
       });
     });
-    const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 300);
+    const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 100);
     const timer = setTimeout(() => {
       setSkeletonVisible(false);
       // Remember this post as fully revealed — future renders skip all transitions
       revealedPostsCache.add(post.id);
-    }, 1400);
+    }, 400);
     return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); };
   }, [embedReady, alreadyRevealed, post.id]);
 
