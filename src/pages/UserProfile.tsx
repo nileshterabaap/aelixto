@@ -29,6 +29,8 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
+  const [followListOpen, setFollowListOpen] = useState(false);
   
   const { isFollowing, follow, unfollow, loading: followLoading, counts } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
