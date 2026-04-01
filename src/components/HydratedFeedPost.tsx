@@ -195,16 +195,19 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     let cancelled = false;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (!cancelled) setCardRevealed(true);
+        if (!cancelled) {
+          setCardRevealed(true);
+          setBlurReady(true);
+        }
       });
     });
     const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 100);
     const timer = setTimeout(() => {
       setSkeletonVisible(false);
       revealedPostsCache.add(post.id);
-    }, 400);
-    // Sharpen: 600ms after reveal, transition blur(12px) → blur(0px)
-    const sharpenTimer = setTimeout(() => { if (!cancelled) setIsSharpened(true); }, 600);
+    }, 350);
+    // Sharpen: 500ms after reveal, transition blur(8px) → blur(0px)
+    const sharpenTimer = setTimeout(() => { if (!cancelled) setIsSharpened(true); }, 500);
     return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); clearTimeout(sharpenTimer); };
   }, [embedReady, alreadyRevealed, post.id]);
 
