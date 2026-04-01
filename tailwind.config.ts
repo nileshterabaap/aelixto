@@ -147,6 +147,7 @@ export default {
         ripple: "ripple 0.6s linear",
         "underline-slide": "underline-slide 0.2s ease-out",
         "fade-in": "fade-in 0.2s ease-out forwards",
+        "tap-bounce": "tap-bounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
       },
     },
   },
