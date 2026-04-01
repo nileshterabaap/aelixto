@@ -203,18 +203,18 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     if (embedState !== 'ready' || alreadyRevealed) return;
     let cancelled = false;
 
-    // Schedule skeleton removal and sharpening
+    // Remove skeleton quickly
     const skeletonTimer = setTimeout(() => {
       if (!cancelled) {
         setSkeletonVisible(false);
         revealedPostsCache.add(post.id);
       }
-    }, 350);
+    }, 200);
 
-    // Sharpen: 500ms after reveal, transition blur(8px) → blur(0px) over 600ms
+    // Sharpen immediately after skeleton removal
     const sharpenTimer = setTimeout(() => {
       if (!cancelled) setIsSharpened(true);
-    }, 500);
+    }, 300);
 
     return () => {
       cancelled = true;
