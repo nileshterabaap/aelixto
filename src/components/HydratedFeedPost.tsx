@@ -207,21 +207,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); clearTimeout(sharpenTimer); };
   }, [embedReady, alreadyRevealed, post.id]);
 
-  // Measure card height and sync to skeleton wrapper to prevent layout shift
-  useEffect(() => {
-    if (alreadyRevealed || isTextOnly) return;
-    const card = cardMeasureRef.current;
-    if (!card) return;
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const h = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
-        if (h > 0) setMeasuredHeight(h);
-      }
-    });
-    ro.observe(card);
-    return () => ro.disconnect();
-  }, [alreadyRevealed, isTextOnly]);
-
   // Resolve the embed type for rendering — must be before effects that use isTextOnly
   const r = resolveRenderer(post);
   const isTextOnly = r.kind === 'none';
