@@ -222,6 +222,25 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     return () => ro.disconnect();
   }, [alreadyRevealed, isTextOnly]);
 
+  // Resolve the embed type for rendering — must be before effects that use isTextOnly
+  const r = resolveRenderer(post);
+  const isTextOnly = r.kind === 'none';
+
+  // Measure card height and sync to skeleton wrapper to prevent layout shift
+  useEffect(() => {
+    if (alreadyRevealed || isTextOnly) return;
+    const card = cardMeasureRef.current;
+    if (!card) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const h = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+        if (h > 0) setMeasuredHeight(h);
+      }
+    });
+    ro.observe(card);
+    return () => ro.disconnect();
+  }, [alreadyRevealed, isTextOnly]);
+
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
 
   
@@ -286,14 +305,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setIsHydrated(true);
   }, []);
 
-  // Resolve the embed type for rendering
-  const r = resolveRenderer(post);
-  
   // Derive thumbnail: prefer stored, then derive from URL
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
-  // For text-only posts (no embed), reveal immediately
-  const isTextOnly = r.kind === 'none';
   const showCard = isTextOnly || cardPainted;
 
   return (
