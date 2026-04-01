@@ -142,6 +142,13 @@ span[data-pin-href] button {
   border-radius: 1rem !important;
 }
 
+/* Hide Instagram "View more on Instagram" fallback link in blockquote */
+.embed-container .instagram-media > a[href*="instagram.com"],
+.embed-container .instagram-media > p,
+.embed-container .instagram-media > div:last-child a[href*="instagram.com"] {
+  display: none !important;
+}
+
 
 /* Facebook embed responsive sizing for mobile */
 .fb-post,
