@@ -56,7 +56,7 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
               className="h-10 w-10"
               onClick={() => navigate('/saved')}
             >
-              <Bookmark className="h-8 w-8 stroke-[2.5]" />
+              <Bookmark className="h-12 w-12 stroke-[2.5]" />
             </Button>
           )}
         </div>
