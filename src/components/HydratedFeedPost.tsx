@@ -168,7 +168,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     if (handleIframes()) return;
 
     const checkContent = () => {
-      if (el.querySelector('img, video, [class*="card"], [class*="preview"]')) {
+      // Only match actual loaded media — not wrappers, skeletons, or placeholder elements
+      if (el.querySelector('img[src]:not([src=""]), video[src]:not([src=""]), iframe')) {
         markReady();
         return true;
       }
