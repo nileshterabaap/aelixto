@@ -190,24 +190,3 @@ span[data-pin-href] button {
 .embed-container > div[style] iframe {
   margin-bottom: 0 !important;
 }
-
-/* Global tap bounce for all interactive elements */
-@layer utilities {
-  .tap-bounce {
-    -webkit-tap-highlight-color: transparent;
-  }
-  .tap-bounce:active {
-    animation: tap-bounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-}
-
-/* Apply tap-bounce to all buttons globally */
-button,
-[role="button"],
-a[href] {
-  -webkit-tap-highlight-color: transparent;
-}
-button:active:not(:disabled),
-[role="button"]:active:not(:disabled) {
-  animation: tap-bounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
