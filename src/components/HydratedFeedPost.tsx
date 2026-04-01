@@ -334,8 +334,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',
-          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : 'blur(8px)'),
-          transition: 'opacity 300ms ease-in-out, filter 600ms ease-out',
+          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : 'blur(4px)'),
+          transition: 'opacity 250ms ease-in-out, filter 400ms ease-out',
         }}
       >
     <Card className="overflow-hidden border border-border rounded-xl">
