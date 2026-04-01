@@ -2,8 +2,7 @@
   "version": 1,
   "protectedFiles": [
     "src/components/RawEmbedRenderer.tsx",
-    "src/lib/resolveRenderer.ts",
-    "src/index.css"
+    "src/lib/resolveRenderer.ts"
   ],
   "baseline": {
     "src/components/RawEmbedRenderer.tsx": {
