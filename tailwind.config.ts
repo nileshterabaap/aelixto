@@ -132,6 +132,12 @@ export default {
             opacity: "1",
           },
         },
+        "tap-bounce": {
+          "0%": { transform: "scale(1)" },
+          "40%": { transform: "scale(0.92)" },
+          "70%": { transform: "scale(1.03)" },
+          "100%": { transform: "scale(1)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
