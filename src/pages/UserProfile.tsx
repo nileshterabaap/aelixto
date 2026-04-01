@@ -312,6 +312,15 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen}
       />
+
+      {profile && (
+        <FollowListDialog
+          open={followListOpen}
+          onOpenChange={setFollowListOpen}
+          userId={profile.user_id}
+          type={followListType}
+        />
+      )}
     </div>
   );
 };
