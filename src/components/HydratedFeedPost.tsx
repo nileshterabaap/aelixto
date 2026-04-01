@@ -101,6 +101,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [cardRevealed, setCardRevealed] = useState(alreadyRevealed);
   const [cardPainted, setCardPainted] = useState(alreadyRevealed);
   const [skeletonVisible, setSkeletonVisible] = useState(!alreadyRevealed);
+  const [isSharpened, setIsSharpened] = useState(alreadyRevealed);
+  const cardMeasureRef = useRef<HTMLDivElement>(null);
+  const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
   const likeControls = useAnimation();
   const repostControls = useAnimation();
   const commentControls = useAnimation();
@@ -185,8 +188,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     };
   }, [isHydrated, embedReady]);
 
-  // When embed is ready, reveal card and schedule skeleton unmount
-  // Double-rAF ensures the browser paints opacity:0 before we transition to opacity:1
+  // When embed is ready, reveal card and schedule skeleton unmount + sharpening
   useEffect(() => {
     if (!embedReady || alreadyRevealed) return;
     let cancelled = false;
@@ -198,11 +200,31 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 100);
     const timer = setTimeout(() => {
       setSkeletonVisible(false);
-      // Remember this post as fully revealed — future renders skip all transitions
       revealedPostsCache.add(post.id);
     }, 400);
-    return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); };
+    // Sharpen: 600ms after reveal, transition blur(12px) → blur(0px)
+    const sharpenTimer = setTimeout(() => { if (!cancelled) setIsSharpened(true); }, 600);
+    return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); clearTimeout(sharpenTimer); };
   }, [embedReady, alreadyRevealed, post.id]);
+
+  // Resolve the embed type for rendering — must be before effects that use isTextOnly
+  const r = resolveRenderer(post);
+  const isTextOnly = r.kind === 'none';
+
+  // Measure card height and sync to skeleton wrapper to prevent layout shift
+  useEffect(() => {
+    if (alreadyRevealed || isTextOnly) return;
+    const card = cardMeasureRef.current;
+    if (!card) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const h = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+        if (h > 0) setMeasuredHeight(h);
+      }
+    });
+    ro.observe(card);
+    return () => ro.disconnect();
+  }, [alreadyRevealed, isTextOnly]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
 
@@ -268,14 +290,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setIsHydrated(true);
   }, []);
 
-  // Resolve the embed type for rendering
-  const r = resolveRenderer(post);
-  
   // Derive thumbnail: prefer stored, then derive from URL
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
-  // For text-only posts (no embed), reveal immediately
-  const isTextOnly = r.kind === 'none';
   const showCard = isTextOnly || cardPainted;
 
   return (
@@ -283,19 +300,26 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {/* Skeleton placeholder — occupies space until card reveals */}
       {!isTextOnly && skeletonVisible && (
         <div
-          className="rounded-xl overflow-hidden transition-opacity duration-[1000ms] ease-in-out"
-          style={{ opacity: showCard ? 0 : 1, pointerEvents: showCard ? 'none' : 'auto' }}
+          className="rounded-xl overflow-hidden transition-opacity duration-[400ms] ease-in-out"
+          style={{
+            opacity: showCard ? 0 : 1,
+            pointerEvents: showCard ? 'none' : 'auto',
+            ...(measuredHeight ? { minHeight: measuredHeight } : {}),
+          }}
         >
           <EmbedSkeleton platform={detectedPlatform || undefined} />
         </div>
       )}
 
-      {/* Real card — hidden until embed loads, then fades in */}
+      {/* Real card — hidden until embed loads, fades in blurred, then sharpens */}
       <div
-        className={`transition-opacity duration-[1000ms] ease-in-out ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
+        ref={cardMeasureRef}
+        className={`${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',
+          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : 'blur(12px)'),
+          transition: 'opacity 400ms ease-in-out, filter 800ms ease-out',
         }}
       >
     <Card className="overflow-hidden border border-border rounded-xl">
