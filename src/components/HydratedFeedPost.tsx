@@ -97,12 +97,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated || alreadyRevealed);
-  const [embedReady, setEmbedReady] = useState(alreadyRevealed);
-  const [cardRevealed, setCardRevealed] = useState(alreadyRevealed);
-  const [cardPainted, setCardPainted] = useState(alreadyRevealed);
+
+  // Unified embed state machine: 'loading' → 'ready' | 'error'
+  type EmbedState = 'loading' | 'ready' | 'error';
+  const [embedState, setEmbedState] = useState<EmbedState>(alreadyRevealed ? 'ready' : 'loading');
   const [skeletonVisible, setSkeletonVisible] = useState(!alreadyRevealed);
   const [isSharpened, setIsSharpened] = useState(alreadyRevealed);
-  const [blurReady, setBlurReady] = useState(alreadyRevealed);
+
   const cardMeasureRef = useRef<HTMLDivElement>(null);
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
   const likeControls = useAnimation();
@@ -137,20 +138,29 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   }, [startHydrated, alreadyRevealed]);
 
   // Hydrate immediately when near viewport — no velocity gating.
-  // Since disableHardSuspend keeps embeds alive forever, eager hydration has no cost.
-  // Once hydrated, stays hydrated (isHydrated only goes false→true).
   useEffect(() => {
     if (isHydrated || !isNearViewport) return;
     setIsHydrated(true);
   }, [isNearViewport, isHydrated]);
 
-  // Detect when embed content is ready (iframe load, SDK process, or DOM content)
+  // Unified embed detection: detect when embed content is ready or error
+  // Single 5s fallback timeout for ALL platforms
   useEffect(() => {
-    if (!isHydrated || embedReady || alreadyRevealed) return;
+    if (!isHydrated || embedState !== 'loading' || alreadyRevealed) return;
     const el = embedRef.current;
     if (!el) return;
 
-    const markReady = () => setEmbedReady(true);
+    let settled = false;
+    const markReady = () => {
+      if (settled) return;
+      settled = true;
+      setEmbedState('ready');
+    };
+    const markError = () => {
+      if (settled) return;
+      settled = true;
+      setEmbedState('error');
+    };
 
     const handleIframes = () => {
       const iframes = el.querySelectorAll('iframe');
@@ -159,16 +169,18 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           iframe.addEventListener('load', markReady, { once: true });
           iframe.addEventListener('error', markReady, { once: true });
         });
-        setTimeout(markReady, 3000);
         return true;
       }
       return false;
     };
 
-    if (handleIframes()) return;
+    if (handleIframes()) {
+      // Single 5s fallback for all platforms
+      const fallback = setTimeout(markReady, 5000);
+      return () => { settled = true; clearTimeout(fallback); };
+    }
 
     const checkContent = () => {
-      // Only match actual loaded media — not wrappers, skeletons, or placeholder elements
       if (el.querySelector('img[src]:not([src=""]), video[src]:not([src=""]), iframe')) {
         markReady();
         return true;
@@ -181,36 +193,40 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     const observer = new MutationObserver(() => { checkContent(); });
     observer.observe(el, { childList: true, subtree: true });
 
-    const fallbackMs = (detectedPlatform === 'instagram' || detectedPlatform === 'facebook') ? 6000 : 4000;
-    const fallback = setTimeout(markReady, fallbackMs);
+    // Single 5s fallback timeout for all platforms
+    const fallback = setTimeout(markReady, 5000);
 
     return () => {
+      settled = true;
       observer.disconnect();
       clearTimeout(fallback);
     };
-  }, [isHydrated, embedReady]);
+  }, [isHydrated, embedState, alreadyRevealed]);
 
-  // When embed is ready, reveal card and schedule skeleton unmount + sharpening
+  // Unified reveal sequence: when embedState becomes 'ready', reveal card and sharpen
   useEffect(() => {
-    if (!embedReady || alreadyRevealed) return;
+    if (embedState !== 'ready' || alreadyRevealed) return;
     let cancelled = false;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!cancelled) {
-          setCardRevealed(true);
-          setBlurReady(true);
-        }
-      });
-    });
-    const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 100);
-    const timer = setTimeout(() => {
-      setSkeletonVisible(false);
-      revealedPostsCache.add(post.id);
+
+    // Schedule skeleton removal and sharpening
+    const skeletonTimer = setTimeout(() => {
+      if (!cancelled) {
+        setSkeletonVisible(false);
+        revealedPostsCache.add(post.id);
+      }
     }, 350);
-    // Sharpen: 500ms after reveal, transition blur(8px) → blur(0px)
-    const sharpenTimer = setTimeout(() => { if (!cancelled) setIsSharpened(true); }, 500);
-    return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); clearTimeout(sharpenTimer); };
-  }, [embedReady, alreadyRevealed, post.id]);
+
+    // Sharpen: 500ms after reveal, transition blur(8px) → blur(0px) over 600ms
+    const sharpenTimer = setTimeout(() => {
+      if (!cancelled) setIsSharpened(true);
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(skeletonTimer);
+      clearTimeout(sharpenTimer);
+    };
+  }, [embedState, alreadyRevealed, post.id]);
 
   // Resolve the embed type for rendering — must be before effects that use isTextOnly
   const r = resolveRenderer(post);
