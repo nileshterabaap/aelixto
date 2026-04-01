@@ -322,7 +322,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     return (
       <div
         className="relative w-full overflow-hidden"
-        style={{ aspectRatio: '3 / 5', touchAction: 'pan-y' }}
+        style={{ aspectRatio: '4 / 5', touchAction: 'pan-y' }}
       >
         <div
           ref={containerRef}
@@ -333,7 +333,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             top: 0,
             left: 0,
             width: '100%',
-            height: 'calc(100% + 500px)',
+            height: 'calc(100% + 600px)',
             overflow: 'hidden',
           }}
           dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
