@@ -187,10 +187,13 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           {/* Avatar and Stats Container */}
           <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
             {/* Left Stats - Followers */}
-            <div className="text-center flex-shrink-0 w-20 -ml-2">
+            <button 
+              className="text-center flex-shrink-0 w-20 -ml-2 active:scale-95 transition-transform"
+              onClick={() => { setFollowListType("followers"); setFollowListOpen(true); }}
+            >
               <div className="text-2xl font-bold leading-none mb-1">{counts.followers}</div>
               <div className="text-xs font-medium">Followers</div>
-            </div>
+            </button>
             
             {/* Avatar - Centered */}
             <div className="absolute left-1/2 -translate-x-1/2 -mt-20">
@@ -201,10 +204,13 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             </div>
             
             {/* Right Stats - Following */}
-            <div className="text-center flex-shrink-0 w-20 -mr-2">
+            <button 
+              className="text-center flex-shrink-0 w-20 -mr-2 active:scale-95 transition-transform"
+              onClick={() => { setFollowListType("following"); setFollowListOpen(true); }}
+            >
               <div className="text-2xl font-bold leading-none mb-1">{counts.following}</div>
               <div className="text-xs font-medium">Following</div>
-            </div>
+            </button>
           </div>
 
           {/* Aelix Score - only show if user enabled it */}
