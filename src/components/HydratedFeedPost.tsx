@@ -144,7 +144,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   }, [isNearViewport, isHydrated]);
 
   // Unified embed detection: detect when embed content is ready or error
-  // Single 5s fallback timeout for ALL platforms
+  // Single 4s fallback timeout for ALL platforms
   useEffect(() => {
     if (!isHydrated || embedState !== 'loading' || alreadyRevealed) return;
     const el = embedRef.current;
@@ -155,11 +155,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       if (settled) return;
       settled = true;
       setEmbedState('ready');
-    };
-    const markError = () => {
-      if (settled) return;
-      settled = true;
-      setEmbedState('error');
     };
 
     const handleIframes = () => {
@@ -174,27 +169,27 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       return false;
     };
 
-    if (handleIframes()) {
-      // Single 5s fallback for all platforms
-      const fallback = setTimeout(markReady, 5000);
-      return () => { settled = true; clearTimeout(fallback); };
-    }
-
+    // Check for any meaningful content (iframes, images, videos, rendered embeds)
     const checkContent = () => {
-      if (el.querySelector('img[src]:not([src=""]), video[src]:not([src=""]), iframe')) {
+      if (el.querySelector('iframe, img[src]:not([src=""]), video[src]:not([src=""]), [class*="fb-"], blockquote, .embed-container > *, .og-card, a[href]')) {
+        // Found content — attach iframe handlers if any, then mark ready
+        handleIframes();
         markReady();
         return true;
       }
       return handleIframes();
     };
 
-    if (checkContent()) return;
+    if (checkContent()) {
+      const fallback = setTimeout(markReady, 4000);
+      return () => { settled = true; clearTimeout(fallback); };
+    }
 
     const observer = new MutationObserver(() => { checkContent(); });
     observer.observe(el, { childList: true, subtree: true });
 
-    // Single 5s fallback timeout for all platforms
-    const fallback = setTimeout(markReady, 5000);
+    // Single 4s fallback timeout — ensures no post stays stuck
+    const fallback = setTimeout(markReady, 4000);
 
     return () => {
       settled = true;
