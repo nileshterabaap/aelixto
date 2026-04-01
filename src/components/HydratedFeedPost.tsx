@@ -102,6 +102,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [cardPainted, setCardPainted] = useState(alreadyRevealed);
   const [skeletonVisible, setSkeletonVisible] = useState(!alreadyRevealed);
   const [isSharpened, setIsSharpened] = useState(alreadyRevealed);
+  const [blurReady, setBlurReady] = useState(alreadyRevealed);
   const cardMeasureRef = useRef<HTMLDivElement>(null);
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
   const likeControls = useAnimation();
@@ -194,16 +195,19 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     let cancelled = false;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (!cancelled) setCardRevealed(true);
+        if (!cancelled) {
+          setCardRevealed(true);
+          setBlurReady(true);
+        }
       });
     });
     const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 100);
     const timer = setTimeout(() => {
       setSkeletonVisible(false);
       revealedPostsCache.add(post.id);
-    }, 400);
-    // Sharpen: 600ms after reveal, transition blur(12px) → blur(0px)
-    const sharpenTimer = setTimeout(() => { if (!cancelled) setIsSharpened(true); }, 600);
+    }, 350);
+    // Sharpen: 500ms after reveal, transition blur(8px) → blur(0px)
+    const sharpenTimer = setTimeout(() => { if (!cancelled) setIsSharpened(true); }, 500);
     return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); clearTimeout(sharpenTimer); };
   }, [embedReady, alreadyRevealed, post.id]);
 
@@ -300,7 +304,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {/* Skeleton placeholder — occupies space until card reveals */}
       {!isTextOnly && skeletonVisible && (
         <div
-          className="rounded-xl overflow-hidden transition-opacity duration-[400ms] ease-in-out"
+          className="rounded-xl overflow-hidden transition-opacity duration-300 ease-in-out"
           style={{
             opacity: showCard ? 0 : 1,
             pointerEvents: showCard ? 'none' : 'auto',
@@ -314,12 +318,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {/* Real card — hidden until embed loads, fades in blurred, then sharpens */}
       <div
         ref={cardMeasureRef}
-        className={`${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
+        className={`overflow-hidden rounded-xl ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',
-          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : 'blur(12px)'),
-          transition: 'opacity 400ms ease-in-out, filter 800ms ease-out',
+          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : (blurReady ? 'blur(8px)' : 'blur(8px)')),
+          transition: 'opacity 300ms ease-in-out, filter 600ms ease-out',
         }}
       >
     <Card className="overflow-hidden border border-border rounded-xl">
