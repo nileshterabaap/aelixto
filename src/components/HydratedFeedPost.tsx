@@ -314,7 +314,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   // Derive thumbnail: prefer stored, then derive from URL
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
-  const showCard = isTextOnly || cardPainted;
+  const showCard = isTextOnly || embedState === 'ready' || embedState === 'error';
 
   return (
     <div className="relative">
