@@ -12,6 +12,7 @@ interface HeaderProps {
 
 export const Header = ({ onCreatePost }: HeaderProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useSession();
   const { conversations } = useConversations();
   const [hidden, setHidden] = useState(false);
