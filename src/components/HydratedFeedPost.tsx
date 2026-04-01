@@ -339,7 +339,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',
-          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : (blurReady ? 'blur(8px)' : 'blur(8px)')),
+          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : 'blur(8px)'),
           transition: 'opacity 300ms ease-in-out, filter 600ms ease-out',
         }}
       >
