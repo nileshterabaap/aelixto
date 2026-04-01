@@ -300,19 +300,26 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {/* Skeleton placeholder — occupies space until card reveals */}
       {!isTextOnly && skeletonVisible && (
         <div
-          className="rounded-xl overflow-hidden transition-opacity duration-[1000ms] ease-in-out"
-          style={{ opacity: showCard ? 0 : 1, pointerEvents: showCard ? 'none' : 'auto' }}
+          className="rounded-xl overflow-hidden transition-opacity duration-[400ms] ease-in-out"
+          style={{
+            opacity: showCard ? 0 : 1,
+            pointerEvents: showCard ? 'none' : 'auto',
+            ...(measuredHeight ? { minHeight: measuredHeight } : {}),
+          }}
         >
           <EmbedSkeleton platform={detectedPlatform || undefined} />
         </div>
       )}
 
-      {/* Real card — hidden until embed loads, then fades in */}
+      {/* Real card — hidden until embed loads, fades in blurred, then sharpens */}
       <div
-        className={`transition-opacity duration-[1000ms] ease-in-out ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
+        ref={cardMeasureRef}
+        className={`${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',
+          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : 'blur(12px)'),
+          transition: 'opacity 400ms ease-in-out, filter 800ms ease-out',
         }}
       >
     <Card className="overflow-hidden border border-border rounded-xl">
