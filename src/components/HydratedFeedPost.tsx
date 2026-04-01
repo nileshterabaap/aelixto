@@ -405,11 +405,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
             </div>
           )}
 
-          {/* Embed layer — fades in when ready */}
-          <div
-            className="transition-opacity duration-[400ms] ease-in-out"
-            style={{ opacity: embedReady || !isHydrated ? 1 : 0 }}
-          >
+          {/* Embed layer — always fully visible; parent card handles reveal */}
+          <div>
             <HydratedEmbed
               post={post}
               renderer={r}
