@@ -171,7 +171,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
     // Check for any meaningful content (iframes, images, videos, rendered embeds)
     const checkContent = () => {
-      if (el.querySelector('iframe, img[src]:not([src=""]), video[src]:not([src=""]), [class*="fb-"], blockquote, .embed-container > *, .og-card, a[href]')) {
+      if (el.querySelector('img[src]:not([src=""]), video[src]:not([src=""]), iframe')) {
         // Found content — attach iframe handlers if any, then mark ready
         handleIframes();
         markReady();
