@@ -151,33 +151,99 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     if (!el) return;
 
     let settled = false;
+    const handledIframes = new WeakSet<HTMLIFrameElement>();
+    const handledImages = new WeakSet<HTMLImageElement>();
+    const handledVideos = new WeakSet<HTMLVideoElement>();
+
     const markReady = () => {
       if (settled) return;
       settled = true;
       setEmbedState('ready');
     };
 
-    const handleIframes = () => {
+    const attachIframeHandlers = () => {
       const iframes = el.querySelectorAll('iframe');
+      let hasLoadedIframe = false;
+
       if (iframes.length > 0) {
         iframes.forEach((iframe) => {
-          iframe.addEventListener('load', markReady, { once: true });
-          iframe.addEventListener('error', markReady, { once: true });
+          if ((iframe as HTMLIFrameElement).dataset.embedLoaded === 'true') {
+            hasLoadedIframe = true;
+            return;
+          }
+
+          if (handledIframes.has(iframe as HTMLIFrameElement)) return;
+          handledIframes.add(iframe as HTMLIFrameElement);
+
+          const handleIframeSettled = () => {
+            (iframe as HTMLIFrameElement).dataset.embedLoaded = 'true';
+            markReady();
+          };
+
+          iframe.addEventListener('load', handleIframeSettled, { once: true });
+          iframe.addEventListener('error', handleIframeSettled, { once: true });
         });
-        return true;
       }
+
+      return iframes.length > 0 ? hasLoadedIframe : false;
+    };
+
+    const attachImageHandlers = (image: HTMLImageElement) => {
+      if (image.complete && image.naturalWidth > 0) return true;
+      if (handledImages.has(image)) return false;
+
+      handledImages.add(image);
+      image.addEventListener('load', markReady, { once: true });
+      image.addEventListener('error', markReady, { once: true });
       return false;
     };
 
-    // Check for any meaningful content (iframes, images, videos, rendered embeds)
+    const attachVideoHandlers = (video: HTMLVideoElement) => {
+      if (video.readyState >= 2) return true;
+      if (handledVideos.has(video)) return false;
+
+      handledVideos.add(video);
+      video.addEventListener('loadeddata', markReady, { once: true });
+      video.addEventListener('canplay', markReady, { once: true });
+      video.addEventListener('error', markReady, { once: true });
+      return false;
+    };
+
+    // Only reveal once actual media is settled, not when wrapper DOM first appears.
     const checkContent = () => {
-      if (el.querySelector('img[src]:not([src=""]), video[src]:not([src=""]), iframe')) {
-        // Found content — attach iframe handlers if any, then mark ready
-        handleIframes();
-        markReady();
+      const mediaNodes = Array.from(
+        el.querySelectorAll('img[src]:not([src=""]), video[src]:not([src=""]), iframe')
+      );
+
+      if (mediaNodes.length === 0) {
+        return false;
+      }
+
+      const iframes = mediaNodes.filter((node): node is HTMLIFrameElement => node instanceof HTMLIFrameElement);
+      if (iframes.length > 0) {
+        if (attachIframeHandlers()) {
+          markReady();
+        }
         return true;
       }
-      return handleIframes();
+
+      const videos = mediaNodes.filter((node): node is HTMLVideoElement => node instanceof HTMLVideoElement);
+      if (videos.length > 0) {
+        if (videos.some(attachVideoHandlers)) {
+          markReady();
+        }
+        return true;
+      }
+
+      const images = mediaNodes.filter((node): node is HTMLImageElement => node instanceof HTMLImageElement);
+      if (images.length > 0) {
+        if (images.some(attachImageHandlers)) {
+          markReady();
+        }
+        return true;
+      }
+
+      return false;
     };
 
     if (checkContent()) {
