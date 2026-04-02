@@ -53,10 +53,10 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
             <Button
               variant="ghost"
               size="icon"
-              className="h-10 w-10"
+className="h-14 w-14"
               onClick={() => navigate('/saved')}
             >
-              <Bookmark className="h-8 w-8 stroke-[2.5]" />
+              <Bookmark className="h-12 w-12 stroke-[2.5]" />
             </Button>
           )}
         </div>
@@ -81,10 +81,10 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
             <Button
               variant="ghost"
               size="icon"
-              className="h-10 w-10 relative"
+className="h-14 w-14 relative"
               onClick={() => navigate('/messages')}
             >
-              <MessageCircle className="h-8 w-8 stroke-[2.5]" />
+              <MessageCircle className="h-12 w-12 stroke-[2.5]" />
               {totalUnreadMessages > 0 && (
                 <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive text-[11px] font-bold text-destructive-foreground flex items-center justify-center">
                   {totalUnreadMessages}

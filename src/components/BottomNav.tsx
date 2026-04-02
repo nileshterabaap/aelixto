@@ -34,8 +34,8 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const lastHomeTapRef = useRef<number>(0);
 
   const baseIcon = "text-foreground transition-all duration-200";
-  const activeIcon = "h-9 w-9 opacity-100";
-  const inactiveIcon = "h-7 w-7 opacity-50 hover:opacity-80";
+  const activeIcon = "h-[3.375rem] w-[3.375rem] opacity-100";
+  const inactiveIcon = "h-[2.625rem] w-[2.625rem] opacity-50 hover:opacity-80";
 
   const createRipple = useCallback((e: MouseEvent<HTMLButtonElement>, key: string) => {
     const button = e.currentTarget;
