@@ -73,23 +73,7 @@ export function classifyUrl(url: string, ogType?: string | null): string {
     }
   }
 
-  // 4. URL path heuristic — detect article-like URLs from news sites
-  try {
-    const parsed = new URL(lower);
-    const path = parsed.pathname;
-    // Slug-based article paths: /category/long-hyphenated-title-123.html
-    const hasHtmlExt = path.endsWith('.html') || path.endsWith('.htm');
-    const hasArticlePath = /\/(article|story|news|post|blog|opinion|editorial)\//i.test(path);
-    const longSlug = path.split('/').some(seg => {
-      const parts = seg.split('-');
-      return parts.length >= 5 && seg.length >= 30;
-    });
-    if (hasHtmlExt || hasArticlePath || longSlug) {
-      return 'article';
-    }
-  } catch { /* ignore parse errors */ }
-
-  // 5. Fallback
+  // 4. Fallback
   return 'external';
 }
 

@@ -144,7 +144,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   }, [isNearViewport, isHydrated]);
 
   // Unified embed detection: detect when embed content is ready or error
-  // Single 4s fallback timeout for ALL platforms
+  // Single 5s fallback timeout for ALL platforms
   useEffect(() => {
     if (!isHydrated || embedState !== 'loading' || alreadyRevealed) return;
     const el = embedRef.current;
@@ -155,6 +155,11 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       if (settled) return;
       settled = true;
       setEmbedState('ready');
+    };
+    const markError = () => {
+      if (settled) return;
+      settled = true;
+      setEmbedState('error');
     };
 
     const handleIframes = () => {
@@ -169,27 +174,27 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       return false;
     };
 
-    // Check for any meaningful content (iframes, images, videos, rendered embeds)
+    if (handleIframes()) {
+      // Single 5s fallback for all platforms
+      const fallback = setTimeout(markReady, 5000);
+      return () => { settled = true; clearTimeout(fallback); };
+    }
+
     const checkContent = () => {
-      if (el.querySelector('iframe, img[src]:not([src=""]), video[src]:not([src=""]), [class*="fb-"], blockquote, .embed-container > *, .og-card, a[href]')) {
-        // Found content — attach iframe handlers if any, then mark ready
-        handleIframes();
+      if (el.querySelector('img[src]:not([src=""]), video[src]:not([src=""]), iframe')) {
         markReady();
         return true;
       }
       return handleIframes();
     };
 
-    if (checkContent()) {
-      const fallback = setTimeout(markReady, 4000);
-      return () => { settled = true; clearTimeout(fallback); };
-    }
+    if (checkContent()) return;
 
     const observer = new MutationObserver(() => { checkContent(); });
     observer.observe(el, { childList: true, subtree: true });
 
-    // Single 4s fallback timeout — ensures no post stays stuck
-    const fallback = setTimeout(markReady, 4000);
+    // Single 5s fallback timeout for all platforms
+    const fallback = setTimeout(markReady, 5000);
 
     return () => {
       settled = true;
@@ -203,18 +208,18 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     if (embedState !== 'ready' || alreadyRevealed) return;
     let cancelled = false;
 
-    // Remove skeleton quickly
+    // Schedule skeleton removal and sharpening
     const skeletonTimer = setTimeout(() => {
       if (!cancelled) {
         setSkeletonVisible(false);
         revealedPostsCache.add(post.id);
       }
-    }, 200);
+    }, 350);
 
-    // Sharpen immediately after skeleton removal
+    // Sharpen: 500ms after reveal, transition blur(8px) → blur(0px) over 600ms
     const sharpenTimer = setTimeout(() => {
       if (!cancelled) setIsSharpened(true);
-    }, 300);
+    }, 500);
 
     return () => {
       cancelled = true;
@@ -334,8 +339,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',
-          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : 'blur(4px)'),
-          transition: 'opacity 250ms ease-in-out, filter 400ms ease-out',
+          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : 'blur(8px)'),
+          transition: 'opacity 300ms ease-in-out, filter 600ms ease-out',
         }}
       >
     <Card className="overflow-hidden border border-border rounded-xl">

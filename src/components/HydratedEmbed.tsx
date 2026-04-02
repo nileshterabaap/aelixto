@@ -8,6 +8,7 @@ import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
+import { SkeletonGate } from '@/components/embeds/SkeletonGate';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -198,25 +199,29 @@ export const HydratedEmbed = memo(({
 
         {/* YouTube video */}
         {r.kind === 'video' && post.platform === 'youtube' && r.url && (
-          <div className={`w-full bg-black ${aspectClass}`}>
-            <iframe
-              className="w-full h-full"
-              src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=0&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
-              title="YouTube video player"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          </div>
+          <SkeletonGate platform="youtube" cacheKey={`${post.id}:youtube-video`}>
+            <div className={`w-full bg-black ${aspectClass}`}>
+              <iframe
+                className="w-full h-full"
+                src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=0&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
+                title="YouTube video player"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+          </SkeletonGate>
         )}
         
         {/* Non-YouTube video */}
         {r.kind === 'video' && post.platform !== 'youtube' && r.url && (
-          <video 
-            src={r.url} 
-            className="w-full h-auto" 
-            controls 
-            playsInline
-          />
+          <SkeletonGate platform={post.platform || undefined} cacheKey={`${post.id}:native-video`}>
+            <video 
+              src={r.url} 
+              className="w-full h-auto" 
+              controls 
+              playsInline
+            />
+          </SkeletonGate>
         )}
         
         {/* Image content */}
@@ -232,28 +237,36 @@ export const HydratedEmbed = memo(({
 
         {/* Fallback routing for legacy raw payloads */}
         {forceTwitterRenderer && mediaUrl && (
-          <ImageViewTracker postId={post.id}>
-            <TwitterEmbed url={mediaUrl} />
-          </ImageViewTracker>
+          <SkeletonGate platform="twitter" cacheKey={`${post.id}:twitter-forced`}>
+            <ImageViewTracker postId={post.id}>
+              <TwitterEmbed url={mediaUrl} />
+            </ImageViewTracker>
+          </SkeletonGate>
         )}
 
         {forcePinterestRenderer && mediaUrl && (
-          <ImageViewTracker postId={post.id}>
-            <PinterestEmbed url={mediaUrl} />
-          </ImageViewTracker>
+          <SkeletonGate platform="pinterest" cacheKey={`${post.id}:pinterest-forced`}>
+            <ImageViewTracker postId={post.id}>
+              <PinterestEmbed url={mediaUrl} />
+            </ImageViewTracker>
+          </SkeletonGate>
         )}
 
         {forceUniversalRenderer && mediaUrl && (
-          <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={mediaUrl} />
-          </ImageViewTracker>
+          <SkeletonGate platform={post.platform || undefined} cacheKey={`${post.id}:universal-forced`}>
+            <ImageViewTracker postId={post.id}>
+              <UniversalMetaEmbed url={mediaUrl} />
+            </ImageViewTracker>
+          </SkeletonGate>
         )}
         
         {/* Raw embed HTML (Instagram, Facebook, Spotify) */}
         {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && r.html && !rawEmbedFailed && (
-          <ImageViewTracker postId={post.id}>
-            <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} />
-          </ImageViewTracker>
+          <SkeletonGate platform={post.platform || undefined} cacheKey={`${post.id}:raw`}>
+            <ImageViewTracker postId={post.id}>
+              <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} />
+            </ImageViewTracker>
+          </SkeletonGate>
         )}
 
         {/* Fallback when raw embed fails — show UniversalMetaEmbed to rebuild */}
@@ -265,37 +278,47 @@ export const HydratedEmbed = memo(({
         
         {/* Twitter/X embed */}
         {r.kind === 'twitter' && r.url && (
-          <ImageViewTracker postId={post.id}>
-            <TwitterEmbed url={r.url} />
-          </ImageViewTracker>
+          <SkeletonGate platform="twitter" cacheKey={`${post.id}:twitter`}>
+            <ImageViewTracker postId={post.id}>
+              <TwitterEmbed url={r.url} />
+            </ImageViewTracker>
+          </SkeletonGate>
         )}
         
         {/* Reddit embed */}
         {r.kind === 'reddit' && r.url && (
-          <ImageViewTracker postId={post.id}>
-            <RedditEmbed url={r.url} />
-          </ImageViewTracker>
+          <SkeletonGate platform="reddit" cacheKey={`${post.id}:reddit`}>
+            <ImageViewTracker postId={post.id}>
+              <RedditEmbed url={r.url} />
+            </ImageViewTracker>
+          </SkeletonGate>
         )}
         
         {/* Pinterest embed */}
         {r.kind === 'pinterest' && r.url && (
-          <ImageViewTracker postId={post.id}>
-            <PinterestEmbed url={r.url} />
-          </ImageViewTracker>
+          <SkeletonGate platform="pinterest" cacheKey={`${post.id}:pinterest`}>
+            <ImageViewTracker postId={post.id}>
+              <PinterestEmbed url={r.url} />
+            </ImageViewTracker>
+          </SkeletonGate>
         )}
         
         {/* Article embed */}
         {r.kind === 'article' && r.url && (
-          <ImageViewTracker postId={post.id}>
-            <ArticleEmbed url={r.url} />
-          </ImageViewTracker>
+          <SkeletonGate platform={post.platform || 'blog'} cacheKey={`${post.id}:article`}>
+            <ImageViewTracker postId={post.id}>
+              <ArticleEmbed url={r.url} />
+            </ImageViewTracker>
+          </SkeletonGate>
         )}
         
         {/* Universal Meta embed (Instagram, Facebook, etc) */}
         {r.kind === 'universal' && r.url && (
-          <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={r.url} />
-          </ImageViewTracker>
+          <SkeletonGate platform={post.platform || undefined} cacheKey={`${post.id}:universal`}>
+            <ImageViewTracker postId={post.id}>
+              <UniversalMetaEmbed url={r.url} />
+            </ImageViewTracker>
+          </SkeletonGate>
         )}
       </div>
     </div>
