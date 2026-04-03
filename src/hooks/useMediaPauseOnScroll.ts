@@ -33,16 +33,6 @@ const SUSPENDED_SRC = 'aelixSuspendedSrc';
 const FROZEN_FLAG = 'aelixFrozen';
 
 const API_PAUSABLE_SELECTOR = [YOUTUBE_SELECTOR, SPOTIFY_SELECTOR].join(', ');
-const GENERIC_PAUSE_MESSAGES: Array<string | Record<string, string>> = [
-  JSON.stringify({ method: 'pause' }),
-  JSON.stringify({ event: 'pause' }),
-  JSON.stringify({ command: 'pause' }),
-  JSON.stringify({ type: 'pause' }),
-  { method: 'pause' },
-  { event: 'pause' },
-  { command: 'pause' },
-  { type: 'pause' },
-];
 
 // ── Detection: does this container currently contain playable media? ───
 
@@ -86,12 +76,9 @@ function hasLifecycleTargets(root: HTMLElement): boolean {
   return hasPlayableMedia(root) || root.querySelector(SUSPENDED_IFRAME_SELECTOR) !== null;
 }
 
-function getHardSuspendDistancePx(
-  hardSuspendDistanceVh: number,
-  hardSuspendMinDistancePx = HARD_SUSPEND_MIN_DISTANCE_PX
-): number {
+function getHardSuspendDistancePx(hardSuspendDistanceVh: number): number {
   const vh = window.innerHeight || document.documentElement.clientHeight;
-  return Math.max(Math.round(hardSuspendDistanceVh * vh), hardSuspendMinDistancePx);
+  return Math.max(Math.round(hardSuspendDistanceVh * vh), HARD_SUSPEND_MIN_DISTANCE_PX);
 }
 
 function getActiveDistancePx(): number {
@@ -122,18 +109,6 @@ function pauseSpotifyIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>(SPOTIFY_SELECTOR).forEach((iframe) => {
     try {
       iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
-    } catch { /* cross-origin */ }
-  });
-}
-
-function pauseGenericPlayableIframes(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (!isPlayableIframe(iframe)) return;
-
-    try {
-      GENERIC_PAUSE_MESSAGES.forEach((message) => {
-        iframe.contentWindow?.postMessage(message, '*');
-      });
     } catch { /* cross-origin */ }
   });
 }
@@ -220,19 +195,21 @@ function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  pauseGenericPlayableIframes(root);
   if (root.dataset.aelixHasBeenActive) {
     muteNonApiIframes(root);
   }
   freezeIframes(root);
 }
 
-/** Undo Stage A (unfreeze + fully unmute non-API iframes) */
+/** Undo Stage A (unfreeze + reset mute flags for next pause cycle) */
 function stageAResume(root: HTMLElement) {
   restoreHardSuspended(root);
   root.dataset.aelixHasBeenActive = 'true';
-  // Fully unmute: restore pointer-events, aria-hidden, tabIndex — CSS-only, no src changes
-  unmuteNonApiIframes(root);
+  // Clear mute flags so next stageAPause can re-apply muting.
+  // Do NOT change iframe src here — that causes flicker.
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    delete iframe.dataset[MUTE_FLAG];
+  });
   unfreezeIframes(root);
 }
 
@@ -277,12 +254,8 @@ interface MediaLifecycleOptions {
   enabled?: boolean;
   /** Stage B threshold in viewport heights. A pixel floor is also applied for tiny screens. */
   hardSuspendDistanceVh?: number;
-  /** Optional pixel floor override for Stage B distance, allowing per-renderer tuning. */
-  hardSuspendMinDistancePx?: number;
   /** When true, skip Stage B (hard-suspend) entirely — embeds stay loaded for the session. */
   disableHardSuspend?: boolean;
-  /** When true, unsupported embeds are hard-suspended as soon as they leave the active zone. */
-  hardSuspendOnPause?: boolean;
 }
 
 // ── Hook ───────────────────────────────────────────────────────────────
@@ -292,13 +265,7 @@ export function useMediaPauseOnScroll(
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
-  const {
-    enabled = true,
-    hardSuspendDistanceVh = 6,
-    hardSuspendMinDistancePx = HARD_SUSPEND_MIN_DISTANCE_PX,
-    disableHardSuspend = false,
-    hardSuspendOnPause = false,
-  } = options;
+  const { enabled = true, hardSuspendDistanceVh = 6, disableHardSuspend = false } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
   const [lifecycleState, setLifecycleState] = useState<LifecycleState>('active');
@@ -322,10 +289,7 @@ export function useMediaPauseOnScroll(
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight || document.documentElement.clientHeight;
       const viewportCenterY = vh / 2;
-      const hardSuspendDistancePx = getHardSuspendDistancePx(
-        hardSuspendDistanceVh,
-        hardSuspendMinDistancePx
-      );
+      const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
       const activeDistancePx = getActiveDistancePx();
 
       const isOnScreen = rect.bottom > 0 && rect.top < vh;
@@ -363,9 +327,6 @@ export function useMediaPauseOnScroll(
           restoreHardSuspended(currentEl);
         }
         stageAPause(currentEl);
-        if (!disableHardSuspend && hardSuspendOnPause && current === 'active') {
-          hardSuspendIframes(currentEl);
-        }
       } else if (target === 'suspended') {
         if (disableHardSuspend) {
           // Skip hard-suspend — just pause media, keep embeds loaded
@@ -412,10 +373,7 @@ export function useMediaPauseOnScroll(
       });
     };
 
-    const hardSuspendDistancePx = getHardSuspendDistancePx(
-      hardSuspendDistanceVh,
-      hardSuspendMinDistancePx
-    );
+    const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
 
     const nearObserver = new IntersectionObserver(() => scheduleReconcile(), {
       rootMargin: `${hardSuspendDistancePx}px 0px ${hardSuspendDistancePx}px 0px`,
@@ -446,7 +404,7 @@ export function useMediaPauseOnScroll(
       if (rafId !== null) cancelAnimationFrame(rafId);
       if (mutationRaf !== null) cancelAnimationFrame(mutationRaf);
     };
-  }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, hardSuspendMinDistancePx, disableHardSuspend, hardSuspendOnPause]);
+  }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, disableHardSuspend]);
 
   useEffect(() => {
     if (!enabled) {

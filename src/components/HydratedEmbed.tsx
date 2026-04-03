@@ -1,4 +1,4 @@
-import { useState, memo, useCallback, useEffect, useRef } from 'react';
+import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import type { Post } from '@/data/demoData';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
@@ -8,7 +8,6 @@ import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
-import { MediaSuspendOverlay } from '@/components/MediaSuspendOverlay';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -63,21 +62,15 @@ export const HydratedEmbed = memo(({
   onPlayClick 
 }: HydratedEmbedProps) => {
   const embedContainerRef = useRef<HTMLDivElement>(null);
-  const previousLifecycleStateRef = useRef<'active' | 'paused' | 'suspended'>('active');
-  const resumeMaskTimeoutRef = useRef<number | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
-  const [resumeMaskVisible, setResumeMaskVisible] = useState(false);
   const shouldHydrate = isHydrated || hydratedPostIds.has(post.id);
   const mediaUrl = post.mediaUrl || (post as any).media_url || r.url;
   const platformHint = (post.platform || '').toLowerCase();
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
 
-  // Enable auto-pause for ALL playable media posts. CSS-only suppression
-  // (pointer-events, aria-hidden, tabIndex) is used for non-API platforms —
-  // no iframe src mutations, so no flicker or reload.
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
     mediaTypeHint === 'audio' ||
@@ -91,9 +84,7 @@ export const HydratedEmbed = memo(({
     platformHint === 'pinterest' ||
     platformHint === 'twitter' ||
     platformHint === 'x' ||
-    platformHint === 'tiktok' ||
     lowerUrl.includes('youtube.com/') ||
-    lowerUrl.includes('youtube-nocookie.com/') ||
     lowerUrl.includes('youtu.be/') ||
     lowerUrl.includes('open.spotify.com/') ||
     lowerUrl.includes('tiktok.com/') ||
@@ -119,29 +110,10 @@ export const HydratedEmbed = memo(({
       r.kind === 'universal' ||
       r.kind === 'pinterest');
 
-  const supportsDirectPause =
-    mediaTypeHint === 'video' ||
-    mediaTypeHint === 'audio' ||
-    r.kind === 'video' ||
-    platformHint === 'youtube' ||
-    platformHint === 'spotify' ||
-    lowerUrl.includes('youtube.com/') ||
-    lowerUrl.includes('youtube-nocookie.com/') ||
-    lowerUrl.includes('youtu.be/') ||
-    lowerUrl.includes('open.spotify.com/');
-
-  const requiresHardSuspend = mediaLifecycleEnabled && !supportsDirectPause;
-
   const lifecycleState = useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
-    {
-      enabled: mediaLifecycleEnabled,
-      hardSuspendDistanceVh: requiresHardSuspend ? 1.75 : 6,
-      hardSuspendMinDistancePx: requiresHardSuspend ? 1000 : undefined,
-      disableHardSuspend: !requiresHardSuspend,
-      hardSuspendOnPause: false,
-    }
+    { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: true }
   );
 
   const forceTwitterRenderer =
@@ -162,76 +134,6 @@ export const HydratedEmbed = memo(({
     rememberHydratedPost(post.id);
   }, [post.id, shouldHydrate]);
 
-  useEffect(() => {
-    return () => {
-      if (resumeMaskTimeoutRef.current !== null) {
-        window.clearTimeout(resumeMaskTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const clearResumeTimeout = () => {
-      if (resumeMaskTimeoutRef.current !== null) {
-        window.clearTimeout(resumeMaskTimeoutRef.current);
-        resumeMaskTimeoutRef.current = null;
-      }
-    };
-
-    if (!requiresHardSuspend) {
-      clearResumeTimeout();
-      setResumeMaskVisible(false);
-      previousLifecycleStateRef.current = lifecycleState;
-      return;
-    }
-
-    const previousState = previousLifecycleStateRef.current;
-    let releaseMask: (() => void) | null = null;
-
-    if (lifecycleState === 'suspended') {
-      clearResumeTimeout();
-      setResumeMaskVisible(true);
-    } else if (previousState === 'suspended') {
-      const root = embedContainerRef.current;
-      const iframes = root ? Array.from(root.querySelectorAll<HTMLIFrameElement>('iframe')) : [];
-      let isReleased = false;
-
-      const settleMask = () => {
-        if (isReleased) return;
-        isReleased = true;
-        clearResumeTimeout();
-        setResumeMaskVisible(false);
-        iframes.forEach((iframe) => iframe.removeEventListener('load', handleLoad));
-      };
-
-      const handleLoad = () => {
-        window.requestAnimationFrame(() => settleMask());
-      };
-
-      setResumeMaskVisible(true);
-
-      if (!iframes.length) {
-        resumeMaskTimeoutRef.current = window.setTimeout(() => {
-          setResumeMaskVisible(false);
-          resumeMaskTimeoutRef.current = null;
-        }, 180);
-      } else {
-        iframes.forEach((iframe) => iframe.addEventListener('load', handleLoad));
-        resumeMaskTimeoutRef.current = window.setTimeout(settleMask, 1200);
-        releaseMask = settleMask;
-      }
-    } else {
-      clearResumeTimeout();
-      setResumeMaskVisible(false);
-    }
-
-    previousLifecycleStateRef.current = lifecycleState;
-
-    return () => {
-      releaseMask?.();
-    };
-  }, [lifecycleState, requiresHardSuspend]);
-
   const handleRawEmbedError = useCallback(() => {
     setRawEmbedFailed(true);
   }, []);
@@ -244,7 +146,6 @@ export const HydratedEmbed = memo(({
   const aspectClass = post.platform === 'youtube' && r.url && isYouTubeShort(r.url)
     ? 'aspect-[9/16]'
     : 'aspect-video';
-  const showSuspendOverlay = requiresHardSuspend && (lifecycleState === 'suspended' || resumeMaskVisible);
   
   
   // If no renderer or none type, show nothing (no placeholder/skeleton either)
@@ -293,7 +194,6 @@ export const HydratedEmbed = memo(({
   // HYDRATED STATE: Show skeleton → fade into actual embed
   return (
     <div ref={embedContainerRef} className="relative w-full" style={{ contain: 'layout paint' }}>
-      <MediaSuspendOverlay visible={showSuspendOverlay} thumbnailUrl={effectiveThumbnail} />
       <div className="w-full">
 
         {/* YouTube video */}
