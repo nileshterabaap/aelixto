@@ -71,25 +71,55 @@ export const HydratedEmbed = memo(({
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
 
-  // Only enable auto-pause where we can issue a real pause without forcing an
-  // iframe reload. For unsupported third-party embeds, CSS-only suppression
-  // looks flicker-free but does not actually stop playback.
-  const supportsFlickerFreeAutoPause =
+  // Enable auto-pause for ALL playable media posts. CSS-only suppression
+  // (pointer-events, aria-hidden, tabIndex) is used for non-API platforms —
+  // no iframe src mutations, so no flicker or reload.
+  const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
     mediaTypeHint === 'audio' ||
     r.kind === 'video' ||
     platformHint === 'youtube' ||
     platformHint === 'spotify' ||
+    platformHint === 'instagram' ||
+    platformHint === 'facebook' ||
+    platformHint === 'linkedin' ||
+    platformHint === 'threads' ||
+    platformHint === 'pinterest' ||
+    platformHint === 'twitter' ||
+    platformHint === 'x' ||
+    platformHint === 'tiktok' ||
     lowerUrl.includes('youtube.com/') ||
     lowerUrl.includes('youtube-nocookie.com/') ||
     lowerUrl.includes('youtu.be/') ||
-    lowerUrl.includes('open.spotify.com/');
+    lowerUrl.includes('open.spotify.com/') ||
+    lowerUrl.includes('tiktok.com/') ||
+    lowerUrl.includes('instagram.com/') ||
+    lowerUrl.includes('facebook.com/') ||
+    lowerUrl.includes('fb.watch/') ||
+    lowerUrl.includes('linkedin.com/') ||
+    lowerUrl.includes('threads.net/') ||
+    lowerUrl.includes('threads.com/') ||
+    lowerUrl.includes('pinterest.com/') ||
+    lowerUrl.includes('pin.it/') ||
+    lowerUrl.includes('twitter.com/') ||
+    lowerUrl.includes('x.com/') ||
+    lowerUrl.includes('/reel/') ||
+    lowerUrl.includes('/shorts/') ||
+    lowerUrl.includes('/video/');
+
+  const mediaLifecycleEnabled =
+    shouldHydrate &&
+    (isPlayableMediaPost ||
+      r.kind === 'raw' ||
+      r.kind === 'twitter' ||
+      r.kind === 'universal' ||
+      r.kind === 'pinterest');
 
   useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
     {
-      enabled: shouldHydrate && supportsFlickerFreeAutoPause,
+      enabled: mediaLifecycleEnabled,
       hardSuspendDistanceVh: 6,
       disableHardSuspend: true,
     }
