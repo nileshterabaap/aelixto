@@ -201,15 +201,12 @@ function stageAPause(root: HTMLElement) {
   freezeIframes(root);
 }
 
-/** Undo Stage A (unfreeze + reset mute flags for next pause cycle) */
+/** Undo Stage A (unfreeze + fully unmute non-API iframes) */
 function stageAResume(root: HTMLElement) {
   restoreHardSuspended(root);
   root.dataset.aelixHasBeenActive = 'true';
-  // Clear mute flags so next stageAPause can re-apply muting.
-  // Do NOT change iframe src here — that causes flicker.
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    delete iframe.dataset[MUTE_FLAG];
-  });
+  // Fully unmute: restore pointer-events, aria-hidden, tabIndex — CSS-only, no src changes
+  unmuteNonApiIframes(root);
   unfreezeIframes(root);
 }
 
