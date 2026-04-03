@@ -365,7 +365,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               />
             </button>
             <button 
-              onClick={() => post.isRealPost ? setShareOpen(true) : handleShare()}
+              onClick={() => setShareOpen(true)}
               className="action-btn p-2 active:scale-90 transition-transform"
             >
               <Share className="h-7 w-7 stroke-[1.5]" />
