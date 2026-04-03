@@ -71,49 +71,28 @@ export const HydratedEmbed = memo(({
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
 
-  const isPlayableMediaPost =
+  // Only enable auto-pause where we can issue a real pause without forcing an
+  // iframe reload. For unsupported third-party embeds, CSS-only suppression
+  // looks flicker-free but does not actually stop playback.
+  const supportsFlickerFreeAutoPause =
     mediaTypeHint === 'video' ||
     mediaTypeHint === 'audio' ||
     r.kind === 'video' ||
     platformHint === 'youtube' ||
     platformHint === 'spotify' ||
-    platformHint === 'instagram' ||
-    platformHint === 'facebook' ||
-    platformHint === 'linkedin' ||
-    platformHint === 'threads' ||
-    platformHint === 'pinterest' ||
-    platformHint === 'twitter' ||
-    platformHint === 'x' ||
     lowerUrl.includes('youtube.com/') ||
+    lowerUrl.includes('youtube-nocookie.com/') ||
     lowerUrl.includes('youtu.be/') ||
-    lowerUrl.includes('open.spotify.com/') ||
-    lowerUrl.includes('tiktok.com/') ||
-    lowerUrl.includes('instagram.com/') ||
-    lowerUrl.includes('facebook.com/') ||
-    lowerUrl.includes('fb.watch/') ||
-    lowerUrl.includes('linkedin.com/') ||
-    lowerUrl.includes('threads.net/') ||
-    lowerUrl.includes('threads.com/') ||
-    lowerUrl.includes('pinterest.com/') ||
-    lowerUrl.includes('pin.it/') ||
-    lowerUrl.includes('twitter.com/') ||
-    lowerUrl.includes('x.com/') ||
-    lowerUrl.includes('/reel/') ||
-    lowerUrl.includes('/shorts/') ||
-    lowerUrl.includes('/video/');
+    lowerUrl.includes('open.spotify.com/');
 
-  const mediaLifecycleEnabled =
-    shouldHydrate &&
-    (isPlayableMediaPost ||
-      r.kind === 'raw' ||
-      r.kind === 'twitter' ||
-      r.kind === 'universal' ||
-      r.kind === 'pinterest');
-
-  const lifecycleState = useMediaPauseOnScroll(
+  useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
-    { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: true }
+    {
+      enabled: shouldHydrate && supportsFlickerFreeAutoPause,
+      hardSuspendDistanceVh: 6,
+      disableHardSuspend: true,
+    }
   );
 
   const forceTwitterRenderer =
