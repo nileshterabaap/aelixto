@@ -40,6 +40,7 @@ import { QuoraPreviewCard } from "@/features/article-embeds/QuoraPreviewCard";
 import { useVideoPlayTracking } from "@/hooks/useViewTracking";
 import { ImageViewTracker } from "@/components/ImageViewTracker";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
+import { SharePostSheet } from "@/components/SharePostSheet";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -105,6 +106,7 @@ const detectPlatformFromUrl = (url?: string) => {
 
 export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [blogFavicon, setBlogFavicon] = useState<string | null>(null);
   const [likeAnimating, setLikeAnimating] = useState(false);
@@ -363,7 +365,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               />
             </button>
             <button 
-              onClick={handleShare}
+              onClick={() => post.isRealPost ? setShareOpen(true) : handleShare()}
               className="action-btn p-2 active:scale-90 transition-transform"
             >
               <Share className="h-7 w-7 stroke-[1.5]" />
@@ -383,6 +385,13 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             onOpenChange={setCommentsOpen}
             postId={post.id}
             postAuthorId={(post as any).user_id}
+          />
+        )}
+        {post.isRealPost && (
+          <SharePostSheet 
+            open={shareOpen} 
+            onOpenChange={setShareOpen}
+            postId={post.id}
           />
         )}
       </Card>
@@ -748,7 +757,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             />
           </button>
           <button 
-            onClick={handleShare}
+            onClick={() => post.isRealPost ? setShareOpen(true) : handleShare()}
             className="action-btn p-2 active:scale-90 transition-transform"
           >
             <Share className="h-7 w-7 stroke-[1.5]" />
@@ -768,6 +777,13 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           onOpenChange={setCommentsOpen}
           postId={post.id}
           postAuthorId={(post as any).user_id}
+        />
+      )}
+      {post.isRealPost && (
+        <SharePostSheet 
+          open={shareOpen} 
+          onOpenChange={setShareOpen}
+          postId={post.id}
         />
       )}
     </Card>
