@@ -130,16 +130,17 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('youtu.be/') ||
     lowerUrl.includes('open.spotify.com/');
 
-  const shouldHardSuspendOnPause = mediaLifecycleEnabled && !supportsDirectPause;
+  const requiresHardSuspend = mediaLifecycleEnabled && !supportsDirectPause;
 
   const lifecycleState = useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
     {
       enabled: mediaLifecycleEnabled,
-      hardSuspendDistanceVh: 6,
-      disableHardSuspend: !shouldHardSuspendOnPause,
-      hardSuspendOnPause: shouldHardSuspendOnPause,
+      hardSuspendDistanceVh: requiresHardSuspend ? 1.75 : 6,
+      hardSuspendMinDistancePx: requiresHardSuspend ? 1000 : undefined,
+      disableHardSuspend: !requiresHardSuspend,
+      hardSuspendOnPause: false,
     }
   );
 
@@ -177,7 +178,7 @@ export const HydratedEmbed = memo(({
       }
     };
 
-    if (!shouldHardSuspendOnPause) {
+    if (!requiresHardSuspend) {
       clearResumeTimeout();
       setResumeMaskVisible(false);
       previousLifecycleStateRef.current = lifecycleState;
@@ -187,10 +188,10 @@ export const HydratedEmbed = memo(({
     const previousState = previousLifecycleStateRef.current;
     let releaseMask: (() => void) | null = null;
 
-    if (lifecycleState !== 'active') {
+    if (lifecycleState === 'suspended') {
       clearResumeTimeout();
       setResumeMaskVisible(true);
-    } else if (previousState !== 'active') {
+    } else if (previousState === 'suspended') {
       const root = embedContainerRef.current;
       const iframes = root ? Array.from(root.querySelectorAll<HTMLIFrameElement>('iframe')) : [];
       let isReleased = false;
@@ -229,7 +230,7 @@ export const HydratedEmbed = memo(({
     return () => {
       releaseMask?.();
     };
-  }, [lifecycleState, shouldHardSuspendOnPause]);
+  }, [lifecycleState, requiresHardSuspend]);
 
   const handleRawEmbedError = useCallback(() => {
     setRawEmbedFailed(true);
@@ -243,7 +244,7 @@ export const HydratedEmbed = memo(({
   const aspectClass = post.platform === 'youtube' && r.url && isYouTubeShort(r.url)
     ? 'aspect-[9/16]'
     : 'aspect-video';
-  const showSuspendOverlay = shouldHardSuspendOnPause && (lifecycleState !== 'active' || resumeMaskVisible);
+  const showSuspendOverlay = requiresHardSuspend && (lifecycleState === 'suspended' || resumeMaskVisible);
   
   
   // If no renderer or none type, show nothing (no placeholder/skeleton either)
