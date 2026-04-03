@@ -106,6 +106,7 @@ const detectPlatformFromUrl = (url?: string) => {
 
 export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [blogFavicon, setBlogFavicon] = useState<string | null>(null);
   const [likeAnimating, setLikeAnimating] = useState(false);
