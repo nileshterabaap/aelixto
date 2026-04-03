@@ -220,8 +220,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
         <button
           aria-label="Create post"
           onClick={onCreatePost}
-          className="absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-2xl bg-foreground text-background 
-                     hover:scale-105 active:scale-95 transition-transform"
+          className="absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-2xl bg-foreground text-background"
         >
           <Plus className="mx-auto h-5 w-5 stroke-[3] text-background" />
         </button>
