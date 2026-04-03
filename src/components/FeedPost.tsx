@@ -779,6 +779,13 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           postAuthorId={(post as any).user_id}
         />
       )}
+      {post.isRealPost && (
+        <SharePostSheet 
+          open={shareOpen} 
+          onOpenChange={setShareOpen}
+          postId={post.id}
+        />
+      )}
     </Card>
   );
 };
