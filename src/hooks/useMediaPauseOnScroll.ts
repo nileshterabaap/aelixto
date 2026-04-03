@@ -86,9 +86,12 @@ function hasLifecycleTargets(root: HTMLElement): boolean {
   return hasPlayableMedia(root) || root.querySelector(SUSPENDED_IFRAME_SELECTOR) !== null;
 }
 
-function getHardSuspendDistancePx(hardSuspendDistanceVh: number): number {
+function getHardSuspendDistancePx(
+  hardSuspendDistanceVh: number,
+  hardSuspendMinDistancePx = HARD_SUSPEND_MIN_DISTANCE_PX
+): number {
   const vh = window.innerHeight || document.documentElement.clientHeight;
-  return Math.max(Math.round(hardSuspendDistanceVh * vh), HARD_SUSPEND_MIN_DISTANCE_PX);
+  return Math.max(Math.round(hardSuspendDistanceVh * vh), hardSuspendMinDistancePx);
 }
 
 function getActiveDistancePx(): number {
@@ -274,6 +277,8 @@ interface MediaLifecycleOptions {
   enabled?: boolean;
   /** Stage B threshold in viewport heights. A pixel floor is also applied for tiny screens. */
   hardSuspendDistanceVh?: number;
+  /** Optional pixel floor override for Stage B distance, allowing per-renderer tuning. */
+  hardSuspendMinDistancePx?: number;
   /** When true, skip Stage B (hard-suspend) entirely — embeds stay loaded for the session. */
   disableHardSuspend?: boolean;
   /** When true, unsupported embeds are hard-suspended as soon as they leave the active zone. */
@@ -290,6 +295,7 @@ export function useMediaPauseOnScroll(
   const {
     enabled = true,
     hardSuspendDistanceVh = 6,
+    hardSuspendMinDistancePx = HARD_SUSPEND_MIN_DISTANCE_PX,
     disableHardSuspend = false,
     hardSuspendOnPause = false,
   } = options;
@@ -316,7 +322,10 @@ export function useMediaPauseOnScroll(
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight || document.documentElement.clientHeight;
       const viewportCenterY = vh / 2;
-      const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
+      const hardSuspendDistancePx = getHardSuspendDistancePx(
+        hardSuspendDistanceVh,
+        hardSuspendMinDistancePx
+      );
       const activeDistancePx = getActiveDistancePx();
 
       const isOnScreen = rect.bottom > 0 && rect.top < vh;
@@ -403,7 +412,10 @@ export function useMediaPauseOnScroll(
       });
     };
 
-    const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
+    const hardSuspendDistancePx = getHardSuspendDistancePx(
+      hardSuspendDistanceVh,
+      hardSuspendMinDistancePx
+    );
 
     const nearObserver = new IntersectionObserver(() => scheduleReconcile(), {
       rootMargin: `${hardSuspendDistancePx}px 0px ${hardSuspendDistancePx}px 0px`,
@@ -434,7 +446,7 @@ export function useMediaPauseOnScroll(
       if (rafId !== null) cancelAnimationFrame(rafId);
       if (mutationRaf !== null) cancelAnimationFrame(mutationRaf);
     };
-  }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, disableHardSuspend, hardSuspendOnPause]);
+  }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, hardSuspendMinDistancePx, disableHardSuspend, hardSuspendOnPause]);
 
   useEffect(() => {
     if (!enabled) {
