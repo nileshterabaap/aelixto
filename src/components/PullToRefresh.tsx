@@ -37,6 +37,9 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const handleTouchStart = useCallback(
     (e: React.TouchEvent) => {
       if (refreshing) return;
+      // Don't capture pulls originating from the bottom nav area
+      const target = e.target as HTMLElement;
+      if (target.closest("nav") || target.closest('[aria-label="Create post"]')) return;
       if (isAtTop()) {
         touchStartY.current = e.touches[0].clientY;
         pulling.current = true;
