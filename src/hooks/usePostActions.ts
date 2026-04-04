@@ -120,10 +120,16 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
   });
 
   // Share functionality
-  const handleShare = () => {
+  const handleShare = async () => {
     const url = `${window.location.origin}/post/${postId}`;
     if (navigator.share) {
-      navigator.share({ url });
+      try {
+        await navigator.share({ url });
+      } catch {
+        // User cancelled or permission denied — fallback to clipboard
+        navigator.clipboard.writeText(url);
+        toast({ title: "Link copied!", description: "Post link copied to clipboard" });
+      }
     } else {
       navigator.clipboard.writeText(url);
       toast({ title: "Link copied!", description: "Post link copied to clipboard" });
