@@ -114,7 +114,7 @@ export const SharedPostCard = ({ postId, isOwn }: SharedPostCardProps) => {
             </AvatarFallback>
           </Avatar>
           <span className="text-xs font-semibold truncate">
-            {post.profile_display_name || post.profile_username}
+            @{post.profile_username}
           </span>
         </div>
 
