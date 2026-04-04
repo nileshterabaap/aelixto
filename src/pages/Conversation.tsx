@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SharedPostCard } from "@/components/messages/SharedPostCard";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMessages } from "@/hooks/useMessages";
