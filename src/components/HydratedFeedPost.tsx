@@ -33,6 +33,7 @@ import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { resolveRenderer } from "@/lib/resolveRenderer";
+import { SharePostSheet } from "@/components/SharePostSheet";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
@@ -95,6 +96,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const alreadyRevealed = revealedPostsCache.has(post.id);
 
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated || alreadyRevealed);
 
@@ -333,7 +335,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         isSaved: false, 
         toggleLike: () => {}, 
         toggleSave: () => {}, 
-        handleShare: () => {}, 
         deletePost: () => {},
         isDeleting: false 
       };
@@ -342,7 +343,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     ? repostActionsResult
     : { isReposted: false, toggleRepost: () => {}, isReposting: false };
 
-  const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost, isDeleting } = postActions;
+  const { isLiked, isSaved, toggleLike, toggleSave, deletePost, isDeleting } = postActions;
   const { isReposted, toggleRepost } = repostActions;
 
   useEffect(() => {
@@ -573,7 +574,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           )}
         </motion.button>
         <motion.button 
-          onClick={handleShare}
+          onClick={() => setShareOpen(true)}
           whileTap={{ scale: 0.9 }}
           className="action-btn p-1.5"
         >
@@ -613,6 +614,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           postAuthorId={(post as any).user_id}
         />
       )}
+
+      <SharePostSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        postId={post.id}
+      />
 
       {post.isRealPost && userId && (
         <SaveToCollectionSheet
