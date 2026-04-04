@@ -130,7 +130,7 @@ const PostDetail = () => {
       </div>
 
       <main className="mx-auto max-w-2xl px-4 py-6">
-        <FeedPost post={post} userId={userId} />
+        <HydratedFeedPost post={post} userId={userId} startHydrated />
       </main>
     </div>
   );
