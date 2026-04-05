@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, MessageCircle, Share } from "lucide-react";
+import { Heart, MessageCircle } from "lucide-react";
+import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 
 interface PostPreview {
   id: string;
