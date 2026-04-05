@@ -158,12 +158,14 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl overflow-hidden border border-border">
-        <Skeleton className="h-48 w-full" />
-        <div className="p-4 space-y-3">
-          <Skeleton className="h-6 w-3/4" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-5/6" />
+      <div data-embed-status="loading">
+        <div className="rounded-2xl overflow-hidden border border-border">
+          <Skeleton className="h-48 w-full" />
+          <div className="p-4 space-y-3">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+          </div>
         </div>
       </div>
     );
@@ -179,14 +181,16 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
     }
     
     return (
-      <LinkPreviewCard
-        url={cleanedUrl}
-        title={data?.meta.title || fallbackDomain}
-        description=""
-        domain={fallbackDomain}
-        favicon={data?.site.favicon}
-        siteName={data?.site.name}
-      />
+      <div data-embed-status="ready">
+        <LinkPreviewCard
+          url={cleanedUrl}
+          title={data?.meta.title || fallbackDomain}
+          description=""
+          domain={fallbackDomain}
+          favicon={data?.site.favicon}
+          siteName={data?.site.name}
+        />
+      </div>
     );
   }
 
@@ -194,24 +198,34 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
   
   // Reddit posts - use official Reddit embed (no fallback card)
   if (rendererType === 'reddit' && data.kind === 'reddit-post') {
-    return <RedditPostEmbed url={data.resolvedUrl} data={data} />;
+    return (
+      <div data-embed-status="ready">
+        <RedditPostEmbed url={data.resolvedUrl} data={data} />
+      </div>
+    );
   }
 
   // Quora posts - link card only (Quora blocks embeds)
   if (rendererType === 'quora') {
     return (
-      <LinkPreviewCard
-        url={data.resolvedUrl}
-        title={data.meta.title || 'View on Quora'}
-        description={data.meta.description}
-        image={data.meta.image || undefined}
-        domain={data.site.domain}
-        favicon={data.site.favicon}
-        siteName={data.site.name}
-      />
+      <div data-embed-status="ready">
+        <LinkPreviewCard
+          url={data.resolvedUrl}
+          title={data.meta.title || 'View on Quora'}
+          description={data.meta.description}
+          image={data.meta.image || undefined}
+          domain={data.site.domain}
+          favicon={data.site.favicon}
+          siteName={data.site.name}
+        />
+      </div>
     );
   }
 
   // Everything else - rich article card
-  return <ArticleContentEmbed data={data} />;
+  return (
+    <div data-embed-status="ready">
+      <ArticleContentEmbed data={data} />
+    </div>
+  );
 };

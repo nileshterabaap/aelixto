@@ -163,6 +163,11 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       setEmbedState('ready');
     };
 
+    const getRendererStatuses = () =>
+      Array.from(el.querySelectorAll<HTMLElement>('[data-embed-status]'))
+        .map((node) => node.dataset.embedStatus)
+        .filter((status): status is 'loading' | 'ready' => status === 'loading' || status === 'ready');
+
     const attachIframeHandlers = () => {
       const iframes = el.querySelectorAll('iframe');
       let hasLoadedIframe = false;
@@ -245,24 +250,50 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         return true;
       }
 
+      const rendererStatuses = getRendererStatuses();
+
+      if (rendererStatuses.includes('loading')) {
+        return false;
+      }
+
+      if (rendererStatuses.includes('ready')) {
+        markReady();
+        return true;
+      }
+
       return false;
     };
 
     if (checkContent()) {
-      const fallback = setTimeout(markReady, 4000);
-      return () => { settled = true; clearTimeout(fallback); };
+      const hardFallback = setTimeout(markReady, 12000);
+      return () => { settled = true; clearTimeout(hardFallback); };
     }
 
     const observer = new MutationObserver(() => { checkContent(); });
-    observer.observe(el, { childList: true, subtree: true });
+    observer.observe(el, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-embed-status'],
+    });
 
-    // Single 4s fallback timeout — ensures no post stays stuck
-    const fallback = setTimeout(markReady, 4000);
+    // Soft fallback: only reveal early if no renderer is still actively loading.
+    const fallback = setTimeout(() => {
+      if (settled) return;
+      if (checkContent()) return;
+      if (!getRendererStatuses().includes('loading')) {
+        markReady();
+      }
+    }, 4000);
+
+    // Hard fallback: never leave a post stuck forever.
+    const hardFallback = setTimeout(markReady, 12000);
 
     return () => {
       settled = true;
       observer.disconnect();
       clearTimeout(fallback);
+      clearTimeout(hardFallback);
     };
   }, [isHydrated, embedState, alreadyRevealed]);
 
