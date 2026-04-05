@@ -83,7 +83,7 @@ export const SharedPostCard = ({ postId, isOwn }: SharedPostCardProps) => {
     );
   }
 
-  const imageUrl = post.thumbnail_url || post.preview_image_url || post.media_url;
+  const imageUrl = post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform) || null;
   const caption = post.title || post.content;
 
   return (
