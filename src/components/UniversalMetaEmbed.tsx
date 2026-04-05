@@ -748,12 +748,14 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     : 'Web';
 
   return (
-    <OgCardFallback
-      url={expandedUrl}
-      title={fallbackData?.title}
-      image={fallbackData?.image}
-      description={fallbackData?.description}
-      platform={platformName}
-    />
+    <div data-embed-status="ready">
+      <OgCardFallback
+        url={expandedUrl}
+        title={fallbackData?.title}
+        image={fallbackData?.image}
+        description={fallbackData?.description}
+        platform={platformName}
+      />
+    </div>
   );
 };

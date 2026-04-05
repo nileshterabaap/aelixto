@@ -218,11 +218,21 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
     // Only reveal once actual media is settled, not when wrapper DOM first appears.
     const checkContent = () => {
+      const rendererStatuses = getRendererStatuses();
+
+      if (rendererStatuses.includes('loading')) {
+        return false;
+      }
+
       const mediaNodes = Array.from(
         el.querySelectorAll('img[src]:not([src=""]), video[src]:not([src=""]), iframe')
       );
 
       if (mediaNodes.length === 0) {
+        if (rendererStatuses.includes('ready')) {
+          markReady();
+          return true;
+        }
         return false;
       }
 
@@ -248,12 +258,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           markReady();
         }
         return true;
-      }
-
-      const rendererStatuses = getRendererStatuses();
-
-      if (rendererStatuses.includes('loading')) {
-        return false;
       }
 
       if (rendererStatuses.includes('ready')) {
