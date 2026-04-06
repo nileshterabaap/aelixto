@@ -377,7 +377,10 @@ const buildFacebookEmbed = (url: string): string | null => {
     ? `href=${encodedUrl}&width=500`
     : `href=${encodedUrl}&show_text=true&width=500`;
 
-  return `<iframe src="https://www.facebook.com/plugins/${pluginEndpoint}?${query}" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+  // Reels / vertical video → 9:16, regular posts → 4:5
+  const aspectRatio = isVideo ? '9/16' : '4/5';
+
+  return `<iframe src="https://www.facebook.com/plugins/${pluginEndpoint}?${query}" style="border:none;width:100%;aspect-ratio:${aspectRatio};overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
 };
 
 // Check if Spotify URL is embeddable (not wrapped-share or other special pages)

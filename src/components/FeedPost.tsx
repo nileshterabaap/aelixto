@@ -40,6 +40,7 @@ import { QuoraPreviewCard } from "@/features/article-embeds/QuoraPreviewCard";
 import { useVideoPlayTracking } from "@/hooks/useViewTracking";
 import { ImageViewTracker } from "@/components/ImageViewTracker";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
+import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { SharePostSheet } from "@/components/SharePostSheet";
 
 interface FeedPostProps {
@@ -713,7 +714,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {/* Title - hide for embeds that contain their own title/caption */}
         {(r.kind === 'image' || (r.kind === 'video' && post.platform === 'youtube')) && (
           <div className="mt-3">
-            <h2 className="text-lg font-bold">{post.title}</h2>
+            {post.platform === 'youtube' ? (
+              <YouTubeTitleFallback mediaUrl={mediaUrl} title={post.title} />
+            ) : (
+              <h2 className="text-lg font-bold">{post.title}</h2>
+            )}
           </div>
         )}
 

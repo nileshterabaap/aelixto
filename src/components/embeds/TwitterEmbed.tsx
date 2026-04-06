@@ -85,6 +85,12 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
 
           if (!tweet) {
             setError(true);
+          } else {
+            // Dispatch a custom event so HydratedFeedPost can detect readiness
+            // immediately without waiting for MutationObserver cycles
+            containerRef.current?.dispatchEvent(
+              new CustomEvent('embedReady', { bubbles: true })
+            );
           }
         }
       } catch (err) {

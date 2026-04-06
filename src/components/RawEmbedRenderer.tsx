@@ -345,7 +345,27 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
 
   // Threads embeds: tighter container, hide fallback link only when iframe loads
   // Height-contained wrapper clips extra vertical space injected by Threads SDK
+  // Decode HTML entities in the blockquote placeholder so raw &#064; etc. don't flash
   if (platform === 'threads') {
+    const decodedHtml = (() => {
+      try {
+        const doc = new DOMParser().parseFromString(sanitizedHtml, 'text/html');
+        // Walk all text nodes inside blockquotes and decode entities
+        const blockquotes = doc.querySelectorAll('blockquote');
+        blockquotes.forEach((bq) => {
+          const walker = doc.createTreeWalker(bq, NodeFilter.SHOW_TEXT);
+          let node: Text | null;
+          while ((node = walker.nextNode() as Text | null)) {
+            // DOMParser already decoded entities in the text content,
+            // so just re-serialize — the entities are now clean Unicode.
+          }
+        });
+        return doc.body.innerHTML;
+      } catch {
+        return sanitizedHtml;
+      }
+    })();
+
     return (
       <div
         style={{ width: '100%', maxHeight: 520, overflow: 'hidden', position: 'relative' }}
@@ -354,7 +374,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           ref={containerRef}
           className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&>iframe~*]:!hidden"
           style={{ overflow: 'hidden' }}
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+          dangerouslySetInnerHTML={{ __html: decodedHtml }}
         />
       </div>
     );

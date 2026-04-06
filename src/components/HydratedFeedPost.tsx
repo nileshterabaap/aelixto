@@ -32,6 +32,7 @@ import threadsIcon from "@/assets/platforms/threads.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
+import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { SharePostSheet } from "@/components/SharePostSheet";
 
@@ -281,6 +282,11 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       attributeFilter: ['data-embed-status'],
     });
 
+    // Listen for custom embedReady events dispatched by platform-specific renderers
+    // (e.g. TwitterEmbed fires this after createTweet resolves)
+    const handleEmbedReady = () => { markReady(); };
+    el.addEventListener('embedReady', handleEmbedReady);
+
     // Soft fallback: only reveal early if no renderer is still actively loading.
     const fallback = setTimeout(() => {
       if (settled) return;
@@ -296,6 +302,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     return () => {
       settled = true;
       observer.disconnect();
+      el.removeEventListener('embedReady', handleEmbedReady);
       clearTimeout(fallback);
       clearTimeout(hardFallback);
     };
@@ -550,9 +557,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
       {/* Title for video/image posts */}
-      {post.title && (r.kind === 'image' || r.kind === 'video') && (
+      {(r.kind === 'image' || r.kind === 'video') && (
         <div className="px-5 pt-3">
-          <h2 className="text-lg font-bold">{post.title}</h2>
+          {post.platform === 'youtube' ? (
+            <YouTubeTitleFallback mediaUrl={mediaUrl} title={post.title} />
+          ) : (
+            post.title && <h2 className="text-lg font-bold">{post.title}</h2>
+          )}
         </div>
       )}
 
