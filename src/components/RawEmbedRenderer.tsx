@@ -2,6 +2,41 @@ import { useEffect, useRef, useState } from 'react';
 import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed, clearScriptCache } from '@/lib/ScriptLoader';
 import DOMPurify from 'dompurify';
 
+/** Decode HTML entities (&#064; → @, &#039; → ', etc.) using DOMParser */
+const decodeHtmlEntities = (html: string): string => {
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || html;
+  } catch {
+    return html;
+  }
+};
+
+/**
+ * Decode HTML entities inside blockquote text nodes so raw codes like &#064;
+ * don't flash before the Threads SDK replaces them with an iframe.
+ * Only touches text content — leaves HTML structure/tags intact.
+ */
+const decodeBlockquoteEntities = (html: string): string => {
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    let node: Text | null;
+    while ((node = walker.nextNode() as Text | null)) {
+      // DOMParser already decoded entities into the text nodes — we just
+      // need to serialise them back. But we also want to handle any
+      // double-encoded entities (e.g. &amp;#064;) that some APIs return.
+      const decoded = node.textContent ?? '';
+      if (decoded !== node.textContent) {
+        node.textContent = decoded;
+      }
+    }
+    return doc.body.innerHTML;
+  } catch {
+    return html;
+  }
+};
+
 interface RawEmbedRendererProps {
   embedHtml: string;
   onError?: () => void;
@@ -346,6 +381,10 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   // Threads embeds: tighter container, hide fallback link only when iframe loads
   // Height-contained wrapper clips extra vertical space injected by Threads SDK
   if (platform === 'threads') {
+    // Decode HTML entities in blockquote text so raw codes like &#064; don't
+    // flash before the Threads SDK replaces the blockquote with an iframe.
+    const decodedThreadsHtml = decodeBlockquoteEntities(sanitizedHtml);
+
     return (
       <div
         style={{ width: '100%', maxHeight: 520, overflow: 'hidden', position: 'relative' }}
@@ -354,7 +393,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           ref={containerRef}
           className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&>iframe~*]:!hidden"
           style={{ overflow: 'hidden' }}
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+          dangerouslySetInnerHTML={{ __html: decodedThreadsHtml }}
         />
       </div>
     );
