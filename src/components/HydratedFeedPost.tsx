@@ -281,6 +281,11 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       attributeFilter: ['data-embed-status'],
     });
 
+    // Listen for custom embedReady events dispatched by platform-specific renderers
+    // (e.g. TwitterEmbed fires this after createTweet resolves)
+    const handleEmbedReady = () => { markReady(); };
+    el.addEventListener('embedReady', handleEmbedReady);
+
     // Soft fallback: only reveal early if no renderer is still actively loading.
     const fallback = setTimeout(() => {
       if (settled) return;
@@ -296,6 +301,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     return () => {
       settled = true;
       observer.disconnect();
+      el.removeEventListener('embedReady', handleEmbedReady);
       clearTimeout(fallback);
       clearTimeout(hardFallback);
     };
