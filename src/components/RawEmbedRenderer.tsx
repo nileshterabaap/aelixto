@@ -381,6 +381,10 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   // Threads embeds: tighter container, hide fallback link only when iframe loads
   // Height-contained wrapper clips extra vertical space injected by Threads SDK
   if (platform === 'threads') {
+    // Decode HTML entities in blockquote text so raw codes like &#064; don't
+    // flash before the Threads SDK replaces the blockquote with an iframe.
+    const decodedThreadsHtml = decodeBlockquoteEntities(sanitizedHtml);
+
     return (
       <div
         style={{ width: '100%', maxHeight: 520, overflow: 'hidden', position: 'relative' }}
@@ -389,7 +393,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           ref={containerRef}
           className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&>iframe~*]:!hidden"
           style={{ overflow: 'hidden' }}
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+          dangerouslySetInnerHTML={{ __html: decodedThreadsHtml }}
         />
       </div>
     );
