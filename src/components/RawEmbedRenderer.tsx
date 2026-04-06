@@ -12,6 +12,65 @@ const decodeHtmlEntities = (html: string): string => {
   }
 };
 
+const fullyDecodeHtmlEntities = (value: string): string => {
+  let decoded = value;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const next = decodeHtmlEntities(decoded);
+    if (next === decoded) break;
+    decoded = next;
+  }
+
+  return decoded;
+};
+
+const isFacebookVideoUrl = (value: string): boolean => {
+  const normalized = fullyDecodeHtmlEntities(value).toLowerCase();
+  return (
+    normalized.includes('/reel/') ||
+    normalized.includes('/videos/') ||
+    normalized.includes('/watch/') ||
+    normalized.includes('fb.watch')
+  );
+};
+
+const setStyleDeclaration = (style: string, property: string, value: string): string => {
+  const withoutProperty = style.replace(new RegExp(`${property}\\s*:\\s*[^;]+;?`, 'gi'), '').trim();
+  const normalizedBase = withoutProperty
+    ? `${withoutProperty}${withoutProperty.endsWith(';') ? '' : ';'}`
+    : '';
+
+  return `${normalizedBase}${property}:${value};`;
+};
+
+const normalizeFacebookIframeEmbed = (html: string): string => {
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const iframe = doc.querySelector('iframe[src*="facebook.com/plugins/"]');
+    if (!iframe) return html;
+
+    const iframeSrc = fullyDecodeHtmlEntities(iframe.getAttribute('src') || '');
+    const pluginPath = iframeSrc.toLowerCase();
+
+    let targetUrl = iframeSrc;
+    try {
+      const iframeUrl = new URL(iframeSrc);
+      targetUrl = fullyDecodeHtmlEntities(iframeUrl.searchParams.get('href') || iframeSrc);
+    } catch {
+      targetUrl = iframeSrc;
+    }
+
+    const aspectRatio =
+      pluginPath.includes('/video.php') || isFacebookVideoUrl(targetUrl) ? '9/16' : '4/5';
+    const baseStyle = iframe.getAttribute('style') || 'border:none;width:100%;overflow:hidden;';
+    iframe.setAttribute('style', setStyleDeclaration(baseStyle, 'aspect-ratio', aspectRatio));
+
+    return doc.body.innerHTML;
+  } catch {
+    return html;
+  }
+};
+
 /**
  * Decode HTML entities inside blockquote text nodes so raw codes like &#064;
  * don't flash before the Threads SDK replaces them with an iframe.
@@ -23,13 +82,7 @@ const decodeBlockquoteEntities = (html: string): string => {
     const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
     let node: Text | null;
     while ((node = walker.nextNode() as Text | null)) {
-      // DOMParser already decoded entities into the text nodes — we just
-      // need to serialise them back. But we also want to handle any
-      // double-encoded entities (e.g. &amp;#064;) that some APIs return.
-      const decoded = node.textContent ?? '';
-      if (decoded !== node.textContent) {
-        node.textContent = decoded;
-      }
+      node.textContent = fullyDecodeHtmlEntities(node.textContent ?? '');
     }
     return doc.body.innerHTML;
   } catch {
@@ -141,6 +194,10 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   // Transform Facebook embeds to SDK-compatible format
   if (platform === 'facebook') {
     sanitizedHtml = transformFacebookEmbed(sanitizedHtml);
+  }
+
+  if (platform === 'facebook-iframe') {
+    sanitizedHtml = normalizeFacebookIframeEmbed(sanitizedHtml);
   }
 
   // Extract URL from embed HTML for double-tap redirection

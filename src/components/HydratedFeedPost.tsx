@@ -362,6 +362,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   
   // Detect platform
   const detectedPlatform = post.platform || detectPlatformFromUrl(mediaUrl);
+  const isYouTubePost = detectedPlatform === 'youtube';
+  const shouldRenderMediaTitle = isYouTubePost || r.kind === 'image' || r.kind === 'video';
   const platform = getPlatformIcon(detectedPlatform);
   
   // Always call hooks unconditionally
@@ -557,9 +559,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
       {/* Title for video/image posts */}
-      {(r.kind === 'image' || r.kind === 'video') && (
+      {shouldRenderMediaTitle && (
         <div className="px-5 pt-3">
-          {post.platform === 'youtube' ? (
+          {isYouTubePost ? (
             <YouTubeTitleFallback mediaUrl={mediaUrl} title={post.title} />
           ) : (
             post.title && <h2 className="text-lg font-bold">{post.title}</h2>
