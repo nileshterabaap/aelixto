@@ -40,6 +40,7 @@ import { QuoraPreviewCard } from "@/features/article-embeds/QuoraPreviewCard";
 import { useVideoPlayTracking } from "@/hooks/useViewTracking";
 import { ImageViewTracker } from "@/components/ImageViewTracker";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
+import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { SharePostSheet } from "@/components/SharePostSheet";
 
 interface FeedPostProps {
