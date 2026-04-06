@@ -713,7 +713,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {/* Title - hide for embeds that contain their own title/caption */}
         {(r.kind === 'image' || (r.kind === 'video' && post.platform === 'youtube')) && (
           <div className="mt-3">
-            <h2 className="text-lg font-bold">{post.title}</h2>
+            {post.platform === 'youtube' ? (
+              <YouTubeTitleFallback mediaUrl={mediaUrl} title={post.title} />
+            ) : (
+              <h2 className="text-lg font-bold">{post.title}</h2>
+            )}
           </div>
         )}
 

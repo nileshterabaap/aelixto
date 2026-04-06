@@ -556,9 +556,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
       {/* Title for video/image posts */}
-      {post.title && (r.kind === 'image' || r.kind === 'video') && (
+      {(r.kind === 'image' || r.kind === 'video') && (
         <div className="px-5 pt-3">
-          <h2 className="text-lg font-bold">{post.title}</h2>
+          {post.platform === 'youtube' ? (
+            <YouTubeTitleFallback mediaUrl={mediaUrl} title={post.title} />
+          ) : (
+            post.title && <h2 className="text-lg font-bold">{post.title}</h2>
+          )}
         </div>
       )}
 
