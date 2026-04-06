@@ -168,8 +168,11 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const handlePost = () => {
     if (!linkUrl.trim()) return;
 
-    // Validate Facebook embed HTML before saving
+    // Use centralised classification
     const platform = classifyUrl(linkUrl, ogType);
+    const mediaType = deriveMediaType(linkUrl, platform);
+
+    // Validate Facebook embed HTML before saving
     if (platform === 'facebook' && embedHtml) {
       const hasIframe = /<iframe\b/i.test(embedHtml);
       const hasValidBlockquote = /<blockquote\b[^>]*data-href="[^"]+"/i.test(embedHtml);
@@ -178,10 +181,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
         return;
       }
     }
-
-    // Use centralised classification
-    const platform = classifyUrl(linkUrl, ogType);
-    const mediaType = deriveMediaType(linkUrl, platform);
 
     console.log('[CreatePostDialog] Creating post with data:', {
       title: title.trim(),
