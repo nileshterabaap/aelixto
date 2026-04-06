@@ -168,6 +168,17 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const handlePost = () => {
     if (!linkUrl.trim()) return;
 
+    // Validate Facebook embed HTML before saving
+    const platform = classifyUrl(linkUrl, ogType);
+    if (platform === 'facebook' && embedHtml) {
+      const hasIframe = /<iframe\b/i.test(embedHtml);
+      const hasValidBlockquote = /<blockquote\b[^>]*data-href="[^"]+"/i.test(embedHtml);
+      if (!hasIframe && !hasValidBlockquote) {
+        toast.error("This Facebook post could not be embedded. Try sharing a different post.");
+        return;
+      }
+    }
+
     // Use centralised classification
     const platform = classifyUrl(linkUrl, ogType);
     const mediaType = deriveMediaType(linkUrl, platform);
