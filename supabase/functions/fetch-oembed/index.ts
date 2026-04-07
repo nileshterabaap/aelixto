@@ -199,8 +199,15 @@ serve(async (req) => {
           if (res.ok) {
             const data = await res.json();
             if (data.html) {
-              embedHtml = data.html;
-              console.log('[fetch-oembed] Facebook oEmbed success');
+              // Only use oEmbed HTML if it contains an <iframe>;
+              // blockquote-based embeds require the Facebook SDK which is unreliable.
+              // Prefer the self-contained plugin iframe fallback instead.
+              if (/<iframe\b/i.test(data.html)) {
+                embedHtml = data.html;
+                console.log('[fetch-oembed] Facebook oEmbed success (iframe)');
+              } else {
+                console.log('[fetch-oembed] Facebook oEmbed returned blockquote, preferring plugin iframe');
+              }
             }
           } else {
             const errorText = await res.text();

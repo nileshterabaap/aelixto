@@ -175,7 +175,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     // Validate Facebook embed HTML before saving
     if (platform === 'facebook' && embedHtml) {
       const hasIframe = /<iframe\b/i.test(embedHtml);
-      const hasValidBlockquote = /<blockquote\b[^>]*data-href="[^"]+"/i.test(embedHtml);
+      const hasValidBlockquote = /<blockquote\b[^>]*(data-href|cite)="[^"]+"/i.test(embedHtml);
       if (!hasIframe && !hasValidBlockquote) {
         toast.error("This Facebook post could not be embedded. Try sharing a different post.");
         return;
