@@ -153,7 +153,7 @@ const isInstagramEmbed = (html: string): boolean => {
 };
 
 // Detect platform for SDK processing purposes
-const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-iframe' | 'threads' | 'tiktok' | 'unknown' => {
+const detectPlatform = (html: string): 'instagram' | 'facebook' | 'threads' | 'tiktok' | 'unknown' => {
   // Instagram iframes don't need SDK processing
   if (html.includes('instagram.com') && html.includes('<iframe')) {
     return 'unknown';
@@ -161,10 +161,7 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-ifra
   if (html.includes('instagram.com') || html.includes('instagram-media')) {
     return 'instagram';
   }
-  // Facebook iframes — need error monitoring but not SDK processing
-  if (html.includes('facebook.com/plugins/') && html.includes('<iframe')) {
-    return 'facebook-iframe';
-  }
+  // Facebook — SDK handles both blockquotes and fb-post/fb-video divs
   if (html.includes('facebook.com') || html.includes('fb-post') || html.includes('fb-video')) {
     return 'facebook';
   }
