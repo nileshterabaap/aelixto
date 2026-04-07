@@ -219,7 +219,7 @@ serve(async (req) => {
         }
       }
 
-      if (!embedHtml && !unresolvedShare) {
+      if (!embedHtml) {
         embedHtml = fallbackIframe;
         console.log('[fetch-oembed] Facebook iframe fallback built');
       }
