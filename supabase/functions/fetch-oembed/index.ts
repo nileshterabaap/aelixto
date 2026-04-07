@@ -174,20 +174,18 @@ serve(async (req) => {
       }
 
       const canonicalFacebookUrl = stripFacebookTrackingParams(resolvedFacebookUrl);
-      const unresolvedShare = canonicalFacebookUrl.includes('/share/');
+      // Even if /share/ didn't expand, still try the plugin iframe — Facebook handles redirects
+      const unresolvedShare = canonicalFacebookUrl.includes('/share/') && resolvedFacebookUrl === url;
       const isVideo =
         canonicalFacebookUrl.includes('/reel/') ||
         canonicalFacebookUrl.includes('/videos/') ||
         canonicalFacebookUrl.includes('/watch/') ||
         canonicalFacebookUrl.includes('fb.watch');
 
-      const pluginEndpoint = isVideo ? 'video.php' : 'post.php';
-      const encodedUrl = encodeURIComponent(canonicalFacebookUrl);
-      const pluginQuery = isVideo
-        ? `href=${encodedUrl}&width=500`
-        : `href=${encodedUrl}&show_text=true&width=500`;
-
-      const fallbackIframe = `<iframe src="https://www.facebook.com/plugins/${pluginEndpoint}?${pluginQuery}" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+      // Use SDK-based divs instead of plugin iframes — Facebook blocks plugin
+      // iframes via X-Frame-Options on third-party domains.
+      const sdkClass = isVideo ? 'fb-video' : 'fb-post';
+      const fallbackHtml = `<div class="${sdkClass}" data-href="${canonicalFacebookUrl}" data-width="auto" data-show-text="true"></div>`;
 
       const metaToken = Deno.env.get('META_APP_TOKEN');
       if (metaToken && !unresolvedShare) {
@@ -199,21 +197,23 @@ serve(async (req) => {
           if (res.ok) {
             const data = await res.json();
             if (data.html) {
+              // Accept both iframes and blockquotes from oEmbed —
+              // the RawEmbedRenderer SDK path handles both.
               embedHtml = data.html;
               console.log('[fetch-oembed] Facebook oEmbed success');
             }
           } else {
             const errorText = await res.text();
-            console.warn('[fetch-oembed] Facebook oEmbed non-200, using iframe fallback:', errorText);
+            console.warn('[fetch-oembed] Facebook oEmbed non-200, using SDK fallback:', errorText);
           }
         } catch (e) {
           console.error('[fetch-oembed] Facebook oEmbed failed:', e);
         }
       }
 
-      if (!embedHtml && !unresolvedShare) {
-        embedHtml = fallbackIframe;
-        console.log('[fetch-oembed] Facebook iframe fallback built');
+      if (!embedHtml) {
+        embedHtml = fallbackHtml;
+        console.log('[fetch-oembed] Facebook SDK fallback built');
       }
     }
 
