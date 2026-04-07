@@ -692,7 +692,6 @@ export type Database = {
       get_following_feed: {
         Args: { cursor?: string; limit_count: number }
         Returns: {
-          comments_count: number
           content: string
           created_at: string
           embed_html: string
@@ -713,7 +712,6 @@ export type Database = {
           reposted_at: string
           reposted_by_user_id: string
           reposted_by_username: string
-          reposts_count: number
           saves_count: number
           thumbnail_url: string
           title: string

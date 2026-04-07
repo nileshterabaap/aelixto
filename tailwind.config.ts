@@ -132,12 +132,6 @@ export default {
             opacity: "1",
           },
         },
-        "tap-bounce": {
-          "0%": { transform: "scale(1)" },
-          "40%": { transform: "scale(0.92)" },
-          "70%": { transform: "scale(1.03)" },
-          "100%": { transform: "scale(1)" },
-        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -147,7 +141,6 @@ export default {
         ripple: "ripple 0.6s linear",
         "underline-slide": "underline-slide 0.2s ease-out",
         "fade-in": "fade-in 0.2s ease-out forwards",
-        "tap-bounce": "tap-bounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
       },
     },
   },

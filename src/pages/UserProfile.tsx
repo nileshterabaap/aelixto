@@ -15,7 +15,6 @@ import { useStartConversation } from "@/hooks/useStartConversation";
 import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
 import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { FollowListDialog } from "@/components/profile/FollowListDialog";
 
 interface UserProfileProps {
   usernameOverride?: string;
@@ -29,8 +28,6 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
-  const [followListOpen, setFollowListOpen] = useState(false);
   
   const { isFollowing, follow, unfollow, loading: followLoading, counts } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
@@ -187,13 +184,10 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           {/* Avatar and Stats Container */}
           <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
             {/* Left Stats - Followers */}
-            <button 
-              className="text-center flex-shrink-0 w-20 -ml-2 active:scale-95 transition-transform"
-              onClick={() => { setFollowListType("followers"); setFollowListOpen(true); }}
-            >
+            <div className="text-center flex-shrink-0 w-20 -ml-2">
               <div className="text-2xl font-bold leading-none mb-1">{counts.followers}</div>
               <div className="text-xs font-medium">Followers</div>
-            </button>
+            </div>
             
             {/* Avatar - Centered */}
             <div className="absolute left-1/2 -translate-x-1/2 -mt-20">
@@ -204,13 +198,10 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             </div>
             
             {/* Right Stats - Following */}
-            <button 
-              className="text-center flex-shrink-0 w-20 -mr-2 active:scale-95 transition-transform"
-              onClick={() => { setFollowListType("following"); setFollowListOpen(true); }}
-            >
+            <div className="text-center flex-shrink-0 w-20 -mr-2">
               <div className="text-2xl font-bold leading-none mb-1">{counts.following}</div>
               <div className="text-xs font-medium">Following</div>
-            </button>
+            </div>
           </div>
 
           {/* Aelix Score - only show if user enabled it */}
@@ -253,7 +244,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                     : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
               >
-                {isFollowing ? 'Following' : 'Follow'}
+                {followLoading ? 'Loading...' : isFollowing ? 'Following' : 'Follow'}
               </Button>
               <Button
                 disabled={conversationLoading}
@@ -312,15 +303,6 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen}
       />
-
-      {profile && (
-        <FollowListDialog
-          open={followListOpen}
-          onOpenChange={setFollowListOpen}
-          userId={profile.user_id}
-          type={followListType}
-        />
-      )}
     </div>
   );
 };

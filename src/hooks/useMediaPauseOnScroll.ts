@@ -141,20 +141,53 @@ function removeParam(url: string, key: string): string {
 
 function muteNonApiIframe(iframe: HTMLIFrameElement) {
   if (iframe.dataset[MUTE_FLAG] === '1') return;
-  // CSS-only suppression — never touch src to avoid iframe reload/flicker
+  const src = iframe.getAttribute('src');
+  if (!src || src === 'about:blank') return;
+
+  const lower = src.toLowerCase();
+  let mutedSrc = src;
+
+  if (lower.includes('tiktok.com')) {
+    mutedSrc = addParam(src, 'mute', '1');
+  } else if (lower.includes('instagram.com')) {
+    mutedSrc = addParam(src, 'autoplay', '0');
+  } else if (lower.includes('facebook.com')) {
+    mutedSrc = addParam(addParam(src, 'autoplay', '0'), 'mute', '1');
+  } else if (lower.includes('twitter.com') || lower.includes('platform.twitter.com')) {
+    // Twitter embeds don't support mute params; freeze pointer events only
+    iframe.style.pointerEvents = 'none';
+    iframe.dataset[MUTE_FLAG] = '1';
+    return;
+  } else {
+    return; // Not a known non-API embed
+  }
+
   iframe.dataset[MUTE_FLAG] = '1';
-  iframe.style.pointerEvents = 'none';
-  iframe.setAttribute('aria-hidden', 'true');
-  iframe.tabIndex = -1;
+  iframe.setAttribute('src', mutedSrc);
 }
 
 function unmuteNonApiIframe(iframe: HTMLIFrameElement) {
   if (iframe.dataset[MUTE_FLAG] !== '1') return;
-  // Undo CSS-only suppression
+  const src = iframe.getAttribute('src');
+  if (!src || src === 'about:blank') return;
+
+  const lower = src.toLowerCase();
+  let unmutedSrc = src;
+
+  if (lower.includes('tiktok.com')) {
+    unmutedSrc = removeParam(src, 'mute');
+  } else if (lower.includes('instagram.com')) {
+    unmutedSrc = removeParam(src, 'autoplay');
+  } else if (lower.includes('facebook.com')) {
+    unmutedSrc = removeParam(removeParam(src, 'autoplay'), 'mute');
+  } else if (lower.includes('twitter.com') || lower.includes('platform.twitter.com')) {
+    iframe.style.pointerEvents = '';
+    delete iframe.dataset[MUTE_FLAG];
+    return;
+  }
+
   delete iframe.dataset[MUTE_FLAG];
-  iframe.style.pointerEvents = '';
-  iframe.removeAttribute('aria-hidden');
-  iframe.tabIndex = 0;
+  iframe.setAttribute('src', unmutedSrc);
 }
 
 function muteNonApiIframes(root: HTMLElement) {
@@ -195,21 +228,14 @@ function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
-  if (root.dataset.aelixHasBeenActive) {
-    muteNonApiIframes(root);
-  }
+  muteNonApiIframes(root);
   freezeIframes(root);
 }
 
-/** Undo Stage A (unfreeze + reset mute flags for next pause cycle) */
+/** Undo Stage A (unmute + unfreeze) */
 function stageAResume(root: HTMLElement) {
   restoreHardSuspended(root);
-  root.dataset.aelixHasBeenActive = 'true';
-  // Clear mute flags so next stageAPause can re-apply muting.
-  // Do NOT change iframe src here — that causes flicker.
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    delete iframe.dataset[MUTE_FLAG];
-  });
+  unmuteNonApiIframes(root);
   unfreezeIframes(root);
 }
 

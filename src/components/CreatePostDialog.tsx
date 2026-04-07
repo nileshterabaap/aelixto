@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -171,17 +170,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     // Use centralised classification
     const platform = classifyUrl(linkUrl, ogType);
     const mediaType = deriveMediaType(linkUrl, platform);
-
-    // Validate Facebook embed HTML before saving
-    if (platform === 'facebook' && embedHtml) {
-      const hasIframe = /<iframe\b/i.test(embedHtml);
-      const hasValidBlockquote = /<blockquote\b[^>]*(data-href|cite)="[^"]+"/i.test(embedHtml);
-      const hasSdkDiv = /<div\b[^>]*class="fb-(post|video)"[^>]*data-href="[^"]+"/i.test(embedHtml);
-      if (!hasIframe && !hasValidBlockquote && !hasSdkDiv) {
-        toast.error("This Facebook post could not be embedded. Try sharing a different post.");
-        return;
-      }
-    }
 
     console.log('[CreatePostDialog] Creating post with data:', {
       title: title.trim(),
