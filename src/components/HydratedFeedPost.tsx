@@ -32,7 +32,6 @@ import threadsIcon from "@/assets/platforms/threads.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
-import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { SharePostSheet } from "@/components/SharePostSheet";
 
@@ -164,11 +163,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       setEmbedState('ready');
     };
 
-    const getRendererStatuses = () =>
-      Array.from(el.querySelectorAll<HTMLElement>('[data-embed-status]'))
-        .map((node) => node.dataset.embedStatus)
-        .filter((status): status is 'loading' | 'ready' => status === 'loading' || status === 'ready');
-
     const attachIframeHandlers = () => {
       const iframes = el.querySelectorAll('iframe');
       let hasLoadedIframe = false;
@@ -219,21 +213,11 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
     // Only reveal once actual media is settled, not when wrapper DOM first appears.
     const checkContent = () => {
-      const rendererStatuses = getRendererStatuses();
-
-      if (rendererStatuses.includes('loading')) {
-        return false;
-      }
-
       const mediaNodes = Array.from(
         el.querySelectorAll('img[src]:not([src=""]), video[src]:not([src=""]), iframe')
       );
 
       if (mediaNodes.length === 0) {
-        if (rendererStatuses.includes('ready')) {
-          markReady();
-          return true;
-        }
         return false;
       }
 
@@ -261,50 +245,24 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         return true;
       }
 
-      if (rendererStatuses.includes('ready')) {
-        markReady();
-        return true;
-      }
-
       return false;
     };
 
     if (checkContent()) {
-      const hardFallback = setTimeout(markReady, 12000);
-      return () => { settled = true; clearTimeout(hardFallback); };
+      const fallback = setTimeout(markReady, 4000);
+      return () => { settled = true; clearTimeout(fallback); };
     }
 
     const observer = new MutationObserver(() => { checkContent(); });
-    observer.observe(el, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['data-embed-status'],
-    });
+    observer.observe(el, { childList: true, subtree: true });
 
-    // Listen for custom embedReady events dispatched by platform-specific renderers
-    // (e.g. TwitterEmbed fires this after createTweet resolves)
-    const handleEmbedReady = () => { markReady(); };
-    el.addEventListener('embedReady', handleEmbedReady);
-
-    // Soft fallback: only reveal early if no renderer is still actively loading.
-    const fallback = setTimeout(() => {
-      if (settled) return;
-      if (checkContent()) return;
-      if (!getRendererStatuses().includes('loading')) {
-        markReady();
-      }
-    }, 4000);
-
-    // Hard fallback: never leave a post stuck forever.
-    const hardFallback = setTimeout(markReady, 12000);
+    // Single 4s fallback timeout — ensures no post stays stuck
+    const fallback = setTimeout(markReady, 4000);
 
     return () => {
       settled = true;
       observer.disconnect();
-      el.removeEventListener('embedReady', handleEmbedReady);
       clearTimeout(fallback);
-      clearTimeout(hardFallback);
     };
   }, [isHydrated, embedState, alreadyRevealed]);
 
@@ -362,8 +320,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   
   // Detect platform
   const detectedPlatform = post.platform || detectPlatformFromUrl(mediaUrl);
-  const isYouTubePost = detectedPlatform === 'youtube';
-  const shouldRenderMediaTitle = isYouTubePost || r.kind === 'image' || r.kind === 'video';
   const platform = getPlatformIcon(detectedPlatform);
   
   // Always call hooks unconditionally
@@ -559,13 +515,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
       {/* Title for video/image posts */}
-      {shouldRenderMediaTitle && (
+      {post.title && (r.kind === 'image' || r.kind === 'video') && (
         <div className="px-5 pt-3">
-          {isYouTubePost ? (
-            <YouTubeTitleFallback mediaUrl={mediaUrl} title={post.title} />
-          ) : (
-            post.title && <h2 className="text-lg font-bold">{post.title}</h2>
-          )}
+          <h2 className="text-lg font-bold">{post.title}</h2>
         </div>
       )}
 

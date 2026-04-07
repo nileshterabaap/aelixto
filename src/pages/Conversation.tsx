@@ -1,14 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SharedPostCard } from "@/components/messages/SharedPostCard";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useMessages, Message } from "@/hooks/useMessages";
+import { useMessages } from "@/hooks/useMessages";
 import { useSession } from "@/hooks/useSession";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 
 interface ConversationUser {
   username: string;
@@ -16,29 +15,14 @@ interface ConversationUser {
   avatar_url: string | null;
 }
 
-interface MessageMenuState {
-  message: Message | null;
-  x: number;
-  y: number;
-}
-
-const EDIT_TIME_LIMIT_MS = 15 * 60 * 1000; // 15 minutes
-
 const Conversation = () => {
   const { conversationId } = useParams();
   const navigate = useNavigate();
   const { user } = useSession();
-  const { toast } = useToast();
   const { messages, loading, sendMessage } = useMessages(conversationId || null);
   const [newMessage, setNewMessage] = useState("");
   const [otherUser, setOtherUser] = useState<ConversationUser | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [menu, setMenu] = useState<MessageMenuState>({ message: null, x: 0, y: 0 });
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editText, setEditText] = useState("");
-  const [replyTo, setReplyTo] = useState<Message | null>(null);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (conversationId && user) {
@@ -50,21 +34,6 @@ const Conversation = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Close menu on outside tap
-  useEffect(() => {
-    const handleOutside = (e: MouseEvent | TouchEvent) => {
-      if (menu.message && menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenu({ message: null, x: 0, y: 0 });
-      }
-    };
-    document.addEventListener("mousedown", handleOutside);
-    document.addEventListener("touchstart", handleOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleOutside);
-      document.removeEventListener("touchstart", handleOutside);
-    };
-  }, [menu.message]);
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -73,6 +42,7 @@ const Conversation = () => {
     if (!conversationId || !user) return;
 
     try {
+      // Get other participant
       const { data: participants, error: participantError } = await supabase
         .from('conversation_participants')
         .select('user_id')
@@ -82,6 +52,7 @@ const Conversation = () => {
 
       if (participantError) throw participantError;
 
+      // Get profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('username, display_name, avatar_url')
@@ -98,9 +69,9 @@ const Conversation = () => {
 
   const handleSend = async () => {
     if (!newMessage.trim()) return;
+
     await sendMessage(newMessage);
     setNewMessage("");
-    setReplyTo(null);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -114,87 +85,6 @@ const Conversation = () => {
     const date = new Date(dateString);
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   };
-
-  // Long press handlers
-  const handleTouchStart = useCallback((msg: Message, e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    longPressTimer.current = setTimeout(() => {
-      setMenu({ message: msg, x: touch.clientX, y: touch.clientY });
-    }, 500);
-  }, []);
-
-  const handleTouchEnd = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  }, []);
-
-  const handleContextMenu = useCallback((msg: Message, e: React.MouseEvent) => {
-    e.preventDefault();
-    setMenu({ message: msg, x: e.clientX, y: e.clientY });
-  }, []);
-
-  // Actions
-  const handleCopy = () => {
-    if (!menu.message) return;
-    navigator.clipboard.writeText(menu.message.content);
-    toast({ description: "Copied to clipboard" });
-    setMenu({ message: null, x: 0, y: 0 });
-  };
-
-  const handleReply = () => {
-    if (!menu.message) return;
-    setReplyTo(menu.message);
-    setMenu({ message: null, x: 0, y: 0 });
-  };
-
-  const handleEditStart = () => {
-    if (!menu.message) return;
-    setEditingId(menu.message.id);
-    setEditText(menu.message.content);
-    setMenu({ message: null, x: 0, y: 0 });
-  };
-
-  const handleEditSave = async () => {
-    if (!editingId || !editText.trim()) return;
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .update({ content: editText.trim() })
-        .eq('id', editingId)
-        .eq('sender_id', user!.id);
-      if (error) throw error;
-      // Update local state via re-fetch will happen via realtime, but let's optimistically update
-      setEditingId(null);
-      setEditText("");
-    } catch {
-      toast({ title: "Error", description: "Failed to edit message", variant: "destructive" });
-    }
-  };
-
-  const handleUnsend = async () => {
-    if (!menu.message) return;
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .delete()
-        .eq('id', menu.message.id)
-        .eq('sender_id', user!.id);
-      if (error) throw error;
-      toast({ description: "Message unsent" });
-    } catch {
-      toast({ title: "Error", description: "Failed to unsend message", variant: "destructive" });
-    }
-    setMenu({ message: null, x: 0, y: 0 });
-  };
-
-  const canEdit = (msg: Message) => {
-    if (msg.sender_id !== user?.id) return false;
-    return Date.now() - new Date(msg.created_at).getTime() < EDIT_TIME_LIMIT_MS;
-  };
-
-  const canUnsend = (msg: Message) => msg.sender_id === user?.id;
 
   if (loading) {
     return (
@@ -246,50 +136,20 @@ const Conversation = () => {
             const isOwn = message.sender_id === user?.id;
             const postMatch = message.content.match(/\/post\/([a-f0-9-]{36})$/);
             const isPostShare = postMatch && message.content.trim().match(/^https?:\/\/.+\/post\/[a-f0-9-]{36}$/);
-            const isEditing = editingId === message.id;
 
             return (
               <div
                 key={message.id}
                 className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-                onTouchStart={(e) => handleTouchStart(message, e)}
-                onTouchEnd={handleTouchEnd}
-                onTouchMove={handleTouchEnd}
-                onContextMenu={(e) => handleContextMenu(message, e)}
               >
                 {isPostShare && postMatch ? (
-                  <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} gap-0.5`}>
+                  <div className="flex flex-col items-end gap-1">
                     <SharedPostCard postId={postMatch[1]} isOwn={isOwn} />
-                    <p className="text-[10px] px-1 text-muted-foreground">
+                    <p className={`text-xs px-1 ${
+                      isOwn ? 'text-muted-foreground' : 'text-muted-foreground'
+                    }`}>
                       {formatTime(message.created_at)}
                     </p>
-                  </div>
-                ) : isEditing ? (
-                  <div className="max-w-[70%] flex flex-col gap-1">
-                    <Input
-                      value={editText}
-                      onChange={(e) => setEditText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleEditSave();
-                        if (e.key === 'Escape') { setEditingId(null); setEditText(""); }
-                      }}
-                      autoFocus
-                      className="text-sm"
-                    />
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        onClick={() => { setEditingId(null); setEditText(""); }}
-                        className="text-[10px] text-muted-foreground"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleEditSave}
-                        className="text-[10px] text-primary font-semibold"
-                      >
-                        Save
-                      </button>
-                    </div>
                   </div>
                 ) : (
                   <div
@@ -300,8 +160,8 @@ const Conversation = () => {
                     }`}
                   >
                     <p className="text-sm">{message.content}</p>
-                    <p className={`text-[10px] mt-0.5 ${
-                      isOwn ? 'text-primary-foreground/60' : 'text-muted-foreground'
+                    <p className={`text-xs mt-1 ${
+                      isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
                     }`}>
                       {formatTime(message.created_at)}
                     </p>
@@ -313,57 +173,6 @@ const Conversation = () => {
           <div ref={messagesEndRef} />
         </div>
       </main>
-
-      {/* Context Menu Overlay */}
-      {menu.message && (
-        <div
-          ref={menuRef}
-          className="fixed z-50 bg-popover border border-border rounded-xl shadow-lg py-1.5 min-w-[160px] animate-in fade-in zoom-in-95"
-          style={{
-            left: Math.min(menu.x, window.innerWidth - 180),
-            top: Math.min(menu.y - 10, window.innerHeight - 200),
-          }}
-        >
-          <button
-            onClick={handleReply}
-            className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors"
-          >
-            <Reply className="h-4 w-4" /> Reply
-          </button>
-          <button
-            onClick={handleCopy}
-            className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors"
-          >
-            <Copy className="h-4 w-4" /> Copy
-          </button>
-          {canEdit(menu.message) && (
-            <button
-              onClick={handleEditStart}
-              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-foreground hover:bg-accent transition-colors"
-            >
-              <Pencil className="h-4 w-4" /> Edit
-            </button>
-          )}
-          {canUnsend(menu.message) && (
-            <button
-              onClick={handleUnsend}
-              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-            >
-              <Trash2 className="h-4 w-4" /> Unsend
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Reply banner */}
-      {replyTo && (
-        <div className="bg-muted/50 border-t border-border px-4 py-2 flex items-center justify-between">
-          <div className="text-xs text-muted-foreground truncate flex-1">
-            Replying to: <span className="text-foreground">{replyTo.content}</span>
-          </div>
-          <button onClick={() => setReplyTo(null)} className="text-xs text-muted-foreground ml-2">✕</button>
-        </div>
-      )}
 
       {/* Input */}
       <div className="sticky bottom-0 bg-background border-t border-border">

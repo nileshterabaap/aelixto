@@ -2,94 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed, clearScriptCache } from '@/lib/ScriptLoader';
 import DOMPurify from 'dompurify';
 
-/** Decode HTML entities (&#064; → @, &#039; → ', etc.) using DOMParser */
-const decodeHtmlEntities = (html: string): string => {
-  try {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    return doc.body.textContent || html;
-  } catch {
-    return html;
-  }
-};
-
-const fullyDecodeHtmlEntities = (value: string): string => {
-  let decoded = value;
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const next = decodeHtmlEntities(decoded);
-    if (next === decoded) break;
-    decoded = next;
-  }
-
-  return decoded;
-};
-
-const isFacebookVideoUrl = (value: string): boolean => {
-  const normalized = fullyDecodeHtmlEntities(value).toLowerCase();
-  return (
-    normalized.includes('/reel/') ||
-    normalized.includes('/videos/') ||
-    normalized.includes('/watch/') ||
-    normalized.includes('fb.watch')
-  );
-};
-
-const setStyleDeclaration = (style: string, property: string, value: string): string => {
-  const withoutProperty = style.replace(new RegExp(`${property}\\s*:\\s*[^;]+;?`, 'gi'), '').trim();
-  const normalizedBase = withoutProperty
-    ? `${withoutProperty}${withoutProperty.endsWith(';') ? '' : ';'}`
-    : '';
-
-  return `${normalizedBase}${property}:${value};`;
-};
-
-const normalizeFacebookIframeEmbed = (html: string): string => {
-  try {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const iframe = doc.querySelector('iframe[src*="facebook.com/plugins/"]');
-    if (!iframe) return html;
-
-    const iframeSrc = fullyDecodeHtmlEntities(iframe.getAttribute('src') || '');
-    const pluginPath = iframeSrc.toLowerCase();
-
-    let targetUrl = iframeSrc;
-    try {
-      const iframeUrl = new URL(iframeSrc);
-      targetUrl = fullyDecodeHtmlEntities(iframeUrl.searchParams.get('href') || iframeSrc);
-    } catch {
-      targetUrl = iframeSrc;
-    }
-
-    const aspectRatio =
-      pluginPath.includes('/video.php') || isFacebookVideoUrl(targetUrl) ? '9/16' : '4/5';
-    const baseStyle = iframe.getAttribute('style') || 'border:none;width:100%;overflow:hidden;';
-    iframe.setAttribute('style', setStyleDeclaration(baseStyle, 'aspect-ratio', aspectRatio));
-
-    return doc.body.innerHTML;
-  } catch {
-    return html;
-  }
-};
-
-/**
- * Decode HTML entities inside blockquote text nodes so raw codes like &#064;
- * don't flash before the Threads SDK replaces them with an iframe.
- * Only touches text content — leaves HTML structure/tags intact.
- */
-const decodeBlockquoteEntities = (html: string): string => {
-  try {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const walker = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
-    let node: Text | null;
-    while ((node = walker.nextNode() as Text | null)) {
-      node.textContent = fullyDecodeHtmlEntities(node.textContent ?? '');
-    }
-    return doc.body.innerHTML;
-  } catch {
-    return html;
-  }
-};
-
 interface RawEmbedRendererProps {
   embedHtml: string;
   onError?: () => void;
@@ -153,7 +65,7 @@ const isInstagramEmbed = (html: string): boolean => {
 };
 
 // Detect platform for SDK processing purposes
-const detectPlatform = (html: string): 'instagram' | 'facebook' | 'threads' | 'tiktok' | 'unknown' => {
+const detectPlatform = (html: string): 'instagram' | 'facebook' | 'facebook-iframe' | 'threads' | 'tiktok' | 'unknown' => {
   // Instagram iframes don't need SDK processing
   if (html.includes('instagram.com') && html.includes('<iframe')) {
     return 'unknown';
@@ -161,7 +73,10 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'threads' | 't
   if (html.includes('instagram.com') || html.includes('instagram-media')) {
     return 'instagram';
   }
-  // Facebook — SDK handles both blockquotes and fb-post/fb-video divs
+  // Facebook iframes — need error monitoring but not SDK processing
+  if (html.includes('facebook.com/plugins/') && html.includes('<iframe')) {
+    return 'facebook-iframe';
+  }
   if (html.includes('facebook.com') || html.includes('fb-post') || html.includes('fb-video')) {
     return 'facebook';
   }
@@ -192,7 +107,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   if (platform === 'facebook') {
     sanitizedHtml = transformFacebookEmbed(sanitizedHtml);
   }
-
 
   // Extract URL from embed HTML for double-tap redirection
   const getEmbedUrl = () => {
@@ -333,6 +247,27 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             checkFacebookError(3000);
             checkFacebookError(6000);
           }
+      } else if (platform === 'facebook-iframe') {
+          // Monitor Facebook iframe for load failures
+          const checkIframe = (timeout: number) => {
+            setTimeout(() => {
+              if (!containerRef.current) return;
+              const iframe = containerRef.current.querySelector('iframe');
+              if (!iframe) {
+                setEmbedFailed(true);
+                onError?.();
+                return;
+              }
+              // Check if iframe has reasonable dimensions (not collapsed)
+              const rect = iframe.getBoundingClientRect();
+              if (rect.height < 50) {
+                setEmbedFailed(true);
+                onError?.();
+              }
+            }, timeout);
+          };
+          checkIframe(5000);
+          checkIframe(10000);
       } else if (platform === 'threads') {
           await loadThreadsEmbed();
           
@@ -411,10 +346,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   // Threads embeds: tighter container, hide fallback link only when iframe loads
   // Height-contained wrapper clips extra vertical space injected by Threads SDK
   if (platform === 'threads') {
-    // Decode HTML entities in blockquote text so raw codes like &#064; don't
-    // flash before the Threads SDK replaces the blockquote with an iframe.
-    const decodedThreadsHtml = decodeBlockquoteEntities(sanitizedHtml);
-
     return (
       <div
         style={{ width: '100%', maxHeight: 520, overflow: 'hidden', position: 'relative' }}
@@ -423,7 +354,7 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           ref={containerRef}
           className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&>iframe~*]:!hidden"
           style={{ overflow: 'hidden' }}
-          dangerouslySetInnerHTML={{ __html: decodedThreadsHtml }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
         />
       </div>
     );

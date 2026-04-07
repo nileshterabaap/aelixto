@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Heart, MessageCircle } from "lucide-react";
-import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
+import { Heart, MessageCircle, Share } from "lucide-react";
 
 interface PostPreview {
   id: string;
@@ -83,7 +82,7 @@ export const SharedPostCard = ({ postId, isOwn }: SharedPostCardProps) => {
     );
   }
 
-  const imageUrl = post.thumbnail_url || post.preview_image_url || deriveThumbnailFromUrl(post.media_url, post.platform) || null;
+  const imageUrl = post.thumbnail_url || post.preview_image_url || post.media_url;
   const caption = post.title || post.content;
 
   return (
@@ -115,7 +114,7 @@ export const SharedPostCard = ({ postId, isOwn }: SharedPostCardProps) => {
             </AvatarFallback>
           </Avatar>
           <span className="text-xs font-semibold truncate">
-            @{post.profile_username}
+            {post.profile_display_name || post.profile_username}
           </span>
         </div>
 
