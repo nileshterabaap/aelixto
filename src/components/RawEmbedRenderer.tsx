@@ -193,9 +193,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     sanitizedHtml = transformFacebookEmbed(sanitizedHtml);
   }
 
-  if (platform === 'facebook-iframe') {
-    sanitizedHtml = normalizeFacebookIframeEmbed(sanitizedHtml);
-  }
 
   // Extract URL from embed HTML for double-tap redirection
   const getEmbedUrl = () => {
