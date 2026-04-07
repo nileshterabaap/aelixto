@@ -19,7 +19,7 @@ export const ImageViewTracker = ({
   viewDuration = 2000 
 }: ImageViewTrackerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const [hasTracked, setHasTracked] = useState(false);
   const trackImageView = useImageViewTracking();
 

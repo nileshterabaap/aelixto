@@ -3,7 +3,6 @@ import { EmbedSkeleton } from '@/components/EmbedSkeleton';
 
 const MIN_SKELETON_MS = 150;
 const IFRAME_LOAD_TIMEOUT = 3000; // Reduced from 12s — cross-origin iframes often never fire load
-const readyCache = new Set<string>();
 
 /**
  * Shows a platform-aware skeleton while embed content loads,
@@ -19,30 +18,23 @@ const readyCache = new Set<string>();
 export const SkeletonGate = ({
   platform,
   children,
-  cacheKey,
 }: {
   platform?: string;
   children: React.ReactNode;
-  cacheKey?: string;
 }) => {
-  const cachedReady = cacheKey ? readyCache.has(cacheKey) : false;
-  const [ready, setReady] = useState(cachedReady);
-  const [minElapsed, setMinElapsed] = useState(cachedReady);
+  const [ready, setReady] = useState(false);
+  const [minElapsed, setMinElapsed] = useState(false);
   const mountTime = useRef(Date.now());
   const containerRef = useRef<HTMLDivElement>(null);
   const handledIframes = useRef(new WeakSet<HTMLIFrameElement>());
 
   useEffect(() => {
-    if (cachedReady) return;
     const remaining = MIN_SKELETON_MS - (Date.now() - mountTime.current);
     const timer = setTimeout(() => setMinElapsed(true), Math.max(0, remaining));
     return () => clearTimeout(timer);
-  }, [cachedReady]);
+  }, []);
 
-  const markReady = useCallback(() => {
-    setReady(true);
-    if (cacheKey) readyCache.add(cacheKey);
-  }, [cacheKey]);
+  const markReady = useCallback(() => setReady(true), []);
 
   // Attach load handler + per-iframe safety timeout
   const attachIframeHandlers = useCallback((iframe: HTMLIFrameElement) => {
@@ -57,7 +49,6 @@ export const SkeletonGate = ({
   }, [markReady]);
 
   useEffect(() => {
-    if (cachedReady) return;
     const el = containerRef.current;
     if (!el) return;
 
@@ -94,7 +85,7 @@ export const SkeletonGate = ({
       observer.disconnect();
       clearTimeout(fallback);
     };
-  }, [attachIframeHandlers, markReady, cachedReady]);
+  }, [attachIframeHandlers, markReady]);
 
   const showContent = ready && minElapsed;
 

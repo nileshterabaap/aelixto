@@ -80,6 +80,7 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
 
         console.log('[ArticleEmbed] Unfurling URL:', cleanedUrl);
 
+        // Add timestamp to bypass cache
         const { data: result, error: fetchError } = await supabase.functions.invoke(
           'unfurl-article',
           {
@@ -89,59 +90,15 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
 
         if (fetchError) {
           console.error('[ArticleEmbed] Error:', fetchError);
-        }
-
-        let unfurledData = result as UnfurlResult | null;
-
-        // If unfurl failed or returned a poor title (just the domain), enhance with OG data
-        const titleLooksLikeDomain = unfurledData?.meta?.title && (
-          unfurledData.meta.title === unfurledData.site?.domain ||
-          unfurledData.meta.title.length < 5 ||
-          !unfurledData.meta.title.trim()
-        );
-
-        if (!unfurledData || fetchError || titleLooksLikeDomain) {
-          console.log('[ArticleEmbed] Trying fetch-og as fallback');
-          try {
-            const { data: ogData } = await supabase.functions.invoke('fetch-og', {
-              body: { url: cleanedUrl },
-            });
-
-            if (ogData) {
-              const ogTitle = ogData.meta?.title || ogData.title;
-              const ogImage = ogData.meta?.image || ogData.image;
-              const ogDescription = ogData.meta?.description || ogData.description;
-              
-              if (!unfurledData) {
-                let domain = cleanedUrl;
-                try { domain = new URL(cleanedUrl).hostname; } catch {}
-                unfurledData = {
-                  kind: 'generic-article',
-                  resolvedUrl: cleanedUrl,
-                  site: { name: domain.replace('www.', ''), domain, favicon: '' },
-                  meta: { title: ogTitle || domain, description: ogDescription || '', image: ogImage || null, publishedTime: null },
-                  content: { html: '' },
-                };
-              } else {
-                // Enhance existing data
-                if (titleLooksLikeDomain && ogTitle) unfurledData.meta.title = ogTitle;
-                if (!unfurledData.meta.image && ogImage) unfurledData.meta.image = ogImage;
-                if (!unfurledData.meta.description && ogDescription) unfurledData.meta.description = ogDescription;
-              }
-            }
-          } catch (ogErr) {
-            console.warn('[ArticleEmbed] OG fallback also failed:', ogErr);
-          }
-        }
-
-        if (!unfurledData) {
           setError('Failed to load article');
           return;
         }
 
-        console.log('[ArticleEmbed] Result:', unfurledData);
+        console.log('[ArticleEmbed] Result:', result);
+        const unfurledData = result as UnfurlResult;
         setData(unfurledData);
         
+        // Pass favicon back to parent if it's a blog/article
         if (unfurledData?.site?.favicon && onFaviconLoaded) {
           onFaviconLoaded(unfurledData.site.favicon);
         }

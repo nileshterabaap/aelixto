@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, Loader2 } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,11 +9,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
-
+import { useScrollVelocity } from "@/hooks/useScrollVelocity";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
-import { SaveToCollectionSheet } from "@/components/saved/SaveToCollectionSheet";
 import { CollapsibleCaption } from "@/components/CollapsibleCaption";
 import { UsernameLink } from "@/components/UsernameLink";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
@@ -37,7 +36,6 @@ interface HydratedFeedPostProps {
   userId?: string;
   isActive?: boolean; // Controlled by parent - whether this post is near viewport
   startHydrated?: boolean; // Skip IntersectionObserver, hydrate immediately
-  onLoaded?: () => void; // Fires when embed is fully loaded and visible
 }
 
 const formatTimestamp = (date: Date) => {
@@ -85,82 +83,68 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
-export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false, onLoaded }: HydratedFeedPostProps) => {
+export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated);
-  const [embedReady, setEmbedReady] = useState(false);
-  const [showPost, setShowPost] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
   const [likeAnimating, setLikeAnimating] = useState(false);
   const [repostAnimating, setRepostAnimating] = useState(false);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
+  const { isScrollingFast, velocity } = useScrollVelocity();
+  const hydrationResumeTimer = useRef<number | null>(null);
 
+  // Track if embed is within viewport proximity (conservative 400px)
+  // Default to true so posts hydrate immediately on mount — IO corrects for off-screen posts
   const [isNearViewport, setIsNearViewport] = useState(true);
 
   useEffect(() => {
     if (startHydrated) return;
     const el = embedRef.current;
     if (!el) return;
+
     const observer = new IntersectionObserver(
-      ([entry]) => { setIsNearViewport(entry.isIntersecting); },
-      { rootMargin: '3000px 0px', threshold: 0 }
+      ([entry]) => {
+        setIsNearViewport(entry.isIntersecting);
+      },
+      { rootMargin: '2000px', threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, [startHydrated]);
 
+  // Gate hydration: hydrate when near viewport, suppress only during active fast scrolling.
+  // On idle / initial load, hydrate immediately (no debounce needed).
   useEffect(() => {
     if (isHydrated || !isNearViewport) return;
-    setIsHydrated(true);
-  }, [isNearViewport, isHydrated]);
 
-  // Detect when embed content is ready
-  useEffect(() => {
-    if (!isHydrated || embedReady) return;
-    const el = embedRef.current;
-    if (!el) return;
-    const markReady = () => setEmbedReady(true);
-    const handleIframes = () => {
-      const iframes = el.querySelectorAll('iframe');
-      if (iframes.length > 0) {
-        iframes.forEach((iframe) => {
-          iframe.addEventListener('load', markReady, { once: true });
-          iframe.addEventListener('error', markReady, { once: true });
-        });
-        setTimeout(markReady, 3000);
-        return true;
+    // Only suppress during *active* fast scrolling
+    if (isScrollingFast) {
+      // Clear any pending hydration timer
+      if (hydrationResumeTimer.current) {
+        clearTimeout(hydrationResumeTimer.current);
+        hydrationResumeTimer.current = null;
       }
-      return false;
-    };
-    if (handleIframes()) return;
-    const checkContent = () => {
-      if (el.querySelector('img, video, [class*="card"], [class*="preview"]')) {
-        markReady();
-        return true;
-      }
-      return handleIframes();
-    };
-    if (checkContent()) return;
-    const observer = new MutationObserver(() => { checkContent(); });
-    observer.observe(el, { childList: true, subtree: true });
-    const fallback = setTimeout(markReady, 4000);
-    return () => { observer.disconnect(); clearTimeout(fallback); };
-  }, [isHydrated, embedReady]);
+      return;
+    }
 
-  // When embed ready, trigger fade-in on next frame and notify parent
-  useEffect(() => {
-    if (!embedReady) return;
-    requestAnimationFrame(() => {
-      setShowPost(true);
-      setIsLoaded(true);
-      onLoaded?.();
-    });
-  }, [embedReady, onLoaded]);
+    // If user is idle (direction === 'idle' or velocity === 0), hydrate immediately
+    if (velocity === 0) {
+      setIsHydrated(true);
+      return;
+    }
+
+    // User is scrolling slowly — hydrate quickly
+    hydrationResumeTimer.current = window.setTimeout(() => {
+      setIsHydrated(true);
+    }, 60);
+
+    return () => {
+      if (hydrationResumeTimer.current) {
+        clearTimeout(hydrationResumeTimer.current);
+      }
+    };
+  }, [isNearViewport, isScrollingFast, isHydrated, velocity]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
-
   
   // Normalize field access
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
@@ -216,34 +200,11 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
   // Resolve the embed type for rendering
   const r = resolveRenderer(post);
-
-  // Posts with no embed are immediately loaded
-  const noEmbed = r.kind === 'none';
-  const cardVisible = noEmbed || isLoaded;
   
   // Derive thumbnail: prefer stored, then derive from URL
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
-  // Fire onLoaded immediately for no-embed posts
-  useEffect(() => {
-    if (noEmbed && !isLoaded) {
-      setIsLoaded(true);
-      setShowPost(true);
-      onLoaded?.();
-    }
-  }, [noEmbed, isLoaded, onLoaded]);
-
   return (
-    <div
-      style={{
-        visibility: cardVisible ? 'visible' : 'hidden',
-        height: cardVisible ? 'auto' : 0,
-        overflow: cardVisible ? 'visible' : 'hidden',
-        margin: cardVisible ? undefined : 0,
-        opacity: cardVisible ? 1 : 0,
-        transition: 'opacity 0.3s ease',
-      }}
-    >
     <Card className="overflow-hidden border border-border rounded-xl">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
@@ -310,39 +271,16 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
 
-      {/* FLUSH CONTENT: Edge-to-edge embed with buffering spinner */}
-      {r.kind !== 'none' ? (
-        <div className="relative">
-          {/* Buffering spinner — shown until embed is ready */}
-          {!showPost && isHydrated && (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          )}
-
-          {/* Post content — hidden until ready, then fades in */}
-          <div
-            ref={embedRef}
-            style={{
-              visibility: showPost ? 'visible' : 'hidden',
-              height: showPost ? 'auto' : 0,
-              overflow: showPost ? 'visible' : 'hidden',
-              opacity: showPost ? 1 : 0,
-              transition: 'opacity 0.3s ease',
-            }}
-          >
-            <HydratedEmbed
-              post={post}
-              renderer={r}
-              thumbnailUrl={effectiveThumbnail}
-              isHydrated={isHydrated}
-              onPlayClick={handlePlayClick}
-            />
-          </div>
-        </div>
-      ) : (
-        <div ref={embedRef} />
-      )}
+      {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed */}
+      <div ref={embedRef} style={{ contain: 'layout paint' }}>
+        <HydratedEmbed
+          post={post}
+          renderer={r}
+          thumbnailUrl={effectiveThumbnail}
+          isHydrated={isHydrated}
+          onPlayClick={handlePlayClick}
+        />
+      </div>
 
       {/* Title for video/image posts */}
       {post.title && (r.kind === 'image' || r.kind === 'video') && (
@@ -395,13 +333,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </button>
         <button
           onClick={() => toggleSave()}
-          onPointerDown={() => {
-            longPressTimer.current = setTimeout(() => {
-              if (canUseActions) setCollectionSheetOpen(true);
-            }, 500);
-          }}
-          onPointerUp={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
-          onPointerLeave={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
           className="action-btn p-1.5 active:scale-90 transition-transform"
         >
           <Bookmark className={`h-6 w-6 stroke-[1.5] ${isSaved ? 'fill-current' : 'fill-none'}`} />
@@ -416,17 +347,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           postAuthorId={(post as any).user_id}
         />
       )}
-
-      {post.isRealPost && userId && (
-        <SaveToCollectionSheet
-          open={collectionSheetOpen}
-          onOpenChange={setCollectionSheetOpen}
-          postId={post.id}
-          userId={userId}
-        />
-      )}
     </Card>
-    </div>
   );
 };
 

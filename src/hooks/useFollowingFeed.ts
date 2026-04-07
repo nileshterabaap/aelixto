@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect } from 'react';
 
 interface FeedPost {
   id: string;
@@ -103,10 +103,7 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
   });
 
   // Flatten all pages into single array - stable reference
-  const items = useMemo(
-    () => data?.pages.flatMap((page) => page.posts) ?? [],
-    [data?.pages]
-  );
+  const items = data?.pages.flatMap((page) => page.posts) ?? [];
 
   // Aggressively preload ALL thumbnails once on data arrival
   useEffect(() => {

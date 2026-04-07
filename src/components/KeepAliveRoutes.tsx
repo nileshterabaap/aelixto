@@ -1,7 +1,7 @@
 import { ReactNode, useMemo, useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useLocation, matchPath } from "react-router-dom";
 import { KeepAlive } from "./KeepAlive";
-import { getScrollPosition, setScrollPosition } from "@/hooks/useScrollRestoration";
+import { setScrollPosition } from "@/hooks/useScrollRestoration";
 
 interface KeepAliveRoute {
   /** Route pattern (supports dynamic segments like /u/:username) */
@@ -91,26 +91,25 @@ export const KeepAliveRoutes = ({ keepAliveRoutes, children }: KeepAliveRoutesPr
     
     // Save scroll position when LEAVING a keep-alive route
     if (wasKeepAlive) {
+      // IMPORTANT: During navigation, browsers (and/or route transitions) can briefly
+      // report scrollY=0. Never overwrite a good saved value with 0.
       const currentY = window.scrollY;
       const existing = keepAliveScrollPositions.get(previousPath.current) ?? 0;
-      const sharedSnapshot = getScrollPosition(previousPath.current) ?? 0;
-      const candidate = sharedSnapshot > 0 ? sharedSnapshot : currentY;
-      const next = candidate === 0 && existing > 0 ? existing : candidate;
-
+      const next = currentY === 0 && existing > 0 ? existing : currentY;
       keepAliveScrollPositions.set(previousPath.current, next);
       setScrollPosition(previousPath.current, next);
     }
     
     // Restore scroll position when RETURNING to a keep-alive route
     if (isKeepAliveRoute) {
-      const savedPosition = keepAliveScrollPositions.get(currentPath) ?? getScrollPosition(currentPath);
+      const savedPosition = keepAliveScrollPositions.get(currentPath);
       
       if (savedPosition !== undefined && savedPosition > 0) {
         isRestoringScroll.current = true;
         
         // Restore function with validation
         const doRestore = () => {
-          const target = keepAliveScrollPositions.get(currentPath) ?? getScrollPosition(currentPath) ?? savedPosition;
+          const target = keepAliveScrollPositions.get(currentPath) ?? savedPosition;
           if (target > 0) {
             window.scrollTo(0, target);
           }
