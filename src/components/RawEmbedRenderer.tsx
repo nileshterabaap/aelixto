@@ -333,27 +333,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
             checkFacebookError(3000);
             checkFacebookError(6000);
           }
-      } else if (platform === 'facebook-iframe') {
-          // Monitor Facebook iframe for load failures
-          const checkIframe = (timeout: number) => {
-            setTimeout(() => {
-              if (!containerRef.current) return;
-              const iframe = containerRef.current.querySelector('iframe');
-              if (!iframe) {
-                setEmbedFailed(true);
-                onError?.();
-                return;
-              }
-              // Check if iframe has reasonable dimensions (not collapsed)
-              const rect = iframe.getBoundingClientRect();
-              if (rect.height < 50) {
-                setEmbedFailed(true);
-                onError?.();
-              }
-            }, timeout);
-          };
-          checkIframe(5000);
-          checkIframe(10000);
       } else if (platform === 'threads') {
           await loadThreadsEmbed();
           
