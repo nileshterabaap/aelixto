@@ -182,13 +182,10 @@ serve(async (req) => {
         canonicalFacebookUrl.includes('/watch/') ||
         canonicalFacebookUrl.includes('fb.watch');
 
-      const pluginEndpoint = isVideo ? 'video.php' : 'post.php';
-      const encodedUrl = encodeURIComponent(canonicalFacebookUrl);
-      const pluginQuery = isVideo
-        ? `href=${encodedUrl}&width=500`
-        : `href=${encodedUrl}&show_text=true&width=500`;
-
-      const fallbackIframe = `<iframe src="https://www.facebook.com/plugins/${pluginEndpoint}?${pluginQuery}" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+      // Use SDK-based divs instead of plugin iframes — Facebook blocks plugin
+      // iframes via X-Frame-Options on third-party domains.
+      const sdkClass = isVideo ? 'fb-video' : 'fb-post';
+      const fallbackHtml = `<div class="${sdkClass}" data-href="${canonicalFacebookUrl}" data-width="auto" data-show-text="true"></div>`;
 
       const metaToken = Deno.env.get('META_APP_TOKEN');
       if (metaToken && !unresolvedShare) {
