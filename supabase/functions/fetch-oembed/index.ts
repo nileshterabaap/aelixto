@@ -174,7 +174,8 @@ serve(async (req) => {
       }
 
       const canonicalFacebookUrl = stripFacebookTrackingParams(resolvedFacebookUrl);
-      const unresolvedShare = canonicalFacebookUrl.includes('/share/');
+      // Even if /share/ didn't expand, still try the plugin iframe — Facebook handles redirects
+      const unresolvedShare = canonicalFacebookUrl.includes('/share/') && resolvedFacebookUrl === url;
       const isVideo =
         canonicalFacebookUrl.includes('/reel/') ||
         canonicalFacebookUrl.includes('/videos/') ||
