@@ -52,7 +52,7 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
           return;
         }
 
-        await loadTwitterScript();
+        await loadTwitterEmbed();
 
         if (containerRef.current && window.twttr) {
           containerRef.current.innerHTML = "";
