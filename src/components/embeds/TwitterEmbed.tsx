@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
+import { loadTwitterEmbed } from "@/lib/ScriptLoader";
 
 interface TwitterEmbedProps {
   url: string;
@@ -21,22 +22,6 @@ declare global {
     };
   }
 }
-
-const loadTwitterScript = () => {
-  return new Promise<void>((resolve, reject) => {
-    if (window.twttr) {
-      resolve();
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = "https://platform.twitter.com/widgets.js";
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Twitter script"));
-    document.body.appendChild(script);
-  });
-};
 
 const extractTweetId = (url: string): string | null => {
   const patterns = [
