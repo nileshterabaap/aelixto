@@ -38,6 +38,15 @@ const unwrapFacebookLoginRedirect = (value: string): string => {
   let current = fullyDecodeHtmlEntities(value).trim();
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
+    const nextIndex = current.search(/[?&]next=/i);
+    if (nextIndex >= 0) {
+      const nextValue = current.slice(nextIndex).replace(/^[?&]next=/i, '').trim();
+      if (nextValue.startsWith('http://') || nextValue.startsWith('https://')) {
+        current = fullyDecodeHtmlEntities(nextValue);
+        continue;
+      }
+    }
+
     try {
       const parsed = new URL(current);
       const hostname = parsed.hostname.toLowerCase();
