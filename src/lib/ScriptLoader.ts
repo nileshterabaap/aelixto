@@ -108,6 +108,11 @@ export const loadThreadsEmbed = (): Promise<void> => {
   return loadScript(scriptUrl);
 };
 
+// TikTok embed script loader
+export const loadTikTokEmbed = (): Promise<void> => {
+  return loadScript('https://www.tiktok.com/embed.js');
+};
+
 // Clear a script from the internal cache (for retry logic)
 export const clearScriptCache = (src: string) => {
   loadedScripts.delete(src);

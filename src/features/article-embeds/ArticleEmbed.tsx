@@ -80,7 +80,6 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
 
         console.log('[ArticleEmbed] Unfurling URL:', cleanedUrl);
 
-        // Add timestamp to bypass cache
         const { data: result, error: fetchError } = await supabase.functions.invoke(
           'unfurl-article',
           {
@@ -90,15 +89,59 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
 
         if (fetchError) {
           console.error('[ArticleEmbed] Error:', fetchError);
+        }
+
+        let unfurledData = result as UnfurlResult | null;
+
+        // If unfurl failed or returned a poor title (just the domain), enhance with OG data
+        const titleLooksLikeDomain = unfurledData?.meta?.title && (
+          unfurledData.meta.title === unfurledData.site?.domain ||
+          unfurledData.meta.title.length < 5 ||
+          !unfurledData.meta.title.trim()
+        );
+
+        if (!unfurledData || fetchError || titleLooksLikeDomain) {
+          console.log('[ArticleEmbed] Trying fetch-og as fallback');
+          try {
+            const { data: ogData } = await supabase.functions.invoke('fetch-og', {
+              body: { url: cleanedUrl },
+            });
+
+            if (ogData) {
+              const ogTitle = ogData.meta?.title || ogData.title;
+              const ogImage = ogData.meta?.image || ogData.image;
+              const ogDescription = ogData.meta?.description || ogData.description;
+              
+              if (!unfurledData) {
+                let domain = cleanedUrl;
+                try { domain = new URL(cleanedUrl).hostname; } catch {}
+                unfurledData = {
+                  kind: 'generic-article',
+                  resolvedUrl: cleanedUrl,
+                  site: { name: domain.replace('www.', ''), domain, favicon: '' },
+                  meta: { title: ogTitle || domain, description: ogDescription || '', image: ogImage || null, publishedTime: null },
+                  content: { html: '' },
+                };
+              } else {
+                // Enhance existing data
+                if (titleLooksLikeDomain && ogTitle) unfurledData.meta.title = ogTitle;
+                if (!unfurledData.meta.image && ogImage) unfurledData.meta.image = ogImage;
+                if (!unfurledData.meta.description && ogDescription) unfurledData.meta.description = ogDescription;
+              }
+            }
+          } catch (ogErr) {
+            console.warn('[ArticleEmbed] OG fallback also failed:', ogErr);
+          }
+        }
+
+        if (!unfurledData) {
           setError('Failed to load article');
           return;
         }
 
-        console.log('[ArticleEmbed] Result:', result);
-        const unfurledData = result as UnfurlResult;
+        console.log('[ArticleEmbed] Result:', unfurledData);
         setData(unfurledData);
         
-        // Pass favicon back to parent if it's a blog/article
         if (unfurledData?.site?.favicon && onFaviconLoaded) {
           onFaviconLoaded(unfurledData.site.favicon);
         }
@@ -115,12 +158,14 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
 
   if (isLoading) {
     return (
-      <div className="rounded-2xl overflow-hidden border border-border">
-        <Skeleton className="h-48 w-full" />
-        <div className="p-4 space-y-3">
-          <Skeleton className="h-6 w-3/4" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-5/6" />
+      <div data-embed-status="loading">
+        <div className="rounded-2xl overflow-hidden border border-border">
+          <Skeleton className="h-48 w-full" />
+          <div className="p-4 space-y-3">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+          </div>
         </div>
       </div>
     );
@@ -136,14 +181,16 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
     }
     
     return (
-      <LinkPreviewCard
-        url={cleanedUrl}
-        title={data?.meta.title || fallbackDomain}
-        description=""
-        domain={fallbackDomain}
-        favicon={data?.site.favicon}
-        siteName={data?.site.name}
-      />
+      <div data-embed-status="ready">
+        <LinkPreviewCard
+          url={cleanedUrl}
+          title={data?.meta.title || fallbackDomain}
+          description=""
+          domain={fallbackDomain}
+          favicon={data?.site.favicon}
+          siteName={data?.site.name}
+        />
+      </div>
     );
   }
 
@@ -151,24 +198,34 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
   
   // Reddit posts - use official Reddit embed (no fallback card)
   if (rendererType === 'reddit' && data.kind === 'reddit-post') {
-    return <RedditPostEmbed url={data.resolvedUrl} data={data} />;
+    return (
+      <div data-embed-status="ready">
+        <RedditPostEmbed url={data.resolvedUrl} data={data} />
+      </div>
+    );
   }
 
   // Quora posts - link card only (Quora blocks embeds)
   if (rendererType === 'quora') {
     return (
-      <LinkPreviewCard
-        url={data.resolvedUrl}
-        title={data.meta.title || 'View on Quora'}
-        description={data.meta.description}
-        image={data.meta.image || undefined}
-        domain={data.site.domain}
-        favicon={data.site.favicon}
-        siteName={data.site.name}
-      />
+      <div data-embed-status="ready">
+        <LinkPreviewCard
+          url={data.resolvedUrl}
+          title={data.meta.title || 'View on Quora'}
+          description={data.meta.description}
+          image={data.meta.image || undefined}
+          domain={data.site.domain}
+          favicon={data.site.favicon}
+          siteName={data.site.name}
+        />
+      </div>
     );
   }
 
   // Everything else - rich article card
-  return <ArticleContentEmbed data={data} />;
+  return (
+    <div data-embed-status="ready">
+      <ArticleContentEmbed data={data} />
+    </div>
+  );
 };

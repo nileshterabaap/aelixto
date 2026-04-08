@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
@@ -10,7 +11,7 @@ import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
-import { useActivePostTracker } from "@/hooks/useActivePostTracker";
+
 import { useQueryClient } from "@tanstack/react-query";
 const Index = () => {
   const navigate = useNavigate();
@@ -103,7 +104,8 @@ const Index = () => {
       timestamp: new Date(post.created_at),
       saves: post.saves_count,
       likes_count: post.likes_count || 0,
-      comments_count: (post as any).comments_count || 0,
+      comments_count: post.comments_count || 0,
+      reposts_count: post.reposts_count || 0,
       isRealPost: true,
       isRepost: post.is_repost,
       repostedByUsername: post.reposted_by_username,
@@ -112,10 +114,6 @@ const Index = () => {
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
   
-  // Track which posts are near the viewport for smart hydration
-  const { registerPost, isActive } = useActivePostTracker(
-    useMemo(() => allPosts.map((p) => p.id), [allPosts])
-  );
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
@@ -207,21 +205,24 @@ const Index = () => {
                   key={post.id} 
                   ref={(el) => {
                     registerItem(post.id)(el);
-                    registerPost(post.id)(el);
                   }}
                   data-feed-item-id={post.id}
                 >
                   <FeedPost 
                     post={post} 
                     userId={user?.id} 
-                    isActive={isActive(post.id)}
-                    startHydrated={index < 5}
+                    startHydrated={index < 8}
                   />
                 </div>
               ))}
               {/* Sentinel for prefetching next page ahead of scroll */}
               {hasMore && !showDemoFeed && (
-                <div ref={prefetchSentinelRef} style={{ height: 1 }} />
+                <>
+                  <div ref={prefetchSentinelRef} style={{ height: 1 }} />
+                  <div className="flex justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                </>
               )}
             </div>
           )}

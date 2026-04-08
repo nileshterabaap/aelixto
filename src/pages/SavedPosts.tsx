@@ -3,16 +3,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
-import { HydratedFeedPost } from "@/components/HydratedFeedPost";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
+import { SavedThumbnailGrid } from "@/components/saved/SavedThumbnailGrid";
+import { CollectionGrid } from "@/components/saved/CollectionGrid";
+import { useCollections } from "@/hooks/useCollections";
+import { SavedSkeleton } from "@/components/saved/SavedSkeleton";
 
 export default function SavedPosts() {
   const { session, loading } = useSession();
   const navigate = useNavigate();
   const [createPostOpen, setCreatePostOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"all" | "collections">("all");
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -31,26 +35,10 @@ export default function SavedPosts() {
         .select(`
           post_id,
           posts (
-            id,
-            user_id,
-            content,
-            created_at,
-            likes_count,
-            saves_count,
-            comments_count,
-            reposts_count,
-            media_type,
-            media_url,
-            platform,
-            embed_html,
-            thumbnail_url,
-            title,
-            is_public,
-            profiles:user_id (
-              username,
-              display_name,
-              avatar_url
-            )
+            id, user_id, content, created_at, likes_count, saves_count,
+            comments_count, reposts_count, media_type, media_url,
+            platform, embed_html, thumbnail_url, title, is_public,
+            profiles:user_id (username, display_name, avatar_url)
           )
         `)
         .eq("user_id", session.user.id)
@@ -63,7 +51,6 @@ export default function SavedPosts() {
         .map((item: any) => {
           const post = item.posts;
           const profile = post.profiles;
-          
           return {
             id: post.id,
             user_id: post.user_id,
@@ -91,14 +78,27 @@ export default function SavedPosts() {
     enabled: !!session?.user?.id,
   });
 
+  const {
+    collections,
+    isLoading: collectionsLoading,
+    createCollection,
+    deleteCollection,
+    isCreating,
+  } = useCollections(session?.user?.id);
+
   const handleRefresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: ["saved-posts"] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["saved-posts"] }),
+      queryClient.invalidateQueries({ queryKey: ["collections"] }),
+    ]);
   }, [queryClient]);
 
   if (loading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
+      <div className="min-h-screen pb-20">
+        <Header onCreatePost={() => setCreatePostOpen(true)} />
+        <SavedSkeleton />
+        <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
       </div>
     );
   }
@@ -106,24 +106,45 @@ export default function SavedPosts() {
   return (
     <div className="min-h-screen pb-20">
       <Header onCreatePost={() => setCreatePostOpen(true)} />
-      
+
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="container max-w-2xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold mb-6">Saved Posts</h1>
-          
-          {savedPosts.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-muted-foreground mb-2">No saved posts yet</p>
-              <p className="text-sm text-muted-foreground">
-                Save posts to see them here
-              </p>
-            </div>
+          <h1 className="text-2xl font-bold mb-4">Saved</h1>
+
+          {/* Tabs */}
+          <div className="flex gap-1 mb-6 bg-muted rounded-xl p-1">
+            <button
+              onClick={() => setActiveTab("all")}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === "all"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground"
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setActiveTab("collections")}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === "collections"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground"
+              }`}
+            >
+              Collections
+            </button>
+          </div>
+
+          {activeTab === "all" ? (
+            <SavedThumbnailGrid posts={savedPosts} userId={session?.user?.id} />
           ) : (
-            <div className="space-y-4">
-              {savedPosts.map((post) => (
-                <HydratedFeedPost key={post.id} post={{...post, likes_count: post.likes || 0, comments_count: post.comments || 0} as any} userId={session?.user?.id} />
-              ))}
-            </div>
+            <CollectionGrid
+              collections={collections}
+              userId={session?.user?.id}
+              onCreateCollection={createCollection}
+              onDeleteCollection={deleteCollection}
+              isCreating={isCreating}
+            />
           )}
         </main>
       </PullToRefresh>

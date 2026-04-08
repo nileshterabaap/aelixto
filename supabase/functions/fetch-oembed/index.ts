@@ -5,6 +5,35 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+/** Mirrors PLATFORM_REGISTRY from the frontend config */
+const PLATFORM_DOMAINS: Record<string, string[]> = {
+  instagram: ['instagram.com'],
+  threads: ['threads.net', 'threads.com'],
+  facebook: ['facebook.com', 'fb.watch', 'fb.me'],
+  youtube: ['youtube.com', 'youtu.be'],
+  twitter: ['x.com', 'twitter.com'],
+  reddit: ['reddit.com', 'redd.it'],
+  linkedin: ['linkedin.com'],
+  pinterest: ['pinterest.com', 'pin.it'],
+  tiktok: ['tiktok.com'],
+  spotify: ['spotify.com'],
+  quora: ['quora.com'],
+};
+
+const ARTICLE_DOMAINS = [
+  'medium.com', 'substack.com', 'ghost.io', 'wordpress.com',
+  'hashnode.com', 'dev.to', 'mirror.xyz', 'blogger.com',
+];
+
+function classifyPlatform(url: string): string {
+  const lower = url.toLowerCase();
+  for (const [key, domains] of Object.entries(PLATFORM_DOMAINS)) {
+    if (domains.some(d => lower.includes(d))) return key;
+  }
+  if (ARTICLE_DOMAINS.some(d => lower.includes(d))) return 'article';
+  return 'external';
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -21,20 +50,18 @@ serve(async (req) => {
 
     console.log('[fetch-oembed] Processing:', url);
     let embedHtml: string | null = null;
-    let platform: string | null = null;
+    let platform: string | null = classifyPlatform(url);
 
     const urlLower = url.toLowerCase();
 
     // YouTube oEmbed → returns responsive iframe
-    if (urlLower.includes('youtube.com') || urlLower.includes('youtu.be')) {
-      platform = 'youtube';
+    if (platform === 'youtube') {
       try {
         const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json&maxwidth=560`;
         const res = await fetch(oembedUrl);
         if (res.ok) {
           const data = await res.json();
           if (data.html) {
-            // Make iframe responsive: remove fixed dimensions, add 100% width
             embedHtml = data.html
               .replace(/width="\d+"/, 'width="100%"')
               .replace(/height="\d+"/, 'height="100%"')
@@ -48,8 +75,7 @@ serve(async (req) => {
     }
 
     // Spotify oEmbed → returns iframe
-    if (urlLower.includes('spotify.com') || urlLower.includes('open.spotify.com')) {
-      platform = 'spotify';
+    if (platform === 'spotify') {
       try {
         const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`;
         const res = await fetch(oembedUrl);
@@ -65,9 +91,8 @@ serve(async (req) => {
       }
     }
 
-    // Twitter/X oEmbed → returns blockquote (needs widgets.js but HTML is pre-cached)
-    if (urlLower.includes('twitter.com') || urlLower.includes('x.com')) {
-      platform = 'twitter';
+    // Twitter/X oEmbed
+    if (platform === 'twitter') {
       try {
         const oembedUrl = `https://publish.twitter.com/oembed?url=${encodeURIComponent(url)}&omit_script=true`;
         const res = await fetch(oembedUrl);
@@ -83,18 +108,15 @@ serve(async (req) => {
       }
     }
 
-    // Instagram - build direct iframe embed (bypasses unreliable SDK)
-    if (urlLower.includes('instagram.com')) {
-      platform = 'instagram';
+    // Instagram - build direct iframe embed
+    if (platform === 'instagram') {
       try {
         const u = new URL(url);
-        // Clean the path - remove trailing slash, add /embed/
         let embedPath = u.pathname.replace(/\/$/, '') + '/embed/';
         const embedUrl = `https://www.instagram.com${embedPath}`;
         embedHtml = `<iframe src="${embedUrl}" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
         console.log('[fetch-oembed] Instagram iframe embed built');
       } catch (e) {
-        // Fallback: just append /embed/ to the cleaned URL
         const cleanUrl = url.split('?')[0].replace(/\/$/, '');
         embedHtml = `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
         console.log('[fetch-oembed] Instagram iframe embed built (fallback)');
@@ -102,8 +124,7 @@ serve(async (req) => {
     }
 
     // Pinterest oEmbed
-    if (urlLower.includes('pinterest.com') || urlLower.includes('pin.it')) {
-      platform = 'pinterest';
+    if (platform === 'pinterest') {
       try {
         const oembedUrl = `https://www.pinterest.com/oembed/?url=${encodeURIComponent(url)}&format=json`;
         const res = await fetch(oembedUrl);
@@ -119,10 +140,8 @@ serve(async (req) => {
       }
     }
 
-    // Facebook oEmbed (requires Meta token) + direct iframe fallback parity
-    if (urlLower.includes('facebook.com') || urlLower.includes('fb.watch') || urlLower.includes('fb.me')) {
-      platform = 'facebook';
-
+    // Facebook oEmbed + direct iframe fallback
+    if (platform === 'facebook') {
       const stripFacebookTrackingParams = (raw: string) => {
         try {
           const u = new URL(raw);
@@ -138,7 +157,6 @@ serve(async (req) => {
 
       let resolvedFacebookUrl = url;
 
-      // Share links (/share/r, /share/v, fb.watch, fb.me) must be expanded to canonical post/reel URLs.
       if (urlLower.includes('/share/') || urlLower.includes('fb.watch') || urlLower.includes('fb.me')) {
         try {
           const expanded = await fetch(url, {
@@ -156,20 +174,18 @@ serve(async (req) => {
       }
 
       const canonicalFacebookUrl = stripFacebookTrackingParams(resolvedFacebookUrl);
-      const unresolvedShare = canonicalFacebookUrl.includes('/share/');
+      // Even if /share/ didn't expand, still try the plugin iframe — Facebook handles redirects
+      const unresolvedShare = canonicalFacebookUrl.includes('/share/') && resolvedFacebookUrl === url;
       const isVideo =
         canonicalFacebookUrl.includes('/reel/') ||
         canonicalFacebookUrl.includes('/videos/') ||
         canonicalFacebookUrl.includes('/watch/') ||
         canonicalFacebookUrl.includes('fb.watch');
 
-      const pluginEndpoint = isVideo ? 'video.php' : 'post.php';
-      const encodedUrl = encodeURIComponent(canonicalFacebookUrl);
-      const pluginQuery = isVideo
-        ? `href=${encodedUrl}&width=500`
-        : `href=${encodedUrl}&show_text=true&width=500`;
-
-      const fallbackIframe = `<iframe src="https://www.facebook.com/plugins/${pluginEndpoint}?${pluginQuery}" style="border:none;width:100%;aspect-ratio:4/5;overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+      // Use SDK-based divs instead of plugin iframes — Facebook blocks plugin
+      // iframes via X-Frame-Options on third-party domains.
+      const sdkClass = isVideo ? 'fb-video' : 'fb-post';
+      const fallbackHtml = `<div class="${sdkClass}" data-href="${canonicalFacebookUrl}" data-width="auto" data-show-text="true"></div>`;
 
       const metaToken = Deno.env.get('META_APP_TOKEN');
       if (metaToken && !unresolvedShare) {
@@ -181,29 +197,29 @@ serve(async (req) => {
           if (res.ok) {
             const data = await res.json();
             if (data.html) {
+              // Accept both iframes and blockquotes from oEmbed —
+              // the RawEmbedRenderer SDK path handles both.
               embedHtml = data.html;
               console.log('[fetch-oembed] Facebook oEmbed success');
             }
           } else {
             const errorText = await res.text();
-            console.warn('[fetch-oembed] Facebook oEmbed non-200, using iframe fallback:', errorText);
+            console.warn('[fetch-oembed] Facebook oEmbed non-200, using SDK fallback:', errorText);
           }
         } catch (e) {
           console.error('[fetch-oembed] Facebook oEmbed failed:', e);
         }
       }
 
-      if (!embedHtml && !unresolvedShare) {
-        embedHtml = fallbackIframe;
-        console.log('[fetch-oembed] Facebook iframe fallback built');
+      if (!embedHtml) {
+        embedHtml = fallbackHtml;
+        console.log('[fetch-oembed] Facebook SDK fallback built');
       }
     }
 
-    // Reddit - build blockquote embed (uses widgets.js on client)
-    if (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) {
-      platform = 'reddit';
+    // Reddit oEmbed
+    if (platform === 'reddit') {
       try {
-        // Reddit supports oEmbed
         const oembedUrl = `https://www.reddit.com/oembed?url=${encodeURIComponent(url)}`;
         const res = await fetch(oembedUrl, {
           headers: { 'User-Agent': 'Aelixto/1.0' }
@@ -220,42 +236,51 @@ serve(async (req) => {
       }
     }
 
-    // TikTok oEmbed
-    if (urlLower.includes('tiktok.com')) {
-      platform = 'tiktok';
+    // TikTok direct iframe embed (fastest, no SDK needed)
+    if (platform === 'tiktok') {
       try {
-        const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
-        const res = await fetch(oembedUrl);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.html) {
-            embedHtml = data.html;
-            console.log('[fetch-oembed] TikTok oEmbed success');
+        const tiktokUrl = new URL(url);
+        const videoMatch = tiktokUrl.pathname.match(/\/@[^/]+\/video\/(\d+)/);
+        if (videoMatch) {
+          const videoId = videoMatch[1];
+          embedHtml = `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" style="border:none;width:100%;height:740px;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
+          console.log('[fetch-oembed] TikTok iframe embed built for video:', videoId);
+        } else {
+          // Fallback to oEmbed for non-standard URLs
+          const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+          const res = await fetch(oembedUrl);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.html) {
+              // Extract video ID from oEmbed response and build iframe
+              const idMatch = data.html?.match(/data-video-id="(\d+)"/);
+              if (idMatch) {
+                embedHtml = `<iframe src="https://www.tiktok.com/embed/v2/${idMatch[1]}" style="border:none;width:100%;height:740px;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
+              } else {
+                embedHtml = data.html;
+              }
+              console.log('[fetch-oembed] TikTok oEmbed fallback success');
+            }
           }
         }
       } catch (e) {
-        console.error('[fetch-oembed] TikTok oEmbed failed:', e);
+        console.error('[fetch-oembed] TikTok embed failed:', e);
       }
     }
 
-    // Blog/Article platforms - store OG metadata as a link preview card HTML
-    if (
-      !platform && (
-        urlLower.includes('medium.com') ||
-        urlLower.includes('substack.com') ||
-        urlLower.includes('wordpress.com') ||
-        urlLower.includes('blogger.com') ||
-        urlLower.includes('ghost.io') ||
-        urlLower.includes('quora.com') ||
-        urlLower.includes('blog')
-      )
-    ) {
-      platform = urlLower.includes('medium.com') ? 'medium'
-        : urlLower.includes('quora.com') ? 'quora'
-        : 'blog';
-      // Articles use the ArticleEmbed client component which calls unfurl-article.
-      // We don't pre-cache HTML for these, but we set the platform so it's recognized.
-      console.log(`[fetch-oembed] ${platform} detected, no oEmbed available - client-side rendering`);
+    // Threads / LinkedIn — no oEmbed available, platform already classified
+    if (platform === 'threads' || platform === 'linkedin') {
+      console.log(`[fetch-oembed] ${platform} detected — client-side rendering`);
+    }
+
+    // Article platforms — client-side ArticleEmbed handles rendering
+    if (platform === 'article') {
+      console.log('[fetch-oembed] Article platform detected — client-side rendering');
+    }
+
+    // External — no special embed
+    if (platform === 'external') {
+      console.log('[fetch-oembed] External URL — no oEmbed available');
     }
 
     return new Response(

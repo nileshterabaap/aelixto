@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { FeedPost } from "@/components/FeedPost";
+import { HydratedFeedPost } from "@/components/HydratedFeedPost";
 import type { Post } from "@/data/demoData";
 
 interface SupabasePost {
@@ -66,7 +66,10 @@ const PostDetail = () => {
       const supabasePost = data as unknown as SupabasePost;
       
       // Transform Supabase post to match FeedPost expected format
+      // Spread ALL raw DB columns so renderers can access fields like
+      // raw_json_data, preview_title, preview_image_url, preview_text, etc.
       const transformedPost: Post & { isRealPost: boolean; user_id: string } = {
+        ...(data as any), // preserve every raw column for renderer access
         id: supabasePost.id,
         user_id: supabasePost.user_id,
         author: {
@@ -83,6 +86,9 @@ const PostDetail = () => {
         embed_html: supabasePost.embed_html,
         timestamp: new Date(supabasePost.created_at),
         saves: supabasePost.saves_count,
+        likes_count: supabasePost.likes_count,
+        comments_count: supabasePost.comments_count,
+        reposts_count: (data as any).reposts_count ?? 0,
         isRealPost: true,
       };
       
@@ -130,7 +136,7 @@ const PostDetail = () => {
       </div>
 
       <main className="mx-auto max-w-2xl px-4 py-6">
-        <FeedPost post={post} userId={userId} />
+        <HydratedFeedPost post={post} userId={userId} startHydrated />
       </main>
     </div>
   );

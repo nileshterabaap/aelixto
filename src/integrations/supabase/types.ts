@@ -56,6 +56,66 @@ export type Database = {
         }
         Relationships: []
       }
+      collection_items: {
+        Row: {
+          collection_id: string
+          created_at: string
+          id: string
+          post_id: string
+        }
+        Insert: {
+          collection_id: string
+          created_at?: string
+          id?: string
+          post_id: string
+        }
+        Update: {
+          collection_id?: string
+          created_at?: string
+          id?: string
+          post_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_items_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_items_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collections: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       comments: {
         Row: {
           content: string
@@ -632,6 +692,7 @@ export type Database = {
       get_following_feed: {
         Args: { cursor?: string; limit_count: number }
         Returns: {
+          comments_count: number
           content: string
           created_at: string
           embed_html: string
@@ -652,6 +713,7 @@ export type Database = {
           reposted_at: string
           reposted_by_user_id: string
           reposted_by_username: string
+          reposts_count: number
           saves_count: number
           thumbnail_url: string
           title: string
