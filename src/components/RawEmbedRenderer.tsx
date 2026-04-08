@@ -34,6 +34,37 @@ const isFacebookVideoUrl = (value: string): boolean => {
   );
 };
 
+const unwrapFacebookLoginRedirect = (value: string): string => {
+  let current = fullyDecodeHtmlEntities(value).trim();
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const nextIndex = current.search(/[?&]next=/i);
+    if (nextIndex >= 0) {
+      const nextValue = current.slice(nextIndex).replace(/^[?&]next=/i, '').trim();
+      if (nextValue.startsWith('http://') || nextValue.startsWith('https://')) {
+        current = fullyDecodeHtmlEntities(nextValue);
+        continue;
+      }
+    }
+
+    try {
+      const parsed = new URL(current);
+      const hostname = parsed.hostname.toLowerCase();
+      const isFacebookLogin =
+        (hostname === 'facebook.com' || hostname === 'www.facebook.com' || hostname.endsWith('.facebook.com')) &&
+        parsed.pathname.startsWith('/login');
+      const nextUrl = parsed.searchParams.get('next');
+
+      if (!isFacebookLogin || !nextUrl) break;
+      current = fullyDecodeHtmlEntities(nextUrl).trim();
+    } catch {
+      break;
+    }
+  }
+
+  return current;
+};
+
 const setStyleDeclaration = (style: string, property: string, value: string): string => {
   const withoutProperty = style.replace(new RegExp(`${property}\\s*:\\s*[^;]+;?`, 'gi'), '').trim();
   const normalizedBase = withoutProperty
@@ -115,35 +146,44 @@ const sanitizeEmbedHtml = (html: string): string => {
 
 // Convert Facebook iframe embed to SDK-compatible format
 const transformFacebookEmbed = (html: string): string => {
-  // If already in SDK format (fb-post, fb-video), check if it has proper attributes
-  if (html.includes('fb-post') || html.includes('fb-video')) {
-    // Ensure it has data-width="auto" for responsive sizing
-    if (!html.includes('data-width')) {
-      html = html.replace(/class="fb-(post|video)"/, 'class="fb-$1" data-width="auto"');
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const sdkEmbed = doc.querySelector<HTMLElement>('.fb-post, .fb-video');
+
+    if (sdkEmbed) {
+      const rawHref = sdkEmbed.getAttribute('data-href');
+      if (rawHref) {
+        sdkEmbed.setAttribute('data-href', unwrapFacebookLoginRedirect(rawHref));
+      }
+      if (!sdkEmbed.getAttribute('data-width')) {
+        sdkEmbed.setAttribute('data-width', 'auto');
+      }
+      return doc.body.innerHTML;
     }
+
+    const iframe = doc.querySelector<HTMLIFrameElement>('iframe[src*="facebook.com/plugins/"]');
+    if (iframe) {
+      const iframeSrc = fullyDecodeHtmlEntities(iframe.getAttribute('src') || '');
+      const iframeUrl = new URL(iframeSrc);
+      const rawHref = iframeUrl.searchParams.get('href');
+
+      if (rawHref) {
+        const postUrl = unwrapFacebookLoginRedirect(rawHref);
+        const embedDiv = doc.createElement('div');
+        embedDiv.className =
+          isFacebookVideoUrl(postUrl) || iframeUrl.pathname.toLowerCase().includes('/video.php')
+            ? 'fb-video'
+            : 'fb-post';
+        embedDiv.setAttribute('data-href', postUrl);
+        embedDiv.setAttribute('data-width', 'auto');
+        embedDiv.setAttribute('data-show-text', 'true');
+        return embedDiv.outerHTML;
+      }
+    }
+  } catch {
     return html;
   }
-  
-  // Extract the Facebook post URL from iframe src
-  const iframeSrcMatch = html.match(/src=["']([^"']*facebook\.com[^"']*)["']/);
-  
-  if (iframeSrcMatch) {
-    const iframeSrc = iframeSrcMatch[1];
-    // Extract the href parameter from the iframe URL
-    const hrefMatch = iframeSrc.match(/href=([^&"']+)/);
-    
-    if (hrefMatch) {
-      const postUrl = decodeURIComponent(hrefMatch[1]);
-      // Detect if it's a video/reel based on URL
-      if (postUrl.includes('/videos/') || postUrl.includes('/watch/') || postUrl.includes('/reel/')) {
-        return `<div class="fb-video" data-href="${postUrl}" data-width="auto" data-show-text="true"></div>`;
-      }
-      // Return SDK-compatible format for posts with auto width
-      return `<div class="fb-post" data-href="${postUrl}" data-width="auto" data-show-text="true"></div>`;
-    }
-  }
-  
-  // If can't parse, return as is
+
   return html;
 };
 
