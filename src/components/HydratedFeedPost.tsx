@@ -288,13 +288,16 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     el.addEventListener('embedReady', handleEmbedReady);
 
     // Soft fallback: only reveal early if no renderer is still actively loading.
+    // Facebook SDK divs take longer (5-8s), so extend the soft fallback for them.
+    const isFacebookPost = detectedPlatform === 'facebook';
+    const softTimeout = isFacebookPost ? 8000 : 4000;
     const fallback = setTimeout(() => {
       if (settled) return;
       if (checkContent()) return;
       if (!getRendererStatuses().includes('loading')) {
         markReady();
       }
-    }, 4000);
+    }, softTimeout);
 
     // Hard fallback: never leave a post stuck forever.
     const hardFallback = setTimeout(markReady, 12000);
