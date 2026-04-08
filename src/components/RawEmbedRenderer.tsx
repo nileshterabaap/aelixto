@@ -306,57 +306,32 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
           if (window.FB?.XFBML?.parse) {
             window.FB.XFBML.parse(containerRef.current);
             
-            // Re-parse after a short delay — SDK sometimes needs a second pass
-            // for fb-post/fb-video divs that were injected after initial page load
-            setTimeout(() => {
-              if (containerRef.current && window.FB?.XFBML?.parse) {
-                const iframe = containerRef.current.querySelector('iframe');
-                if (!iframe) {
-                  window.FB.XFBML.parse(containerRef.current);
-                }
-              }
-            }, 2000);
-
-            // Check for genuine errors only — don't treat missing iframe as error
-            // because SDK divs can take 5-8s to fully render on slow connections
-            const checkFacebookError = (timeout: number, isFinal: boolean) => {
+            // Check for errors after render - two passes
+            const checkFacebookError = (timeout: number) => {
               setTimeout(() => {
                 if (containerRef.current) {
                   const text = (containerRef.current.textContent || '').toLowerCase();
+                  const iframe = containerRef.current.querySelector('iframe');
                   
-                  const hasTextError = 
+                  const hasError = 
                     text.includes('no longer available') ||
                     text.includes('been removed') ||
                     text.includes('privacy setting') ||
                     text.includes("isn't available") ||
-                    text.includes('log in to facebook');
+                    text.includes('log in to facebook') ||
+                    !iframe; // No iframe = SDK failed to render
                   
-                  if (hasTextError) {
+                  if (hasError) {
                     setEmbedFailed(true);
                     onError?.();
-                    return;
-                  }
-
-                  // Only on final check: if still no iframe, try one last parse
-                  if (isFinal && !containerRef.current.querySelector('iframe')) {
-                    if (window.FB?.XFBML?.parse) {
-                      window.FB.XFBML.parse(containerRef.current);
-                    }
-                    // Give it one more chance
-                    setTimeout(() => {
-                      if (containerRef.current && !containerRef.current.querySelector('iframe')) {
-                        setEmbedFailed(true);
-                        onError?.();
-                      }
-                    }, 4000);
                   }
                 }
               }, timeout);
             };
             
-            // First check at 4s (text errors only), final check at 8s (includes missing iframe)
-            checkFacebookError(4000, false);
-            checkFacebookError(8000, true);
+            // First check at 3s, final check at 6s
+            checkFacebookError(3000);
+            checkFacebookError(6000);
           }
       } else if (platform === 'threads') {
           await loadThreadsEmbed();
