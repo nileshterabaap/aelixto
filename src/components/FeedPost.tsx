@@ -1,4 +1,5 @@
 import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2 } from "lucide-react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -265,15 +266,12 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         <div className="p-5">
           {/* Author Info */}
           <div className="flex items-center gap-3 mb-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-full overflow-hidden bg-muted">
-              <img 
-                src={post.author.avatar} 
-                alt={post.author.username}
-                className="w-full h-full object-cover"
-                loading="eager"
-                decoding="async"
-              />
-            </div>
+            <Avatar className="h-12 w-12">
+              {post.author.avatar ? (
+                <AvatarImage src={post.author.avatar} alt={post.author.username} />
+              ) : null}
+              <AvatarFallback />
+            </Avatar>
             <div className="flex-1 min-w-0">
               <UsernameLink username={post.author.username} className="font-bold text-base block">{post.author.username}</UsernameLink>
             </div>
@@ -421,15 +419,12 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         
         {/* Author Info */}
         <div className="flex items-center gap-3 mb-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full overflow-hidden bg-muted">
-            <img 
-              src={post.author.avatar} 
-              alt={post.author.username}
-              className="w-full h-full object-cover"
-              loading="eager"
-              decoding="async"
-            />
-          </div>
+           <Avatar className="h-12 w-12">
+              {post.author.avatar ? (
+                <AvatarImage src={post.author.avatar} alt={post.author.username} />
+              ) : null}
+              <AvatarFallback />
+            </Avatar>
           <div className="flex-1 min-w-0">
             <UsernameLink username={post.author.username} className="font-bold text-base block">{post.author.username}</UsernameLink>
           </div>
