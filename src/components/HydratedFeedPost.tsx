@@ -1,6 +1,7 @@
 import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, RefreshCw } from "lucide-react";
 import { motion, useAnimation } from "framer-motion";
 import { Card } from "@/components/ui/card";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -463,15 +464,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       
       {/* Standardized Header: avatar, bold username, timestamp + platform icon top-right */}
       <div className="flex items-center gap-3 px-5 pt-4 pb-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full overflow-hidden bg-muted">
-          <img 
-            src={post.author.avatar} 
-            alt={post.author.username}
-            className="w-full h-full object-cover"
-            loading="eager"
-            decoding="async"
-          />
-        </div>
+        <Avatar className="h-12 w-12 shrink-0">
+          {post.author.avatar ? (
+            <AvatarImage src={post.author.avatar} alt={post.author.username} />
+          ) : null}
+          <AvatarFallback />
+        </Avatar>
         <div className="flex-1 min-w-0">
           <UsernameLink username={post.author.username} className="font-bold text-base block leading-tight">
             {post.author.name || post.author.username.replace('@', '')}
