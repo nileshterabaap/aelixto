@@ -158,8 +158,8 @@ const transformFacebookEmbed = (html: string): string => {
       if (!sdkEmbed.getAttribute('data-width')) {
         sdkEmbed.setAttribute('data-width', 'auto');
       }
-      // Always show full caption text with expandable "view more"
-      sdkEmbed.setAttribute('data-show-text', 'true');
+      // Render Facebook embeds without native caption text
+      sdkEmbed.setAttribute('data-show-text', 'false');
       return doc.body.innerHTML;
     }
 
@@ -178,7 +178,7 @@ const transformFacebookEmbed = (html: string): string => {
             : 'fb-post';
         embedDiv.setAttribute('data-href', postUrl);
         embedDiv.setAttribute('data-width', 'auto');
-        embedDiv.setAttribute('data-show-text', 'true');
+        embedDiv.setAttribute('data-show-text', 'false');
         return embedDiv.outerHTML;
       }
     }
