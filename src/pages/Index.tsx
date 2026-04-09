@@ -49,7 +49,7 @@ const Index = () => {
           username: `@${post.profiles?.username || "anonymous"}`,
           avatar:
             post.profiles?.avatar_url ||
-            "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
+           "",
         },
         title: post.title || "",
         content: post.content,
@@ -86,7 +86,7 @@ const Index = () => {
         username: `@${post.profiles?.username || "anonymous"}`,
         avatar:
           post.profiles?.avatar_url ||
-          "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
+           "",
       },
       title: post.title || "",
       content: post.content,
