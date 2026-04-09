@@ -69,7 +69,7 @@ export default function SavedPosts() {
             author: {
               name: profile?.display_name || profile?.username || "Unknown",
               username: profile?.username || "Unknown",
-              avatar: profile?.avatar_url || "/placeholder.svg",
+              avatar: profile?.avatar_url || "",
             },
             isRealPost: true,
           };
