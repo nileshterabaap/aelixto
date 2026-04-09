@@ -158,6 +158,8 @@ const transformFacebookEmbed = (html: string): string => {
       if (!sdkEmbed.getAttribute('data-width')) {
         sdkEmbed.setAttribute('data-width', 'auto');
       }
+      // Always show full caption text with expandable "view more"
+      sdkEmbed.setAttribute('data-show-text', 'true');
       return doc.body.innerHTML;
     }
 
