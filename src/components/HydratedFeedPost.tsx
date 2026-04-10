@@ -363,6 +363,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
   const previewImageUrl = (post as any).preview_image_url;
   const mediaUrl = post.mediaUrl || (post as any).media_url;
+  const previewText = (post as any).preview_text;
   
   // Detect platform
   const detectedPlatform = post.platform || detectPlatformFromUrl(mediaUrl);
