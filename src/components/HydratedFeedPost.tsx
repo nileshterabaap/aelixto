@@ -36,6 +36,7 @@ import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { SharePostSheet } from "@/components/SharePostSheet";
+import { supabase } from "@/integrations/supabase/client";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
@@ -101,6 +102,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [shareOpen, setShareOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(startHydrated || alreadyRevealed);
+  const [fallbackPreviewText, setFallbackPreviewText] = useState<string | null>(null);
 
   // Unified embed state machine: 'loading' → 'ready' | 'error'
   type EmbedState = 'loading' | 'ready' | 'error';
@@ -337,8 +339,32 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     };
   }, [embedState, alreadyRevealed, post.id]);
 
+  // Normalize field access
+  const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
+  const previewImageUrl = (post as any).preview_image_url;
+  const mediaUrl = post.mediaUrl || (post as any).media_url;
+  const previewText = (post as any).preview_text;
+  const effectivePreviewText = previewText || fallbackPreviewText;
+  
+  // Detect platform
+  const detectedPlatform = post.platform || detectPlatformFromUrl(mediaUrl);
+  const normalizedEmbedHtml = useMemo(() => {
+    if (detectedPlatform !== 'instagram' || !post.embed_html || !effectivePreviewText) {
+      return post.embed_html;
+    }
+
+    return post.embed_html
+      .replace(/\/embed\/captioned\//g, '/embed/')
+      .replace(/\/embed\/captioned(?=["'])/g, '/embed');
+  }, [detectedPlatform, effectivePreviewText, post.embed_html]);
+
+  const renderPost = useMemo(
+    () => (normalizedEmbedHtml === post.embed_html ? post : { ...post, embed_html: normalizedEmbedHtml }),
+    [normalizedEmbedHtml, post]
+  );
+
   // Resolve the embed type for rendering — must be before effects that use isTextOnly
-  const r = resolveRenderer(post);
+  const r = resolveRenderer(renderPost);
   const isTextOnly = r.kind === 'none';
 
   // Measure card height and sync to skeleton wrapper to prevent layout shift
@@ -358,15 +384,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
 
-  
-  // Normalize field access
-  const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
-  const previewImageUrl = (post as any).preview_image_url;
-  const mediaUrl = post.mediaUrl || (post as any).media_url;
-  const previewText = (post as any).preview_text;
-  
-  // Detect platform
-  const detectedPlatform = post.platform || detectPlatformFromUrl(mediaUrl);
   const isYouTubePost = detectedPlatform === 'youtube';
   const shouldRenderMediaTitle = isYouTubePost || r.kind === 'image' || r.kind === 'video';
   const platform = getPlatformIcon(detectedPlatform);
@@ -399,6 +416,30 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setDisplayLikeCount(Number((post as any).likes_count ?? (post as any).likes ?? 0));
     setDisplayRepostCount(Number((post as any).reposts_count ?? (post as any).shares ?? 0));
   }, [post.id, (post as any).likes_count, (post as any).likes, (post as any).reposts_count, (post as any).shares]);
+
+  useEffect(() => {
+    if (detectedPlatform !== 'instagram' || previewText || !mediaUrl) {
+      setFallbackPreviewText(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchInstagramCaption = async () => {
+      const { data, error } = await supabase.functions.invoke('fetch-oembed', {
+        body: { url: mediaUrl },
+      });
+
+      if (cancelled || error || !data?.preview_text) return;
+      setFallbackPreviewText(data.preview_text);
+    };
+
+    void fetchInstagramCaption();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detectedPlatform, mediaUrl, post.id, previewText]);
 
   const handleLikeClick = useCallback(() => {
     if (!canUseActions) return;
@@ -542,7 +583,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           {embedState !== 'error' && (
             <div>
               <HydratedEmbed
-                post={post}
+                post={renderPost}
                 renderer={r}
                 thumbnailUrl={effectiveThumbnail}
                 isHydrated={isHydrated}
@@ -662,10 +703,10 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
       {/* Original poster's caption (e.g. Instagram) — collapsible with "more" */}
-      {previewText && detectedPlatform === 'instagram' && (
+      {effectivePreviewText && detectedPlatform === 'instagram' && (
         <div className="px-5 pb-3">
           <CollapsibleCaption 
-            content={previewText} 
+            content={effectivePreviewText} 
             maxLines={2}
             className="text-sm text-muted-foreground"
           />
@@ -717,6 +758,10 @@ const arePropsEqual = (prev: HydratedFeedPostProps, next: HydratedFeedPostProps)
     p.mediaUrl === n.mediaUrl &&
     p.thumbnailUrl === n.thumbnailUrl &&
     p.platform === n.platform &&
+    (p as any).preview_text === (n as any).preview_text &&
+    (p as any).preview_title === (n as any).preview_title &&
+    (p as any).preview_image_url === (n as any).preview_image_url &&
+    (p as any).embed_html === (n as any).embed_html &&
     p.saves === n.saves &&
     p.isRepost === n.isRepost &&
     p.repostedByUsername === n.repostedByUsername &&
