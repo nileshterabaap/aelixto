@@ -118,7 +118,7 @@ serve(async (req) => {
         console.log('[fetch-oembed] Instagram iframe embed built');
       } catch (e) {
         const cleanUrl = url.split('?')[0].replace(/\/$/, '');
-        embedHtml = `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+        embedHtml = `<iframe src="${cleanUrl}/embed/captioned/" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
         console.log('[fetch-oembed] Instagram iframe embed built (fallback)');
       }
     }
