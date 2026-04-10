@@ -1,5 +1,5 @@
 import { useState, useRef, useLayoutEffect, useCallback } from 'react';
-import { parseTextWithMentions } from './UsernameLink';
+import { parseTextWithMentions, UsernameLink } from './UsernameLink';
 
 interface CollapsibleCaptionProps {
   content: string;
