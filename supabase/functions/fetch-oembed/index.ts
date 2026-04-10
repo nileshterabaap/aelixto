@@ -112,7 +112,7 @@ serve(async (req) => {
     if (platform === 'instagram') {
       try {
         const u = new URL(url);
-        let embedPath = u.pathname.replace(/\/$/, '') + '/embed/';
+        let embedPath = u.pathname.replace(/\/$/, '') + '/embed/captioned/';
         const embedUrl = `https://www.instagram.com${embedPath}`;
         embedHtml = `<iframe src="${embedUrl}" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
         console.log('[fetch-oembed] Instagram iframe embed built');
