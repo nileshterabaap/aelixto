@@ -422,17 +422,26 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     return null;
   }
 
-  // Instagram embeds: render naturally, caption already stripped via stripInstagramCaption.
-  // No fixed aspect-ratio hack — let the SDK iframe determine its own height.
+  // Instagram embeds: render naturally but clip the bottom native UI
+  // (action buttons, likes count, "Add a comment...") by cutting ~160px from the bottom.
   if (isInstagram) {
     return (
       <div
-        ref={containerRef}
-        onClick={handleDoubleTap}
-        className="embed-container w-full max-w-full [&>*]:!m-0 cursor-pointer"
-        style={{ overflow: 'hidden', touchAction: 'pan-y' }}
-        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-      />
+        className="relative w-full overflow-hidden"
+        style={{ touchAction: 'pan-y' }}
+      >
+        <div
+          ref={containerRef}
+          onClick={handleDoubleTap}
+          className="embed-container w-full max-w-full [&>*]:!m-0 cursor-pointer"
+          style={{
+            overflow: 'hidden',
+            clipPath: 'inset(0 0 160px 0)',
+            marginBottom: '-160px',
+          }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        />
+      </div>
     );
   }
 
