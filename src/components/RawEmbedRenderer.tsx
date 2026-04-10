@@ -422,30 +422,17 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     return null;
   }
 
-  // Instagram embeds get viewport-lock surgery to mask native action buttons/comments
-  // The SDK replaces the blockquote with an iframe. We clip the bottom portion
-  // (likes, comments, "Add a comment") using a height-constrained overflow-hidden container.
+  // Instagram embeds: render naturally, caption already stripped via stripInstagramCaption.
+  // No fixed aspect-ratio hack — let the SDK iframe determine its own height.
   if (isInstagram) {
     return (
       <div
-        className="relative w-full overflow-hidden"
-        style={{ aspectRatio: '3 / 5', touchAction: 'pan-y' }}
-      >
-        <div
-          ref={containerRef}
-          onClick={handleDoubleTap}
-          className="embed-container w-full max-w-full [&>*]:!m-0"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: 'calc(100% + 500px)',
-            overflow: 'hidden',
-          }}
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-        />
-      </div>
+        ref={containerRef}
+        onClick={handleDoubleTap}
+        className="embed-container w-full max-w-full [&>*]:!m-0 cursor-pointer"
+        style={{ overflow: 'hidden', touchAction: 'pan-y' }}
+        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+      />
     );
   }
 
