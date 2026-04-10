@@ -508,12 +508,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       </div>
 
-      {/* Caption */}
-      {post.content && (
-        <div className="px-5 pb-3">
-          <CollapsibleCaption content={post.content} />
-        </div>
-      )}
+      {/* Caption moved below action bar — Instagram-style */}
 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
@@ -654,9 +649,19 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           />
         </motion.button>
       </div>
+
+      {/* Caption below action bar — Instagram-style: bold username + collapsible text */}
+      {post.content && (
+        <div className="px-5 pb-3">
+          <CollapsibleCaption 
+            content={post.content} 
+            username={post.author.username?.replace('@', '')}
+          />
+        </div>
+      )}
       
       {post.isRealPost && (
-        <CommentsDialog 
+        <CommentsDialog
           open={commentsOpen} 
           onOpenChange={setCommentsOpen}
           postId={post.id}
