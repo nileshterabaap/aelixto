@@ -24,6 +24,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [showThumbnailInput, setShowThumbnailInput] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [embedHtml, setEmbedHtml] = useState("");
+  const [previewText, setPreviewText] = useState("");
   const [ogType, setOgType] = useState<string | null>(null);
   const createPost = useCreatePost();
 
@@ -157,6 +158,10 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
           setEmbedHtml(oembedData.embed_html);
           console.log('[CreatePostDialog] Got oEmbed HTML, length:', oembedData.embed_html.length);
         }
+        if (!oembedError && oembedData?.preview_text) {
+          setPreviewText(oembedData.preview_text);
+          console.log('[CreatePostDialog] Got preview_text:', oembedData.preview_text.substring(0, 80));
+        }
       } catch (error) {
         console.error('[CreatePostDialog] oEmbed fetch failed:', error);
       }
@@ -205,6 +210,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       platform: platform,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
+      preview_text: previewText || undefined,
     });
 
     // Reset form
@@ -215,6 +221,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setCaption("");
     setShowThumbnailInput(false);
     setEmbedHtml("");
+    setPreviewText("");
     setOgType(null);
     onOpenChange(false);
   };

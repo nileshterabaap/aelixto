@@ -363,6 +363,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
   const previewImageUrl = (post as any).preview_image_url;
   const mediaUrl = post.mediaUrl || (post as any).media_url;
+  const previewText = (post as any).preview_text;
   
   // Detect platform
   const detectedPlatform = post.platform || detectPlatformFromUrl(mediaUrl);
@@ -656,6 +657,17 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           <CollapsibleCaption 
             content={post.content} 
             username={post.author.username?.replace('@', '')}
+          />
+        </div>
+      )}
+
+      {/* Original poster's caption (e.g. Instagram) — collapsible with "more" */}
+      {previewText && detectedPlatform === 'instagram' && (
+        <div className="px-5 pb-3">
+          <CollapsibleCaption 
+            content={previewText} 
+            maxLines={2}
+            className="text-sm text-muted-foreground"
           />
         </div>
       )}
