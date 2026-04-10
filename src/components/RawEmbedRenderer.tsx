@@ -127,19 +127,11 @@ interface RawEmbedRendererProps {
 }
 
 // Sanitize embed HTML using DOMPurify to prevent XSS attacks
-// Strip Instagram caption attribute to render media-only embeds
-const stripInstagramCaption = (html: string): string => {
-  // Remove data-instgrm-captioned attribute so embed renders without native caption
-  return html.replace(/\s*data-instgrm-captioned\s*/gi, ' ');
-};
 
 const sanitizeEmbedHtml = (html: string): string => {
-  // First strip Instagram caption attribute
-  let processedHtml = stripInstagramCaption(html);
-  
-  return DOMPurify.sanitize(processedHtml, {
+  return DOMPurify.sanitize(html, {
     ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img', 'svg', 'path', 'title', 'section'],
-    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling', 'data-text-post-permalink', 'data-text-post-version', 'id', 'viewBox', 'xmlns', 'role', 'fill', 'd', 'aria-label', 'cite', 'data-video-id', 'rel'],
+    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'data-instgrm-captioned', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling', 'data-text-post-permalink', 'data-text-post-version', 'id', 'viewBox', 'xmlns', 'role', 'fill', 'd', 'aria-label', 'cite', 'data-video-id', 'rel'],
     ALLOW_DATA_ATTR: true
   });
 };
@@ -427,21 +419,12 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
   if (isInstagram) {
     return (
       <div
-        className="relative w-full overflow-hidden"
-        style={{ touchAction: 'pan-y' }}
-      >
-        <div
-          ref={containerRef}
-          onClick={handleDoubleTap}
-          className="embed-container w-full max-w-full [&>*]:!m-0 cursor-pointer"
-          style={{
-            overflow: 'hidden',
-            clipPath: 'inset(0 0 160px 0)',
-            marginBottom: '-160px',
-          }}
-          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-        />
-      </div>
+        ref={containerRef}
+        onClick={handleDoubleTap}
+        className="embed-container w-full max-w-full [&>*]:!m-0 cursor-pointer"
+        style={{ overflow: 'hidden', touchAction: 'pan-y' }}
+        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+      />
     );
   }
 
