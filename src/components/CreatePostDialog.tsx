@@ -221,6 +221,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setCaption("");
     setShowThumbnailInput(false);
     setEmbedHtml("");
+    setPreviewText("");
     setOgType(null);
     onOpenChange(false);
   };
