@@ -51,6 +51,7 @@ serve(async (req) => {
     console.log('[fetch-oembed] Processing:', url);
     let embedHtml: string | null = null;
     let platform: string | null = classifyPlatform(url);
+    let previewText: string | null = null;
 
     const urlLower = url.toLowerCase();
 
