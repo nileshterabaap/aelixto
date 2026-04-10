@@ -24,6 +24,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [showThumbnailInput, setShowThumbnailInput] = useState(false);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [embedHtml, setEmbedHtml] = useState("");
+  const [previewText, setPreviewText] = useState("");
   const [ogType, setOgType] = useState<string | null>(null);
   const createPost = useCreatePost();
 
