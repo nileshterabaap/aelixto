@@ -660,6 +660,17 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           />
         </div>
       )}
+
+      {/* Original poster's caption (e.g. Instagram) — collapsible with "more" */}
+      {previewText && detectedPlatform === 'instagram' && (
+        <div className="px-5 pb-3">
+          <CollapsibleCaption 
+            content={previewText} 
+            maxLines={2}
+            className="text-sm text-muted-foreground"
+          />
+        </div>
+      )}
       
       {post.isRealPost && (
         <CommentsDialog
