@@ -301,7 +301,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ embed_html: embedHtml, platform }),
+      JSON.stringify({ embed_html: embedHtml, platform, preview_text: previewText }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
