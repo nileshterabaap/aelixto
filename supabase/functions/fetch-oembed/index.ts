@@ -111,16 +111,32 @@ serve(async (req) => {
 
     // Instagram - build direct iframe embed
     if (platform === 'instagram') {
+      // Fetch oEmbed to get the original poster's caption
+      try {
+        const oembedUrl = `https://api.instagram.com/oembed/?url=${encodeURIComponent(url)}&omitscript=true`;
+        const res = await fetch(oembedUrl);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.title) {
+            previewText = data.title;
+            console.log('[fetch-oembed] Instagram caption extracted:', previewText?.substring(0, 80));
+          }
+        }
+      } catch (e) {
+        console.warn('[fetch-oembed] Instagram oEmbed caption fetch failed:', e);
+      }
+
+      // Build iframe WITHOUT /captioned/ — we render caption ourselves
       try {
         const u = new URL(url);
-        let embedPath = u.pathname.replace(/\/$/, '') + '/embed/captioned/';
+        let embedPath = u.pathname.replace(/\/$/, '') + '/embed/';
         const embedUrl = `https://www.instagram.com${embedPath}`;
         embedHtml = `<iframe src="${embedUrl}" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
-        console.log('[fetch-oembed] Instagram iframe embed built');
+        console.log('[fetch-oembed] Instagram iframe embed built (no caption)');
       } catch (e) {
         const cleanUrl = url.split('?')[0].replace(/\/$/, '');
-        embedHtml = `<iframe src="${cleanUrl}/embed/captioned/" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
-        console.log('[fetch-oembed] Instagram iframe embed built (fallback)');
+        embedHtml = `<iframe src="${cleanUrl}/embed/" style="border:0;width:100%;min-height:500px;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+        console.log('[fetch-oembed] Instagram iframe embed built (fallback, no caption)');
       }
     }
 
