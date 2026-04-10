@@ -210,6 +210,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       platform: platform,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
+      preview_text: previewText || undefined,
     });
 
     // Reset form
