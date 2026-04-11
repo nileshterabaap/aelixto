@@ -1,16 +1,18 @@
 import { useState, useRef, useLayoutEffect, useCallback } from 'react';
-import { parseTextWithMentions } from './UsernameLink';
+import { parseTextWithMentions, UsernameLink } from './UsernameLink';
 
 interface CollapsibleCaptionProps {
   content: string;
   maxLines?: number;
   className?: string;
+  username?: string;
 }
 
 export const CollapsibleCaption = ({ 
   content, 
   maxLines = 2,
-  className = "text-sm mb-3"
+  className = "text-sm mb-3",
+  username
 }: CollapsibleCaptionProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isTruncated, setIsTruncated] = useState(false);
@@ -50,6 +52,7 @@ export const CollapsibleCaption = ({
           overflow: 'hidden'
         } : undefined}
       >
+        {username && <UsernameLink username={username} className="font-bold mr-1">{username}</UsernameLink>}
         {parsedContent}
       </span>
       {isTruncated && !isExpanded && (

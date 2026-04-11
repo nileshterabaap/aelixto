@@ -508,12 +508,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       </div>
 
-      {/* Caption */}
-      {post.content && (
-        <div className="px-5 pb-3">
-          <CollapsibleCaption content={post.content} />
-        </div>
-      )}
+      {/* Caption moved below action bar — Instagram-style */}
 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
@@ -572,7 +567,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* Interaction Bar - tight spacing, professional layout */}
       {/* For Instagram: pull bar up to cover native action buttons */}
-      <div className={`flex items-center justify-around px-3 py-3 relative z-10 bg-background ${detectedPlatform === 'instagram' ? '-mt-10' : ''}`}>
+      <div className="flex items-center justify-around px-3 py-3 relative z-10 bg-background">
         <motion.button
           onClick={handleLikeClick}
           animate={likeControls}
@@ -654,9 +649,19 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           />
         </motion.button>
       </div>
+
+      {/* Caption below action bar — Instagram-style: bold username + collapsible text */}
+      {post.content && (
+        <div className="px-5 pb-3">
+          <CollapsibleCaption 
+            content={post.content} 
+            username={post.author.username?.replace('@', '')}
+          />
+        </div>
+      )}
       
       {post.isRealPost && (
-        <CommentsDialog 
+        <CommentsDialog
           open={commentsOpen} 
           onOpenChange={setCommentsOpen}
           postId={post.id}
