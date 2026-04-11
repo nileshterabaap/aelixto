@@ -42,7 +42,6 @@ const Index = () => {
 
     return demoPostsData
       .map((post) => ({
-        ...(post as any),
         id: post.id,
         user_id: post.user_id,
         author: {
@@ -65,9 +64,6 @@ const Index = () => {
           | "twitter"
           | "pinterest",
         embed_html: post.embed_html,
-        preview_text: post.preview_text,
-        preview_title: post.preview_title,
-        preview_image_url: post.preview_image_url,
         timestamp: new Date(post.created_at),
         saves: post.saves_count,
         likes_count: (post as any).likes_count || 0,
@@ -83,7 +79,6 @@ const Index = () => {
     if (showDemoFeed || !followingPosts.length) return [];
 
     return followingPosts.map((post) => ({
-      ...(post as any),
       id: post.id,
       user_id: post.user_id,
       author: {
@@ -106,9 +101,6 @@ const Index = () => {
         | "twitter"
         | "pinterest",
       embed_html: post.embed_html,
-      preview_text: (post as any).preview_text,
-      preview_title: (post as any).preview_title,
-      preview_image_url: (post as any).preview_image_url,
       timestamp: new Date(post.created_at),
       saves: post.saves_count,
       likes_count: post.likes_count || 0,

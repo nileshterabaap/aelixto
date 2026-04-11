@@ -467,17 +467,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <CollapsibleCaption content={post.content} />
         )}
 
-        {/* Original poster's caption (e.g. Instagram) — collapsible with "more" */}
-        {previewText && detectedPlatform === 'instagram' && (
-          <div className="pb-2">
-            <CollapsibleCaption 
-              content={previewText} 
-              maxLines={2}
-              className="text-sm text-muted-foreground"
-            />
-          </div>
-        )}
-
         {/* Feature flag check - show disabled message if embed is disabled */}
         {!embedEnabled && (
           <div className="rounded-2xl border-2 border-border bg-muted/30 p-8 text-center mb-3">
