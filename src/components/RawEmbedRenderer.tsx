@@ -127,11 +127,19 @@ interface RawEmbedRendererProps {
 }
 
 // Sanitize embed HTML using DOMPurify to prevent XSS attacks
+// Strip Instagram caption attribute to render media-only embeds
+const stripInstagramCaption = (html: string): string => {
+  // Remove data-instgrm-captioned attribute so embed renders without native caption
+  return html.replace(/\s*data-instgrm-captioned\s*/gi, ' ');
+};
 
 const sanitizeEmbedHtml = (html: string): string => {
-  return DOMPurify.sanitize(html, {
+  // First strip Instagram caption attribute
+  let processedHtml = stripInstagramCaption(html);
+  
+  return DOMPurify.sanitize(processedHtml, {
     ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img', 'svg', 'path', 'title', 'section'],
-    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'data-instgrm-captioned', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling', 'data-text-post-permalink', 'data-text-post-version', 'id', 'viewBox', 'xmlns', 'role', 'fill', 'd', 'aria-label', 'cite', 'data-video-id', 'rel'],
+    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling', 'data-text-post-permalink', 'data-text-post-version', 'id', 'viewBox', 'xmlns', 'role', 'fill', 'd', 'aria-label', 'cite', 'data-video-id', 'rel'],
     ALLOW_DATA_ATTR: true
   });
 };
@@ -414,17 +422,30 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     return null;
   }
 
-  // Instagram embeds: render naturally but clip the bottom native UI
-  // (action buttons, likes count, "Add a comment...") by cutting ~160px from the bottom.
+  // Instagram embeds get viewport-lock surgery to mask native action buttons/comments
+  // The SDK replaces the blockquote with an iframe. We clip the bottom portion
+  // (likes, comments, "Add a comment") using a height-constrained overflow-hidden container.
   if (isInstagram) {
     return (
       <div
-        ref={containerRef}
-        onClick={handleDoubleTap}
-        className="embed-container w-full max-w-full [&>*]:!m-0 cursor-pointer"
-        style={{ overflow: 'hidden', touchAction: 'pan-y' }}
-        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-      />
+        className="relative w-full overflow-hidden"
+        style={{ aspectRatio: '3 / 5', touchAction: 'pan-y' }}
+      >
+        <div
+          ref={containerRef}
+          onClick={handleDoubleTap}
+          className="embed-container w-full max-w-full [&>*]:!m-0"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: 'calc(100% + 500px)',
+            overflow: 'hidden',
+          }}
+          dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+        />
+      </div>
     );
   }
 

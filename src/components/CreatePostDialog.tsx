@@ -79,10 +79,6 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
           if (!error && data) {
             videoTitle = data.title || "";
             thumbnail = data.thumbnail || "";
-            // Auto-fill caption from Meta oEmbed title (which contains the post caption)
-            if (data.title && !caption) {
-              setCaption(data.title);
-            }
           }
         } catch (error) {
           console.error(`[CreatePostDialog] ${platform} thumbnail fetch failed:`, error);
