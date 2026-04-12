@@ -371,11 +371,9 @@ export function useMediaPauseOnScroll(
       threshold: 0,
     });
 
-    const mutationObserver = new MutationObserver(() => scheduleMutationCheck());
 
     nearObserver.observe(el);
     activeObserver.observe(el);
-    mutationObserver.observe(el, { childList: true, subtree: true });
 
     const handleResize = () => {
       syncObserverStateFromLayout();
@@ -390,9 +388,7 @@ export function useMediaPauseOnScroll(
     return () => {
       nearObserver.disconnect();
       activeObserver.disconnect();
-      mutationObserver.disconnect();
       window.removeEventListener('resize', handleResize);
-      if (mutationRaf !== null) cancelAnimationFrame(mutationRaf);
     };
   }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, disableHardSuspend]);
 
