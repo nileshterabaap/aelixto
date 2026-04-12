@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type ReactNode } from "react";
+import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { Loader2 } from "lucide-react";
 
@@ -10,6 +10,13 @@ interface PullToRefreshProps {
 const THRESHOLD = 55;
 const MAX_PULL = 100;
 const LOADING_REST = 45;
+
+const shouldIgnorePullTarget = (target: EventTarget | null) => {
+  return (
+    target instanceof HTMLElement &&
+    (target.closest("nav") || target.closest('[aria-label="Create post"]'))
+  );
+};
 
 export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const [refreshing, setRefreshing] = useState(false);
@@ -24,78 +31,92 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const spinnerRotate = useTransform(pullY, [0, MAX_PULL], [0, 270]);
 
   const isAtTop = useCallback(() => {
-    if (containerRef.current) {
-      let el: HTMLElement | null = containerRef.current;
-      while (el) {
-        if (el.scrollTop > 0) return false;
-        el = el.parentElement;
-      }
-    }
-    return window.scrollY <= 0;
+    const containerScrollTop = containerRef.current?.scrollTop ?? 0;
+    const pageScrollTop =
+      window.scrollY ||
+      document.scrollingElement?.scrollTop ||
+      document.documentElement.scrollTop ||
+      0;
+
+    return containerScrollTop <= 0 && pageScrollTop <= 0;
   }, []);
 
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent) => {
-      if (refreshing) return;
-      // Don't capture pulls originating from the bottom nav area
-      const target = e.target as HTMLElement;
-      if (target.closest("nav") || target.closest('[aria-label="Create post"]')) return;
-      if (isAtTop()) {
-        touchStartY.current = e.touches[0].clientY;
-        pulling.current = true;
-      }
-    },
-    [refreshing, isAtTop]
-  );
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
 
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent) => {
+    const handleTouchStart = (event: TouchEvent) => {
+      if (refreshing) return;
+      if (shouldIgnorePullTarget(event.target)) return;
+      if (!isAtTop()) return;
+
+      const touch = event.touches[0];
+      if (!touch) return;
+
+      touchStartY.current = touch.clientY;
+      pulling.current = true;
+    };
+
+    const handleTouchMove = (event: TouchEvent) => {
       if (!pulling.current || refreshing) return;
 
-      const currentY = e.touches[0].clientY;
-      const diff = currentY - touchStartY.current;
+      const touch = event.touches[0];
+      if (!touch) return;
+
+      const diff = touch.clientY - touchStartY.current;
 
       if (diff > 0 && isAtTop()) {
-        // Smooth logarithmic rubber-band — easy to start, harder to pull further
         const dampened = Math.min(MAX_PULL, diff * 0.5 * (1 - diff / (diff + 300)));
         pullY.set(dampened);
-      } else {
-        pullY.set(0);
+        return;
       }
-    },
-    [refreshing, pullY, isAtTop]
-  );
 
-  const handleTouchEnd = useCallback(async () => {
-    if (!pulling.current) return;
-    pulling.current = false;
+      pullY.set(0);
+    };
 
-    const currentPull = pullY.get();
+    const handleTouchEnd = () => {
+      if (!pulling.current) return;
+      pulling.current = false;
 
-    if (currentPull >= THRESHOLD && !refreshing) {
-      // Snap to loading rest position
-      animate(pullY, LOADING_REST, { type: "spring", stiffness: 200, damping: 25 });
-      setRefreshing(true);
+      const currentPull = pullY.get();
 
-      try {
-        await onRefresh();
-      } finally {
-        setRefreshing(false);
-        animate(pullY, 0, { type: "spring", stiffness: 250, damping: 28 });
+      if (currentPull >= THRESHOLD && !refreshing) {
+        animate(pullY, LOADING_REST, { type: "spring", stiffness: 200, damping: 25 });
+        setRefreshing(true);
+
+        void (async () => {
+          try {
+            await onRefresh();
+          } finally {
+            setRefreshing(false);
+            animate(pullY, 0, { type: "spring", stiffness: 250, damping: 28 });
+          }
+        })();
+
+        return;
       }
-    } else {
-      // Snap back smoothly
+
       animate(pullY, 0, { type: "spring", stiffness: 350, damping: 28 });
-    }
-  }, [pullY, refreshing, onRefresh]);
+    };
+
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
+    el.addEventListener("touchmove", handleTouchMove, { passive: true });
+    el.addEventListener("touchend", handleTouchEnd, { passive: true });
+    el.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+
+    return () => {
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchmove", handleTouchMove);
+      el.removeEventListener("touchend", handleTouchEnd);
+      el.removeEventListener("touchcancel", handleTouchEnd);
+    };
+  }, [isAtTop, onRefresh, pullY, refreshing]);
 
   return (
     <div
       ref={containerRef}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
       className="relative"
+      style={{ touchAction: "pan-y" }}
     >
       {/* Pull indicator — overlays on top, content does NOT move */}
       <motion.div
