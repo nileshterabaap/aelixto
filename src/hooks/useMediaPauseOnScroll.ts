@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, RefObject } from 'react';
+import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
 
 /**
@@ -268,8 +268,8 @@ export function useMediaPauseOnScroll(
   const { enabled = true, hardSuspendDistanceVh = 6, disableHardSuspend = false } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
-  const [lifecycleState, setLifecycleState] = useState<LifecycleState>('active');
   const stateRef = useRef<LifecycleState>('active');
+  const observerStateRef = useRef({ near: false, active: false });
 
   useEffect(() => {
     const el = containerRef.current;
@@ -278,33 +278,25 @@ export function useMediaPauseOnScroll(
     if (!enabled) {
       restoreHardSuspended(el);
       stateRef.current = 'active';
-      setLifecycleState('active');
+      observerStateRef.current = { near: false, active: false };
       return;
     }
 
-    let rafId: number | null = null;
     let mutationRaf: number | null = null;
 
-    const computeZone = (): 'visible' | 'near' | 'far' => {
-      const rect = el.getBoundingClientRect();
+    const syncObserverStateFromLayout = () => {
+      const currentEl = containerRef.current;
+      if (!currentEl) return;
+
+      const rect = currentEl.getBoundingClientRect();
       const vh = window.innerHeight || document.documentElement.clientHeight;
-      const viewportCenterY = vh / 2;
       const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
       const activeDistancePx = getActiveDistancePx();
 
-      const isOnScreen = rect.bottom > 0 && rect.top < vh;
-      const embedCenterY = rect.top + rect.height / 2;
-      const distanceToViewportCenter = Math.abs(embedCenterY - viewportCenterY);
-
-      if (isOnScreen && distanceToViewportCenter <= activeDistancePx) {
-        return 'visible';
-      }
-
-      if (rect.bottom > -hardSuspendDistancePx && rect.top < vh + hardSuspendDistancePx) {
-        return 'near';
-      }
-
-      return 'far';
+      observerStateRef.current = {
+        near: rect.bottom > -hardSuspendDistancePx && rect.top < vh + hardSuspendDistancePx,
+        active: rect.bottom > activeDistancePx && rect.top < vh - activeDistancePx,
+      };
     };
 
     const transition = (target: LifecycleState) => {
@@ -316,7 +308,6 @@ export function useMediaPauseOnScroll(
 
       if (!hasLifecycleTargets(currentEl) && target !== 'active') {
         stateRef.current = 'active';
-        setLifecycleState('active');
         return;
       }
 
@@ -332,7 +323,6 @@ export function useMediaPauseOnScroll(
           // Skip hard-suspend — just pause media, keep embeds loaded
           stageAPause(currentEl);
           stateRef.current = 'paused';
-          setLifecycleState('paused');
           return;
         }
         if (current === 'active') {
@@ -342,22 +332,12 @@ export function useMediaPauseOnScroll(
       }
 
       stateRef.current = target;
-      setLifecycleState(target);
     };
 
     const reconcile = () => {
-      const zone = computeZone();
-      if (zone === 'visible') transition('active');
-      else if (zone === 'near') transition('paused');
+      if (observerStateRef.current.active) transition('active');
+      else if (observerStateRef.current.near) transition('paused');
       else transition('suspended');
-    };
-
-    const scheduleReconcile = () => {
-      if (rafId !== null) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        reconcile();
-      });
     };
 
     const scheduleMutationCheck = () => {
@@ -367,41 +347,51 @@ export function useMediaPauseOnScroll(
         const currentEl = containerRef.current;
         if (!currentEl) return;
 
-        if (hasPlayableMedia(currentEl)) {
-          reconcile();
-        }
+        syncObserverStateFromLayout();
+        reconcile();
       });
     };
 
     const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
+    const activeDistancePx = getActiveDistancePx();
 
-    const nearObserver = new IntersectionObserver(() => scheduleReconcile(), {
+    const nearObserver = new IntersectionObserver(([entry]) => {
+      observerStateRef.current.near = entry?.isIntersecting ?? false;
+      reconcile();
+    }, {
       rootMargin: `${hardSuspendDistancePx}px 0px ${hardSuspendDistancePx}px 0px`,
       threshold: 0,
     });
 
-    const viewportObserver = new IntersectionObserver(() => scheduleReconcile(), {
-      threshold: [0, 0.1],
+    const activeObserver = new IntersectionObserver(([entry]) => {
+      observerStateRef.current.active = entry?.isIntersecting ?? false;
+      reconcile();
+    }, {
+      rootMargin: `-${activeDistancePx}px 0px -${activeDistancePx}px 0px`,
+      threshold: 0,
     });
 
     const mutationObserver = new MutationObserver(() => scheduleMutationCheck());
 
     nearObserver.observe(el);
-    viewportObserver.observe(el);
+    activeObserver.observe(el);
     mutationObserver.observe(el, { childList: true, subtree: true });
 
-    document.addEventListener('scroll', scheduleReconcile, true);
-    window.addEventListener('resize', scheduleReconcile);
+    const handleResize = () => {
+      syncObserverStateFromLayout();
+      reconcile();
+    };
 
+    window.addEventListener('resize', handleResize);
+
+    syncObserverStateFromLayout();
     reconcile();
 
     return () => {
       nearObserver.disconnect();
-      viewportObserver.disconnect();
+      activeObserver.disconnect();
       mutationObserver.disconnect();
-      document.removeEventListener('scroll', scheduleReconcile, true);
-      window.removeEventListener('resize', scheduleReconcile);
-      if (rafId !== null) cancelAnimationFrame(rafId);
+      window.removeEventListener('resize', handleResize);
       if (mutationRaf !== null) cancelAnimationFrame(mutationRaf);
     };
   }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, disableHardSuspend]);
@@ -420,13 +410,12 @@ export function useMediaPauseOnScroll(
           hardSuspendIframes(el);
         }
         stateRef.current = disableHardSuspend ? 'paused' : 'suspended';
-        setLifecycleState(disableHardSuspend ? 'paused' : 'suspended');
       }
       prevPathRef.current = location.pathname;
     }
   }, [enabled, location.pathname, containerRef, disableHardSuspend]);
 
-  return lifecycleState;
+  return stateRef.current;
 }
 
 /**
