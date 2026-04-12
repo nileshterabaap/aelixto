@@ -74,7 +74,7 @@ export const useFeedAnchorRestoration = (routeKey: RouteKey, itemIds: string[]) 
   }, [idsSet, routeKey]);
 
   const scheduleSnapshot = useCallback(
-    (delay = 120) => {
+    (delay = 300) => {
       if (snapshotTimeoutRef.current !== null) {
         window.clearTimeout(snapshotTimeoutRef.current);
       }
