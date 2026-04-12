@@ -40,6 +40,7 @@ import { SharePostSheet } from "@/components/SharePostSheet";
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
 const revealedPostsCache = new Set<string>();
+const HYDRATION_ROOT_MARGIN = '3000px 0px';
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -120,9 +121,10 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
 
-  // Track if embed is within viewport proximity — symmetric for both scroll directions
-  // Default to true so posts hydrate immediately on mount — IO corrects for off-screen posts
-  const [isNearViewport, setIsNearViewport] = useState(true);
+  // Only hydrate embeds that are actually near the viewport.
+  // Hydrating too many posts at once keeps the main thread busy on mobile
+  // and makes follow-up swipes feel delayed while momentum scrolling.
+  const [isNearViewport, setIsNearViewport] = useState(startHydrated || alreadyRevealed);
 
   useEffect(() => {
     if (startHydrated || alreadyRevealed) return;
@@ -135,7 +137,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       },
       // Huge margin: start hydration ~5 screens away so the entire reveal
       // cycle (embed load + skeleton fade) finishes before the post is visible
-      { rootMargin: '8000px 0px', threshold: 0 }
+      { rootMargin: HYDRATION_ROOT_MARGIN, threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
