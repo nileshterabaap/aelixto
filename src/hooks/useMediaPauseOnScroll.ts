@@ -282,8 +282,6 @@ export function useMediaPauseOnScroll(
       return;
     }
 
-    let mutationRaf: number | null = null;
-
     const syncObserverStateFromLayout = () => {
       const currentEl = containerRef.current;
       if (!currentEl) return;
@@ -340,18 +338,6 @@ export function useMediaPauseOnScroll(
       else transition('suspended');
     };
 
-    const scheduleMutationCheck = () => {
-      if (mutationRaf !== null) return;
-      mutationRaf = requestAnimationFrame(() => {
-        mutationRaf = null;
-        const currentEl = containerRef.current;
-        if (!currentEl) return;
-
-        syncObserverStateFromLayout();
-        reconcile();
-      });
-    };
-
     const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
     const activeDistancePx = getActiveDistancePx();
 
@@ -371,11 +357,9 @@ export function useMediaPauseOnScroll(
       threshold: 0,
     });
 
-    const mutationObserver = new MutationObserver(() => scheduleMutationCheck());
 
     nearObserver.observe(el);
     activeObserver.observe(el);
-    mutationObserver.observe(el, { childList: true, subtree: true });
 
     const handleResize = () => {
       syncObserverStateFromLayout();
@@ -390,9 +374,7 @@ export function useMediaPauseOnScroll(
     return () => {
       nearObserver.disconnect();
       activeObserver.disconnect();
-      mutationObserver.disconnect();
       window.removeEventListener('resize', handleResize);
-      if (mutationRaf !== null) cancelAnimationFrame(mutationRaf);
     };
   }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, disableHardSuspend]);
 
