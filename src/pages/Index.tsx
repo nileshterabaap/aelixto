@@ -14,7 +14,7 @@ import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
-import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
+import { SwipeableView } from "@/components/SwipeableView";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -22,7 +22,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  useSwipeNavigation();
+  
   
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
@@ -166,23 +166,26 @@ const Index = () => {
 
   if (shouldShowSkeleton) {
     return (
-      <div className="min-h-screen bg-background pb-20">
-        <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
-        <main className="mx-auto max-w-2xl px-4 py-6">
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <PostSkeleton key={i} />
-            ))}
-          </div>
-        </main>
-        <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
-      </div>
+      <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
+        <div className="min-h-screen bg-background pb-20">
+          <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
+          <main className="mx-auto max-w-2xl px-4 py-6">
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <PostSkeleton key={i} />
+              ))}
+            </div>
+          </main>
+          <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
+        </div>
+      </SwipeableView>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
+    <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
+      <div className="min-h-screen bg-background pb-20">
+        <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
@@ -235,8 +238,9 @@ const Index = () => {
 
       <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
-      <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
-    </div>
+        <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
+      </div>
+    </SwipeableView>
   );
 };
 
