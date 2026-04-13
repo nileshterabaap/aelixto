@@ -1,6 +1,6 @@
 import { MessageCircle, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { useConversations } from "@/hooks/useConversations";
@@ -12,6 +12,7 @@ interface HeaderProps {
 
 export const Header = ({ onCreatePost }: HeaderProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useSession();
   const { conversations } = useConversations();
   const [hidden, setHidden] = useState(false);
