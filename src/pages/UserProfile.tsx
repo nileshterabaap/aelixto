@@ -16,6 +16,7 @@ import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
 import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { FollowListDialog } from "@/components/profile/FollowListDialog";
+import { ProfileOptionsMenu } from "@/components/profile/ProfileOptionsMenu";
 
 interface UserProfileProps {
   usernameOverride?: string;
@@ -32,10 +33,23 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
   const [followListOpen, setFollowListOpen] = useState(false);
   
-  const { isFollowing, follow, unfollow, loading: followLoading, counts } = useFollow(profile?.user_id);
+  const { isFollowing, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
+  const [isFollowedByTarget, setIsFollowedByTarget] = useState(false);
+
+  // Check if the target user follows the current user
+  useEffect(() => {
+    if (!user || !profile?.user_id || isMe) return;
+    supabase
+      .from("follows")
+      .select("id")
+      .eq("follower_id", profile.user_id)
+      .eq("following_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => setIsFollowedByTarget(!!data));
+  }, [user, profile?.user_id, isMe]);
 
   const handleRefresh = useCallback(async () => {
     await fetchProfile();
@@ -168,7 +182,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                   <p className="text-white/95 text-sm truncate drop-shadow-lg">@{profile.username}</p>
                 </div>
               </div>
-              {isMe && (
+              {isMe ? (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -177,7 +191,19 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                 >
                   <Menu className="h-4 w-4 stroke-[2.5]" />
                 </Button>
-              )}
+              ) : user ? (
+                <ProfileOptionsMenu
+                  targetUserId={profile.user_id}
+                  username={profile.username}
+                  displayName={profile.display_name}
+                  isFollowedByTarget={isFollowedByTarget}
+                  onBlocked={() => navigate('/')}
+                  onRemovedFollower={() => {
+                    setIsFollowedByTarget(false);
+                    refreshFollow();
+                  }}
+                />
+              ) : null}
             </div>
           </div>
         </div>
