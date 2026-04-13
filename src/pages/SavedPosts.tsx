@@ -1,3 +1,4 @@
+import { SwipeableView } from "@/components/SwipeableView";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
@@ -95,15 +96,18 @@ export default function SavedPosts() {
 
   if (loading || isLoading) {
     return (
-      <div className="min-h-screen pb-20">
-        <Header onCreatePost={() => setCreatePostOpen(true)} />
-        <SavedSkeleton />
-        <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
-      </div>
+      <SwipeableView rightRoute="/" rightLabel="Home">
+        <div className="min-h-screen pb-20">
+          <Header onCreatePost={() => setCreatePostOpen(true)} />
+          <SavedSkeleton />
+          <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
+        </div>
+      </SwipeableView>
     );
   }
 
   return (
+    <SwipeableView rightRoute="/" rightLabel="Home">
     <div className="min-h-screen pb-20">
       <Header onCreatePost={() => setCreatePostOpen(true)} />
 
@@ -152,5 +156,6 @@ export default function SavedPosts() {
       <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
       <CreatePostDialog open={createPostOpen} onOpenChange={setCreatePostOpen} />
     </div>
+    </SwipeableView>
   );
 }
