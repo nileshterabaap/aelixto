@@ -20,6 +20,7 @@ const Index = () => {
   const { user, loading: sessionLoading } = useSession();
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
+  useIframeScrollFreeze();
   
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
