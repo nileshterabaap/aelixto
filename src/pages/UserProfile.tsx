@@ -16,6 +16,7 @@ import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
 import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { FollowListDialog } from "@/components/profile/FollowListDialog";
+import { ProfileOptionsMenu } from "@/components/profile/ProfileOptionsMenu";
 
 interface UserProfileProps {
   usernameOverride?: string;
