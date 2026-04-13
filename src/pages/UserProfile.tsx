@@ -182,7 +182,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                   <p className="text-white/95 text-sm truncate drop-shadow-lg">@{profile.username}</p>
                 </div>
               </div>
-              {isMe && (
+              {isMe ? (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -191,7 +191,19 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                 >
                   <Menu className="h-4 w-4 stroke-[2.5]" />
                 </Button>
-              )}
+              ) : user ? (
+                <ProfileOptionsMenu
+                  targetUserId={profile.user_id}
+                  username={profile.username}
+                  displayName={profile.display_name}
+                  isFollowedByTarget={isFollowedByTarget}
+                  onBlocked={() => navigate('/')}
+                  onRemovedFollower={() => {
+                    setIsFollowedByTarget(false);
+                    refreshFollow();
+                  }}
+                />
+              ) : null}
             </div>
           </div>
         </div>
