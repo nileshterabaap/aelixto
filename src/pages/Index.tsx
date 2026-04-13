@@ -14,6 +14,7 @@ import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
+import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -21,6 +22,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
+  useSwipeNavigation();
   
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
