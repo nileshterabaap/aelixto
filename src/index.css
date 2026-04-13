@@ -213,3 +213,9 @@ a:active:not(:disabled) {
   animation: tap-bounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Global iframe freeze during scroll — prevents iframes from intercepting
+   touch events which causes 1-2s scroll input delay on mobile */
+.scroll-freezing-iframes iframe {
+  pointer-events: none !important;
+}

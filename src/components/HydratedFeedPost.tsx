@@ -127,21 +127,22 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [isNearViewport, setIsNearViewport] = useState(startHydrated || alreadyRevealed);
 
   useEffect(() => {
-    if (startHydrated || alreadyRevealed) return;
+    if (startHydrated || alreadyRevealed || isNearViewport) return;
     const el = embedRef.current;
     if (!el) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsNearViewport(entry.isIntersecting);
+        if (entry.isIntersecting) {
+          setIsNearViewport(true);
+          observer.disconnect(); // One-shot: never fires again, no re-renders during scroll
+        }
       },
-      // Huge margin: start hydration ~5 screens away so the entire reveal
-      // cycle (embed load + skeleton fade) finishes before the post is visible
       { rootMargin: HYDRATION_ROOT_MARGIN, threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [startHydrated, alreadyRevealed]);
+  }, [startHydrated, alreadyRevealed, isNearViewport]);
 
   // Hydrate immediately when near viewport — no velocity gating.
   useEffect(() => {
