@@ -12,11 +12,10 @@ import { useLocation } from 'react-router-dom';
  *
  * Stage B (far from viewport):
  *   - Hard-suspend playable iframes by swapping src → about:blank
- *   - Restore them early when they come back near the viewport so they can load
- *     before reaching the active center post again
+ *   - Restore them early when they come back near the viewport
  *
- * Only applies to containers with playable media (video, audio, YouTube,
- * Spotify, TikTok, Instagram reels, etc.). Static embeds are ignored.
+ * Performance: uses TWO shared IntersectionObservers + ONE resize listener
+ * for ALL registered posts, instead of per-post observers.
  */
 
 // ── Selectors ──────────────────────────────────────────────────────────
@@ -26,15 +25,13 @@ const SPOTIFY_SELECTOR = 'iframe[src*="open.spotify.com"]';
 const SUSPENDED_IFRAME_SELECTOR = 'iframe[data-aelix-suspended="1"]';
 const HARD_SUSPEND_MIN_DISTANCE_PX = 2800;
 
-// ── Data attributes for hard-suspend bookkeeping ───────────────────────
-
 const SUSPENDED_FLAG = 'aelixSuspended';
 const SUSPENDED_SRC = 'aelixSuspendedSrc';
 const FROZEN_FLAG = 'aelixFrozen';
 
 const API_PAUSABLE_SELECTOR = [YOUTUBE_SELECTOR, SPOTIFY_SELECTOR].join(', ');
 
-// ── Detection: does this container currently contain playable media? ───
+// ── Detection ─────────────────────────────────────────────────────────
 
 const PLAYABLE_MEDIA_SELECTOR = 'video, audio';
 const PLAYABLE_IFRAME_HINTS = [
@@ -60,10 +57,8 @@ const PLAYABLE_IFRAME_HINTS = [
 function isPlayableIframe(iframe: HTMLIFrameElement): boolean {
   const src = (iframe.getAttribute('src') || '').toLowerCase();
   const allow = (iframe.getAttribute('allow') || '').toLowerCase();
-
   if (!src || src === 'about:blank') return false;
   if (allow.includes('autoplay')) return true;
-
   return PLAYABLE_IFRAME_HINTS.some((hint) => src.includes(hint));
 }
 
@@ -86,7 +81,7 @@ function getActiveDistancePx(): number {
   return Math.min(Math.max(Math.round(vh * 0.45), 80), 220);
 }
 
-// ── Stage A helpers: pause only, preserve visuals ──────────────────────
+// ── Stage A helpers ───────────────────────────────────────────────────
 
 function pauseNativeMedia(root: HTMLElement) {
   root.querySelectorAll<HTMLVideoElement | HTMLAudioElement>('video, audio').forEach((el) => {
@@ -113,48 +108,16 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
-// ── Mute/unmute helpers for non-API iframes ────────────────────────────
+// ── Mute/unmute helpers ───────────────────────────────────────────────
 
 const MUTE_FLAG = 'aelixMuted';
 
-function addParam(url: string, key: string, value: string): string {
-  try {
-    const u = new URL(url);
-    u.searchParams.set(key, value);
-    return u.toString();
-  } catch {
-    // Fallback for relative or malformed URLs
-    const sep = url.includes('?') ? '&' : '?';
-    return `${url}${sep}${key}=${value}`;
-  }
-}
-
-function removeParam(url: string, key: string): string {
-  try {
-    const u = new URL(url);
-    u.searchParams.delete(key);
-    return u.toString();
-  } catch {
-    return url.replace(new RegExp(`[?&]${key}=[^&#]*`, 'g'), '').replace(/\?$/, '');
-  }
-}
-
 function muteNonApiIframe(iframe: HTMLIFrameElement) {
   if (iframe.dataset[MUTE_FLAG] === '1') return;
-  // CSS-only suppression — never touch src to avoid iframe reload/flicker
   iframe.dataset[MUTE_FLAG] = '1';
   iframe.style.pointerEvents = 'none';
   iframe.setAttribute('aria-hidden', 'true');
   iframe.tabIndex = -1;
-}
-
-function unmuteNonApiIframe(iframe: HTMLIFrameElement) {
-  if (iframe.dataset[MUTE_FLAG] !== '1') return;
-  // Undo CSS-only suppression
-  delete iframe.dataset[MUTE_FLAG];
-  iframe.style.pointerEvents = '';
-  iframe.removeAttribute('aria-hidden');
-  iframe.tabIndex = 0;
 }
 
 function muteNonApiIframes(root: HTMLElement) {
@@ -165,13 +128,6 @@ function muteNonApiIframes(root: HTMLElement) {
   });
 }
 
-function unmuteNonApiIframes(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    unmuteNonApiIframe(iframe);
-  });
-}
-
-/** Freeze all iframes (pointer-events) */
 function freezeIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
@@ -181,7 +137,6 @@ function freezeIframes(root: HTMLElement) {
   });
 }
 
-/** Unfreeze all iframes */
 function unfreezeIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (iframe.dataset[FROZEN_FLAG] !== '1') return;
@@ -190,7 +145,6 @@ function unfreezeIframes(root: HTMLElement) {
   });
 }
 
-/** Stage A: pause native/API media and mute other playable embeds */
 function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
@@ -201,28 +155,23 @@ function stageAPause(root: HTMLElement) {
   freezeIframes(root);
 }
 
-/** Undo Stage A (unfreeze + reset mute flags for next pause cycle) */
 function stageAResume(root: HTMLElement) {
   restoreHardSuspended(root);
   root.dataset.aelixHasBeenActive = 'true';
-  // Clear mute flags so next stageAPause can re-apply muting.
-  // Do NOT change iframe src here — that causes flicker.
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     delete iframe.dataset[MUTE_FLAG];
   });
   unfreezeIframes(root);
 }
 
-// ── Stage B helpers: hard suspend / restore ────────────────────────────
+// ── Stage B helpers ───────────────────────────────────────────────────
 
 function hardSuspendIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (!isPlayableIframe(iframe)) return;
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
-
     const src = iframe.getAttribute('src');
     if (!src || src === 'about:blank') return;
-
     iframe.dataset[SUSPENDED_SRC] = src;
     iframe.dataset[SUSPENDED_FLAG] = '1';
     iframe.setAttribute('src', 'about:blank');
@@ -233,43 +182,170 @@ function hardSuspendIframes(root: HTMLElement) {
 function restoreHardSuspended(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (iframe.dataset[SUSPENDED_FLAG] !== '1') return;
-
     const storedSrc = iframe.dataset[SUSPENDED_SRC];
-    if (storedSrc) {
-      iframe.setAttribute('src', storedSrc);
-    }
-
+    if (storedSrc) iframe.setAttribute('src', storedSrc);
     delete iframe.dataset[SUSPENDED_FLAG];
     delete iframe.dataset[SUSPENDED_SRC];
     iframe.style.visibility = '';
   });
 }
 
-// ── Lifecycle states ───────────────────────────────────────────────────
+// ── Shared observer registry ──────────────────────────────────────────
+// Instead of 2 IntersectionObservers + 1 resize listener PER POST,
+// we maintain 2 shared observers + 1 resize listener for ALL posts.
 
 type LifecycleState = 'active' | 'paused' | 'suspended';
 
+interface RegisteredElement {
+  near: boolean;
+  active: boolean;
+  state: LifecycleState;
+  disableHardSuspend: boolean;
+}
+
+const elementStates = new Map<HTMLElement, RegisteredElement>();
+
+let sharedNearObserver: IntersectionObserver | null = null;
+let sharedActiveObserver: IntersectionObserver | null = null;
+let sharedResizeHandler: (() => void) | null = null;
+let observerRefCount = 0;
+
+function transitionElement(el: HTMLElement, reg: RegisteredElement, target: LifecycleState) {
+  const current = reg.state;
+  if (current === target) return;
+
+  if (!hasLifecycleTargets(el) && target !== 'active') {
+    reg.state = 'active';
+    return;
+  }
+
+  if (target === 'active') {
+    stageAResume(el);
+  } else if (target === 'paused') {
+    if (current === 'suspended') restoreHardSuspended(el);
+    stageAPause(el);
+  } else if (target === 'suspended') {
+    if (reg.disableHardSuspend) {
+      stageAPause(el);
+      reg.state = 'paused';
+      return;
+    }
+    if (current === 'active') stageAPause(el);
+    hardSuspendIframes(el);
+  }
+
+  reg.state = target;
+}
+
+function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
+  if (reg.active) transitionElement(el, reg, 'active');
+  else if (reg.near) transitionElement(el, reg, 'paused');
+  else transitionElement(el, reg, 'suspended');
+}
+
+function ensureSharedObservers() {
+  if (sharedNearObserver) return;
+
+  const hardDist = getHardSuspendDistancePx(6);
+  const activeDist = getActiveDistancePx();
+
+  sharedNearObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const reg = elementStates.get(entry.target as HTMLElement);
+      if (!reg) continue;
+      reg.near = entry.isIntersecting;
+      reconcileElement(entry.target as HTMLElement, reg);
+    }
+  }, {
+    rootMargin: `${hardDist}px 0px ${hardDist}px 0px`,
+    threshold: 0,
+  });
+
+  sharedActiveObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      const reg = elementStates.get(entry.target as HTMLElement);
+      if (!reg) continue;
+      reg.active = entry.isIntersecting;
+      reconcileElement(entry.target as HTMLElement, reg);
+    }
+  }, {
+    rootMargin: `-${activeDist}px 0px -${activeDist}px 0px`,
+    threshold: 0,
+  });
+
+  sharedResizeHandler = () => {
+    const vh = window.innerHeight || document.documentElement.clientHeight;
+    const hd = getHardSuspendDistancePx(6);
+    const ad = getActiveDistancePx();
+    elementStates.forEach((reg, el) => {
+      const rect = el.getBoundingClientRect();
+      reg.near = rect.bottom > -hd && rect.top < vh + hd;
+      reg.active = rect.bottom > ad && rect.top < vh - ad;
+      reconcileElement(el, reg);
+    });
+  };
+
+  window.addEventListener('resize', sharedResizeHandler);
+}
+
+function destroySharedObservers() {
+  sharedNearObserver?.disconnect();
+  sharedActiveObserver?.disconnect();
+  if (sharedResizeHandler) window.removeEventListener('resize', sharedResizeHandler);
+  sharedNearObserver = null;
+  sharedActiveObserver = null;
+  sharedResizeHandler = null;
+}
+
+function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
+  ensureSharedObservers();
+  observerRefCount++;
+
+  const reg: RegisteredElement = { near: false, active: false, state: 'active', disableHardSuspend };
+  elementStates.set(el, reg);
+  sharedNearObserver!.observe(el);
+  sharedActiveObserver!.observe(el);
+
+  // Sync initial state from layout
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  const hardDist = getHardSuspendDistancePx(6);
+  const activeDist = getActiveDistancePx();
+  const rect = el.getBoundingClientRect();
+  reg.near = rect.bottom > -hardDist && rect.top < vh + hardDist;
+  reg.active = rect.bottom > activeDist && rect.top < vh - activeDist;
+  reconcileElement(el, reg);
+}
+
+function unregisterElement(el: HTMLElement) {
+  elementStates.delete(el);
+  sharedNearObserver?.unobserve(el);
+  sharedActiveObserver?.unobserve(el);
+  observerRefCount--;
+
+  if (observerRefCount <= 0) {
+    observerRefCount = 0;
+    destroySharedObservers();
+  }
+}
+
+// ── Hook options ──────────────────────────────────────────────────────
+
 interface MediaLifecycleOptions {
-  /** Enable lifecycle for this post. Should be true only for playable media posts. */
   enabled?: boolean;
-  /** Stage B threshold in viewport heights. A pixel floor is also applied for tiny screens. */
   hardSuspendDistanceVh?: number;
-  /** When true, skip Stage B (hard-suspend) entirely — embeds stay loaded for the session. */
   disableHardSuspend?: boolean;
 }
 
-// ── Hook ───────────────────────────────────────────────────────────────
+// ── Hook ──────────────────────────────────────────────────────────────
 
 export function useMediaPauseOnScroll(
   containerRef: RefObject<HTMLElement | null>,
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
-  const { enabled = true, hardSuspendDistanceVh = 6, disableHardSuspend = false } = options;
+  const { enabled = true, disableHardSuspend = false } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
-  const stateRef = useRef<LifecycleState>('active');
-  const observerStateRef = useRef({ near: false, active: false });
 
   useEffect(() => {
     const el = containerRef.current;
@@ -277,107 +353,14 @@ export function useMediaPauseOnScroll(
 
     if (!enabled) {
       restoreHardSuspended(el);
-      stateRef.current = 'active';
-      observerStateRef.current = { near: false, active: false };
       return;
     }
 
-    const syncObserverStateFromLayout = () => {
-      const currentEl = containerRef.current;
-      if (!currentEl) return;
+    registerElement(el, disableHardSuspend);
+    return () => unregisterElement(el);
+  }, [containerRef, observeKey, enabled, disableHardSuspend]);
 
-      const rect = currentEl.getBoundingClientRect();
-      const vh = window.innerHeight || document.documentElement.clientHeight;
-      const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
-      const activeDistancePx = getActiveDistancePx();
-
-      observerStateRef.current = {
-        near: rect.bottom > -hardSuspendDistancePx && rect.top < vh + hardSuspendDistancePx,
-        active: rect.bottom > activeDistancePx && rect.top < vh - activeDistancePx,
-      };
-    };
-
-    const transition = (target: LifecycleState) => {
-      const current = stateRef.current;
-      if (current === target) return;
-
-      const currentEl = containerRef.current;
-      if (!currentEl) return;
-
-      if (!hasLifecycleTargets(currentEl) && target !== 'active') {
-        stateRef.current = 'active';
-        return;
-      }
-
-      if (target === 'active') {
-        stageAResume(currentEl);
-      } else if (target === 'paused') {
-        if (current === 'suspended') {
-          restoreHardSuspended(currentEl);
-        }
-        stageAPause(currentEl);
-      } else if (target === 'suspended') {
-        if (disableHardSuspend) {
-          // Skip hard-suspend — just pause media, keep embeds loaded
-          stageAPause(currentEl);
-          stateRef.current = 'paused';
-          return;
-        }
-        if (current === 'active') {
-          stageAPause(currentEl);
-        }
-        hardSuspendIframes(currentEl);
-      }
-
-      stateRef.current = target;
-    };
-
-    const reconcile = () => {
-      if (observerStateRef.current.active) transition('active');
-      else if (observerStateRef.current.near) transition('paused');
-      else transition('suspended');
-    };
-
-    const hardSuspendDistancePx = getHardSuspendDistancePx(hardSuspendDistanceVh);
-    const activeDistancePx = getActiveDistancePx();
-
-    const nearObserver = new IntersectionObserver(([entry]) => {
-      observerStateRef.current.near = entry?.isIntersecting ?? false;
-      reconcile();
-    }, {
-      rootMargin: `${hardSuspendDistancePx}px 0px ${hardSuspendDistancePx}px 0px`,
-      threshold: 0,
-    });
-
-    const activeObserver = new IntersectionObserver(([entry]) => {
-      observerStateRef.current.active = entry?.isIntersecting ?? false;
-      reconcile();
-    }, {
-      rootMargin: `-${activeDistancePx}px 0px -${activeDistancePx}px 0px`,
-      threshold: 0,
-    });
-
-
-    nearObserver.observe(el);
-    activeObserver.observe(el);
-
-    const handleResize = () => {
-      syncObserverStateFromLayout();
-      reconcile();
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    syncObserverStateFromLayout();
-    reconcile();
-
-    return () => {
-      nearObserver.disconnect();
-      activeObserver.disconnect();
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [containerRef, observeKey, enabled, hardSuspendDistanceVh, disableHardSuspend]);
-
+  // Route-change pause
   useEffect(() => {
     if (!enabled) {
       prevPathRef.current = location.pathname;
@@ -388,22 +371,17 @@ export function useMediaPauseOnScroll(
       const el = containerRef.current;
       if (el && hasPlayableMedia(el)) {
         stageAPause(el);
-        if (!disableHardSuspend) {
-          hardSuspendIframes(el);
-        }
-        stateRef.current = disableHardSuspend ? 'paused' : 'suspended';
+        if (!disableHardSuspend) hardSuspendIframes(el);
+        const reg = elementStates.get(el);
+        if (reg) reg.state = disableHardSuspend ? 'paused' : 'suspended';
       }
       prevPathRef.current = location.pathname;
     }
   }, [enabled, location.pathname, containerRef, disableHardSuspend]);
-
-  return stateRef.current;
 }
 
-/**
- * Global route-change media killer.
- * Mount once at app level to pause ALL playable media on any navigation.
- */
+// ── Global route-change media killer ──────────────────────────────────
+
 export function useGlobalMediaPauseOnNavigate() {
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);

@@ -279,21 +279,28 @@ export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) 
     };
 
     // Lock any existing iframes
-    containerRef.current.querySelectorAll('iframe').forEach(lockIframe);
+    const existing = containerRef.current.querySelectorAll('iframe');
+    existing.forEach(lockIframe);
+
+    // If iframes already exist, no need to watch for new ones
+    if (existing.length > 0) return;
 
     // Watch for new iframes (SDK creates them asynchronously)
     const observer = new MutationObserver((mutations) => {
+      let found = false;
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
           if (node instanceof HTMLIFrameElement) {
             lockIframe(node);
+            found = true;
           }
-          // Also check children of added nodes
           if (node instanceof HTMLElement) {
-            node.querySelectorAll('iframe').forEach(lockIframe);
+            node.querySelectorAll('iframe').forEach((f) => { lockIframe(f); found = true; });
           }
         }
       }
+      // Disconnect once we've found and locked the iframe — job done
+      if (found) observer.disconnect();
     });
 
     observer.observe(containerRef.current, { childList: true, subtree: true });

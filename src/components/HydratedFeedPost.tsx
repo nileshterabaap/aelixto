@@ -345,6 +345,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const isTextOnly = r.kind === 'none';
 
   // Measure card height and sync to skeleton wrapper to prevent layout shift
+  const roRef = useRef<ResizeObserver | null>(null);
+
   useEffect(() => {
     if (alreadyRevealed || isTextOnly) return;
     const card = cardMeasureRef.current;
@@ -355,9 +357,18 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         if (h > 0) setMeasuredHeight(h);
       }
     });
+    roRef.current = ro;
     ro.observe(card);
-    return () => ro.disconnect();
+    return () => { ro.disconnect(); roRef.current = null; };
   }, [alreadyRevealed, isTextOnly]);
+
+  // Disconnect ResizeObserver once skeleton is gone — no longer needed
+  useEffect(() => {
+    if (!skeletonVisible && roRef.current) {
+      roRef.current.disconnect();
+      roRef.current = null;
+    }
+  }, [skeletonVisible]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
 
