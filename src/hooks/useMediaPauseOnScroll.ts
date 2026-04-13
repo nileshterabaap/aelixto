@@ -214,11 +214,6 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
   const current = reg.state;
   if (current === target) return;
 
-  if (!hasLifecycleTargets(el) && target !== 'active') {
-    reg.state = 'active';
-    return;
-  }
-
   if (target === 'active') {
     stageAResume(el);
   } else if (target === 'paused') {
