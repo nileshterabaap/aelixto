@@ -13,12 +13,14 @@ import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
+  useIframeScrollFreeze();
   
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
