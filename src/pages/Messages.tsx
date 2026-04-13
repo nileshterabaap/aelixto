@@ -1,3 +1,4 @@
+import { SwipeableView } from "@/components/SwipeableView";
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
@@ -27,6 +28,7 @@ const Messages = () => {
   }, [refetch]);
 
   return (
+    <SwipeableView leftRoute="/" leftLabel="Home">
     <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
@@ -117,6 +119,7 @@ const Messages = () => {
         onOpenChange={setIsCreateDialogOpen}
       />
     </div>
+    </SwipeableView>
   );
 };
 
