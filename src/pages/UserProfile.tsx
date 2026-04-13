@@ -33,10 +33,23 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
   const [followListOpen, setFollowListOpen] = useState(false);
   
-  const { isFollowing, follow, unfollow, loading: followLoading, counts } = useFollow(profile?.user_id);
+  const { isFollowing, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
+  const [isFollowedByTarget, setIsFollowedByTarget] = useState(false);
+
+  // Check if the target user follows the current user
+  useEffect(() => {
+    if (!user || !profile?.user_id || isMe) return;
+    supabase
+      .from("follows")
+      .select("id")
+      .eq("follower_id", profile.user_id)
+      .eq("following_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => setIsFollowedByTarget(!!data));
+  }, [user, profile?.user_id, isMe]);
 
   const handleRefresh = useCallback(async () => {
     await fetchProfile();
