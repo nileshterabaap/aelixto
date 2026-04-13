@@ -1,6 +1,6 @@
 import { MessageCircle, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { useConversations } from "@/hooks/useConversations";
@@ -12,6 +12,7 @@ interface HeaderProps {
 
 export const Header = ({ onCreatePost }: HeaderProps) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useSession();
   const { conversations } = useConversations();
   const [hidden, setHidden] = useState(false);
@@ -56,7 +57,7 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
 className="h-14 w-14"
               onClick={() => navigate('/saved')}
             >
-              <Bookmark className="h-12 w-12 stroke-[2.5]" />
+              <Bookmark className={`h-12 w-12 stroke-[2.5] transition-opacity ${location.pathname === '/saved' ? 'opacity-100' : 'opacity-50'}`} fill={location.pathname === '/saved' ? 'currentColor' : 'none'} />
             </Button>
           )}
         </div>
@@ -84,7 +85,7 @@ className="h-14 w-14"
 className="h-14 w-14 relative"
               onClick={() => navigate('/messages')}
             >
-              <MessageCircle className="h-12 w-12 stroke-[2.5]" />
+              <MessageCircle className={`h-12 w-12 stroke-[2.5] transition-opacity ${location.pathname === '/messages' ? 'opacity-100' : 'opacity-50'}`} fill={location.pathname === '/messages' ? 'currentColor' : 'none'} />
               {totalUnreadMessages > 0 && (
                 <div className="absolute top-1 right-1 h-5 w-5 rounded-full bg-destructive text-[11px] font-bold text-destructive-foreground flex items-center justify-center">
                   {totalUnreadMessages}

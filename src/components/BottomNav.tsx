@@ -26,6 +26,8 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     if (path === "/profile") {
       return location.pathname === "/profile" || location.pathname.startsWith("/u/");
     }
+    if (path === "/saved") return location.pathname === "/saved";
+    if (path === "/messages") return location.pathname === "/messages";
     return location.pathname === path;
   };
   const [ripples, setRipples] = useState<Record<string, Ripple[]>>({});

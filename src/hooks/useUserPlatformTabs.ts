@@ -64,12 +64,31 @@ export const useUserPlatformTabs = (userId: string | undefined) => {
 
         if (error) throw error;
 
-        const platformTabs: PlatformTab[] = (data || []).map((item: any) => ({
-          key: item.platform,
-          label: PLATFORM_META[item.platform]?.label || item.platform,
-          icon: PLATFORM_META[item.platform]?.icon || externalIcon,
-          count: item.post_count,
-        }));
+        // Fetch the most recent post date per platform to sort by recency
+        const { data: recentPosts } = await supabase
+          .from("posts")
+          .select("platform, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(500);
+
+        const latestByPlatform: Record<string, string> = {};
+        (recentPosts || []).forEach((p: any) => {
+          if (p.platform && !latestByPlatform[p.platform]) {
+            latestByPlatform[p.platform] = p.created_at;
+          }
+        });
+
+        const platformTabs: PlatformTab[] = (data || [])
+          .map((item: any) => ({
+            key: item.platform,
+            label: PLATFORM_META[item.platform]?.label || item.platform,
+            icon: PLATFORM_META[item.platform]?.icon || externalIcon,
+            count: item.post_count,
+            _latest: latestByPlatform[item.platform] || "1970-01-01",
+          }))
+          .sort((a: any, b: any) => b._latest.localeCompare(a._latest))
+          .map(({ _latest, ...tab }: any) => tab as PlatformTab);
 
         setTabs(platformTabs);
 
