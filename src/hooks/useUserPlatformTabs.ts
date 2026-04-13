@@ -65,12 +65,21 @@ export const useUserPlatformTabs = (userId: string | undefined) => {
         if (error) throw error;
 
         // Fetch the most recent post date per platform to sort by recency
-        const { data: recentPosts } = await supabase
-          .from("posts")
-          .select("platform, created_at")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(500);
+        // Include both own posts and reposts
+        const [{ data: recentPosts }, { data: recentReposts }] = await Promise.all([
+          supabase
+            .from("posts")
+            .select("platform, created_at")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(500),
+          supabase
+            .from("reposts")
+            .select("created_at, post_id")
+            .eq("user_id", userId)
+            .order("created_at", { ascending: false })
+            .limit(200),
+        ]);
 
         const latestByPlatform: Record<string, string> = {};
         (recentPosts || []).forEach((p: any) => {
@@ -78,6 +87,27 @@ export const useUserPlatformTabs = (userId: string | undefined) => {
             latestByPlatform[p.platform] = p.created_at;
           }
         });
+
+        // For reposts, fetch the platform of the original post and use repost timestamp
+        if (recentReposts && recentReposts.length > 0) {
+          const postIds = recentReposts.map((r: any) => r.post_id);
+          const { data: repostedPosts } = await supabase
+            .from("posts")
+            .select("id, platform")
+            .in("id", postIds);
+
+          const platformByPostId: Record<string, string> = {};
+          (repostedPosts || []).forEach((p: any) => {
+            if (p.platform) platformByPostId[p.id] = p.platform;
+          });
+
+          recentReposts.forEach((r: any) => {
+            const platform = platformByPostId[r.post_id];
+            if (platform && (!latestByPlatform[platform] || r.created_at > latestByPlatform[platform])) {
+              latestByPlatform[platform] = r.created_at;
+            }
+          });
+        }
 
         const platformTabs: PlatformTab[] = (data || [])
           .map((item: any) => ({
