@@ -429,6 +429,35 @@ export type Database = {
           },
         ]
       }
+      post_seen: {
+        Row: {
+          id: number
+          post_id: string
+          seen_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: never
+          post_id: string
+          seen_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: never
+          post_id?: string
+          seen_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_seen_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       post_views: {
         Row: {
           author_id: string
