@@ -24,6 +24,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
+  const { observePost } = useMarkPostSeen(user?.id);
   
   
   // Demo feed for signed-out users
