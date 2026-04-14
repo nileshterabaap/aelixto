@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
@@ -11,6 +12,7 @@ import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
+import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
@@ -22,6 +24,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
+  const { observePost } = useMarkPostSeen(user?.id);
   
   
   // Demo feed for signed-out users
@@ -212,6 +215,7 @@ const Index = () => {
                   key={post.id} 
                   ref={(el) => {
                     registerItem(post.id)(el);
+                    if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
                   }}
                   data-feed-item-id={post.id}
                 >
@@ -230,6 +234,16 @@ const Index = () => {
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                   </div>
                 </>
+              )}
+              {/* All caught up message */}
+              {!hasMore && !showDemoFeed && allPosts.length > 0 && (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
+                  <h3 className="text-lg font-semibold">You're all caught up</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    You've seen all recent posts from people you follow.
+                  </p>
+                </div>
               )}
             </div>
           )}
