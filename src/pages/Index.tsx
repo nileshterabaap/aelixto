@@ -11,6 +11,7 @@ import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
+import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
