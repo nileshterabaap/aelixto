@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { markPostSeenImmediate } from "@/hooks/useMarkPostSeen";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
@@ -38,6 +39,10 @@ const PostDetail = () => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUserId(user?.id);
+      // Mark this post as seen when viewing it
+      if (user?.id && postId) {
+        markPostSeenImmediate(user.id, postId);
+      }
     };
     getUser();
     

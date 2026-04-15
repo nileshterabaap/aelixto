@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
+import { markPostsSeenImmediate } from "@/hooks/useMarkPostSeen";
 
 interface SavedPost {
   id: string;
@@ -43,6 +44,13 @@ export const SavedPostViewer = ({
       if (el) el.scrollIntoView({ behavior: "auto", block: "start" });
     }, 100);
   }, [initialPostId]);
+
+  // Mark all viewed saved posts as seen
+  useEffect(() => {
+    if (userId && posts.length > 0) {
+      markPostsSeenImmediate(userId, posts.map(p => p.id));
+    }
+  }, [userId, posts]);
 
   // Prevent body scroll
   useEffect(() => {
