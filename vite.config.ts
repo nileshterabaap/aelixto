@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'logo.png', 'assets/**'],
+      includeAssets: ['robots.txt', 'logo.png', 'assets/**'],
       manifest: {
         name: 'Aelixto',
         short_name: 'Aelixto',
