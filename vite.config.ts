@@ -15,12 +15,12 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'robots.txt', 'logo.png', 'assets/**'],
+      includeAssets: ['robots.txt', 'logo.png', 'assets/**'],
       manifest: {
         name: 'Aelixto',
         short_name: 'Aelixto',
         description: 'Social media platform for creators',
-        theme_color: '#000000',
+        theme_color: '#2563EB',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
