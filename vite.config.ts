@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => ({
         name: 'Aelixto',
         short_name: 'Aelixto',
         description: 'Social media platform for creators',
-        theme_color: '#000000',
+        theme_color: '#2563EB',
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
