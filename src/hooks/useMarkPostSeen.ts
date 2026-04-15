@@ -6,6 +6,35 @@ const VISIBILITY_THRESHOLD = 0.5; // 50% visible
 const MIN_VIEW_TIME = 1500; // 1.5s minimum viewing time
 
 /**
+ * Mark a single post as seen immediately (fire-and-forget).
+ * Use this when viewing a post on detail/profile/saved pages.
+ */
+export const markPostSeenImmediate = async (userId: string, postId: string) => {
+  try {
+    await supabase
+      .from('post_seen')
+      .upsert({ user_id: userId, post_id: postId }, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
+  } catch {
+    // best-effort
+  }
+};
+
+/**
+ * Mark multiple posts as seen immediately (fire-and-forget).
+ */
+export const markPostsSeenImmediate = async (userId: string, postIds: string[]) => {
+  if (postIds.length === 0) return;
+  try {
+    const rows = postIds.map((post_id) => ({ user_id: userId, post_id }));
+    await supabase
+      .from('post_seen')
+      .upsert(rows, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
+  } catch {
+    // best-effort
+  }
+};
+
+/**
  * Tracks which posts the user has actually viewed in the feed
  * and batch-inserts them into post_seen for feed filtering.
  */
@@ -79,9 +108,6 @@ export const useMarkPostSeen = (userId: string | undefined) => {
         );
 
         observer.observe(el);
-
-        // Cleanup via MutationObserver isn't needed since React manages the DOM,
-        // but we store the observer for potential cleanup
         (el as any).__seenObserver = observer;
       };
     },
