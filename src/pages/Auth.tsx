@@ -132,8 +132,13 @@ const Auth = () => {
   };
 
   const handleGoogleSignIn = async () => {
+    const isNative = Capacitor.isNativePlatform();
+    const redirectUri = isNative
+      ? "https://aelixto.com/auth"
+      : `${window.location.origin}/auth`;
+
     const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/auth`,
+      redirect_uri: redirectUri,
     });
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
