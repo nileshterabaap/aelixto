@@ -27,5 +27,8 @@ createRoot(document.getElementById("root")!).render(<App />);
 
 // Dismiss splash after a brief delay to ensure first paint
 requestAnimationFrame(() => {
-  requestAnimationFrame(dismissSplash);
+  requestAnimationFrame(() => {
+    dismissSplash();
+    initCapacitorPlugins();
+  });
 });
