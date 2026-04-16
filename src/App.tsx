@@ -85,15 +85,15 @@ const AnimatedRoutes = () => {
           <Routes location={location} key={location.pathname}>
             <Route path="/discover" element={<PageTransition><Discover /></PageTransition>} />
             <Route path="/notifications" element={<PageTransition><Notifications /></PageTransition>} />
-            <Route path="/messages" element={<Messages />} />
+            <Route path="/messages" element={<PageTransition><Messages /></PageTransition>} />
             <Route path="/conversation/:conversationId" element={<PageTransition><Conversation /></PageTransition>} />
-            <Route path="/profile" element={<Profile />} />
+            <Route path="/profile" element={<PageTransition><Profile /></PageTransition>} />
             <Route path="/post/:postId" element={<PageTransition><PostDetail /></PageTransition>} />
             <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
             <Route path="/settings/interactions" element={<PageTransition><InteractionSettings /></PageTransition>} />
             <Route path="/settings/privacy" element={<PageTransition><PrivacySettings /></PageTransition>} />
             <Route path="/edit-profile" element={<PageTransition><EditProfile /></PageTransition>} />
-            <Route path="/saved" element={<SavedPosts />} />
+            <Route path="/saved" element={<PageTransition><SavedPosts /></PageTransition>} />
             <Route path="/auth" element={<PageTransition><Auth /></PageTransition>} />
             <Route path="/privacy" element={<PageTransition><PrivacyPolicy /></PageTransition>} />
             <Route path="/terms" element={<PageTransition><TermsOfService /></PageTransition>} />
