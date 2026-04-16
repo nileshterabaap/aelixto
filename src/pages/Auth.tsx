@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { Capacitor } from "@capacitor/core";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -131,8 +132,13 @@ const Auth = () => {
   };
 
   const handleGoogleSignIn = async () => {
+    const isNative = Capacitor.isNativePlatform();
+    const redirectUri = isNative
+      ? "https://aelixto.com/auth"
+      : `${window.location.origin}/auth`;
+
     const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/auth`,
+      redirect_uri: redirectUri,
     });
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
