@@ -1,6 +1,7 @@
 import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import InstagramIcon from "@/assets/platforms/instagram.svg";
 import FacebookIcon from "@/assets/platforms/facebook.svg";
@@ -134,16 +135,17 @@ export const ProfilePlatformGrid = ({
       <div className="space-y-4">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
           {items.map((post, i) => (
-            <div
+            <motion.div
               key={post.id}
-              className="animate-fade-in"
-              style={{ animationDelay: `${i * 40}ms`, animationFillMode: 'both' }}
+              initial={{ opacity: 0, scale: 0.92 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.4), ease: [0.4, 0, 0.2, 1] }}
             >
               <PostCard
                 post={post}
                 onClick={() => handlePostClick(post.id)}
               />
-            </div>
+            </motion.div>
           ))}
         </div>
 
