@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { registerSW } from 'virtual:pwa-register';
 import App from "./App.tsx";
 import "./index.css";
+import { initCapacitorPlugins } from "./capacitor-init";
 
 // Dismiss splash screen once React is ready
 const dismissSplash = () => {
