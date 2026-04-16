@@ -1,5 +1,6 @@
 import { SwipeableView } from "@/components/SwipeableView";
 import { useState, useCallback } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
@@ -54,7 +55,7 @@ const Messages = () => {
             </div>
           ) : (
             <div className="space-y-1">
-              {conversations.map((conversation) => {
+              {conversations.map((conversation, i) => {
                 const hasUnread = conversation.unread_count > 0;
                 const lastMessagePreview = conversation.last_message
                   ? conversation.last_message.sender_id === user?.id
@@ -63,8 +64,11 @@ const Messages = () => {
                   : "No messages yet";
 
                 return (
-                  <div
+                  <motion.div
                     key={conversation.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: Math.min(i * 0.06, 0.5), ease: [0.4, 0, 0.2, 1] }}
                     className={`flex items-center gap-4 p-4 rounded-lg cursor-pointer transition-colors hover:bg-accent ${
                       hasUnread ? "bg-accent/50" : ""
                     }`}
@@ -105,7 +109,7 @@ const Messages = () => {
                         {lastMessagePreview}
                       </p>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
