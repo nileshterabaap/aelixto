@@ -43,6 +43,7 @@ import { ImageViewTracker } from "@/components/ImageViewTracker";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { SharePostSheet } from "@/components/SharePostSheet";
+import { PostReportMenu } from "@/components/PostReportMenu";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -283,7 +284,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
-            {post.isRealPost && (post as any).user_id === userId && (
+            {post.isRealPost && (post as any).user_id === userId ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                   <Button 
@@ -305,7 +306,13 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
+            ) : post.isRealPost && (post as any).user_id ? (
+              <PostReportMenu
+                postId={post.id}
+                authorUserId={(post as any).user_id}
+                authorUsername={post.author?.username}
+              />
+            ) : null}
             </div>
           </div>
 
@@ -436,7 +443,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
-            {post.isRealPost && (post as any).user_id === userId && (
+            {post.isRealPost && (post as any).user_id === userId ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                   <Button 
@@ -458,7 +465,13 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
+            ) : post.isRealPost && (post as any).user_id ? (
+              <PostReportMenu
+                postId={post.id}
+                authorUserId={(post as any).user_id}
+                authorUsername={post.author?.username}
+              />
+            ) : null}
           </div>
         </div>
 
