@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { MoreVertical, Ban, UserMinus, Copy, Share2 } from "lucide-react";
+import { MoreVertical, Ban, UserMinus, Copy, Share2, Flag } from "lucide-react";
+import { ReportDialog } from "@/components/ReportDialog";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -40,6 +41,7 @@ export const ProfileOptionsMenu = ({
 }: ProfileOptionsMenuProps) => {
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [removeFollowerDialogOpen, setRemoveFollowerDialogOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const profileUrl = `${window.location.origin}/u/${username}`;
@@ -155,6 +157,13 @@ export const ProfileOptionsMenu = ({
           )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
+            onClick={() => setReportOpen(true)}
+            className="text-destructive focus:text-destructive"
+          >
+            <Flag className="h-4 w-4 mr-2" />
+            Report @{username}
+          </DropdownMenuItem>
+          <DropdownMenuItem
             onClick={() => setBlockDialogOpen(true)}
             className="text-destructive focus:text-destructive"
           >
@@ -163,6 +172,14 @@ export const ProfileOptionsMenu = ({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <ReportDialog
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        targetType="user"
+        targetUserId={targetUserId}
+        targetUsername={username}
+      />
 
       {/* Block confirmation */}
       <AlertDialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
