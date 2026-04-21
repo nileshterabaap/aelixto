@@ -174,6 +174,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const isYouTubeShort = (url: string) => {
     if (url.includes('/shorts/')) return true;
     if (post.title && /#shorts?\b/i.test(post.title)) return true;
+    if (post.content && /#shorts?\b/i.test(post.content)) return true;
     return false;
   };
 
