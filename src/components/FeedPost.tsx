@@ -172,7 +172,9 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   };
 
   const isYouTubeShort = (url: string) => {
-    return url.includes('/shorts/');
+    if (url.includes('/shorts/')) return true;
+    if (post.title && /#shorts?\b/i.test(post.title)) return true;
+    return false;
   };
 
   const getYouTubeThumbnail = (url: string) => {

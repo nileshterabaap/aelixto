@@ -47,7 +47,11 @@ const getYouTubeVideoId = (url: string) => {
   return (match && match[2].length === 11) ? match[2] : null;
 };
 
-const isYouTubeShort = (url: string) => url.includes('/shorts/');
+const isYouTubeShort = (url: string, title?: string | null) => {
+  if (url.includes('/shorts/')) return true;
+  if (title && /#shorts?\b/i.test(title)) return true;
+  return false;
+};
 
 const getYouTubeThumbnail = (url: string) => {
   const videoId = getYouTubeVideoId(url);
@@ -143,7 +147,7 @@ export const HydratedEmbed = memo(({
     ? getYouTubeThumbnail(r.url) || thumbnailUrl 
     : thumbnailUrl;
   
-  const aspectClass = post.platform === 'youtube' && r.url && isYouTubeShort(r.url)
+  const aspectClass = post.platform === 'youtube' && r.url && isYouTubeShort(r.url, post.title)
     ? 'aspect-[9/16]'
     : 'aspect-video';
   
