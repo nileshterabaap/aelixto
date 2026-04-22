@@ -222,7 +222,39 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       embed_html: embedHtml || undefined,
     });
 
-    // Reset form
+    // If posted from a draft, remove it
+    if (draftId) {
+      deleteDraft.mutate(draftId);
+    }
+
+    resetAndClose();
+  };
+
+  const handleSaveAsDraft = async () => {
+    if (!linkUrl.trim()) {
+      toast.error("Add a link before saving as draft");
+      return;
+    }
+    const platform = classifyUrl(linkUrl, ogType);
+    const mediaType = deriveMediaType(linkUrl, platform);
+    await saveDraft.mutateAsync({
+      link_url: linkUrl,
+      caption: caption.trim() || null,
+      title: title.trim() || null,
+      thumbnail_url: thumbnailUrl || null,
+      embed_html: embedHtml || null,
+      platform,
+      media_type: mediaType,
+      og_type: ogType,
+    });
+    // If editing an existing draft, delete the old one (replace)
+    if (draftId) {
+      deleteDraft.mutate(draftId);
+    }
+    resetAndClose();
+  };
+
+  const resetAndClose = () => {
     setStep(1);
     setLinkUrl("");
     setThumbnailUrl("");
@@ -231,6 +263,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setShowThumbnailInput(false);
     setEmbedHtml("");
     setOgType(null);
+    setDraftId(null);
     onOpenChange(false);
   };
 
@@ -249,6 +282,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setIsLoadingPreview(false);
     setEmbedHtml("");
     setOgType(null);
+    setDraftId(null);
     onOpenChange(false);
   };
 
