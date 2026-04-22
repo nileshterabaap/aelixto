@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,15 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
+import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialDraft?: PostDraft | null;
 }
 
-export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) => {
+export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePostDialogProps) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [linkUrl, setLinkUrl] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
@@ -25,7 +27,24 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [embedHtml, setEmbedHtml] = useState("");
   const [ogType, setOgType] = useState<string | null>(null);
+  const [draftId, setDraftId] = useState<string | null>(null);
   const createPost = useCreatePost();
+  const saveDraft = useSaveDraft();
+  const deleteDraft = useDeleteDraft();
+
+  // Hydrate from existing draft when opening
+  useEffect(() => {
+    if (open && initialDraft) {
+      setStep(2);
+      setLinkUrl(initialDraft.link_url || "");
+      setThumbnailUrl(initialDraft.thumbnail_url || "");
+      setTitle(initialDraft.title || "");
+      setCaption(initialDraft.caption || "");
+      setEmbedHtml(initialDraft.embed_html || "");
+      setOgType(initialDraft.og_type || null);
+      setDraftId(initialDraft.id);
+    }
+  }, [open, initialDraft]);
 
   const handleLinkSubmit = async () => {
     if (!linkUrl.trim()) return;
@@ -203,7 +222,39 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
       embed_html: embedHtml || undefined,
     });
 
-    // Reset form
+    // If posted from a draft, remove it
+    if (draftId) {
+      deleteDraft.mutate(draftId);
+    }
+
+    resetAndClose();
+  };
+
+  const handleSaveAsDraft = async () => {
+    if (!linkUrl.trim()) {
+      toast.error("Add a link before saving as draft");
+      return;
+    }
+    const platform = classifyUrl(linkUrl, ogType);
+    const mediaType = deriveMediaType(linkUrl, platform);
+    await saveDraft.mutateAsync({
+      link_url: linkUrl,
+      caption: caption.trim() || null,
+      title: title.trim() || null,
+      thumbnail_url: thumbnailUrl || null,
+      embed_html: embedHtml || null,
+      platform,
+      media_type: mediaType,
+      og_type: ogType,
+    });
+    // If editing an existing draft, delete the old one (replace)
+    if (draftId) {
+      deleteDraft.mutate(draftId);
+    }
+    resetAndClose();
+  };
+
+  const resetAndClose = () => {
     setStep(1);
     setLinkUrl("");
     setThumbnailUrl("");
@@ -212,6 +263,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setShowThumbnailInput(false);
     setEmbedHtml("");
     setOgType(null);
+    setDraftId(null);
     onOpenChange(false);
   };
 
@@ -230,6 +282,7 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
     setIsLoadingPreview(false);
     setEmbedHtml("");
     setOgType(null);
+    setDraftId(null);
     onOpenChange(false);
   };
 
@@ -334,6 +387,18 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
 
             <Button onClick={handlePost} className="w-full">
               Post
+            </Button>
+            <Button
+              onClick={handleSaveAsDraft}
+              variant="outline"
+              className="w-full"
+              disabled={saveDraft.isPending}
+            >
+              {saveDraft.isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
+              ) : (
+                "Save as Draft"
+              )}
             </Button>
           </div>
         )}

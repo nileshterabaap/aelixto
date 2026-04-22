@@ -479,6 +479,51 @@ export type Database = {
           },
         ]
       }
+      post_drafts: {
+        Row: {
+          caption: string | null
+          created_at: string
+          embed_html: string | null
+          id: string
+          link_url: string | null
+          media_type: string | null
+          og_type: string | null
+          platform: string | null
+          thumbnail_url: string | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          embed_html?: string | null
+          id?: string
+          link_url?: string | null
+          media_type?: string | null
+          og_type?: string | null
+          platform?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          embed_html?: string | null
+          id?: string
+          link_url?: string | null
+          media_type?: string | null
+          og_type?: string | null
+          platform?: string | null
+          thumbnail_url?: string | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       post_seen: {
         Row: {
           id: number
