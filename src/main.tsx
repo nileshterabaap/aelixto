@@ -1,13 +1,32 @@
 import { createRoot } from "react-dom/client";
-import { registerSW } from 'virtual:pwa-register';
 import App from "./App.tsx";
 import "./index.css";
 import { initCapacitorPlugins } from "./capacitor-init";
 
-const isPreviewHost =
-  typeof window !== "undefined" &&
-  (window.location.hostname.startsWith("id-preview--") ||
-    window.location.hostname.includes("lovable.dev"));
+const unregisterAppServiceWorkers = async () => {
+  if (!("serviceWorker" in navigator)) return;
+
+  const registrations = await navigator.serviceWorker.getRegistrations();
+
+  await Promise.all(
+    registrations.map(async (registration) => {
+      const scriptUrl =
+        registration.active?.scriptURL ||
+        registration.waiting?.scriptURL ||
+        registration.installing?.scriptURL ||
+        "";
+
+      if (scriptUrl.endsWith("/sw-push.js")) return;
+
+      await registration.unregister();
+    }),
+  );
+
+  if (!("caches" in window)) return;
+
+  const cacheKeys = await window.caches.keys();
+  await Promise.all(cacheKeys.map((cacheKey) => window.caches.delete(cacheKey)));
+};
 
 // Dismiss splash screen once React is ready
 const dismissSplash = () => {
@@ -18,26 +37,7 @@ const dismissSplash = () => {
   }
 };
 
-// Keep preview uncached so code changes appear immediately,
-// while published builds auto-apply updated service workers.
-if ("serviceWorker" in navigator) {
-  if (isPreviewHost) {
-    navigator.serviceWorker.getRegistrations().then((registrations) => {
-      registrations.forEach((registration) => {
-        void registration.unregister();
-      });
-    });
-  } else {
-    const updateSW = registerSW({
-      onNeedRefresh() {
-        void updateSW(true);
-      },
-      onOfflineReady() {
-        console.log("App ready to work offline");
-      },
-    });
-  }
-}
+void unregisterAppServiceWorkers();
 
 createRoot(document.getElementById("root")!).render(<App />);
 
