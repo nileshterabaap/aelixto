@@ -4,6 +4,11 @@ import App from "./App.tsx";
 import "./index.css";
 import { initCapacitorPlugins } from "./capacitor-init";
 
+const isPreviewHost =
+  typeof window !== "undefined" &&
+  (window.location.hostname.startsWith("id-preview--") ||
+    window.location.hostname.includes("lovable.dev"));
+
 // Dismiss splash screen once React is ready
 const dismissSplash = () => {
   const splash = document.getElementById('splash-screen');
@@ -13,15 +18,26 @@ const dismissSplash = () => {
   }
 };
 
-// Register service worker with auto-update
-registerSW({
-  onNeedRefresh() {
-    console.log('New content available, refresh to update');
-  },
-  onOfflineReady() {
-    console.log('App ready to work offline');
-  },
-});
+// Keep preview uncached so code changes appear immediately,
+// while published builds auto-apply updated service workers.
+if ("serviceWorker" in navigator) {
+  if (isPreviewHost) {
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((registration) => {
+        void registration.unregister();
+      });
+    });
+  } else {
+    const updateSW = registerSW({
+      onNeedRefresh() {
+        void updateSW(true);
+      },
+      onOfflineReady() {
+        console.log("App ready to work offline");
+      },
+    });
+  }
+}
 
 createRoot(document.getElementById("root")!).render(<App />);
 
