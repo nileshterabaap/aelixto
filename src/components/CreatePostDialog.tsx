@@ -388,6 +388,18 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             <Button onClick={handlePost} className="w-full">
               Post
             </Button>
+            <Button
+              onClick={handleSaveAsDraft}
+              variant="outline"
+              className="w-full"
+              disabled={saveDraft.isPending}
+            >
+              {saveDraft.isPending ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</>
+              ) : (
+                "Save as Draft"
+              )}
+            </Button>
           </div>
         )}
       </DialogContent>
