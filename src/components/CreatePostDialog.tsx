@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,15 @@ import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
+import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialDraft?: PostDraft | null;
 }
 
-export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) => {
+export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePostDialogProps) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [linkUrl, setLinkUrl] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
@@ -25,7 +27,24 @@ export const CreatePostDialog = ({ open, onOpenChange }: CreatePostDialogProps) 
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [embedHtml, setEmbedHtml] = useState("");
   const [ogType, setOgType] = useState<string | null>(null);
+  const [draftId, setDraftId] = useState<string | null>(null);
   const createPost = useCreatePost();
+  const saveDraft = useSaveDraft();
+  const deleteDraft = useDeleteDraft();
+
+  // Hydrate from existing draft when opening
+  useEffect(() => {
+    if (open && initialDraft) {
+      setStep(2);
+      setLinkUrl(initialDraft.link_url || "");
+      setThumbnailUrl(initialDraft.thumbnail_url || "");
+      setTitle(initialDraft.title || "");
+      setCaption(initialDraft.caption || "");
+      setEmbedHtml(initialDraft.embed_html || "");
+      setOgType(initialDraft.og_type || null);
+      setDraftId(initialDraft.id);
+    }
+  }, [open, initialDraft]);
 
   const handleLinkSubmit = async () => {
     if (!linkUrl.trim()) return;
