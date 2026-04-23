@@ -138,9 +138,9 @@ const Settings = () => {
         <SectionHeader title="Support" />
         <div className="divide-y divide-border">
           <Row label="Report a problem" onClick={() => window.open('mailto:support@aelixto.com', '_blank')} hasChevron={false} />
-          <Row label="Help centre" onClick={() => toast({ title: "Coming soon" })} />
           <Row label="Terms of Service" onClick={() => navigate('/terms')} />
           <Row label="Privacy Policy" onClick={() => navigate('/privacy')} />
+          <Row label="Child Safety Standards" onClick={() => navigate('/child-safety')} />
         </div>
 
         {/* Log out at bottom */}
