@@ -34,7 +34,7 @@ const Messages = () => {
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
       <PullToRefresh onRefresh={handleRefresh}>
-        <main className="container max-w-2xl mx-auto px-4 py-6">
+        <main className="container max-w-2xl mx-auto px-4 py-6 animate-fade-in">
           <h2 className="text-2xl font-bold mb-6">Messages</h2>
           
           {/* Search Bar */}

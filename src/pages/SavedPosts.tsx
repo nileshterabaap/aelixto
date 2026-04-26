@@ -117,7 +117,7 @@ export default function SavedPosts() {
       <Header onCreatePost={() => setCreatePostOpen(true)} />
 
       <PullToRefresh onRefresh={handleRefresh}>
-        <main className="container max-w-2xl mx-auto px-4 py-6">
+        <main className="container max-w-2xl mx-auto px-4 py-6 animate-fade-in">
           <h1 className="text-2xl font-bold mb-4">Saved</h1>
 
           {/* Tabs */}
