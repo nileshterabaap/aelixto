@@ -241,7 +241,7 @@ const Conversation = () => {
 
       {/* Messages */}
       <main className="flex-1 overflow-y-auto">
-        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4">
+        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4 animate-fade-in">
           {messages.map((message) => {
             const isOwn = message.sender_id === user?.id;
             const postMatch = message.content.match(/\/post\/([a-f0-9-]{36})$/);
