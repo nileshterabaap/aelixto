@@ -6,7 +6,22 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     url: "https://aelixto.com",
-    cleartext: true
+    cleartext: true,
+    // Keep OAuth flows (Google sign-in, Lovable broker) inside the WebView
+    // instead of bouncing the user out to Chrome.
+    allowNavigation: [
+      "aelixto.com",
+      "*.aelixto.com",
+      "*.lovable.app",
+      "oauth.lovable.app",
+      "*.lovableproject.com",
+      "accounts.google.com",
+      "*.google.com",
+      "*.googleusercontent.com",
+      "appleid.apple.com",
+      "*.apple.com",
+      "*.supabase.co"
+    ]
   },
   plugins: {
     SplashScreen: {
