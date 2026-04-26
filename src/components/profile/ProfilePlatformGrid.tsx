@@ -1,6 +1,7 @@
 import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import InstagramIcon from "@/assets/platforms/instagram.svg";
@@ -108,6 +109,32 @@ export const ProfilePlatformGrid = ({
   );
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const location = useLocation();
+
+  // Close the viewer when the route/location changes (e.g. user taps a nav button)
+  useEffect(() => {
+    if (viewerOpen) setViewerOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, location.key]);
+
+  // Push a history entry when the viewer opens so the hardware/browser back
+  // button closes the overlay instead of leaving the profile page.
+  useEffect(() => {
+    if (!viewerOpen) return;
+    window.history.pushState({ viewer: true }, "");
+    const onPop = () => setViewerOpen(false);
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+    };
+  }, [viewerOpen]);
+
+  const closeViewer = () => {
+    setViewerOpen(false);
+    if (window.history.state?.viewer) {
+      window.history.back();
+    }
+  };
 
   const handlePostClick = (postId: string) => {
     setSelectedPostId(postId);
@@ -169,7 +196,7 @@ export const ProfilePlatformGrid = ({
           initialPostId={selectedPostId}
           tabs={tabs}
           activeTab={activeTab}
-          onClose={() => setViewerOpen(false)}
+          onClose={closeViewer}
           onTabChange={(tab) => {
             onTabChange(tab);
           }}
