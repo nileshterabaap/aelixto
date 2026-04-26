@@ -21,4 +21,20 @@ export async function initCapacitorPlugins() {
   } catch (e) {
     console.warn("SplashScreen plugin not available", e);
   }
+
+  // Wire Android hardware back button to React Router history.
+  // Default behavior exits the app from any screen — instead, navigate back
+  // through history and only exit when there's nowhere left to go.
+  try {
+    const { App } = await import("@capacitor/app");
+    App.addListener("backButton", ({ canGoBack }) => {
+      if (canGoBack || window.history.length > 1) {
+        window.history.back();
+      } else {
+        App.exitApp();
+      }
+    });
+  } catch (e) {
+    console.warn("App plugin not available", e);
+  }
 }
