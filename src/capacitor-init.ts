@@ -5,7 +5,10 @@ export async function initCapacitorPlugins() {
 
   try {
     const { StatusBar, Style } = await import("@capacitor/status-bar");
-    await StatusBar.setStyle({ style: Style.Light });
+    // Ensure the webview does NOT draw under the status bar (so bg color shows)
+    await StatusBar.setOverlaysWebView({ overlay: false });
+    // Style.Dark = dark icons (for light/white backgrounds)
+    await StatusBar.setStyle({ style: Style.Dark });
     await StatusBar.setBackgroundColor({ color: "#FFFFFF" });
   } catch (e) {
     console.warn("StatusBar plugin not available", e);
