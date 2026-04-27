@@ -143,8 +143,13 @@ export const ProfilePlatformGrid = ({
 
   if (loading && items.length === 0) {
     return (
-      <div className="text-center py-8">
-        <p className="text-sm text-muted-foreground">Loading posts...</p>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={i}
+            className="aspect-[3/4] rounded-2xl bg-muted/60 animate-shimmer"
+          />
+        ))}
       </div>
     );
   }
@@ -160,13 +165,20 @@ export const ProfilePlatformGrid = ({
   return (
     <>
       <div className="space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
-          {items.map((post) => (
+        <div
+          key={activeTab}
+          className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6"
+        >
+          {items.map((post, idx) => (
             <motion.div
-              key={post.id}
-              initial={{ opacity: 0, y: 8 }}
+              key={`${activeTab}-${post.id}`}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+              transition={{
+                duration: 0.35,
+                delay: Math.min(idx, 8) * 0.04,
+                ease: [0.22, 1, 0.36, 1],
+              }}
             >
               <PostCard
                 post={post}
