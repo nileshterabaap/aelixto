@@ -133,9 +133,14 @@ const Auth = () => {
 
   const handleGoogleSignIn = async () => {
     const isNative = Capacitor.isNativePlatform();
+    // For the native APK, the WebView loads https://aelixto.com (see
+    // capacitor.config.ts). The Lovable OAuth broker callback lands at the
+    // origin root via the /~oauth proxy route, so we must redirect there —
+    // NOT to /auth, which the broker does not recognize and which produces
+    // a 404 after the Google consent screen.
     const redirectUri = isNative
-      ? "https://aelixto.com/auth"
-      : `${window.location.origin}/auth`;
+      ? "https://aelixto.com/"
+      : `${window.location.origin}/`;
 
     const { error } = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: redirectUri,
