@@ -5,10 +5,9 @@ const config: CapacitorConfig = {
   appName: 'Aelixto',
   webDir: 'dist',
   server: {
-    url: "https://aelixto.com",
     cleartext: true,
-    // Keep OAuth flows (Google sign-in, Lovable broker) inside the WebView
-    // instead of bouncing the user out to Chrome.
+    // Keep allowed external auth/social pages inside the WebView while the app
+    // itself loads from the freshly synced local `dist` bundle.
     allowNavigation: [
       "aelixto.com",
       "*.aelixto.com",
