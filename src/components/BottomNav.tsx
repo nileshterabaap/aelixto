@@ -222,9 +222,9 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
         <button
           aria-label="Create post"
           onClick={onCreatePost}
-          className="absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-2xl bg-foreground text-background"
+          className="absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-2xl bg-[hsl(var(--brand-blue))] text-white"
         >
-          <Plus className="mx-auto h-5 w-5 stroke-[3] text-background" />
+          <Plus className="mx-auto h-5 w-5 stroke-[3] text-white" />
         </button>
       </div>
     </nav>
