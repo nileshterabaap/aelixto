@@ -121,7 +121,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       {/* Pull indicator — overlays on top, content does NOT move */}
       <motion.div
         className="absolute left-0 right-0 flex justify-center pointer-events-none z-50"
-        style={{ top: -36, y: pullY }}
+        style={{ top: 12, y: pullY, x: 0 }}
       >
         <motion.div
           className="h-9 w-9 rounded-full bg-background border border-border shadow-md flex items-center justify-center"
@@ -140,8 +140,10 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
         </motion.div>
       </motion.div>
 
-      {/* Content stays in place — no vertical shift */}
-      {children}
+      {/* Content drags down with the pull, Instagram-style */}
+      <motion.div style={{ y: pullY }}>
+        {children}
+      </motion.div>
     </div>
   );
 };
