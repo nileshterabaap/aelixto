@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
+import { createLovableAuth } from "@lovable.dev/cloud-auth-js";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -9,6 +10,10 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { User } from "@supabase/supabase-js";
+
+const nativeLovableAuth = createLovableAuth({
+  oauthBrokerUrl: "https://aelixto.com/~oauth/initiate",
+});
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -133,14 +138,25 @@ const Auth = () => {
 
   const handleGoogleSignIn = async () => {
     const isNative = Capacitor.isNativePlatform();
-    // For the native APK, the WebView loads https://aelixto.com (see
-    // capacitor.config.ts). The Lovable OAuth broker callback lands at the
-    // origin root via the /~oauth proxy route, so we must redirect there —
-    // NOT to /auth, which the broker does not recognize and which produces
-    // a 404 after the Google consent screen.
-    const redirectUri = isNative
-      ? "https://aelixto.com/"
-      : `${window.location.origin}/`;
+    const redirectUri = `${window.location.origin}/`;
+
+    if (isNative) {
+      const result = await nativeLovableAuth.signInWithOAuth("google", {
+        redirect_uri: redirectUri,
+      });
+
+      if (result.redirected) return;
+      if (result.error) {
+        toast({ title: "Error", description: result.error.message, variant: "destructive" });
+        return;
+      }
+
+      const { error } = await supabase.auth.setSession(result.tokens);
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+      }
+      return;
+    }
 
     const { error } = await lovable.auth.signInWithOAuth("google", {
       redirect_uri: redirectUri,
