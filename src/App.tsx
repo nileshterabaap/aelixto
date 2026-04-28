@@ -30,6 +30,7 @@ import PrivacySettings from "./pages/PrivacySettings";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import ChildSafety from "./pages/ChildSafety";
+import AuthBridge from "./pages/AuthBridge";
 
 // Configure QueryClient with aggressive caching for instant navigation
 const queryClient = new QueryClient({
@@ -99,6 +100,8 @@ const AnimatedRoutes = () => {
             <Route path="/privacy" element={<PageTransition><PrivacyPolicy /></PageTransition>} />
             <Route path="/terms" element={<PageTransition><TermsOfService /></PageTransition>} />
             <Route path="/child-safety" element={<PageTransition><ChildSafety /></PageTransition>} />
+            {/* Native OAuth bridge — converts web redirect into a custom-scheme deep link */}
+            <Route path="/~auth-bridge" element={<AuthBridge />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
           </Routes>
