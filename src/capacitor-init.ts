@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { supabase } from "@/integrations/supabase/client";
 
 export async function initCapacitorPlugins() {
   if (!Capacitor.isNativePlatform()) return;
@@ -32,6 +33,46 @@ export async function initCapacitorPlugins() {
         window.history.back();
       } else {
         App.exitApp();
+      }
+    });
+
+    // Handle OAuth deep links: com.aelixto.app10://oauth-callback#access_token=...
+    App.addListener("appUrlOpen", async ({ url }) => {
+      try {
+        if (!url) return;
+        const lower = url.toLowerCase();
+        const isOAuth =
+          lower.includes("oauth-callback") ||
+          lower.includes("access_token") ||
+          lower.includes("code=");
+
+        if (!isOAuth) return;
+
+        // Extract the fragment / query and parse tokens.
+        const fragment = url.includes("#") ? url.split("#")[1] : "";
+        const query = url.includes("?") ? url.split("?")[1].split("#")[0] : "";
+        const params = new URLSearchParams(fragment || query);
+        const access_token = params.get("access_token");
+        const refresh_token = params.get("refresh_token");
+
+        // Close the in-app browser tab if it's still open.
+        try {
+          const { Browser } = await import("@capacitor/browser");
+          await Browser.close();
+        } catch {
+          /* ignore — tab may already be closed */
+        }
+
+        if (access_token && refresh_token) {
+          await supabase.auth.setSession({ access_token, refresh_token });
+        }
+
+        // Land the user on home regardless.
+        if (window.location.pathname !== "/") {
+          window.location.replace("/");
+        }
+      } catch (e) {
+        console.warn("appUrlOpen handler failed", e);
       }
     });
   } catch (e) {
