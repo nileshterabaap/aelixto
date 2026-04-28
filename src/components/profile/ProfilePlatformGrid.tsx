@@ -2,7 +2,7 @@ import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import InstagramIcon from "@/assets/platforms/instagram.svg";
 import FacebookIcon from "@/assets/platforms/facebook.svg";
@@ -141,54 +141,66 @@ export const ProfilePlatformGrid = ({
     setViewerOpen(true);
   };
 
-  if (loading && items.length === 0) {
-    return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div
-            key={i}
-            className="aspect-[3/4] rounded-2xl bg-muted/60 animate-shimmer"
-          />
-        ))}
-      </div>
-    );
-  }
+  const isInitialLoading = loading && items.length === 0;
 
-  if (items.length === 0) {
-    return (
-      <div className="px-6 py-16 text-center text-muted-foreground">
-        No posts yet from {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}.
-      </div>
-    );
-  }
+  // Stable key per view state so AnimatePresence can crossfade between
+  // "skeleton" / "empty" / "grid" without flashing or layout jumps.
+  const viewKey = isInitialLoading
+    ? `${activeTab}-loading`
+    : items.length === 0
+    ? `${activeTab}-empty`
+    : `${activeTab}-grid`;
 
   return (
     <>
-      <div className="space-y-4">
-        <div
-          key={activeTab}
-          className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6"
-        >
-          {items.map((post, idx) => (
-            <motion.div
-              key={`${activeTab}-${post.id}`}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                duration: 0.35,
-                delay: Math.min(idx, 8) * 0.04,
-                ease: [0.22, 1, 0.36, 1],
-              }}
-            >
-              <PostCard
-                post={post}
-                onClick={() => handlePostClick(post.id)}
-              />
-            </motion.div>
-          ))}
-        </div>
+      <div className="space-y-4 relative">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={viewKey}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {isInitialLoading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="aspect-[3/4] rounded-2xl bg-muted/60 animate-shimmer"
+                  />
+                ))}
+              </div>
+            ) : items.length === 0 ? (
+              <div className="px-6 py-16 text-center text-muted-foreground">
+                No posts yet from{" "}
+                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+                {items.map((post, idx) => (
+                  <motion.div
+                    key={`${activeTab}-${post.id}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.3,
+                      delay: Math.min(idx, 8) * 0.03,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                  >
+                    <PostCard
+                      post={post}
+                      onClick={() => handlePostClick(post.id)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
 
-        {hasMore && (
+        {hasMore && !isInitialLoading && items.length > 0 && (
           <div className="flex justify-center pt-4">
             <Button
               onClick={loadMore}
