@@ -138,35 +138,52 @@ const Auth = () => {
 
   const handleGoogleSignIn = async () => {
     const isNative = Capacitor.isNativePlatform();
-    // On native (Capacitor) the WebView origin is something like
-    // http://localhost which is NOT in the OAuth broker's allowlist,
-    // causing "redirect_uri is not allowed". Use the published web
-    // domain as the redirect target — the broker will then bounce
-    // back into the app.
-    const redirectUri = isNative
-      ? "https://aelixto.com/"
-      : `${window.location.origin}/`;
-
     if (isNative) {
+      // Native flow (APK/AAB):
+      // 1. Open Chrome Custom Tab to the OAuth broker.
+      // 2. Broker finishes and redirects to our /~auth-bridge web page.
+      // 3. Bridge page rewrites to com.aelixto.app10://oauth-callback#tokens.
+      // 4. Android resolves the custom scheme back into our installed app,
+      //    where the App.appUrlOpen listener completes the sign-in.
+      const bridgeUri = "https://aelixto.com/~auth-bridge";
       const result = await nativeLovableAuth.signInWithOAuth("google", {
-        redirect_uri: redirectUri,
+        redirect_uri: bridgeUri,
       });
 
-      if (result.redirected) return;
       if (result.error) {
         toast({ title: "Error", description: result.error.message, variant: "destructive" });
         return;
       }
 
-      const { error } = await supabase.auth.setSession(result.tokens);
-      if (error) {
-        toast({ title: "Error", description: error.message, variant: "destructive" });
+      // Open the broker URL in a system browser tab so Google trusts it.
+      // (Google blocks OAuth inside embedded WebViews.)
+      const targetUrl = (result as { url?: string }).url;
+      if (targetUrl) {
+        try {
+          const { Browser } = await import("@capacitor/browser");
+          await Browser.open({ url: targetUrl, presentationStyle: "popover" });
+          return;
+        } catch (e) {
+          // Fallback: let the WebView navigate (will likely fail Google's UA check).
+          window.location.href = targetUrl;
+          return;
+        }
+      }
+
+      // If the SDK already set tokens directly (rare on native), persist them.
+      if ((result as { tokens?: { access_token: string; refresh_token: string } }).tokens) {
+        const tokens = (result as { tokens: { access_token: string; refresh_token: string } }).tokens;
+        const { error } = await supabase.auth.setSession(tokens);
+        if (error) {
+          toast({ title: "Error", description: error.message, variant: "destructive" });
+        }
       }
       return;
     }
 
+    // Web flow — unchanged.
     const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: redirectUri,
+      redirect_uri: `${window.location.origin}/`,
     });
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
