@@ -6,10 +6,14 @@ export async function initCapacitorPlugins() {
 
   try {
     const { StatusBar, Style } = await import("@capacitor/status-bar");
-    // Ensure the webview does NOT draw under the status bar (so bg color shows)
+    // Webview should NOT draw under the status bar — the OS reserves that space
+    // and paints it with our backgroundColor below. This avoids the giant gap
+    // we'd otherwise need to compensate for in CSS via env(safe-area-inset-top).
     await StatusBar.setOverlaysWebView({ overlay: false });
-    // Style.Dark = dark icons (for light/white backgrounds)
-    await StatusBar.setStyle({ style: Style.Dark });
+    // Style.Light = light status-bar (white bg) with DARK icons/text.
+    // (Capacitor's naming is the opposite of what you'd expect — Style.Dark
+    // actually produces a dark bar with light icons.)
+    await StatusBar.setStyle({ style: Style.Light });
     await StatusBar.setBackgroundColor({ color: "#FFFFFF" });
   } catch (e) {
     console.warn("StatusBar plugin not available", e);
