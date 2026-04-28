@@ -138,7 +138,14 @@ const Auth = () => {
 
   const handleGoogleSignIn = async () => {
     const isNative = Capacitor.isNativePlatform();
-    const redirectUri = `${window.location.origin}/`;
+    // On native (Capacitor) the WebView origin is something like
+    // http://localhost which is NOT in the OAuth broker's allowlist,
+    // causing "redirect_uri is not allowed". Use the published web
+    // domain as the redirect target — the broker will then bounce
+    // back into the app.
+    const redirectUri = isNative
+      ? "https://aelixto.com/"
+      : `${window.location.origin}/`;
 
     if (isNative) {
       const result = await nativeLovableAuth.signInWithOAuth("google", {
