@@ -10,6 +10,13 @@ import YoutubeIcon from "@/assets/platforms/youtube.svg";
 import TiktokIcon from "@/assets/platforms/tiktok.svg";
 import XIcon from "@/assets/platforms/x.svg";
 import BlogIcon from "@/assets/platforms/blog.svg";
+import ThreadsIcon from "@/assets/platforms/threads.svg";
+import RedditIcon from "@/assets/platforms/reddit.svg";
+import PinterestIcon from "@/assets/platforms/pinterest.svg";
+import SpotifyIcon from "@/assets/platforms/spotify.svg";
+import LinkedinIcon from "@/assets/platforms/linkedin.svg";
+import QuoraIcon from "@/assets/platforms/quora.svg";
+import ExternalIcon from "@/assets/platforms/external.svg";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 import { PlatformPostViewer } from "./PlatformPostViewer";
 
@@ -29,8 +36,15 @@ function PostCard({ post, onClick }: {
       case 'youtube': return 'bg-gradient-to-br from-red-600 to-red-400';
       case 'tiktok': return 'bg-gradient-to-br from-black to-gray-800';
       case 'x': return 'bg-black';
+      case 'twitter': return 'bg-black';
+      case 'threads': return 'bg-gradient-to-br from-neutral-900 to-neutral-700';
+      case 'reddit': return 'bg-gradient-to-br from-orange-600 to-orange-400';
+      case 'pinterest': return 'bg-gradient-to-br from-red-700 to-red-500';
+      case 'spotify': return 'bg-gradient-to-br from-green-600 to-green-400';
+      case 'linkedin': return 'bg-gradient-to-br from-blue-700 to-blue-500';
+      case 'quora': return 'bg-gradient-to-br from-red-800 to-red-600';
       case 'article': return 'bg-gradient-to-br from-emerald-600 to-teal-400';
-      default: return 'bg-muted';
+      default: return 'bg-gradient-to-br from-slate-600 to-slate-400';
     }
   };
 
@@ -41,8 +55,15 @@ function PostCard({ post, onClick }: {
       case 'youtube': return YoutubeIcon;
       case 'tiktok': return TiktokIcon;
       case 'x': return XIcon;
+      case 'twitter': return XIcon;
+      case 'threads': return ThreadsIcon;
+      case 'reddit': return RedditIcon;
+      case 'pinterest': return PinterestIcon;
+      case 'spotify': return SpotifyIcon;
+      case 'linkedin': return LinkedinIcon;
+      case 'quora': return QuoraIcon;
       case 'article': return BlogIcon;
-      default: return null;
+      default: return ExternalIcon;
     }
   };
 
