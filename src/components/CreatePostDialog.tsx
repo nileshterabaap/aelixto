@@ -293,12 +293,12 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   };
 
   const stepVariants = {
-    initial: (dir: number) => ({ opacity: 0, x: dir * 24, filter: "blur(6px)" }),
+    initial: (dir: number) => ({ opacity: 0, x: dir * 18, filter: "blur(5px)" }),
     animate: { opacity: 1, x: 0, filter: "blur(0px)" },
-    exit: (dir: number) => ({ opacity: 0, x: -dir * 24, filter: "blur(6px)" }),
+    exit: (dir: number) => ({ opacity: 0, x: -dir * 18, filter: "blur(5px)" }),
   };
 
-  const panelTransition = { type: "spring" as const, stiffness: 430, damping: 38, mass: 0.9 };
+  const panelTransition = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.82 };
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={handleClose}>
@@ -320,11 +320,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
               <motion.div
                 className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none"
-                initial={{ opacity: 0, scale: 0.9, x: "-50%", y: "calc(-50% + 40px)", filter: "blur(8px)" }}
-                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+                initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)", filter: "blur(10px)" }}
+                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%", filter: "blur(0px)" }}
                 exit={{ opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)", filter: "blur(8px)" }}
                 transition={panelTransition}
-                style={{ transformOrigin: "50% 50%" }}
+                style={{ transformOrigin: "50% calc(100% + 120px)" }}
               >
                 <motion.div
                   layoutId="create-post-surface"
