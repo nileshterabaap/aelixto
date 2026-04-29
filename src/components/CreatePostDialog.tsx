@@ -4,8 +4,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Link2, Loader2, Sparkles, X, Check } from "lucide-react";
+import { ArrowLeft, Loader2, Plus, X, Check } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
@@ -293,12 +294,10 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   };
 
   const stepVariants = {
-    initial: (dir: number) => ({ opacity: 0, x: dir * 18, filter: "blur(5px)" }),
+    initial: (dir: number) => ({ opacity: 0, x: dir * 24, filter: "blur(6px)" }),
     animate: { opacity: 1, x: 0, filter: "blur(0px)" },
-    exit: (dir: number) => ({ opacity: 0, x: -dir * 18, filter: "blur(5px)" }),
+    exit: (dir: number) => ({ opacity: 0, x: -dir * 24, filter: "blur(6px)" }),
   };
-
-  const panelTransition = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.82 };
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={handleClose}>
@@ -308,49 +307,31 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             {/* Blurred backdrop */}
             <DialogPrimitive.Overlay asChild forceMount>
               <motion.div
-                className="fixed inset-0 z-50 bg-foreground/45 backdrop-blur-xl"
+                className="fixed inset-0 z-50 bg-black/40 backdrop-blur-md"
                 initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-                animate={{ opacity: 1, backdropFilter: "blur(18px)" }}
+                animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
                 exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
                 transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
               />
             </DialogPrimitive.Overlay>
 
-            {/* Centered card with viewport-safe sizing */}
+            {/* Card emerging from the FAB position */}
             <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
               <motion.div
-                className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none"
-                initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)", filter: "blur(10px)" }}
-                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%", filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)", filter: "blur(8px)" }}
-                transition={panelTransition}
-                style={{ transformOrigin: "50% calc(100% + 120px)" }}
+                className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 outline-none"
+                initial={{ opacity: 0, scale: 0.85, y: 40 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 30 }}
+                transition={{ type: "spring", stiffness: 360, damping: 34, mass: 0.85 }}
+                style={{ transformOrigin: "50% 50%" }}
               >
-                <motion.div
-                  transition={panelTransition}
-                  className="relative max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[32px] bg-background shadow-[0_34px_90px_-24px_hsl(var(--foreground)/0.45)] ring-1 ring-border/15"
-                >
+                <div className="relative overflow-hidden rounded-[28px] bg-background shadow-[0_30px_80px_-20px_rgba(0,0,0,0.35)] ring-1 ring-black/5">
                   {/* Soft gradient sheen */}
-                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--foreground)/0.10),transparent_42%)]" />
-                  <motion.div
-                    aria-hidden
-                    className="pointer-events-none absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-muted"
-                    initial={{ scaleX: 0.35, opacity: 0 }}
-                    animate={{ scaleX: 1, opacity: 1 }}
-                    transition={{ delay: 0.08, duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                  />
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/60 via-transparent to-transparent dark:from-white/5" />
 
                   {/* Header */}
-                  <div className="relative flex items-center justify-between px-6 pt-7 pb-3">
-                    <div className="flex items-center gap-3">
-                      <motion.div
-                        initial={{ scale: 0.2, rotate: -45, opacity: 0 }}
-                        animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                        transition={{ type: "spring", stiffness: 540, damping: 30, delay: 0.04 }}
-                        className="grid h-10 w-10 place-items-center rounded-2xl bg-foreground text-background shadow-[0_14px_28px_-18px_hsl(var(--foreground)/0.9)]"
-                      >
-                        {step === 1 ? <Link2 className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
-                      </motion.div>
+                  <div className="relative flex items-center justify-between px-5 pt-5 pb-2">
+                    <div className="flex items-center gap-2">
                       <AnimatePresence initial={false} mode="wait">
                         {step === 2 && (
                           <motion.button
@@ -372,9 +353,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.25 }}
-                          className="text-[1.0625rem] font-semibold tracking-normal"
+                          className="text-lg font-semibold tracking-tight"
                         >
-                          {step === 1 ? "Create post" : "Add details"}
+                          {step === 1 ? "Create Post" : "Add Details"}
                         </motion.h2>
                       </DialogPrimitive.Title>
                     </div>
@@ -387,7 +368,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                   </div>
 
                   {/* Body */}
-                  <div className="relative max-h-[calc(100dvh-7rem)] overflow-y-auto px-6 pb-6 pt-2 overscroll-contain">
+                  <div className="relative px-5 pb-5 pt-2">
                     <AnimatePresence mode="wait" custom={step === 1 ? -1 : 1} initial={false}>
                       {step === 1 ? (
                         <motion.div
@@ -398,45 +379,37 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           animate="animate"
                           exit="exit"
                           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                          className="space-y-5"
+                          className="space-y-4"
                         >
                           <div>
-                            <Label htmlFor="link" className="text-sm font-medium text-foreground/80">
+                            <Label htmlFor="link" className="text-sm font-medium">
                               Paste your link
                             </Label>
-                            <input
+                            <Input
                               id="link"
                               type="url"
                               autoFocus
                               placeholder=" "
                               value={linkUrl}
                               onChange={(e) => setLinkUrl(e.target.value)}
-                              className="mt-2 h-14 w-full rounded-[24px] border border-input bg-background px-4 text-base outline-none shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04),0_0_0_4px_hsl(var(--muted)/0.75)] transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04),0_0_0_5px_hsl(var(--foreground)/0.06)]"
+                              className="mt-2 h-12 rounded-2xl border-border/70 bg-muted/40 px-4 focus-visible:ring-2 focus-visible:ring-foreground/20"
                             />
                           </div>
 
-                          <motion.div whileTap={{ scale: 0.985 }}>
-                            <Button
-                              onClick={handleLinkSubmit}
-                              className="relative h-12 w-full overflow-hidden rounded-[22px] bg-foreground text-background shadow-[0_18px_38px_-26px_hsl(var(--foreground)/0.9)] transition-transform hover:bg-foreground/90"
-                              disabled={!linkUrl.trim() || isLoadingPreview}
-                            >
-                              <motion.span
-                                aria-hidden
-                                className="absolute inset-y-0 -left-1/3 w-1/3 bg-background/15"
-                                animate={{ x: ["0%", "430%"] }}
-                                transition={{ repeat: Infinity, repeatDelay: 1.6, duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-                              />
-                              {isLoadingPreview ? (
-                                <>
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                  Fetching preview...
-                                </>
-                              ) : (
-                                "Next"
-                              )}
-                            </Button>
-                          </motion.div>
+                          <Button
+                            onClick={handleLinkSubmit}
+                            className="h-12 w-full rounded-2xl bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-transform"
+                            disabled={!linkUrl.trim() || isLoadingPreview}
+                          >
+                            {isLoadingPreview ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Fetching preview...
+                              </>
+                            ) : (
+                              "Next"
+                            )}
+                          </Button>
                         </motion.div>
                       ) : (
                         <motion.div
@@ -466,7 +439,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           )}
 
                           <div>
-                            <Label htmlFor="caption" className="text-sm font-medium text-foreground/80">
+                            <Label htmlFor="caption" className="text-sm font-medium">
                               Caption (optional)
                             </Label>
                             <Textarea
@@ -474,7 +447,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                               placeholder="Write a caption..."
                               value={caption}
                               onChange={(e) => setCaption(e.target.value)}
-                              className="mt-2 min-h-[88px] resize-none rounded-[24px] border-input bg-background px-4 py-3 text-base outline-none shadow-[0_0_0_4px_hsl(var(--muted)/0.75)] focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-foreground/25 focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.06)]"
+                              className="mt-2 min-h-[80px] resize-none rounded-2xl border-border/70 bg-muted/40 px-4 py-3"
                             />
                           </div>
 
@@ -483,7 +456,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                               type="button"
                               variant="outline"
                               onClick={() => setShowThumbnailInput(!showThumbnailInput)}
-                              className="h-11 w-full rounded-[20px] border-input bg-background"
+                              className="h-11 w-full rounded-2xl border-border/70"
                             >
                               {showThumbnailInput ? "Hide" : "Change"} Thumbnail
                             </Button>
@@ -500,13 +473,13 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                                   <Label htmlFor="thumbnail" className="text-sm font-medium">
                                     Thumbnail URL
                                   </Label>
-                                  <input
+                                  <Input
                                     id="thumbnail"
                                     type="url"
                                     placeholder="https://..."
                                     value={thumbnailUrl}
                                     onChange={(e) => setThumbnailUrl(e.target.value)}
-                                    className="mt-2 h-12 w-full rounded-[22px] border border-input bg-background px-4 text-base outline-none shadow-[0_0_0_4px_hsl(var(--muted)/0.75)] transition-[border-color,box-shadow] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.06)]"
+                                    className="mt-2 h-12 rounded-2xl border-border/70 bg-muted/40 px-4"
                                   />
                                 </motion.div>
                               )}
@@ -517,7 +490,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                             <Button
                               onClick={handlePost}
                               disabled={submitState !== null}
-                              className="h-12 w-full rounded-[22px] bg-foreground text-background shadow-[0_18px_38px_-26px_hsl(var(--foreground)/0.9)] hover:bg-foreground/90"
+                              className="h-12 w-full rounded-2xl bg-foreground text-background hover:bg-foreground/90"
                             >
                               {submitState === "post" ? (
                                 <motion.span
@@ -537,7 +510,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                             <Button
                               onClick={handleSaveAsDraft}
                               variant="outline"
-                              className="h-12 w-full rounded-[22px] border-input bg-background"
+                              className="h-12 w-full rounded-2xl border-border/70"
                               disabled={saveDraft.isPending || submitState !== null}
                             >
                               {submitState === "draft" ? (
@@ -582,7 +555,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </motion.div>
+                </div>
               </motion.div>
             </DialogPrimitive.Content>
           </DialogPrimitive.Portal>
