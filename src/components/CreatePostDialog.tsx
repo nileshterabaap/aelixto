@@ -397,14 +397,14 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                             <Label htmlFor="link" className="text-sm font-medium">
                               Paste your link
                             </Label>
-                            <Input
+                            <input
                               id="link"
                               type="url"
                               autoFocus
                               placeholder=" "
                               value={linkUrl}
                               onChange={(e) => setLinkUrl(e.target.value)}
-                              className="mt-2 h-12 rounded-2xl border-border/70 bg-muted/40 px-4 focus-visible:ring-2 focus-visible:ring-foreground/20"
+                              className="mt-2 h-12 w-full rounded-[22px] border border-border/50 bg-muted/35 px-4 text-base outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/20 focus:bg-background focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.06)]"
                             />
                           </div>
 
@@ -485,13 +485,13 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                                   <Label htmlFor="thumbnail" className="text-sm font-medium">
                                     Thumbnail URL
                                   </Label>
-                                  <Input
+                                  <input
                                     id="thumbnail"
                                     type="url"
                                     placeholder="https://..."
                                     value={thumbnailUrl}
                                     onChange={(e) => setThumbnailUrl(e.target.value)}
-                                    className="mt-2 h-12 rounded-2xl border-border/70 bg-muted/40 px-4"
+                                    className="mt-2 h-12 w-full rounded-[22px] border border-border/50 bg-muted/35 px-4 text-base outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/20 focus:bg-background focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.06)]"
                                   />
                                 </motion.div>
                               )}
