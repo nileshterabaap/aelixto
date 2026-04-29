@@ -5,7 +5,7 @@
     <link rel="icon" href="/logo.png" type="image/png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <meta name="theme-color" content="#2563EB" />
+    <meta name="theme-color" content="#000000" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -13,47 +13,30 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <title>Aelixto - Share What Matters</title>
     <meta name="description" content="A minimalist social feed where attention earns rewards" />
-    <meta name="author" content="Aelixto" />
+    <meta name="author" content="Lovable" />
+    
+    <!-- Content Security Policy for embed support - temporarily relaxed for debugging -->
+    <!-- <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self'; 
+      script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.instagram.com https://connect.facebook.net https://platform.twitter.com https://assets.pinterest.com https://*.pinimg.com; 
+      frame-src 'self' https://*.cdninstagram.com https://*.fbcdn.net https://www.facebook.com https://www.youtube.com https://platform.twitter.com https://*.pinimg.com https://assets.pinterest.com; 
+      style-src 'self' 'unsafe-inline' https://assets.pinterest.com; 
+      img-src 'self' data: https: http: https://*.pinimg.com;
+      connect-src 'self' https://www.instagram.com https://www.facebook.com https://graph.facebook.com https://www.pinterest.com https://api.pinterest.com https://*.supabase.co wss://*.supabase.co;
+      media-src 'self' https: http: data:
+    " /> -->
 
     <meta property="og:title" content="Aelixto - Share What Matters" />
     <meta property="og:description" content="A minimalist social feed where attention earns rewards" />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/logo.png" />
+    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:image" content="/logo.png" />
-
-    <style>
-      #splash-screen {
-        position: fixed;
-        inset: 0;
-        z-index: 99999;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: #ffffff;
-        transition: opacity 0.3s ease-out;
-      }
-      #splash-screen.fade-out {
-        opacity: 0;
-        pointer-events: none;
-      }
-      #splash-screen img {
-        width: 96px;
-        height: 96px;
-        animation: splash-pulse 1.5s ease-in-out infinite;
-      }
-      @keyframes splash-pulse {
-        0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.05); opacity: 0.85; }
-      }
-    </style>
+    <meta name="twitter:site" content="@lovable_dev" />
+    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
   </head>
 
   <body>
-    <div id="splash-screen">
-      <img src="/logo.png" alt="Aelixto" />
-    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

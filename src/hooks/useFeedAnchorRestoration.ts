@@ -22,7 +22,7 @@ const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(mi
  */
 export const useFeedAnchorRestoration = (routeKey: RouteKey, itemIds: string[]) => {
   const elByIdRef = useRef(new Map<string, HTMLElement>());
-  const snapshotTimeoutRef = useRef<number | null>(null);
+  const rafScheduled = useRef(false);
   const hasRestored = useRef(false);
 
   const idsSet = useMemo(() => new Set(itemIds), [itemIds]);
@@ -73,57 +73,25 @@ export const useFeedAnchorRestoration = (routeKey: RouteKey, itemIds: string[]) 
     anchors.set(routeKey, { id: best.id, offsetWithin });
   }, [idsSet, routeKey]);
 
-  const scheduleSnapshot = useCallback(
-    (delay = 300) => {
-      if (snapshotTimeoutRef.current !== null) {
-        window.clearTimeout(snapshotTimeoutRef.current);
-      }
-
-      snapshotTimeoutRef.current = window.setTimeout(() => {
-        snapshotTimeoutRef.current = null;
-        snapshotAnchor();
-      }, delay);
-    },
-    [snapshotAnchor]
-  );
-
-  // Snapshot after scrolling settles instead of measuring every frame.
+  // Continuously snapshot (throttled to rAF) while this route is mounted
   useEffect(() => {
     const onScroll = () => {
-      scheduleSnapshot();
-    };
-
-    const onResize = () => {
-      scheduleSnapshot(0);
-    };
-
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
+      if (rafScheduled.current) return;
+      rafScheduled.current = true;
+      requestAnimationFrame(() => {
+        rafScheduled.current = false;
         snapshotAnchor();
-      }
-    };
-
-    const onPageHide = () => {
-      snapshotAnchor();
+      });
     };
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onResize);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("pagehide", onPageHide);
-    scheduleSnapshot(0);
+    onScroll();
 
     return () => {
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onResize);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("pagehide", onPageHide);
-      if (snapshotTimeoutRef.current !== null) {
-        window.clearTimeout(snapshotTimeoutRef.current);
-      }
       snapshotAnchor();
     };
-  }, [scheduleSnapshot, snapshotAnchor]);
+  }, [snapshotAnchor]);
 
   // Restore once items exist.
   useLayoutEffect(() => {

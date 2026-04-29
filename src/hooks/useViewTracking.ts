@@ -15,8 +15,10 @@ interface TrackViewParams {
  */
 export async function trackView({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
   try {
+    console.log('[trackView] Starting', { postId, eventType, durationMs });
     // Get current user (may be null for anonymous)
     const { data: { user } } = await supabase.auth.getUser();
+    console.log('[trackView] User', { userId: user?.id || 'anonymous' });
     
     // Get device fingerprint and hash it
     const deviceId = getDeviceId();
@@ -31,9 +33,13 @@ export async function trackView({ postId, eventType, durationMs = 0 }: TrackView
       viewer_id: user?.id || null,
     };
 
+    // Call edge function
+    console.log('[trackView] Calling edge function', { payload });
     const { data, error } = await supabase.functions.invoke('record-view', {
       body: payload,
     });
+
+    console.log('[trackView] Edge function response', { data, error });
 
     if (error) {
       console.error('[useViewTracking] Error:', error);
@@ -41,6 +47,7 @@ export async function trackView({ postId, eventType, durationMs = 0 }: TrackView
     }
 
     const success = data?.ok === true;
+    console.log('[trackView] Success', { success });
     return success;
   } catch (error) {
     console.error('[useViewTracking] Exception:', error);

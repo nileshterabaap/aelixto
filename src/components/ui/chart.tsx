@@ -89,38 +89,16 @@ ${colorConfig
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
 
-type ChartTooltipPayload = {
-  color?: string;
-  dataKey?: string | number;
-  name?: string;
-  value?: number | string;
-  payload: Record<string, unknown> & { fill?: string };
-};
-
-type ChartTooltipContentProps = React.ComponentProps<"div"> & {
-  active?: boolean;
-  payload?: ChartTooltipPayload[];
-  label?: React.ReactNode;
-  labelFormatter?: (label: React.ReactNode, payload: ChartTooltipPayload[]) => React.ReactNode;
-  labelClassName?: string;
-  formatter?: (
-    value: number | string,
-    name: string,
-    item: ChartTooltipPayload,
-    index: number,
-    payload: ChartTooltipPayload["payload"],
-  ) => React.ReactNode;
-  hideLabel?: boolean;
-  hideIndicator?: boolean;
-  indicator?: "line" | "dot" | "dashed";
-  nameKey?: string;
-  labelKey?: string;
-  color?: string;
-};
-
 const ChartTooltipContent = React.forwardRef<
   HTMLDivElement,
-  ChartTooltipContentProps
+  React.ComponentProps<typeof RechartsPrimitive.Tooltip> &
+    React.ComponentProps<"div"> & {
+      hideLabel?: boolean;
+      hideIndicator?: boolean;
+      indicator?: "line" | "dot" | "dashed";
+      nameKey?: string;
+      labelKey?: string;
+    }
 >(
   (
     {
@@ -229,7 +207,7 @@ const ChartTooltipContent = React.forwardRef<
                         {nestLabel ? tooltipLabel : null}
                         <span className="text-muted-foreground">{itemConfig?.label || item.name}</span>
                       </div>
-                      {item.value !== undefined && item.value !== null && (
+                      {item.value && (
                         <span className="font-mono font-medium tabular-nums text-foreground">
                           {item.value.toLocaleString()}
                         </span>

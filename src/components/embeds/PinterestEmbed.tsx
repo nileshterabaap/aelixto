@@ -53,18 +53,14 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
 
   if (loading) {
     return (
-      <div
-        className="w-full animate-pulse bg-muted rounded-xl"
-        data-embed-status="loading"
-        style={{ aspectRatio: '3/4', maxWidth: 500, margin: '0 auto' }}
-      />
+      <div className="w-full animate-pulse bg-muted rounded-xl" style={{ aspectRatio: '3/4', maxWidth: 500, margin: '0 auto' }} />
     );
   }
 
   // If we have a pin ID, use Pinterest's native embed iframe (supports video playback)
   if (pinId) {
     return (
-      <div className="w-full" data-embed-status={iframeLoaded ? 'ready' : 'loading'}>
+      <div className="w-full">
         <div
           className="relative w-full overflow-hidden bg-muted"
           style={{ minHeight: 400 }}
@@ -102,15 +98,13 @@ export const PinterestEmbed = ({ url }: PinterestEmbedProps) => {
 
   // Fallback: no pin ID extracted, show a link
   return (
-    <div data-embed-status="ready">
-      <div 
-        className="rounded-xl overflow-hidden border border-border bg-card cursor-pointer hover:opacity-95 transition-opacity max-w-[500px] mx-auto p-4"
-        onClick={() => window.open(resolvedUrl, '_blank', 'noopener,noreferrer')}
-      >
-        <div className="flex items-center gap-3">
-          <img src={pinterestIcon} alt="Pinterest" className="w-6 h-6 flex-shrink-0" />
-          <p className="text-sm text-muted-foreground">View on Pinterest</p>
-        </div>
+    <div 
+      className="rounded-xl overflow-hidden border border-border bg-card cursor-pointer hover:opacity-95 transition-opacity max-w-[500px] mx-auto p-4"
+      onClick={() => window.open(resolvedUrl, '_blank', 'noopener,noreferrer')}
+    >
+      <div className="flex items-center gap-3">
+        <img src={pinterestIcon} alt="Pinterest" className="w-6 h-6 flex-shrink-0" />
+        <p className="text-sm text-muted-foreground">View on Pinterest</p>
       </div>
     </div>
   );

@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { Plus, Trash2, FolderOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,33 +142,21 @@ export const CollectionGrid = ({
     <>
       <div className="grid grid-cols-2 gap-4">
         {/* Create new collection tile */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.92 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+        <button
+          onClick={() => setCreateOpen(true)}
+          className="rounded-2xl aspect-square border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 hover:border-muted-foreground/50 transition-colors"
         >
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="rounded-2xl aspect-square border-2 border-dashed border-muted-foreground/30 flex flex-col items-center justify-center gap-2 hover:border-muted-foreground/50 transition-colors w-full"
-          >
-            <Plus className="w-8 h-8 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground font-medium">New Collection</span>
-          </button>
-        </motion.div>
+          <Plus className="w-8 h-8 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground font-medium">New Collection</span>
+        </button>
 
-        {collections.map((col, i) => (
-          <motion.div
+        {collections.map((col) => (
+          <CollectionTile
             key={col.id}
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: (i + 1) * 0.08, ease: [0.4, 0, 0.2, 1] }}
-          >
-            <CollectionTile
-              collection={col}
-              onClick={() => setSelectedCollection(col)}
-              onDelete={() => onDeleteCollection(col.id)}
-            />
-          </motion.div>
+            collection={col}
+            onClick={() => setSelectedCollection(col)}
+            onDelete={() => onDeleteCollection(col.id)}
+          />
         ))}
       </div>
 

@@ -26,8 +26,6 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     if (path === "/profile") {
       return location.pathname === "/profile" || location.pathname.startsWith("/u/");
     }
-    if (path === "/saved") return location.pathname === "/saved";
-    if (path === "/messages") return location.pathname === "/messages";
     return location.pathname === path;
   };
   const [ripples, setRipples] = useState<Record<string, Ripple[]>>({});
@@ -36,8 +34,8 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const lastHomeTapRef = useRef<number>(0);
 
   const baseIcon = "text-foreground transition-all duration-200";
-  const activeIcon = "h-[3.375rem] w-[3.375rem] opacity-100";
-  const inactiveIcon = "h-[2.625rem] w-[2.625rem] opacity-50 hover:opacity-80";
+  const activeIcon = "h-9 w-9 opacity-100";
+  const inactiveIcon = "h-7 w-7 opacity-50 hover:opacity-80";
 
   const createRipple = useCallback((e: MouseEvent<HTMLButtonElement>, key: string) => {
     const button = e.currentTarget;
@@ -222,9 +220,10 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
         <button
           aria-label="Create post"
           onClick={onCreatePost}
-          className="absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-2xl bg-foreground text-background"
+          className="absolute left-1/2 -top-4 -translate-x-1/2 h-12 w-12 rounded-2xl bg-foreground text-background 
+                     hover:scale-105 active:scale-95 transition-transform"
         >
-          <Plus className="mx-auto h-5 w-5 stroke-[3] text-white" />
+          <Plus className="mx-auto h-5 w-5 stroke-[3] text-background" />
         </button>
       </div>
     </nav>

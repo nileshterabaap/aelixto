@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useCallback } from 'react';
+import { useState, useRef, useLayoutEffect } from 'react';
 import { parseTextWithMentions } from './UsernameLink';
 
 interface CollapsibleCaptionProps {
@@ -16,27 +16,23 @@ export const CollapsibleCaption = ({
   const [isTruncated, setIsTruncated] = useState(false);
   const textRef = useRef<HTMLSpanElement>(null);
 
-  const measure = useCallback(() => {
+  // Check if text overflows after 2 lines - use useLayoutEffect for accurate measurement
+  useLayoutEffect(() => {
     const el = textRef.current;
     if (!el || isExpanded) return;
-    const isOverflowing = el.scrollHeight > el.clientHeight + 1;
-    setIsTruncated(isOverflowing);
-  }, [isExpanded]);
-
-  // Measure on mount and content change
-  useLayoutEffect(() => {
-    measure();
-    // Also measure after fonts load and after a short delay for layout settle
-    const raf = requestAnimationFrame(measure);
-    const timer = setTimeout(measure, 150);
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(timer);
-    };
-  }, [content, isExpanded, measure]);
+    
+    // Force a reflow to ensure accurate measurement
+    requestAnimationFrame(() => {
+      if (el) {
+        const isOverflowing = el.scrollHeight > el.clientHeight + 1; // +1 for rounding
+        setIsTruncated(isOverflowing);
+      }
+    });
+  }, [content, isExpanded]);
 
   if (!content) return null;
 
+  // Parse content to convert @mentions to clickable links
   const parsedContent = parseTextWithMentions(content);
 
   return (

@@ -1,4 +1,3 @@
-import { SwipeableView } from "@/components/SwipeableView";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
@@ -12,14 +11,12 @@ import { SavedThumbnailGrid } from "@/components/saved/SavedThumbnailGrid";
 import { CollectionGrid } from "@/components/saved/CollectionGrid";
 import { useCollections } from "@/hooks/useCollections";
 import { SavedSkeleton } from "@/components/saved/SavedSkeleton";
-import { DraftsGrid } from "@/components/saved/DraftsGrid";
-import { useDrafts } from "@/hooks/useDrafts";
 
 export default function SavedPosts() {
   const { session, loading } = useSession();
   const navigate = useNavigate();
   const [createPostOpen, setCreatePostOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"all" | "collections" | "drafts">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "collections">("all");
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -72,7 +69,7 @@ export default function SavedPosts() {
             author: {
               name: profile?.display_name || profile?.username || "Unknown",
               username: profile?.username || "Unknown",
-              avatar: profile?.avatar_url || "",
+              avatar: profile?.avatar_url || "/placeholder.svg",
             },
             isRealPost: true,
           };
@@ -89,60 +86,58 @@ export default function SavedPosts() {
     isCreating,
   } = useCollections(session?.user?.id);
 
-  const { data: drafts = [] } = useDrafts(session?.user?.id);
-
   const handleRefresh = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["saved-posts"] }),
       queryClient.invalidateQueries({ queryKey: ["collections"] }),
-      queryClient.invalidateQueries({ queryKey: ["post-drafts"] }),
     ]);
   }, [queryClient]);
 
   if (loading || isLoading) {
     return (
-      <SwipeableView rightRoute="/" rightLabel="Home">
-        <div className="min-h-screen pb-20">
-          <Header onCreatePost={() => setCreatePostOpen(true)} />
-          <SavedSkeleton />
-          <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
-        </div>
-      </SwipeableView>
+      <div className="min-h-screen pb-20">
+        <Header onCreatePost={() => setCreatePostOpen(true)} />
+        <SavedSkeleton />
+        <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
+      </div>
     );
   }
 
   return (
-    <SwipeableView rightRoute="/" rightLabel="Home">
     <div className="min-h-screen pb-20">
       <Header onCreatePost={() => setCreatePostOpen(true)} />
 
       <PullToRefresh onRefresh={handleRefresh}>
-        <main className="container max-w-2xl mx-auto px-4 py-6 animate-fade-in">
+        <main className="container max-w-2xl mx-auto px-4 py-6">
           <h1 className="text-2xl font-bold mb-4">Saved</h1>
 
           {/* Tabs */}
           <div className="flex gap-1 mb-6 bg-muted rounded-xl p-1">
-            {(["all", "collections", "drafts"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${
-                  activeTab === tab
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground"
-                }`}
-              >
-                {tab === "drafts" && drafts.length > 0
-                  ? `Drafts (${drafts.length})`
-                  : tab}
-              </button>
-            ))}
+            <button
+              onClick={() => setActiveTab("all")}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === "all"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground"
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setActiveTab("collections")}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === "collections"
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground"
+              }`}
+            >
+              Collections
+            </button>
           </div>
 
-          {activeTab === "all" && (
+          {activeTab === "all" ? (
             <SavedThumbnailGrid posts={savedPosts} userId={session?.user?.id} />
-          )}
-          {activeTab === "collections" && (
+          ) : (
             <CollectionGrid
               collections={collections}
               userId={session?.user?.id}
@@ -151,13 +146,11 @@ export default function SavedPosts() {
               isCreating={isCreating}
             />
           )}
-          {activeTab === "drafts" && <DraftsGrid drafts={drafts} />}
         </main>
       </PullToRefresh>
 
       <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
       <CreatePostDialog open={createPostOpen} onOpenChange={setCreatePostOpen} />
     </div>
-    </SwipeableView>
   );
 }

@@ -1,10 +1,9 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { markPostSeenImmediate } from "@/hooks/useMarkPostSeen";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { HydratedFeedPost } from "@/components/HydratedFeedPost";
+import { FeedPost } from "@/components/FeedPost";
 import type { Post } from "@/data/demoData";
 
 interface SupabasePost {
@@ -39,10 +38,6 @@ const PostDetail = () => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUserId(user?.id);
-      // Mark this post as seen when viewing it
-      if (user?.id && postId) {
-        markPostSeenImmediate(user.id, postId);
-      }
     };
     getUser();
     
@@ -71,10 +66,7 @@ const PostDetail = () => {
       const supabasePost = data as unknown as SupabasePost;
       
       // Transform Supabase post to match FeedPost expected format
-      // Spread ALL raw DB columns so renderers can access fields like
-      // raw_json_data, preview_title, preview_image_url, preview_text, etc.
       const transformedPost: Post & { isRealPost: boolean; user_id: string } = {
-        ...(data as any), // preserve every raw column for renderer access
         id: supabasePost.id,
         user_id: supabasePost.user_id,
         author: {
@@ -91,9 +83,6 @@ const PostDetail = () => {
         embed_html: supabasePost.embed_html,
         timestamp: new Date(supabasePost.created_at),
         saves: supabasePost.saves_count,
-        likes_count: supabasePost.likes_count,
-        comments_count: supabasePost.comments_count,
-        reposts_count: (data as any).reposts_count ?? 0,
         isRealPost: true,
       };
       
@@ -141,7 +130,7 @@ const PostDetail = () => {
       </div>
 
       <main className="mx-auto max-w-2xl px-4 py-6">
-        <HydratedFeedPost post={post} userId={userId} startHydrated />
+        <FeedPost post={post} userId={userId} />
       </main>
     </div>
   );

@@ -286,56 +286,6 @@ export type Database = {
           },
         ]
       }
-      hidden_posts: {
-        Row: {
-          created_at: string
-          id: string
-          post_id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          post_id: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          post_id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "hidden_posts_post_id_fkey"
-            columns: ["post_id"]
-            isOneToOne: false
-            referencedRelation: "posts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      hidden_users: {
-        Row: {
-          created_at: string
-          hidden_user_id: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          hidden_user_id: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          hidden_user_id?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       likes: {
         Row: {
           created_at: string
@@ -476,80 +426,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
-          },
-        ]
-      }
-      post_drafts: {
-        Row: {
-          caption: string | null
-          created_at: string
-          embed_html: string | null
-          id: string
-          link_url: string | null
-          media_type: string | null
-          og_type: string | null
-          platform: string | null
-          thumbnail_url: string | null
-          title: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          caption?: string | null
-          created_at?: string
-          embed_html?: string | null
-          id?: string
-          link_url?: string | null
-          media_type?: string | null
-          og_type?: string | null
-          platform?: string | null
-          thumbnail_url?: string | null
-          title?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          caption?: string | null
-          created_at?: string
-          embed_html?: string | null
-          id?: string
-          link_url?: string | null
-          media_type?: string | null
-          og_type?: string | null
-          platform?: string | null
-          thumbnail_url?: string | null
-          title?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      post_seen: {
-        Row: {
-          id: number
-          post_id: string
-          seen_at: string
-          user_id: string
-        }
-        Insert: {
-          id?: never
-          post_id: string
-          seen_at?: string
-          user_id: string
-        }
-        Update: {
-          id?: never
-          post_id?: string
-          seen_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "post_seen_post_id_fkey"
-            columns: ["post_id"]
-            isOneToOne: false
-            referencedRelation: "posts"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -749,50 +625,6 @@ export type Database = {
         }
         Relationships: []
       }
-      reports: {
-        Row: {
-          created_at: string
-          details: string | null
-          id: string
-          reason: Database["public"]["Enums"]["report_reason"]
-          reporter_id: string
-          status: string
-          target_post_id: string | null
-          target_type: Database["public"]["Enums"]["report_target"]
-          target_user_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          details?: string | null
-          id?: string
-          reason: Database["public"]["Enums"]["report_reason"]
-          reporter_id: string
-          status?: string
-          target_post_id?: string | null
-          target_type: Database["public"]["Enums"]["report_target"]
-          target_user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          details?: string | null
-          id?: string
-          reason?: Database["public"]["Enums"]["report_reason"]
-          reporter_id?: string
-          status?: string
-          target_post_id?: string | null
-          target_type?: Database["public"]["Enums"]["report_target"]
-          target_user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "reports_target_post_id_fkey"
-            columns: ["target_post_id"]
-            isOneToOne: false
-            referencedRelation: "posts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       reposts: {
         Row: {
           created_at: string
@@ -850,27 +682,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      user_roles: {
-        Row: {
-          created_at: string
-          id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
       }
     }
     Views: {
@@ -941,13 +752,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
       is_conversation_participant: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
@@ -965,17 +769,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "moderator" | "user"
-      report_reason:
-        | "spam"
-        | "harassment"
-        | "hate_speech"
-        | "nudity_sexual"
-        | "violence"
-        | "misinformation"
-        | "self_harm"
-        | "other"
-      report_target: "post" | "user"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1102,19 +896,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      app_role: ["admin", "moderator", "user"],
-      report_reason: [
-        "spam",
-        "harassment",
-        "hate_speech",
-        "nudity_sexual",
-        "violence",
-        "misinformation",
-        "self_harm",
-        "other",
-      ],
-      report_target: ["post", "user"],
-    },
+    Enums: {},
   },
 } as const

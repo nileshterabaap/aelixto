@@ -175,7 +175,7 @@ export const useCollectionItems = (collectionId: string | undefined) => {
             author: {
               name: profile?.display_name || profile?.username || "Unknown",
               username: profile?.username || "Unknown",
-              avatar: profile?.avatar_url || "",
+              avatar: profile?.avatar_url || "/placeholder.svg",
             },
             isRealPost: true,
           };

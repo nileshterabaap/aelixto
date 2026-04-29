@@ -38,11 +38,6 @@ const PrivacyPolicy = () => {
               guardian and believe your child has provided us with personal data, please contact us at{" "}
               <a href="mailto:support@aelixto.com" className="text-primary hover:underline">support@aelixto.com</a>.
             </p>
-            <p className="text-muted-foreground mt-2">
-              For our full child protection commitments, including CSAE prevention, detection, and
-              reporting practices, please see our{" "}
-              <a href="/child-safety" className="text-primary hover:underline">Child Safety Standards</a>.
-            </p>
           </section>
 
           <section>

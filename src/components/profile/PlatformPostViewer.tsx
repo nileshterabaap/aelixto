@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
 import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts";
 import { useSession } from "@/hooks/useSession";
-import { markPostsSeenImmediate } from "@/hooks/useMarkPostSeen";
 import type { Post } from "@/data/demoData";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 
@@ -103,13 +102,6 @@ export const PlatformPostViewer = ({
       }, 100);
     }
   }, [items, initialPostId, activeTab]);
-
-  // Mark all visible posts as seen when viewing profile posts
-  useEffect(() => {
-    if (user?.id && items.length > 0) {
-      markPostsSeenImmediate(user.id, items.map(p => p.id));
-    }
-  }, [user?.id, items]);
 
   // Get adjacent tabs for swipe navigation
   const currentTabIndex = tabs.findIndex(t => t.key === activeTab);

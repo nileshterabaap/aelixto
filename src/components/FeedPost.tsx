@@ -1,5 +1,4 @@
 import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2 } from "lucide-react";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -41,9 +40,6 @@ import { QuoraPreviewCard } from "@/features/article-embeds/QuoraPreviewCard";
 import { useVideoPlayTracking } from "@/hooks/useViewTracking";
 import { ImageViewTracker } from "@/components/ImageViewTracker";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
-import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
-import { SharePostSheet } from "@/components/SharePostSheet";
-import { PostReportMenu } from "@/components/PostReportMenu";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -109,7 +105,6 @@ const detectPlatformFromUrl = (url?: string) => {
 
 export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [blogFavicon, setBlogFavicon] = useState<string | null>(null);
   const [likeAnimating, setLikeAnimating] = useState(false);
@@ -172,10 +167,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   };
 
   const isYouTubeShort = (url: string) => {
-    if (url.includes('/shorts/')) return true;
-    if (post.title && /#shorts?\b/i.test(post.title)) return true;
-    if (post.content && /#shorts?\b/i.test(post.content)) return true;
-    return false;
+    return url.includes('/shorts/');
   };
 
   const getYouTubeThumbnail = (url: string) => {
@@ -270,12 +262,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         <div className="p-5">
           {/* Author Info */}
           <div className="flex items-center gap-3 mb-4">
-            <Avatar className="h-12 w-12">
-              {post.author.avatar ? (
-                <AvatarImage src={post.author.avatar} alt={post.author.username} />
-              ) : null}
-              <AvatarFallback />
-            </Avatar>
+            <div className="flex h-12 w-12 items-center justify-center rounded-full overflow-hidden bg-muted">
+              <img 
+                src={post.author.avatar} 
+                alt={post.author.username}
+                className="w-full h-full object-cover"
+                loading="eager"
+                decoding="async"
+              />
+            </div>
             <div className="flex-1 min-w-0">
               <UsernameLink username={post.author.username} className="font-bold text-base block">{post.author.username}</UsernameLink>
             </div>
@@ -287,7 +282,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
-            {post.isRealPost && (post as any).user_id === userId ? (
+            {post.isRealPost && (post as any).user_id === userId && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                   <Button 
@@ -309,13 +304,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            ) : post.isRealPost && (post as any).user_id ? (
-              <PostReportMenu
-                postId={post.id}
-                authorUserId={(post as any).user_id}
-                authorUsername={post.author?.username}
-              />
-            ) : null}
+            )}
             </div>
           </div>
 
@@ -374,7 +363,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               />
             </button>
             <button 
-              onClick={() => setShareOpen(true)}
+              onClick={handleShare}
               className="action-btn p-2 active:scale-90 transition-transform"
             >
               <Share className="h-7 w-7 stroke-[1.5]" />
@@ -394,13 +383,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             onOpenChange={setCommentsOpen}
             postId={post.id}
             postAuthorId={(post as any).user_id}
-          />
-        )}
-        {(
-          <SharePostSheet 
-            open={shareOpen} 
-            onOpenChange={setShareOpen}
-            postId={post.id}
           />
         )}
       </Card>
@@ -429,12 +411,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         
         {/* Author Info */}
         <div className="flex items-center gap-3 mb-4">
-           <Avatar className="h-12 w-12">
-              {post.author.avatar ? (
-                <AvatarImage src={post.author.avatar} alt={post.author.username} />
-              ) : null}
-              <AvatarFallback />
-            </Avatar>
+          <div className="flex h-12 w-12 items-center justify-center rounded-full overflow-hidden bg-muted">
+            <img 
+              src={post.author.avatar} 
+              alt={post.author.username}
+              className="w-full h-full object-cover"
+              loading="eager"
+              decoding="async"
+            />
+          </div>
           <div className="flex-1 min-w-0">
             <UsernameLink username={post.author.username} className="font-bold text-base block">{post.author.username}</UsernameLink>
           </div>
@@ -446,7 +431,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' || blogFavicon ? 'w-6 h-6' : 'w-8 h-8'}`}
               />
             )}
-            {post.isRealPost && (post as any).user_id === userId ? (
+            {post.isRealPost && (post as any).user_id === userId && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                   <Button 
@@ -468,13 +453,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            ) : post.isRealPost && (post as any).user_id ? (
-              <PostReportMenu
-                postId={post.id}
-                authorUserId={(post as any).user_id}
-                authorUsername={post.author?.username}
-              />
-            ) : null}
+            )}
           </div>
         </div>
 
@@ -725,11 +704,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {/* Title - hide for embeds that contain their own title/caption */}
         {(r.kind === 'image' || (r.kind === 'video' && post.platform === 'youtube')) && (
           <div className="mt-3">
-            {post.platform === 'youtube' ? (
-              <YouTubeTitleFallback mediaUrl={mediaUrl} title={post.title} />
-            ) : (
-              <h2 className="text-lg font-bold">{post.title}</h2>
-            )}
+            <h2 className="text-lg font-bold">{post.title}</h2>
           </div>
         )}
 
@@ -773,7 +748,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             />
           </button>
           <button 
-            onClick={() => setShareOpen(true)}
+            onClick={handleShare}
             className="action-btn p-2 active:scale-90 transition-transform"
           >
             <Share className="h-7 w-7 stroke-[1.5]" />
@@ -793,13 +768,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           onOpenChange={setCommentsOpen}
           postId={post.id}
           postAuthorId={(post as any).user_id}
-        />
-      )}
-      {(
-        <SharePostSheet 
-          open={shareOpen} 
-          onOpenChange={setShareOpen}
-          postId={post.id}
         />
       )}
     </Card>
