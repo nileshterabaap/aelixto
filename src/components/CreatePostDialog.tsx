@@ -315,17 +315,17 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
               />
             </DialogPrimitive.Overlay>
 
-            {/* Card emerging from the FAB position */}
+            {/* Centered card with viewport-safe sizing */}
             <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
               <motion.div
-                className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 outline-none"
-                initial={{ opacity: 0, scale: 0.85, y: 40 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: 30 }}
+                className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none"
+                initial={{ opacity: 0, scale: 0.94, x: "-50%", y: "calc(-50% + 18px)" }}
+                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+                exit={{ opacity: 0, scale: 0.96, x: "-50%", y: "calc(-50% + 14px)" }}
                 transition={{ type: "spring", stiffness: 360, damping: 34, mass: 0.85 }}
                 style={{ transformOrigin: "50% 50%" }}
               >
-                <div className="relative overflow-hidden rounded-[28px] bg-background shadow-[0_30px_80px_-20px_rgba(0,0,0,0.35)] ring-1 ring-black/5">
+                <div className="relative max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[28px] bg-background shadow-[0_30px_80px_-20px_hsl(var(--foreground)/0.35)] ring-1 ring-border/10">
                   {/* Soft gradient sheen */}
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/60 via-transparent to-transparent dark:from-white/5" />
 
@@ -368,7 +368,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                   </div>
 
                   {/* Body */}
-                  <div className="relative px-5 pb-5 pt-2">
+                  <div className="relative max-h-[calc(100dvh-6.5rem)] overflow-y-auto px-5 pb-5 pt-2 overscroll-contain">
                     <AnimatePresence mode="wait" custom={step === 1 ? -1 : 1} initial={false}>
                       {step === 1 ? (
                         <motion.div
