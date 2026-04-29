@@ -161,12 +161,32 @@ const Auth = () => {
       if (targetUrl) {
         try {
           const { Browser } = await import("@capacitor/browser");
-          await Browser.open({ url: targetUrl, presentationStyle: "popover" });
+          // Chrome Custom Tab — Google trusts this user agent.
+          await Browser.open({ url: targetUrl, presentationStyle: "fullscreen" });
           return;
         } catch (e) {
-          // Fallback: let the WebView navigate (will likely fail Google's UA check).
-          window.location.href = targetUrl;
-          return;
+          // Custom Tab failed (e.g. no Chrome / no browser supporting Custom Tabs).
+          // DO NOT fall back to window.location.href — that loads the OAuth page
+          // inside the Android WebView and Google blocks it with
+          // `disallowed_useragent` (Error 403). Instead, ask Android to open the
+          // URL with the user's default external browser via an ACTION_VIEW intent.
+          try {
+            const { App } = await import("@capacitor/app");
+            // App.openUrl asks the OS to resolve the URL — for https:// links
+            // this hands off to the default browser app, not our WebView.
+            // Available on Capacitor 5+.
+            await (App as unknown as { openUrl: (o: { url: string }) => Promise<unknown> }).openUrl({ url: targetUrl });
+            return;
+          } catch (e2) {
+            console.error("Native OAuth: no external browser available", e, e2);
+            toast({
+              title: "Browser required",
+              description:
+                "Google sign-in needs to open in a real browser. Please install Chrome (or another browser) and try again.",
+              variant: "destructive",
+            });
+            return;
+          }
         }
       }
 
