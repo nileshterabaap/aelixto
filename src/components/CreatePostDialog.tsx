@@ -466,7 +466,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           )}
 
                           <div>
-                            <Label htmlFor="caption" className="text-sm font-medium">
+                            <Label htmlFor="caption" className="text-sm font-medium text-foreground/80">
                               Caption (optional)
                             </Label>
                             <Textarea
@@ -474,7 +474,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                               placeholder="Write a caption..."
                               value={caption}
                               onChange={(e) => setCaption(e.target.value)}
-                              className="mt-2 min-h-[80px] resize-none rounded-2xl border-border/70 bg-muted/40 px-4 py-3"
+                              className="mt-2 min-h-[88px] resize-none rounded-[24px] border-input bg-background px-4 py-3 text-base outline-none shadow-[0_0_0_4px_hsl(var(--muted)/0.75)] focus-visible:ring-0 focus-visible:ring-offset-0 focus:border-foreground/25 focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.06)]"
                             />
                           </div>
 
@@ -483,7 +483,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                               type="button"
                               variant="outline"
                               onClick={() => setShowThumbnailInput(!showThumbnailInput)}
-                              className="h-11 w-full rounded-2xl border-border/70"
+                              className="h-11 w-full rounded-[20px] border-input bg-background"
                             >
                               {showThumbnailInput ? "Hide" : "Change"} Thumbnail
                             </Button>
@@ -506,7 +506,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                                     placeholder="https://..."
                                     value={thumbnailUrl}
                                     onChange={(e) => setThumbnailUrl(e.target.value)}
-                                    className="mt-2 h-12 w-full rounded-[22px] border border-border/40 bg-muted/25 px-4 text-base outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:bg-background focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.055)]"
+                                    className="mt-2 h-12 w-full rounded-[22px] border border-input bg-background px-4 text-base outline-none shadow-[0_0_0_4px_hsl(var(--muted)/0.75)] transition-[border-color,box-shadow] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.06)]"
                                   />
                                 </motion.div>
                               )}
@@ -517,7 +517,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                             <Button
                               onClick={handlePost}
                               disabled={submitState !== null}
-                              className="h-12 w-full rounded-2xl bg-foreground text-background hover:bg-foreground/90"
+                              className="h-12 w-full rounded-[22px] bg-foreground text-background shadow-[0_18px_38px_-26px_hsl(var(--foreground)/0.9)] hover:bg-foreground/90"
                             >
                               {submitState === "post" ? (
                                 <motion.span
@@ -537,7 +537,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                             <Button
                               onClick={handleSaveAsDraft}
                               variant="outline"
-                              className="h-12 w-full rounded-2xl border-border/70"
+                              className="h-12 w-full rounded-[22px] border-input bg-background"
                               disabled={saveDraft.isPending || submitState !== null}
                             >
                               {submitState === "draft" ? (
