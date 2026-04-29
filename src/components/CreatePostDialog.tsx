@@ -319,11 +319,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
               <motion.div
                 className="fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 outline-none"
-                initial={{ opacity: 0, scale: 0.2, y: 220, borderRadius: 24 }}
-                animate={{ opacity: 1, scale: 1, y: 0, borderRadius: 28 }}
-                exit={{ opacity: 0, scale: 0.25, y: 220, borderRadius: 24 }}
-                transition={{ type: "spring", stiffness: 320, damping: 32, mass: 0.9 }}
-                style={{ transformOrigin: "50% calc(100% + 60vh)" }}
+                initial={{ opacity: 0, scale: 0.85, y: 40 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 30 }}
+                transition={{ type: "spring", stiffness: 360, damping: 34, mass: 0.85 }}
+                style={{ transformOrigin: "50% 50%" }}
               >
                 <div className="relative overflow-hidden rounded-[28px] bg-background shadow-[0_30px_80px_-20px_rgba(0,0,0,0.35)] ring-1 ring-black/5">
                   {/* Soft gradient sheen */}
