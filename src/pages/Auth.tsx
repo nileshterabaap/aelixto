@@ -162,10 +162,7 @@ const Auth = () => {
         try {
           const { Browser } = await import("@capacitor/browser");
           // Chrome Custom Tab — Google trusts this user agent.
-          await Browser.open({
-            url: targetUrl,
-            windowTarget: "_blank",
-          });
+          await Browser.open({ url: targetUrl, presentationStyle: "fullscreen" });
           return;
         } catch (e) {
           // Custom Tab failed (e.g. no Chrome / no browser supporting Custom Tabs).
