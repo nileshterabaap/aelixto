@@ -327,7 +327,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                 style={{ transformOrigin: "50% calc(100% + 120px)" }}
               >
                 <motion.div
-                  layoutId="create-post-surface"
                   transition={panelTransition}
                   className="relative max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[32px] bg-background shadow-[0_34px_90px_-24px_hsl(var(--foreground)/0.45)] ring-1 ring-border/15"
                 >
@@ -404,7 +403,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                               placeholder=" "
                               value={linkUrl}
                               onChange={(e) => setLinkUrl(e.target.value)}
-                              className="mt-2 h-12 w-full rounded-[22px] border border-border/50 bg-muted/35 px-4 text-base outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/20 focus:bg-background focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.06)]"
+                              className="mt-2 h-12 w-full rounded-[22px] border border-border/40 bg-muted/25 px-4 text-base outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:bg-background focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.055)]"
                             />
                           </div>
 
@@ -491,7 +490,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                                     placeholder="https://..."
                                     value={thumbnailUrl}
                                     onChange={(e) => setThumbnailUrl(e.target.value)}
-                                    className="mt-2 h-12 w-full rounded-[22px] border border-border/50 bg-muted/35 px-4 text-base outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/20 focus:bg-background focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.06)]"
+                                    className="mt-2 h-12 w-full rounded-[22px] border border-border/40 bg-muted/25 px-4 text-base outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:bg-background focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.055)]"
                                   />
                                 </motion.div>
                               )}
