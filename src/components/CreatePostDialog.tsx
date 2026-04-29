@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Loader2, Plus, X, Check } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
@@ -299,6 +298,8 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     exit: (dir: number) => ({ opacity: 0, x: -dir * 24, filter: "blur(6px)" }),
   };
 
+  const panelTransition = { type: "spring" as const, stiffness: 430, damping: 38, mass: 0.9 };
+
   return (
     <DialogPrimitive.Root open={open} onOpenChange={handleClose}>
       <AnimatePresence>
@@ -307,9 +308,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             {/* Blurred backdrop */}
             <DialogPrimitive.Overlay asChild forceMount>
               <motion.div
-                className="fixed inset-0 z-50 bg-black/40 backdrop-blur-md"
+                className="fixed inset-0 z-50 bg-foreground/45 backdrop-blur-xl"
                 initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-                animate={{ opacity: 1, backdropFilter: "blur(12px)" }}
+                animate={{ opacity: 1, backdropFilter: "blur(18px)" }}
                 exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
                 transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
               />
@@ -319,18 +320,29 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
               <motion.div
                 className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none"
-                initial={{ opacity: 0, scale: 0.94, x: "-50%", y: "calc(-50% + 18px)" }}
+                initial={{ opacity: 0, scale: 0.9, x: "-50%", y: "calc(-50% + 40px)", filter: "blur(8px)" }}
                 animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
-                exit={{ opacity: 0, scale: 0.96, x: "-50%", y: "calc(-50% + 14px)" }}
-                transition={{ type: "spring", stiffness: 360, damping: 34, mass: 0.85 }}
+                exit={{ opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)", filter: "blur(8px)" }}
+                transition={panelTransition}
                 style={{ transformOrigin: "50% 50%" }}
               >
-                <div className="relative max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[28px] bg-background shadow-[0_30px_80px_-20px_hsl(var(--foreground)/0.35)] ring-1 ring-border/10">
+                <motion.div
+                  layoutId="create-post-surface"
+                  transition={panelTransition}
+                  className="relative max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[32px] bg-background shadow-[0_34px_90px_-24px_hsl(var(--foreground)/0.45)] ring-1 ring-border/15"
+                >
                   {/* Soft gradient sheen */}
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/60 via-transparent to-transparent dark:from-white/5" />
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--foreground)/0.10),transparent_42%)]" />
+                  <motion.div
+                    aria-hidden
+                    className="pointer-events-none absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-foreground/10"
+                    initial={{ scaleX: 0.35, opacity: 0 }}
+                    animate={{ scaleX: 1, opacity: 1 }}
+                    transition={{ delay: 0.08, duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                  />
 
                   {/* Header */}
-                  <div className="relative flex items-center justify-between px-5 pt-5 pb-2">
+                  <div className="relative flex items-center justify-between px-6 pt-7 pb-2">
                     <div className="flex items-center gap-2">
                       <AnimatePresence initial={false} mode="wait">
                         {step === 2 && (
@@ -368,7 +380,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                   </div>
 
                   {/* Body */}
-                  <div className="relative max-h-[calc(100dvh-6.5rem)] overflow-y-auto px-5 pb-5 pt-2 overscroll-contain">
+                  <div className="relative max-h-[calc(100dvh-7rem)] overflow-y-auto px-6 pb-6 pt-2 overscroll-contain">
                     <AnimatePresence mode="wait" custom={step === 1 ? -1 : 1} initial={false}>
                       {step === 1 ? (
                         <motion.div
