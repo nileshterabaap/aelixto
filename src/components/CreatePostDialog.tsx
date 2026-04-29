@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Loader2, Plus, X, Check } from "lucide-react";
+import { ArrowLeft, Link2, Loader2, Sparkles, X, Check } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
@@ -334,15 +334,23 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--foreground)/0.10),transparent_42%)]" />
                   <motion.div
                     aria-hidden
-                    className="pointer-events-none absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-foreground/10"
+                    className="pointer-events-none absolute left-1/2 top-3 h-1.5 w-12 -translate-x-1/2 rounded-full bg-muted"
                     initial={{ scaleX: 0.35, opacity: 0 }}
                     animate={{ scaleX: 1, opacity: 1 }}
                     transition={{ delay: 0.08, duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                   />
 
                   {/* Header */}
-                  <div className="relative flex items-center justify-between px-6 pt-7 pb-2">
-                    <div className="flex items-center gap-2">
+                  <div className="relative flex items-center justify-between px-6 pt-7 pb-3">
+                    <div className="flex items-center gap-3">
+                      <motion.div
+                        initial={{ scale: 0.2, rotate: -45, opacity: 0 }}
+                        animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                        transition={{ type: "spring", stiffness: 540, damping: 30, delay: 0.04 }}
+                        className="grid h-10 w-10 place-items-center rounded-2xl bg-foreground text-background shadow-[0_14px_28px_-18px_hsl(var(--foreground)/0.9)]"
+                      >
+                        {step === 1 ? <Link2 className="h-5 w-5" /> : <Sparkles className="h-5 w-5" />}
+                      </motion.div>
                       <AnimatePresence initial={false} mode="wait">
                         {step === 2 && (
                           <motion.button
@@ -364,9 +372,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           initial={{ opacity: 0, y: 6 }}
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ duration: 0.25 }}
-                          className="text-lg font-semibold tracking-tight"
+                          className="text-[1.0625rem] font-semibold tracking-normal"
                         >
-                          {step === 1 ? "Create Post" : "Add Details"}
+                          {step === 1 ? "Create post" : "Add details"}
                         </motion.h2>
                       </DialogPrimitive.Title>
                     </div>
@@ -390,10 +398,10 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           animate="animate"
                           exit="exit"
                           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                          className="space-y-4"
+                          className="space-y-5"
                         >
                           <div>
-                            <Label htmlFor="link" className="text-sm font-medium">
+                            <Label htmlFor="link" className="text-sm font-medium text-foreground/80">
                               Paste your link
                             </Label>
                             <input
@@ -403,24 +411,32 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                               placeholder=" "
                               value={linkUrl}
                               onChange={(e) => setLinkUrl(e.target.value)}
-                              className="mt-2 h-12 w-full rounded-[22px] border border-border/40 bg-muted/25 px-4 text-base outline-none transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:bg-background focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.055)]"
+                              className="mt-2 h-14 w-full rounded-[24px] border border-input bg-background px-4 text-base outline-none shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04),0_0_0_4px_hsl(var(--muted)/0.75)] transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04),0_0_0_5px_hsl(var(--foreground)/0.06)]"
                             />
                           </div>
 
-                          <Button
-                            onClick={handleLinkSubmit}
-                            className="h-12 w-full rounded-2xl bg-foreground text-background hover:bg-foreground/90 active:scale-[0.98] transition-transform"
-                            disabled={!linkUrl.trim() || isLoadingPreview}
-                          >
-                            {isLoadingPreview ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Fetching preview...
-                              </>
-                            ) : (
-                              "Next"
-                            )}
-                          </Button>
+                          <motion.div whileTap={{ scale: 0.985 }}>
+                            <Button
+                              onClick={handleLinkSubmit}
+                              className="relative h-12 w-full overflow-hidden rounded-[22px] bg-foreground text-background shadow-[0_18px_38px_-26px_hsl(var(--foreground)/0.9)] transition-transform hover:bg-foreground/90"
+                              disabled={!linkUrl.trim() || isLoadingPreview}
+                            >
+                              <motion.span
+                                aria-hidden
+                                className="absolute inset-y-0 -left-1/3 w-1/3 bg-background/15"
+                                animate={{ x: ["0%", "430%"] }}
+                                transition={{ repeat: Infinity, repeatDelay: 1.6, duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
+                              />
+                              {isLoadingPreview ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Fetching preview...
+                                </>
+                              ) : (
+                                "Next"
+                              )}
+                            </Button>
+                          </motion.div>
                         </motion.div>
                       ) : (
                         <motion.div
