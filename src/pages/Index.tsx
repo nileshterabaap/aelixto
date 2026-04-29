@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { CheckCircle2 } from "lucide-react";
 import { Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
@@ -11,14 +12,20 @@ import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
+import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
+import { SwipeableView } from "@/components/SwipeableView";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
+  useIframeScrollFreeze();
+  const { observePost } = useMarkPostSeen(user?.id);
+  
   
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
@@ -49,7 +56,7 @@ const Index = () => {
           username: `@${post.profiles?.username || "anonymous"}`,
           avatar:
             post.profiles?.avatar_url ||
-            "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
+           "",
         },
         title: post.title || "",
         content: post.content,
@@ -86,7 +93,7 @@ const Index = () => {
         username: `@${post.profiles?.username || "anonymous"}`,
         avatar:
           post.profiles?.avatar_url ||
-          "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
+           "",
       },
       title: post.title || "",
       content: post.content,
@@ -162,23 +169,26 @@ const Index = () => {
 
   if (shouldShowSkeleton) {
     return (
-      <div className="min-h-screen bg-background pb-20">
-        <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
-        <main className="mx-auto max-w-2xl px-4 py-6">
-          <div className="space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <PostSkeleton key={i} />
-            ))}
-          </div>
-        </main>
-        <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
-      </div>
+      <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
+        <div className="min-h-screen bg-background pb-20">
+          <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
+          <main className="mx-auto max-w-2xl px-4 py-6">
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <PostSkeleton key={i} />
+              ))}
+            </div>
+          </main>
+          <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
+        </div>
+      </SwipeableView>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
+    <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
+      <div className="min-h-screen bg-background pb-20">
+        <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
@@ -205,13 +215,14 @@ const Index = () => {
                   key={post.id} 
                   ref={(el) => {
                     registerItem(post.id)(el);
+                    if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
                   }}
                   data-feed-item-id={post.id}
                 >
                   <FeedPost 
                     post={post} 
                     userId={user?.id} 
-                    startHydrated={index < 8}
+                    startHydrated={index < 4}
                   />
                 </div>
               ))}
@@ -224,6 +235,16 @@ const Index = () => {
                   </div>
                 </>
               )}
+              {/* All caught up message */}
+              {!hasMore && !showDemoFeed && allPosts.length > 0 && (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
+                  <h3 className="text-lg font-semibold">You're all caught up</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    You've seen all recent posts from people you follow.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </main>
@@ -231,8 +252,9 @@ const Index = () => {
 
       <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
-      <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
-    </div>
+        <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
+      </div>
+    </SwipeableView>
   );
 };
 

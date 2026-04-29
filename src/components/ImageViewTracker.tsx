@@ -24,27 +24,17 @@ export const ImageViewTracker = ({
   const trackImageView = useImageViewTracking();
 
   useEffect(() => {
-    console.log('[ImageViewTracker] Mount', { postId, hasTracked });
     if (!containerRef.current || hasTracked) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          console.log('[ImageViewTracker] Intersection', { 
-            postId, 
-            isIntersecting: entry.isIntersecting, 
-            intersectionRatio: entry.intersectionRatio,
-            threshold 
-          });
           if (entry.isIntersecting && entry.intersectionRatio >= threshold) {
             // Start timer when image becomes visible
             if (!timerRef.current) {
-              console.log('[ImageViewTracker] Starting timer', { postId, viewDuration });
               timerRef.current = setTimeout(async () => {
                 if (!hasTracked) {
-                  console.log('[ImageViewTracker] Calling trackImageView', { postId });
                   const success = await trackImageView(postId);
-                  console.log('[ImageViewTracker] Track result', { postId, success });
                   if (success) {
                     setHasTracked(true);
                   }

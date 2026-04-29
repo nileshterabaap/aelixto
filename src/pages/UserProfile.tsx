@@ -15,6 +15,8 @@ import { useStartConversation } from "@/hooks/useStartConversation";
 import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
 import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { FollowListDialog } from "@/components/profile/FollowListDialog";
+import { ProfileOptionsMenu } from "@/components/profile/ProfileOptionsMenu";
 
 interface UserProfileProps {
   usernameOverride?: string;
@@ -28,11 +30,26 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
+  const [followListOpen, setFollowListOpen] = useState(false);
   
-  const { isFollowing, follow, unfollow, loading: followLoading, counts } = useFollow(profile?.user_id);
+  const { isFollowing, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
+  const [isFollowedByTarget, setIsFollowedByTarget] = useState(false);
+
+  // Check if the target user follows the current user
+  useEffect(() => {
+    if (!user || !profile?.user_id || isMe) return;
+    supabase
+      .from("follows")
+      .select("id")
+      .eq("follower_id", profile.user_id)
+      .eq("following_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => setIsFollowedByTarget(!!data));
+  }, [user, profile?.user_id, isMe]);
 
   const handleRefresh = useCallback(async () => {
     await fetchProfile();
@@ -165,7 +182,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                   <p className="text-white/95 text-sm truncate drop-shadow-lg">@{profile.username}</p>
                 </div>
               </div>
-              {isMe && (
+              {isMe ? (
                 <Button
                   variant="ghost"
                   size="icon"
@@ -174,7 +191,19 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                 >
                   <Menu className="h-4 w-4 stroke-[2.5]" />
                 </Button>
-              )}
+              ) : user ? (
+                <ProfileOptionsMenu
+                  targetUserId={profile.user_id}
+                  username={profile.username}
+                  displayName={profile.display_name}
+                  isFollowedByTarget={isFollowedByTarget}
+                  onBlocked={() => navigate('/')}
+                  onRemovedFollower={() => {
+                    setIsFollowedByTarget(false);
+                    refreshFollow();
+                  }}
+                />
+              ) : null}
             </div>
           </div>
         </div>
@@ -184,10 +213,13 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           {/* Avatar and Stats Container */}
           <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
             {/* Left Stats - Followers */}
-            <div className="text-center flex-shrink-0 w-20 -ml-2">
+            <button 
+              className="text-center flex-shrink-0 w-20 -ml-2 active:scale-95 transition-transform"
+              onClick={() => { setFollowListType("followers"); setFollowListOpen(true); }}
+            >
               <div className="text-2xl font-bold leading-none mb-1">{counts.followers}</div>
               <div className="text-xs font-medium">Followers</div>
-            </div>
+            </button>
             
             {/* Avatar - Centered */}
             <div className="absolute left-1/2 -translate-x-1/2 -mt-20">
@@ -198,10 +230,13 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             </div>
             
             {/* Right Stats - Following */}
-            <div className="text-center flex-shrink-0 w-20 -mr-2">
+            <button 
+              className="text-center flex-shrink-0 w-20 -mr-2 active:scale-95 transition-transform"
+              onClick={() => { setFollowListType("following"); setFollowListOpen(true); }}
+            >
               <div className="text-2xl font-bold leading-none mb-1">{counts.following}</div>
               <div className="text-xs font-medium">Following</div>
-            </div>
+            </button>
           </div>
 
           {/* Aelix Score - only show if user enabled it */}
@@ -228,8 +263,8 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           {isMe ? (
             <Button 
               variant="outline" 
-              className="w-full rounded-full py-4 text-sm font-bold border-2 mb-6 hover:bg-muted"
-              onClick={() => navigate('/settings')}
+              className="w-full rounded-full py-4 text-sm font-bold border-2 mb-6 hover:bg-muted active:scale-[0.96] transition-transform duration-200"
+              onClick={() => window.location.href = 'https://aelixto.com/edit-profile'}
             >
               Edit Profile
             </Button>
@@ -244,7 +279,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                     : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
               >
-                {followLoading ? 'Loading...' : isFollowing ? 'Following' : 'Follow'}
+                {isFollowing ? 'Following' : 'Follow'}
               </Button>
               <Button
                 disabled={conversationLoading}
@@ -303,6 +338,15 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen}
       />
+
+      {profile && (
+        <FollowListDialog
+          open={followListOpen}
+          onOpenChange={setFollowListOpen}
+          userId={profile.user_id}
+          type={followListType}
+        />
+      )}
     </div>
   );
 };

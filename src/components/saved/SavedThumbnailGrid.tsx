@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import { SavedPostViewer } from "@/components/saved/SavedPostViewer";
 import instagramIcon from "@/assets/platforms/instagram.svg";
@@ -103,8 +104,15 @@ export const SavedThumbnailGrid = ({ posts, userId }: SavedThumbnailGridProps) =
   return (
     <>
       <div className="grid grid-cols-3 gap-1.5">
-        {posts.map((post) => (
-          <ThumbnailCard key={post.id} post={post} onClick={() => setSelectedPostId(post.id)} />
+        {posts.map((post, i) => (
+          <motion.div
+            key={post.id}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.4), ease: [0.4, 0, 0.2, 1] }}
+          >
+            <ThumbnailCard post={post} onClick={() => setSelectedPostId(post.id)} />
+          </motion.div>
         ))}
       </div>
 

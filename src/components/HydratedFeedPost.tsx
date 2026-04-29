@@ -1,5 +1,7 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, RefreshCw } from "lucide-react";
+import { motion, useAnimation } from "framer-motion";
 import { Card } from "@/components/ui/card";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -31,7 +33,14 @@ import threadsIcon from "@/assets/platforms/threads.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import { HydratedEmbed } from "@/components/HydratedEmbed";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
+import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { resolveRenderer } from "@/lib/resolveRenderer";
+import { SharePostSheet } from "@/components/SharePostSheet";
+
+// Module-level cache: posts that have already completed their reveal cycle
+// skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
+const revealedPostsCache = new Set<string>();
+const HYDRATION_ROOT_MARGIN = '3000px 0px';
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -86,109 +95,280 @@ const detectPlatformFromUrl = (url?: string) => {
 };
 
 export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
+  // If this post was already revealed in a previous render, skip ALL skeleton/transition work
+  const alreadyRevealed = revealedPostsCache.has(post.id);
+
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [collectionSheetOpen, setCollectionSheetOpen] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(startHydrated);
-  const [embedReady, setEmbedReady] = useState(false);
-  const [cardRevealed, setCardRevealed] = useState(false);
-  const [cardPainted, setCardPainted] = useState(false);
-  const [skeletonVisible, setSkeletonVisible] = useState(true);
-  const [likeAnimating, setLikeAnimating] = useState(false);
-  const [repostAnimating, setRepostAnimating] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(startHydrated || alreadyRevealed);
+
+  // Unified embed state machine: 'loading' → 'ready' | 'error'
+  type EmbedState = 'loading' | 'ready' | 'error';
+  const [embedState, setEmbedState] = useState<EmbedState>(alreadyRevealed ? 'ready' : 'loading');
+  const [skeletonVisible, setSkeletonVisible] = useState(!alreadyRevealed);
+  const [isSharpened, setIsSharpened] = useState(alreadyRevealed);
+
+  const cardMeasureRef = useRef<HTMLDivElement>(null);
+  const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
+  const likeControls = useAnimation();
+  const repostControls = useAnimation();
+  const commentControls = useAnimation();
+  const saveControls = useAnimation();
   const [displayLikeCount, setDisplayLikeCount] = useState<number>(Number((post as any).likes_count ?? (post as any).likes ?? 0));
   const [displayCommentCount] = useState<number>(Number((post as any).comments_count ?? (post as any).comments ?? 0));
   const [displayRepostCount, setDisplayRepostCount] = useState<number>(Number((post as any).reposts_count ?? (post as any).shares ?? 0));
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
 
-  // Track if embed is within viewport proximity — symmetric for both scroll directions
-  // Default to true so posts hydrate immediately on mount — IO corrects for off-screen posts
-  const [isNearViewport, setIsNearViewport] = useState(true);
+  // Only hydrate embeds that are actually near the viewport.
+  // Hydrating too many posts at once keeps the main thread busy on mobile
+  // and makes follow-up swipes feel delayed while momentum scrolling.
+  const [isNearViewport, setIsNearViewport] = useState(startHydrated || alreadyRevealed);
 
   useEffect(() => {
-    if (startHydrated) return;
+    if (startHydrated || alreadyRevealed || isNearViewport) return;
     const el = embedRef.current;
     if (!el) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
-        setIsNearViewport(entry.isIntersecting);
+        if (entry.isIntersecting) {
+          setIsNearViewport(true);
+          observer.disconnect(); // One-shot: never fires again, no re-renders during scroll
+        }
       },
-      // Symmetric margin: 3000px above AND below the viewport
-      // Ensures posts are ready before entering view in BOTH scroll directions
-      { rootMargin: '3000px 0px', threshold: 0 }
+      { rootMargin: HYDRATION_ROOT_MARGIN, threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [startHydrated]);
+  }, [startHydrated, alreadyRevealed, isNearViewport]);
 
   // Hydrate immediately when near viewport — no velocity gating.
-  // Since disableHardSuspend keeps embeds alive forever, eager hydration has no cost.
-  // Once hydrated, stays hydrated (isHydrated only goes false→true).
   useEffect(() => {
     if (isHydrated || !isNearViewport) return;
     setIsHydrated(true);
   }, [isNearViewport, isHydrated]);
 
-  // Detect when embed content is ready (iframe load, SDK process, or DOM content)
+  // Unified embed detection: detect when embed content is ready or error
+  // Single 4s fallback timeout for ALL platforms
   useEffect(() => {
-    if (!isHydrated || embedReady) return;
+    if (!isHydrated || embedState !== 'loading' || alreadyRevealed) return;
     const el = embedRef.current;
     if (!el) return;
 
-    const markReady = () => setEmbedReady(true);
+    let settled = false;
+    const handledIframes = new WeakSet<HTMLIFrameElement>();
+    const handledImages = new WeakSet<HTMLImageElement>();
+    const handledVideos = new WeakSet<HTMLVideoElement>();
 
-    const handleIframes = () => {
+    const markReady = () => {
+      if (settled) return;
+      settled = true;
+      setEmbedState('ready');
+    };
+
+    const getRendererStatuses = () =>
+      Array.from(el.querySelectorAll<HTMLElement>('[data-embed-status]'))
+        .map((node) => node.dataset.embedStatus)
+        .filter((status): status is 'loading' | 'ready' => status === 'loading' || status === 'ready');
+
+    const attachIframeHandlers = () => {
       const iframes = el.querySelectorAll('iframe');
+      let hasLoadedIframe = false;
+
       if (iframes.length > 0) {
         iframes.forEach((iframe) => {
-          iframe.addEventListener('load', markReady, { once: true });
-          iframe.addEventListener('error', markReady, { once: true });
+          if ((iframe as HTMLIFrameElement).dataset.embedLoaded === 'true') {
+            hasLoadedIframe = true;
+            return;
+          }
+
+          if (handledIframes.has(iframe as HTMLIFrameElement)) return;
+          handledIframes.add(iframe as HTMLIFrameElement);
+
+          const handleIframeSettled = () => {
+            (iframe as HTMLIFrameElement).dataset.embedLoaded = 'true';
+            markReady();
+          };
+
+          iframe.addEventListener('load', handleIframeSettled, { once: true });
+          iframe.addEventListener('error', handleIframeSettled, { once: true });
         });
-        setTimeout(markReady, 3000);
-        return true;
       }
+
+      return iframes.length > 0 ? hasLoadedIframe : false;
+    };
+
+    const attachImageHandlers = (image: HTMLImageElement) => {
+      if (image.complete && image.naturalWidth > 0) return true;
+      if (handledImages.has(image)) return false;
+
+      handledImages.add(image);
+      image.addEventListener('load', markReady, { once: true });
+      image.addEventListener('error', markReady, { once: true });
       return false;
     };
 
-    if (handleIframes()) return;
+    const attachVideoHandlers = (video: HTMLVideoElement) => {
+      if (video.readyState >= 2) return true;
+      if (handledVideos.has(video)) return false;
 
+      handledVideos.add(video);
+      video.addEventListener('loadeddata', markReady, { once: true });
+      video.addEventListener('canplay', markReady, { once: true });
+      video.addEventListener('error', markReady, { once: true });
+      return false;
+    };
+
+    // Only reveal once actual media is settled, not when wrapper DOM first appears.
     const checkContent = () => {
-      if (el.querySelector('img, video, [class*="card"], [class*="preview"]')) {
+      const rendererStatuses = getRendererStatuses();
+
+      if (rendererStatuses.includes('loading')) {
+        return false;
+      }
+
+      const mediaNodes = Array.from(
+        el.querySelectorAll('img[src]:not([src=""]), video[src]:not([src=""]), iframe')
+      );
+
+      if (mediaNodes.length === 0) {
+        if (rendererStatuses.includes('ready')) {
+          markReady();
+          return true;
+        }
+        return false;
+      }
+
+      const iframes = mediaNodes.filter((node): node is HTMLIFrameElement => node instanceof HTMLIFrameElement);
+      if (iframes.length > 0) {
+        if (attachIframeHandlers()) {
+          markReady();
+        }
+        return true;
+      }
+
+      const videos = mediaNodes.filter((node): node is HTMLVideoElement => node instanceof HTMLVideoElement);
+      if (videos.length > 0) {
+        if (videos.some(attachVideoHandlers)) {
+          markReady();
+        }
+        return true;
+      }
+
+      const images = mediaNodes.filter((node): node is HTMLImageElement => node instanceof HTMLImageElement);
+      if (images.length > 0) {
+        if (images.some(attachImageHandlers)) {
+          markReady();
+        }
+        return true;
+      }
+
+      if (rendererStatuses.includes('ready')) {
         markReady();
         return true;
       }
-      return handleIframes();
+
+      return false;
     };
 
-    if (checkContent()) return;
+    if (checkContent()) {
+      const hardFallback = setTimeout(markReady, 12000);
+      return () => { settled = true; clearTimeout(hardFallback); };
+    }
 
     const observer = new MutationObserver(() => { checkContent(); });
-    observer.observe(el, { childList: true, subtree: true });
+    observer.observe(el, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-embed-status'],
+    });
 
-    const fallbackMs = (detectedPlatform === 'instagram' || detectedPlatform === 'facebook') ? 6000 : 4000;
-    const fallback = setTimeout(markReady, fallbackMs);
+    // Listen for custom embedReady events dispatched by platform-specific renderers
+    // (e.g. TwitterEmbed fires this after createTweet resolves)
+    const handleEmbedReady = () => { markReady(); };
+    el.addEventListener('embedReady', handleEmbedReady);
+
+    // Soft fallback: only reveal early if no renderer is still actively loading.
+    // Facebook SDK divs take longer (5-8s), so extend the soft fallback for them.
+    const isFacebookPost = detectedPlatform === 'facebook';
+    const softTimeout = isFacebookPost ? 8000 : 4000;
+    const fallback = setTimeout(() => {
+      if (settled) return;
+      if (checkContent()) return;
+      if (!getRendererStatuses().includes('loading')) {
+        markReady();
+      }
+    }, softTimeout);
+
+    // Hard fallback: never leave a post stuck forever.
+    const hardFallback = setTimeout(markReady, 12000);
 
     return () => {
+      settled = true;
       observer.disconnect();
+      el.removeEventListener('embedReady', handleEmbedReady);
       clearTimeout(fallback);
+      clearTimeout(hardFallback);
     };
-  }, [isHydrated, embedReady]);
+  }, [isHydrated, embedState, alreadyRevealed]);
 
-  // When embed is ready, reveal card and schedule skeleton unmount
-  // Double-rAF ensures the browser paints opacity:0 before we transition to opacity:1
+  // Unified reveal sequence: when embedState becomes 'ready', reveal card and sharpen
   useEffect(() => {
-    if (!embedReady) return;
+    if (embedState !== 'ready' || alreadyRevealed) return;
     let cancelled = false;
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!cancelled) setCardRevealed(true);
-      });
+
+    // Remove skeleton quickly
+    const skeletonTimer = setTimeout(() => {
+      if (!cancelled) {
+        setSkeletonVisible(false);
+        revealedPostsCache.add(post.id);
+      }
+    }, 200);
+
+    // Sharpen immediately after skeleton removal
+    const sharpenTimer = setTimeout(() => {
+      if (!cancelled) setIsSharpened(true);
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(skeletonTimer);
+      clearTimeout(sharpenTimer);
+    };
+  }, [embedState, alreadyRevealed, post.id]);
+
+  // Resolve the embed type for rendering — must be before effects that use isTextOnly
+  const r = resolveRenderer(post);
+  const isTextOnly = r.kind === 'none';
+
+  // Measure card height and sync to skeleton wrapper to prevent layout shift
+  const roRef = useRef<ResizeObserver | null>(null);
+
+  useEffect(() => {
+    if (alreadyRevealed || isTextOnly) return;
+    const card = cardMeasureRef.current;
+    if (!card) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const h = entry.borderBoxSize?.[0]?.blockSize ?? entry.contentRect.height;
+        if (h > 0) setMeasuredHeight(h);
+      }
     });
-    const paintDelay = setTimeout(() => { if (!cancelled) setCardPainted(true); }, 300);
-    const timer = setTimeout(() => setSkeletonVisible(false), 1400);
-    return () => { cancelled = true; clearTimeout(paintDelay); clearTimeout(timer); };
-  }, [embedReady]);
+    roRef.current = ro;
+    ro.observe(card);
+    return () => { ro.disconnect(); roRef.current = null; };
+  }, [alreadyRevealed, isTextOnly]);
+
+  // Disconnect ResizeObserver once skeleton is gone — no longer needed
+  useEffect(() => {
+    if (!skeletonVisible && roRef.current) {
+      roRef.current.disconnect();
+      roRef.current = null;
+    }
+  }, [skeletonVisible]);
 
   // Once hydrated, stay hydrated - prevents expensive re-initialization on scroll back
 
@@ -200,6 +380,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   
   // Detect platform
   const detectedPlatform = post.platform || detectPlatformFromUrl(mediaUrl);
+  const isYouTubePost = detectedPlatform === 'youtube';
+  const shouldRenderMediaTitle = isYouTubePost || r.kind === 'image' || r.kind === 'video';
   const platform = getPlatformIcon(detectedPlatform);
   
   // Always call hooks unconditionally
@@ -215,7 +397,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         isSaved: false, 
         toggleLike: () => {}, 
         toggleSave: () => {}, 
-        handleShare: () => {}, 
         deletePost: () => {},
         isDeleting: false 
       };
@@ -224,7 +405,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     ? repostActionsResult
     : { isReposted: false, toggleRepost: () => {}, isReposting: false };
 
-  const { isLiked, isSaved, toggleLike, toggleSave, handleShare, deletePost, isDeleting } = postActions;
+  const { isLiked, isSaved, toggleLike, toggleSave, deletePost, isDeleting } = postActions;
   const { isReposted, toggleRepost } = repostActions;
 
   useEffect(() => {
@@ -234,52 +415,56 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
   const handleLikeClick = useCallback(() => {
     if (!canUseActions) return;
-    setLikeAnimating(true);
     setDisplayLikeCount((current) => Math.max(0, current + (isLiked ? -1 : 1)));
     toggleLike();
-    setTimeout(() => setLikeAnimating(false), 400);
-  }, [canUseActions, isLiked, toggleLike]);
+    if (isLiked) {
+      likeControls.start({ scale: [1, 0.85, 1], transition: { duration: 0.3, ease: 'easeOut' } });
+    } else {
+      likeControls.start({ scale: [1, 1.4, 1], transition: { type: 'spring', stiffness: 500, damping: 15, duration: 0.3 } });
+    }
+  }, [canUseActions, isLiked, toggleLike, likeControls]);
 
   const handleRepostClick = useCallback(() => {
     if (!canUseActions) return;
-    setRepostAnimating(true);
     setDisplayRepostCount((current) => Math.max(0, current + (isReposted ? -1 : 1)));
     toggleRepost();
-    setTimeout(() => setRepostAnimating(false), 500);
-  }, [canUseActions, isReposted, toggleRepost]);
+    repostControls.start({ rotate: [0, 360], transition: { duration: 0.4, ease: 'easeOut' } });
+  }, [canUseActions, isReposted, toggleRepost, repostControls]);
 
   const handlePlayClick = useCallback(() => {
     setIsHydrated(true);
   }, []);
 
-  // Resolve the embed type for rendering
-  const r = resolveRenderer(post);
-  
   // Derive thumbnail: prefer stored, then derive from URL
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
-  // For text-only posts (no embed), reveal immediately
-  const isTextOnly = r.kind === 'none';
-  const showCard = isTextOnly || cardPainted;
+  const showCard = isTextOnly || embedState === 'ready' || embedState === 'error';
 
   return (
     <div className="relative">
       {/* Skeleton placeholder — occupies space until card reveals */}
       {!isTextOnly && skeletonVisible && (
         <div
-          className="rounded-xl overflow-hidden transition-opacity duration-[1000ms] ease-in-out"
-          style={{ opacity: showCard ? 0 : 1, pointerEvents: showCard ? 'none' : 'auto' }}
+          className="rounded-xl overflow-hidden transition-opacity duration-300 ease-in-out"
+          style={{
+            opacity: showCard ? 0 : 1,
+            pointerEvents: showCard ? 'none' : 'auto',
+            ...(measuredHeight ? { minHeight: measuredHeight } : {}),
+          }}
         >
           <EmbedSkeleton platform={detectedPlatform || undefined} />
         </div>
       )}
 
-      {/* Real card — hidden until embed loads, then fades in */}
+      {/* Real card — hidden until embed loads, fades in blurred, then sharpens */}
       <div
-        className={`transition-opacity duration-[1000ms] ease-in-out ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
+        ref={cardMeasureRef}
+        className={`overflow-hidden rounded-xl ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',
+          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : 'blur(4px)'),
+          transition: 'opacity 250ms ease-in-out, filter 400ms ease-out',
         }}
       >
     <Card className="overflow-hidden border border-border rounded-xl">
@@ -293,15 +478,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       
       {/* Standardized Header: avatar, bold username, timestamp + platform icon top-right */}
       <div className="flex items-center gap-3 px-5 pt-4 pb-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full overflow-hidden bg-muted">
-          <img 
-            src={post.author.avatar} 
-            alt={post.author.username}
-            className="w-full h-full object-cover"
-            loading="eager"
-            decoding="async"
-          />
-        </div>
+        <Avatar className="h-12 w-12 shrink-0">
+          {post.author.avatar ? (
+            <AvatarImage src={post.author.avatar} alt={post.author.username} />
+          ) : null}
+          <AvatarFallback />
+        </Avatar>
         <div className="flex-1 min-w-0">
           <UsernameLink username={post.author.username} className="font-bold text-base block leading-tight">
             {post.author.name || post.author.username.replace('@', '')}
@@ -351,88 +533,123 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
         <div ref={embedRef} className="relative" style={{ contain: 'layout paint' }}>
-          {/* Skeleton layer — fades out when embed is ready */}
-          {isHydrated && skeletonVisible && (
-            <div
-              className="absolute inset-0 z-10 transition-opacity duration-[400ms] ease-in-out"
-              style={{ opacity: embedReady ? 0 : 1, pointerEvents: 'none' }}
-            >
-              <EmbedSkeleton platform={detectedPlatform || undefined} />
+          {/* Error state — clean fallback with refresh */}
+          {embedState === 'error' && (
+            <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
+              <p className="text-sm">Could not load post</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setEmbedState('loading');
+                  setIsHydrated(false);
+                  setSkeletonVisible(true);
+                  setIsSharpened(false);
+                  // Re-trigger hydration
+                  setTimeout(() => setIsHydrated(true), 50);
+                }}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry
+              </Button>
             </div>
           )}
 
-          {/* Embed layer — fades in when ready */}
-          <div
-            className="transition-opacity duration-[400ms] ease-in-out"
-            style={{ opacity: embedReady || !isHydrated ? 1 : 0 }}
-          >
-            <HydratedEmbed
-              post={post}
-              renderer={r}
-              thumbnailUrl={effectiveThumbnail}
-              isHydrated={isHydrated}
-              onPlayClick={handlePlayClick}
-            />
-          </div>
+          {/* Embed layer — always fully visible; parent card handles reveal */}
+          {embedState !== 'error' && (
+            <div>
+              <HydratedEmbed
+                post={post}
+                renderer={r}
+                thumbnailUrl={effectiveThumbnail}
+                isHydrated={isHydrated}
+                onPlayClick={handlePlayClick}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <div ref={embedRef} />
       )}
 
       {/* Title for video/image posts */}
-      {post.title && (r.kind === 'image' || r.kind === 'video') && (
+      {shouldRenderMediaTitle && (
         <div className="px-5 pt-3">
-          <h2 className="text-lg font-bold">{post.title}</h2>
+          {isYouTubePost ? (
+            <YouTubeTitleFallback mediaUrl={mediaUrl} title={post.title} />
+          ) : (
+            post.title && <h2 className="text-lg font-bold">{post.title}</h2>
+          )}
         </div>
       )}
 
       {/* Interaction Bar - tight spacing, professional layout */}
       {/* For Instagram: pull bar up to cover native action buttons */}
       <div className={`flex items-center justify-around px-3 py-3 relative z-10 bg-background ${detectedPlatform === 'instagram' ? '-mt-10' : ''}`}>
-        <button
+        <motion.button
           onClick={handleLikeClick}
-          className="action-btn p-1.5 active:scale-90 transition-transform flex items-center gap-1"
+          animate={likeControls}
+          whileTap={{ scale: 0.9 }}
+          className="action-btn p-1.5 flex items-center gap-1"
         >
           <Heart 
-            className={`h-6 w-6 stroke-[1.5] ${likeAnimating ? 'animate-like-pop' : ''}`}
+            className="h-6 w-6 stroke-[1.5]"
             style={{ 
               fill: isLiked ? '#ef4444' : 'none',
-              color: isLiked ? '#ef4444' : 'currentColor'
+              color: isLiked ? '#ef4444' : 'currentColor',
+              transition: 'fill 200ms ease, color 200ms ease',
             }}
           />
           {!(post as any).hide_likes && displayLikeCount > 0 && (
-            <span className="text-xs text-muted-foreground">{displayLikeCount}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{displayLikeCount}</span>
           )}
-        </button>
-        <button 
-          onClick={() => setCommentsOpen(true)}
-          className="action-btn p-1.5 active:scale-90 transition-transform flex items-center gap-1"
+        </motion.button>
+        <motion.button 
+          onClick={() => {
+            setCommentsOpen(true);
+            commentControls.start({ scale: [1, 1.2, 1], transition: { duration: 0.2, ease: 'easeOut' } });
+          }}
+          animate={commentControls}
+          whileTap={{ scale: 0.9 }}
+          className="action-btn p-1.5 flex items-center gap-1"
         >
           <MessageCircle className="h-6 w-6 stroke-[1.5] fill-none" />
           {displayCommentCount > 0 && (
-            <span className="text-xs text-muted-foreground">{displayCommentCount}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{displayCommentCount}</span>
           )}
-        </button>
-        <button 
+        </motion.button>
+        <motion.button 
           onClick={handleRepostClick}
-          className="action-btn p-1.5 active:scale-90 transition-transform flex items-center gap-1"
+          animate={repostControls}
+          whileTap={{ scale: 0.9 }}
+          className="action-btn p-1.5 flex items-center gap-1"
         >
           <Repeat2 
-            className={`h-7 w-7 stroke-[2] ${repostAnimating ? 'animate-repost-spin' : ''}`}
-            style={{ color: isReposted ? '#22c55e' : 'currentColor' }}
+            className="h-7 w-7 stroke-[2]"
+            style={{ 
+              color: isReposted ? '#22c55e' : 'currentColor',
+              transition: 'color 200ms ease',
+            }}
           />
           {displayRepostCount > 0 && (
-            <span className="text-xs text-muted-foreground">{displayRepostCount}</span>
+            <span className="text-xs font-semibold text-muted-foreground">{displayRepostCount}</span>
           )}
-        </button>
-        <button 
-          onClick={handleShare}
-          className="action-btn p-1.5 active:scale-90 transition-transform"
+        </motion.button>
+        <motion.button 
+          onClick={() => setShareOpen(true)}
+          whileTap={{ scale: 0.9 }}
+          className="action-btn p-1.5"
         >
           <Share className="h-6 w-6 stroke-[1.5]" />
-        </button>
-        <button
-          onClick={() => toggleSave()}
+        </motion.button>
+        <motion.button
+          onClick={() => {
+            toggleSave();
+            saveControls.start({ scale: [1, 1.3, 1], transition: { type: 'spring', stiffness: 500, damping: 15, duration: 0.3 } });
+          }}
+          animate={saveControls}
+          whileTap={{ scale: 0.9 }}
           onPointerDown={() => {
             longPressTimer.current = setTimeout(() => {
               if (canUseActions) setCollectionSheetOpen(true);
@@ -440,10 +657,16 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           }}
           onPointerUp={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
           onPointerLeave={() => { if (longPressTimer.current) clearTimeout(longPressTimer.current); }}
-          className="action-btn p-1.5 active:scale-90 transition-transform"
+          className="action-btn p-1.5"
         >
-          <Bookmark className={`h-6 w-6 stroke-[1.5] ${isSaved ? 'fill-current' : 'fill-none'}`} />
-        </button>
+          <Bookmark 
+            className="h-6 w-6 stroke-[1.5]"
+            style={{
+              fill: isSaved ? 'currentColor' : 'none',
+              transition: 'fill 200ms ease',
+            }}
+          />
+        </motion.button>
       </div>
       
       {post.isRealPost && (
@@ -454,6 +677,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           postAuthorId={(post as any).user_id}
         />
       )}
+
+      <SharePostSheet
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        postId={post.id}
+      />
 
       {post.isRealPost && userId && (
         <SaveToCollectionSheet

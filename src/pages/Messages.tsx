@@ -1,4 +1,6 @@
+import { SwipeableView } from "@/components/SwipeableView";
 import { useState, useCallback } from "react";
+import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
@@ -27,11 +29,12 @@ const Messages = () => {
   }, [refetch]);
 
   return (
+    <SwipeableView leftRoute="/" leftLabel="Home">
     <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
       <PullToRefresh onRefresh={handleRefresh}>
-        <main className="container max-w-2xl mx-auto px-4 py-6">
+        <main className="container max-w-2xl mx-auto px-4 py-6 animate-fade-in">
           <h2 className="text-2xl font-bold mb-6">Messages</h2>
           
           {/* Search Bar */}
@@ -52,7 +55,7 @@ const Messages = () => {
             </div>
           ) : (
             <div className="space-y-1">
-              {conversations.map((conversation) => {
+              {conversations.map((conversation, i) => {
                 const hasUnread = conversation.unread_count > 0;
                 const lastMessagePreview = conversation.last_message
                   ? conversation.last_message.sender_id === user?.id
@@ -61,8 +64,11 @@ const Messages = () => {
                   : "No messages yet";
 
                 return (
-                  <div
+                  <motion.div
                     key={conversation.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: Math.min(i * 0.06, 0.5), ease: [0.4, 0, 0.2, 1] }}
                     className={`flex items-center gap-4 p-4 rounded-lg cursor-pointer transition-colors hover:bg-accent ${
                       hasUnread ? "bg-accent/50" : ""
                     }`}
@@ -103,7 +109,7 @@ const Messages = () => {
                         {lastMessagePreview}
                       </p>
                     </div>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
@@ -117,6 +123,7 @@ const Messages = () => {
         onOpenChange={setIsCreateDialogOpen}
       />
     </div>
+    </SwipeableView>
   );
 };
 

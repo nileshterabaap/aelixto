@@ -1,6 +1,8 @@
 import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import InstagramIcon from "@/assets/platforms/instagram.svg";
 import FacebookIcon from "@/assets/platforms/facebook.svg";
@@ -8,6 +10,13 @@ import YoutubeIcon from "@/assets/platforms/youtube.svg";
 import TiktokIcon from "@/assets/platforms/tiktok.svg";
 import XIcon from "@/assets/platforms/x.svg";
 import BlogIcon from "@/assets/platforms/blog.svg";
+import ThreadsIcon from "@/assets/platforms/threads.svg";
+import RedditIcon from "@/assets/platforms/reddit.svg";
+import PinterestIcon from "@/assets/platforms/pinterest.svg";
+import SpotifyIcon from "@/assets/platforms/spotify.svg";
+import LinkedinIcon from "@/assets/platforms/linkedin.svg";
+import QuoraIcon from "@/assets/platforms/quora.svg";
+import ExternalIcon from "@/assets/platforms/external.svg";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 import { PlatformPostViewer } from "./PlatformPostViewer";
 
@@ -27,8 +36,15 @@ function PostCard({ post, onClick }: {
       case 'youtube': return 'bg-gradient-to-br from-red-600 to-red-400';
       case 'tiktok': return 'bg-gradient-to-br from-black to-gray-800';
       case 'x': return 'bg-black';
+      case 'twitter': return 'bg-black';
+      case 'threads': return 'bg-gradient-to-br from-neutral-900 to-neutral-700';
+      case 'reddit': return 'bg-gradient-to-br from-orange-600 to-orange-400';
+      case 'pinterest': return 'bg-gradient-to-br from-red-700 to-red-500';
+      case 'spotify': return 'bg-gradient-to-br from-green-600 to-green-400';
+      case 'linkedin': return 'bg-gradient-to-br from-blue-700 to-blue-500';
+      case 'quora': return 'bg-gradient-to-br from-red-800 to-red-600';
       case 'article': return 'bg-gradient-to-br from-emerald-600 to-teal-400';
-      default: return 'bg-muted';
+      default: return 'bg-gradient-to-br from-slate-600 to-slate-400';
     }
   };
 
@@ -39,8 +55,15 @@ function PostCard({ post, onClick }: {
       case 'youtube': return YoutubeIcon;
       case 'tiktok': return TiktokIcon;
       case 'x': return XIcon;
+      case 'twitter': return XIcon;
+      case 'threads': return ThreadsIcon;
+      case 'reddit': return RedditIcon;
+      case 'pinterest': return PinterestIcon;
+      case 'spotify': return SpotifyIcon;
+      case 'linkedin': return LinkedinIcon;
+      case 'quora': return QuoraIcon;
       case 'article': return BlogIcon;
-      default: return null;
+      default: return ExternalIcon;
     }
   };
 
@@ -107,42 +130,98 @@ export const ProfilePlatformGrid = ({
   );
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const location = useLocation();
+
+  // Close the viewer when the route/location changes (e.g. user taps a nav button)
+  useEffect(() => {
+    if (viewerOpen) setViewerOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname, location.key]);
+
+  // Push a history entry when the viewer opens so the hardware/browser back
+  // button closes the overlay instead of leaving the profile page.
+  useEffect(() => {
+    if (!viewerOpen) return;
+    window.history.pushState({ viewer: true }, "");
+    const onPop = () => setViewerOpen(false);
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+    };
+  }, [viewerOpen]);
+
+  const closeViewer = () => {
+    setViewerOpen(false);
+    if (window.history.state?.viewer) {
+      window.history.back();
+    }
+  };
 
   const handlePostClick = (postId: string) => {
     setSelectedPostId(postId);
     setViewerOpen(true);
   };
 
-  if (loading && items.length === 0) {
-    return (
-      <div className="text-center py-8">
-        <p className="text-sm text-muted-foreground">Loading posts...</p>
-      </div>
-    );
-  }
+  const isInitialLoading = loading && items.length === 0;
 
-  if (items.length === 0) {
-    return (
-      <div className="px-6 py-16 text-center text-muted-foreground">
-        No posts yet from {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}.
-      </div>
-    );
-  }
+  // Stable key per view state so AnimatePresence can crossfade between
+  // "skeleton" / "empty" / "grid" without flashing or layout jumps.
+  const viewKey = isInitialLoading
+    ? `${activeTab}-loading`
+    : items.length === 0
+    ? `${activeTab}-empty`
+    : `${activeTab}-grid`;
 
   return (
     <>
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
-          {items.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              onClick={() => handlePostClick(post.id)}
-            />
-          ))}
-        </div>
+      <div className="space-y-4 relative">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={viewKey}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {isInitialLoading ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="aspect-[3/4] rounded-2xl bg-muted/60 animate-shimmer"
+                  />
+                ))}
+              </div>
+            ) : items.length === 0 ? (
+              <div className="px-6 py-16 text-center text-muted-foreground">
+                No posts yet from{" "}
+                {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}.
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+                {items.map((post, idx) => (
+                  <motion.div
+                    key={`${activeTab}-${post.id}`}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      duration: 0.3,
+                      delay: Math.min(idx, 8) * 0.03,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                  >
+                    <PostCard
+                      post={post}
+                      onClick={() => handlePostClick(post.id)}
+                    />
+                  </motion.div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </AnimatePresence>
 
-        {hasMore && (
+        {hasMore && !isInitialLoading && items.length > 0 && (
           <div className="flex justify-center pt-4">
             <Button
               onClick={loadMore}
@@ -162,7 +241,7 @@ export const ProfilePlatformGrid = ({
           initialPostId={selectedPostId}
           tabs={tabs}
           activeTab={activeTab}
-          onClose={() => setViewerOpen(false)}
+          onClose={closeViewer}
           onTabChange={(tab) => {
             onTabChange(tab);
           }}

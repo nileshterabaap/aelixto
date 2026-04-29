@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
+import { loadTwitterEmbed } from "@/lib/ScriptLoader";
 
 interface TwitterEmbedProps {
   url: string;
@@ -21,22 +22,6 @@ declare global {
     };
   }
 }
-
-const loadTwitterScript = () => {
-  return new Promise<void>((resolve, reject) => {
-    if (window.twttr) {
-      resolve();
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = "https://platform.twitter.com/widgets.js";
-    script.async = true;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error("Failed to load Twitter script"));
-    document.body.appendChild(script);
-  });
-};
 
 const extractTweetId = (url: string): string | null => {
   const patterns = [
@@ -67,7 +52,7 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
           return;
         }
 
-        await loadTwitterScript();
+        await loadTwitterEmbed();
 
         if (containerRef.current && window.twttr) {
           containerRef.current.innerHTML = "";
@@ -85,6 +70,12 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
 
           if (!tweet) {
             setError(true);
+          } else {
+            // Dispatch a custom event so HydratedFeedPost can detect readiness
+            // immediately without waiting for MutationObserver cycles
+            containerRef.current?.dispatchEvent(
+              new CustomEvent('embedReady', { bubbles: true })
+            );
           }
         }
       } catch (err) {
@@ -100,31 +91,33 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
 
   if (error) {
     return (
-      <Card className="p-6 text-center space-y-3">
-        <div className="flex justify-center">
-          <svg
-            className="w-12 h-12 text-muted-foreground"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-          </svg>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Unable to load this post
-        </p>
-        <Button variant="outline" size="sm" asChild>
-          <a href={url} target="_blank" rel="noopener noreferrer">
-            <ExternalLink className="w-4 h-4 mr-2" />
-            View on X
-          </a>
-        </Button>
-      </Card>
+      <div data-embed-status="ready">
+        <Card className="p-6 text-center space-y-3">
+          <div className="flex justify-center">
+            <svg
+              className="w-12 h-12 text-muted-foreground"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+            </svg>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Unable to load this post
+          </p>
+          <Button variant="outline" size="sm" asChild>
+            <a href={url} target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="w-4 h-4 mr-2" />
+              View on X
+            </a>
+          </Button>
+        </Card>
+      </div>
     );
   }
 
   return (
-    <div className="relative">
+    <div className="relative" data-embed-status={loading ? 'loading' : 'ready'}>
       {loading && (
         <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       )}

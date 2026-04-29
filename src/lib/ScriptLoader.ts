@@ -119,13 +119,19 @@ export const clearScriptCache = (src: string) => {
   loadingPromises.delete(src);
 };
 
+// Twitter/X embed script loader
+export const loadTwitterEmbed = () => loadScript('https://platform.twitter.com/widgets.js');
+
 // Preload all embed SDKs early for faster embed rendering
 export const preloadEmbedSDKs = () => {
-  // Load in background without blocking
+  // Load in background without blocking — stagger to avoid bandwidth contention
   setTimeout(() => {
     loadInstagramEmbed().catch(() => {});
     loadFacebookSDK().catch(() => {});
-  }, 1000);
+  }, 500);
+  setTimeout(() => {
+    loadTwitterEmbed().catch(() => {});
+  }, 1500);
 };
 
 // Type declarations for global window objects

@@ -1,11 +1,46 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.9e8e690862444131a6858cbb5e68e94d',
-  appName: 'aelixto',
+  appId: 'com.aelixto.app10',
+  appName: 'Aelixto',
   webDir: 'dist',
-  // Bundled mode: No server URL - app loads from local files for best performance
-  // This ensures offline capability and fastest load times
+  server: {
+    cleartext: true,
+    // Keep allowed external auth/social pages inside the WebView while the app
+    // itself loads from the freshly synced local `dist` bundle.
+    allowNavigation: [
+      "aelixto.com",
+      "*.aelixto.com",
+      "*.lovable.app",
+      "oauth.lovable.app",
+      "*.lovableproject.com",
+      "accounts.google.com",
+      "*.google.com",
+      "*.googleusercontent.com",
+      "appleid.apple.com",
+      "*.apple.com",
+      "*.supabase.co"
+    ]
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 2000,
+      launchAutoHide: true,
+      launchFadeOutDuration: 300,
+      backgroundColor: "#FFFFFF",
+      androidSplashResourceName: "splash",
+      androidScaleType: "CENTER_CROP",
+      showSpinner: false,
+      splashFullScreen: true,
+      splashImmersive: true,
+    },
+    StatusBar: {
+      // "LIGHT" = light status-bar background → dark icons/text (correct for our white header)
+      style: "LIGHT",
+      backgroundColor: "#FFFFFF",
+      overlaysWebView: false,
+    },
+  },
 };
 
 export default config;
