@@ -567,7 +567,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                       </motion.div>
                     )}
                   </AnimatePresence>
-                </div>
+                </motion.div>
               </motion.div>
             </DialogPrimitive.Content>
           </DialogPrimitive.Portal>
