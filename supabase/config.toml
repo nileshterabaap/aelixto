@@ -1,43 +1,33 @@
 project_id = "hhotresssetunubidrth"
 
-[functions.expand-url]
-verify_jwt = false
-
-[functions.fetch-og]
-verify_jwt = false
-
-[functions.expand-pin]
-verify_jwt = false
-
-[functions.unfurl-article]
-verify_jwt = false
-
-[functions.backfill-thumbnails]
-verify_jwt = false
-
-[functions.record-view]
-verify_jwt = false
-
-[functions.fetch-post-preview]
-verify_jwt = false
-
-[functions.img-proxy]
-verify_jwt = false
-
-[functions.refresh-thumbnails]
-verify_jwt = false
-
-[functions.store-thumbnail]
-verify_jwt = false
-
-[functions.fetch-meta-thumbnail]
-verify_jwt = false
-
-[functions.generate-vapid-keys]
-verify_jwt = false
-
-[functions.send-push-notification]
-verify_jwt = false
-
-[functions.fetch-oembed]
-verify_jwt = false
+[functions]
+  [functions.auth-email-hook]
+    verify_jwt = false
+  [functions.backfill-thumbnails]
+    verify_jwt = false
+  [functions.expand-pin]
+    verify_jwt = false
+  [functions.expand-url]
+    verify_jwt = false
+  [functions.fetch-meta-thumbnail]
+    verify_jwt = false
+  [functions.fetch-oembed]
+    verify_jwt = false
+  [functions.fetch-og]
+    verify_jwt = false
+  [functions.fetch-post-preview]
+    verify_jwt = false
+  [functions.generate-vapid-keys]
+    verify_jwt = false
+  [functions.img-proxy]
+    verify_jwt = false
+  [functions.record-view]
+    verify_jwt = false
+  [functions.refresh-thumbnails]
+    verify_jwt = false
+  [functions.send-push-notification]
+    verify_jwt = false
+  [functions.store-thumbnail]
+    verify_jwt = false
+  [functions.unfurl-article]
+    verify_jwt = false

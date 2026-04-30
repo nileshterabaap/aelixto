@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.aelixto.app10",
+      "sha256_cert_fingerprints": [
+        "51:7F:40:3C:F8:7F:1F:07:70:91:50:01:44:7E:36:7C:DD:33:AC:77:A4:2B:F1:88:5B:FE:72:47:5C:D8:7B:90",
+        "CA:D3:57:44:AB:48:D3:D2:D7:79:79:33:58:EE:4F:04:43:7A:3A:78:36:3D:29:82:66:D6:7B:6C:73:81:1C:A9"
+      ]
+    }
+  }
+]
