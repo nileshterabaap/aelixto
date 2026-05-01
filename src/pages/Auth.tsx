@@ -124,14 +124,16 @@ const Auth = () => {
 
   const handleForgotPassword = async (email: string) => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: `${window.location.origin}/` },
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth`,
     });
     if (error) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Check your email", description: "We sent you a password reset link!" });
+      toast({
+        title: "Check your email",
+        description: "We sent you a password reset link. Check your inbox (and spam folder).",
+      });
     }
     setLoading(false);
   };
