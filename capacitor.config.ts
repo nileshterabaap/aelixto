@@ -6,21 +6,6 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: {
     cleartext: true,
-    // Keep allowed external auth/social pages inside the WebView while the app
-    // itself loads from the freshly synced local `dist` bundle.
-    allowNavigation: [
-      "aelixto.com",
-      "*.aelixto.com",
-      "*.lovable.app",
-      "oauth.lovable.app",
-      "*.lovableproject.com",
-      "accounts.google.com",
-      "*.google.com",
-      "*.googleusercontent.com",
-      "appleid.apple.com",
-      "*.apple.com",
-      "*.supabase.co"
-    ]
   },
   plugins: {
     SplashScreen: {

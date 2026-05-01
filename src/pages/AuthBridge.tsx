@@ -18,6 +18,7 @@ import { useEffect } from "react";
  * the normal site root so users still land somewhere sensible.
  */
 const APP_SCHEME = "com.aelixto.app10";
+const APP_PACKAGE = "com.aelixto.app10";
 
 const AuthBridge = () => {
   useEffect(() => {
@@ -30,15 +31,27 @@ const AuthBridge = () => {
       return;
     }
 
-    // Hand the tokens off to the native app.
-    const deepLink = `${APP_SCHEME}://oauth-callback${payload}`;
-    window.location.replace(deepLink);
+    // Hand the tokens off to the native app. Chrome handles `intent://` links
+    // more reliably from Custom Tabs; keep the custom-scheme URL as fallback.
+    const customSchemeLink = `${APP_SCHEME}://oauth-callback${payload}`;
+    const intentPayload = payload.startsWith("#") ? `?${payload.slice(1)}` : payload;
+    const fallbackUrl = encodeURIComponent(`${window.location.origin}/`);
+    const intentLink = `intent://oauth-callback${intentPayload}#Intent;scheme=${APP_SCHEME};package=${APP_PACKAGE};S.browser_fallback_url=${fallbackUrl};end`;
+
+    window.location.replace(intentLink);
+
+    const schemeFallback = window.setTimeout(() => {
+      window.location.replace(customSchemeLink);
+    }, 500);
 
     // Web fallback: if nothing handled the scheme within ~1.2s, go home.
     const fallback = window.setTimeout(() => {
       window.location.replace("/");
     }, 1200);
-    return () => window.clearTimeout(fallback);
+    return () => {
+      window.clearTimeout(schemeFallback);
+      window.clearTimeout(fallback);
+    };
   }, []);
 
   return (
