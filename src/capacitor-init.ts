@@ -52,7 +52,8 @@ export async function initCapacitorPlugins() {
 
         if (!isOAuth) return;
 
-        // Extract the fragment / query and parse tokens.
+        // Extract the fragment / query and parse tokens. Chrome intent links
+        // can deliver the former hash payload as query params, so support both.
         const fragment = url.includes("#") ? url.split("#")[1] : "";
         const query = url.includes("?") ? url.split("?")[1].split("#")[0] : "";
         const params = new URLSearchParams(fragment || query);
