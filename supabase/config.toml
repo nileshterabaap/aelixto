@@ -33,3 +33,15 @@ project_id = "hhotresssetunubidrth"
     verify_jwt = false
   [functions.unfurl-article]
     verify_jwt = false
+  [functions.send-transactional-email]
+    verify_jwt = true
+  [functions.preview-transactional-email]
+    verify_jwt = false
+  [functions.handle-email-unsubscribe]
+    verify_jwt = false
+  [functions.handle-email-suppression]
+    verify_jwt = false
+  [functions.notify-report]
+    verify_jwt = true
+  [functions.moderate-report]
+    verify_jwt = false
