@@ -94,8 +94,19 @@ export const ReportDialog = ({
         payload.target_user_id = targetUserId;
       }
 
-      const { error } = await supabase.from("reports" as any).insert(payload);
+      const { data: insertData, error } = await supabase
+        .from("reports" as any)
+        .insert(payload)
+        .select("id")
+        .single();
       if (error) throw error;
+
+      // Fire-and-forget moderator email — don't block UI on it
+      if (targetType === "post" && (insertData as any)?.id) {
+        supabase.functions
+          .invoke("notify-report", { body: { reportId: (insertData as any).id } })
+          .catch((err) => console.error("notify-report failed:", err));
+      }
 
       // Auto-hide locally so the user stops seeing the offending content
       if (targetType === "post" && postId) {
