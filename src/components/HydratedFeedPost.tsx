@@ -36,6 +36,7 @@ import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { SharePostSheet } from "@/components/SharePostSheet";
+import { PostReportMenu } from "@/components/PostReportMenu";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
@@ -518,6 +519,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          )}
+          {post.isRealPost && (post as any).user_id && (post as any).user_id !== userId && (
+            <PostReportMenu
+              postId={post.id}
+              authorUserId={(post as any).user_id}
+              authorUsername={post.author?.username}
+            />
           )}
         </div>
       </div>

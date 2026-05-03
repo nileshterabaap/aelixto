@@ -518,6 +518,7 @@ export type Database = {
           created_at: string
           id: string
           is_read: boolean
+          metadata: Json | null
           post_id: string | null
           recipient_id: string
           type: string
@@ -528,6 +529,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_read?: boolean
+          metadata?: Json | null
           post_id?: string | null
           recipient_id: string
           type: string
@@ -538,6 +540,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_read?: boolean
+          metadata?: Json | null
           post_id?: string | null
           recipient_id?: string
           type?: string
@@ -843,6 +846,8 @@ export type Database = {
           id: string
           reason: Database["public"]["Enums"]["report_reason"]
           reporter_id: string
+          resolution: string | null
+          resolved_at: string | null
           status: string
           target_post_id: string | null
           target_type: Database["public"]["Enums"]["report_target"]
@@ -854,6 +859,8 @@ export type Database = {
           id?: string
           reason: Database["public"]["Enums"]["report_reason"]
           reporter_id: string
+          resolution?: string | null
+          resolved_at?: string | null
           status?: string
           target_post_id?: string | null
           target_type: Database["public"]["Enums"]["report_target"]
@@ -865,6 +872,8 @@ export type Database = {
           id?: string
           reason?: Database["public"]["Enums"]["report_reason"]
           reporter_id?: string
+          resolution?: string | null
+          resolved_at?: string | null
           status?: string
           target_post_id?: string | null
           target_type?: Database["public"]["Enums"]["report_target"]

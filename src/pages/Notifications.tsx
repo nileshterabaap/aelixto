@@ -2,7 +2,7 @@ import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { Heart, MessageCircle, Repeat2, Bell, Check } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Bell, Check, Shield, ShieldAlert } from "lucide-react";
 import { useState, useCallback } from "react";
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,8 @@ const getNotificationIcon = (type: string) => {
       return { icon: MessageCircle, bgColor: 'bg-blue-100', iconColor: 'text-blue-500' };
     case 'repost':
       return { icon: Repeat2, bgColor: 'bg-green-100', iconColor: 'text-green-500' };
+    case 'report_outcome':
+      return { icon: Shield, bgColor: 'bg-amber-100', iconColor: 'text-amber-600' };
     default:
       return { icon: Bell, bgColor: 'bg-muted', iconColor: 'text-muted-foreground' };
   }
@@ -50,6 +52,11 @@ const NotificationItem = ({
   const { icon: Icon, bgColor, iconColor } = getNotificationIcon(notification.type);
   const message = getNotificationMessage(notification.type);
   const actorName = notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
+  const isReportOutcome = notification.type === 'report_outcome';
+  const outcome = notification.metadata?.action as 'removed' | 'kept' | undefined;
+  const snapshot = notification.metadata?.post_snapshot as
+    | { title?: string; content?: string; thumbnail_url?: string }
+    | undefined;
   
   const handleClick = () => {
     if (!notification.is_read) {
@@ -72,23 +79,41 @@ const NotificationItem = ({
           <Icon className={`h-5 w-5 ${iconColor}`} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm">
-            <span className="font-semibold">{actorName}</span>{' '}
-            <span className="text-muted-foreground">{message}</span>
-          </p>
-          {notification.post?.title && (
+          {isReportOutcome ? (
+            <p className="text-sm">
+              <span className="font-semibold">
+                {outcome === 'removed' ? 'Post removed' : 'Report reviewed'}
+              </span>{' '}
+              <span className="text-muted-foreground">
+                {outcome === 'removed'
+                  ? "— thanks for flagging it. We've taken it down."
+                  : "— thanks for the report. We didn't find a violation this time."}
+              </span>
+            </p>
+          ) : (
+            <p className="text-sm">
+              <span className="font-semibold">{actorName}</span>{' '}
+              <span className="text-muted-foreground">{message}</span>
+            </p>
+          )}
+          {!isReportOutcome && notification.post?.title && (
             <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
               "{notification.post.title}"
+            </p>
+          )}
+          {isReportOutcome && (snapshot?.title || snapshot?.content) && (
+            <p className="text-sm text-muted-foreground mt-1 line-clamp-2 italic">
+              "{snapshot.title || snapshot.content}"
             </p>
           )}
           <p className="text-xs text-muted-foreground mt-2">
             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
           </p>
         </div>
-        {notification.post?.thumbnail_url && (
+        {(notification.post?.thumbnail_url || snapshot?.thumbnail_url) && (
           <div className="shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-muted">
             <img 
-              src={notification.post.thumbnail_url} 
+              src={notification.post?.thumbnail_url || snapshot?.thumbnail_url}
               alt=""
               className="w-full h-full object-cover"
             />
@@ -120,6 +145,7 @@ const Notifications = () => {
   const navigate = useNavigate();
 
   const handleNotificationClick = (notification: Notification) => {
+    if (notification.type === 'report_outcome') return; // no navigation for moderation outcomes
     if (notification.post_id) {
       navigate(`/post/${notification.post_id}`);
     } else if (notification.actor?.username) {
