@@ -145,6 +145,7 @@ const Notifications = () => {
   const navigate = useNavigate();
 
   const handleNotificationClick = (notification: Notification) => {
+    if (notification.type === 'report_outcome') return; // no navigation for moderation outcomes
     if (notification.post_id) {
       navigate(`/post/${notification.post_id}`);
     } else if (notification.actor?.username) {
