@@ -54,6 +54,8 @@ const NotificationItem = ({
   const actorName = notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
   const isReportOutcome = notification.type === 'report_outcome';
   const outcome = notification.metadata?.action as 'removed' | 'kept' | undefined;
+  const reportKind = notification.metadata?.kind as 'report_outcome' | 'post_removed' | undefined;
+  const isAuthorRemoval = reportKind === 'post_removed';
   const snapshot = notification.metadata?.post_snapshot as
     | { title?: string; content?: string; thumbnail_url?: string }
     | undefined;
@@ -82,10 +84,16 @@ const NotificationItem = ({
           {isReportOutcome ? (
             <p className="text-sm">
               <span className="font-semibold">
-                {outcome === 'removed' ? 'Post removed' : 'Report reviewed'}
+                {isAuthorRemoval
+                  ? 'Your post was removed'
+                  : outcome === 'removed'
+                  ? 'Post removed'
+                  : 'Report reviewed'}
               </span>{' '}
               <span className="text-muted-foreground">
-                {outcome === 'removed'
+                {isAuthorRemoval
+                  ? '— it was reported and found to violate our community guidelines.'
+                  : outcome === 'removed'
                   ? "— thanks for flagging it. We've taken it down."
                   : "— thanks for the report. We didn't find a violation this time."}
               </span>

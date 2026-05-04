@@ -136,6 +136,31 @@ Deno.serve(async (req) => {
       metadata: notifMetadata,
     })
 
+    // If the post was deleted, also notify the post author so they know
+    // their post was removed by moderation.
+    if (isDelete && postSnapshot?.user_id) {
+      const authorMetadata: Record<string, any> = {
+        kind: 'post_removed',
+        action: 'removed',
+        reason: report.reason,
+        report_id: reportId,
+        post_snapshot: {
+          id: postSnapshot.id,
+          title: postSnapshot.title,
+          content: postSnapshot.content,
+          thumbnail_url: postSnapshot.thumbnail_url || postSnapshot.preview_image_url,
+          platform: postSnapshot.platform,
+        },
+      }
+      await supabase.from('notifications').insert({
+        recipient_id: postSnapshot.user_id,
+        actor_id: postSnapshot.user_id, // system action — UI treats kind=post_removed specially
+        type: 'report_outcome',
+        post_id: null,
+        metadata: authorMetadata,
+      })
+    }
+
     const msg = isDelete
       ? '<p>The post has been <strong>deleted</strong> and the reporter has been notified.</p>'
       : '<p>The post will be <strong>kept</strong>. The reporter has been notified that no action was needed.</p>'
