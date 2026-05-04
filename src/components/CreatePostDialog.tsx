@@ -99,6 +99,12 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           if (!error && data) {
             videoTitle = data.title || "";
             thumbnail = data.thumbnail || "";
+            // Instagram: auto-fill caption with the original poster's caption
+            // (returned in oEmbed title) so CollapsibleCaption "...more" toggle
+            // appears for every IG post. Only if user hasn't typed one.
+            if (platform === "instagram" && data.title && !caption.trim()) {
+              setCaption(data.title);
+            }
           }
         } catch (error) {
           console.error(`[CreatePostDialog] ${platform} thumbnail fetch failed:`, error);
