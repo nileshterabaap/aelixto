@@ -89,7 +89,6 @@ export const useCreatePost = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["following-feed"] });
       toast({
         title: "Post created!",
         description: "Your post has been published successfully.",
