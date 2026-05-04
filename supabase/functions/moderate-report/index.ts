@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     if (!reportId || !action || !sig) {
       return new Response(htmlPage('Invalid link', '<p>Missing parameters.</p>', '#dc2626'), {
         status: 400,
-        headers: { 'Content-Type': 'text/html' },
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
       })
     }
 
@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     if (expected !== sig) {
       return new Response(htmlPage('Invalid signature', '<p>This link is invalid or tampered with.</p>', '#dc2626'), {
         status: 403,
-        headers: { 'Content-Type': 'text/html' },
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
       })
     }
 
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
     if (reportErr || !report) {
       return new Response(htmlPage('Report not found', '<p>This report no longer exists.</p>', '#dc2626'), {
         status: 404,
-        headers: { 'Content-Type': 'text/html' },
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
       })
     }
 
@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
           'Already resolved',
           `<p>This report was already resolved as <strong>${report.resolution}</strong>.</p>`
         ),
-        { headers: { 'Content-Type': 'text/html' } }
+        { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
       )
     }
 
@@ -141,13 +141,13 @@ Deno.serve(async (req) => {
       : '<p>The post will be <strong>kept</strong>. The reporter has been notified that no action was needed.</p>'
 
     return new Response(htmlPage(isDelete ? 'Post removed ✓' : 'Post kept ✓', msg, isDelete ? '#dc2626' : '#16a34a'), {
-      headers: { 'Content-Type': 'text/html' },
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
     })
   } catch (e) {
     console.error('moderate-report error', e)
     return new Response(htmlPage('Error', `<p>${(e as Error).message}</p>`, '#dc2626'), {
       status: 500,
-      headers: { 'Content-Type': 'text/html' },
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
     })
   }
 })
