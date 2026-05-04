@@ -520,7 +520,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {post.isRealPost && (post as any).user_id && (post as any).user_id !== userId && (
+          {post.isRealPost && userId && (post as any).user_id && (post as any).user_id !== userId && (
             <PostReportMenu
               postId={post.id}
               authorUserId={(post as any).user_id}

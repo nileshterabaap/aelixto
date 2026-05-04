@@ -14,7 +14,12 @@ interface SearchResultItemProps {
 export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) => {
   const navigate = useNavigate();
   const { user } = useSession();
-  const { isFollowing, follow, unfollow, loading } = useFollow(result.user_id);
+  // Seed with the value already returned by search_profiles so the
+  // Follow/Following label is correct on first paint — no 3-4s flicker.
+  const { isFollowing, follow, unfollow, loading } = useFollow(result.user_id, {
+    initialIsFollowing: result.is_following,
+    skipInitialRefresh: true,
+  });
   
   const isMe = user?.id === result.user_id;
 

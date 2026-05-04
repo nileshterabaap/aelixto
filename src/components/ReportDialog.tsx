@@ -76,9 +76,15 @@ export const ReportDialog = ({
     }
     setSubmitting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("Please sign in to report");
+      // Use getSession() so we know we have a live JWT on the supabase
+      // client — getUser() can return a cached user even when the
+      // request would go out anonymously, which then trips RLS.
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!session || !user) {
+        toast.error("Please sign in to report", {
+          description: "You need an account to send reports.",
+        });
         return;
       }
 

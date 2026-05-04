@@ -1,9 +1,23 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
-export function useFollow(targetUserId?: string) {
+interface UseFollowOptions {
+  /** Seed the initial follow state so the UI doesn't flicker while the
+   *  network round-trip resolves. Pass the value from a list query
+   *  (e.g. search_profiles.is_following). */
+  initialIsFollowing?: boolean;
+  /** Skip the initial network refresh entirely. Use when the caller
+   *  already has authoritative data and only needs follow/unfollow
+   *  mutations + counts on demand. */
+  skipInitialRefresh?: boolean;
+}
+
+export function useFollow(targetUserId?: string, options: UseFollowOptions = {}) {
+  const { initialIsFollowing, skipInitialRefresh } = options;
   const [loading, setLoading] = useState(false);
-  const [isFollowing, setIsFollowing] = useState<boolean | null>(null);
+  const [isFollowing, setIsFollowing] = useState<boolean | null>(
+    initialIsFollowing ?? null
+  );
   const [counts, setCounts] = useState<{ followers: number; following: number }>({ 
     followers: 0, 
     following: 0 
@@ -50,8 +64,9 @@ export function useFollow(targetUserId?: string) {
   }, [targetUserId]);
 
   useEffect(() => {
+    if (skipInitialRefresh) return;
     refresh();
-  }, [refresh]);
+  }, [refresh, skipInitialRefresh]);
 
   const follow = useCallback(async () => {
     if (!targetUserId || isFollowing) return;
