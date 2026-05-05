@@ -2,10 +2,9 @@ import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { Heart, MessageCircle, Repeat2, Bell, Check, Shield, ShieldAlert } from "lucide-react";
-import { useState, useCallback } from "react";
+import { Heart, MessageCircle, Repeat2, Bell, Shield } from "lucide-react";
+import { useState, useCallback, useEffect } from "react";
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
@@ -42,11 +41,9 @@ const getNotificationMessage = (type: string) => {
 
 const NotificationItem = ({ 
   notification, 
-  onMarkAsRead,
   onClick 
 }: { 
   notification: Notification; 
-  onMarkAsRead: (id: string) => void;
   onClick: () => void;
 }) => {
   const { icon: Icon, bgColor, iconColor } = getNotificationIcon(notification.type);
@@ -66,9 +63,6 @@ const NotificationItem = ({
     | undefined;
   
   const handleClick = () => {
-    if (!notification.is_read) {
-      onMarkAsRead(notification.id);
-    }
     onClick();
   };
 
@@ -113,22 +107,12 @@ const NotificationItem = ({
               <span className="text-muted-foreground">{message}</span>
             </p>
           )}
-          {!isReportOutcome && notification.post?.title && (
-            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-              "{notification.post.title}"
-            </p>
-          )}
-          {isReportOutcome && (snapshot?.title || snapshot?.content) && (
-            <p className="text-sm text-muted-foreground mt-1 line-clamp-2 italic">
-              "{snapshot.title || snapshot.content}"
-            </p>
-          )}
           <p className="text-xs text-muted-foreground mt-2">
             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
           </p>
         </div>
         {(notification.post?.thumbnail_url || snapshot?.thumbnail_url) && (
-          <div className="shrink-0 w-12 h-12 rounded-lg overflow-hidden bg-muted">
+          <div className="shrink-0 w-12 h-12 rounded-md overflow-hidden bg-muted">
             <img 
               src={notification.post?.thumbnail_url || snapshot?.thumbnail_url}
               alt=""
@@ -158,8 +142,16 @@ const NotificationSkeleton = () => (
 
 const Notifications = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const { notifications, isLoading, markAllRead, markAsRead, isMarkingAllRead, refetch } = useNotifications();
+  const { notifications, isLoading, markAllRead, refetch } = useNotifications();
   const navigate = useNavigate();
+
+  // Auto mark all as read when user opens the notifications page
+  useEffect(() => {
+    if (!isLoading && notifications.some((n) => !n.is_read)) {
+      markAllRead();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
 
   const handleNotificationClick = (notification: Notification) => {
     if (notification.type === 'report_outcome') return; // no navigation for moderation outcomes
@@ -174,8 +166,6 @@ const Notifications = () => {
     await refetch();
   }, [refetch]);
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
-
   return (
     <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
@@ -184,18 +174,6 @@ const Notifications = () => {
         <main className="mx-auto max-w-2xl px-4 py-6 animate-fade-in">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold">Notifications</h1>
-            {unreadCount > 0 && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => markAllRead()}
-                disabled={isMarkingAllRead}
-                className="text-primary hover:text-primary"
-              >
-                <Check className="h-4 w-4 mr-1" />
-                Mark all read
-              </Button>
-            )}
           </div>
           
           {isLoading ? (
@@ -218,7 +196,6 @@ const Notifications = () => {
                 <NotificationItem
                   key={notification.id}
                   notification={notification}
-                  onMarkAsRead={markAsRead}
                   onClick={() => handleNotificationClick(notification)}
                 />
               ))}
