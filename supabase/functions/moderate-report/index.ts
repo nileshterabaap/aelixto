@@ -91,6 +91,11 @@ Deno.serve(async (req) => {
       postSnapshot = post
     }
 
+    // For user-target reports we need the offending user's id directly
+    const offenderUserId: string | null =
+      postSnapshot?.user_id || report.target_user_id || null
+    const isUserReport = report.target_type === 'user' || (!report.target_post_id && !!report.target_user_id)
+
     const isDelete = action === 'delete'
     const resolution = isDelete ? 'removed' : 'kept'
 
@@ -117,6 +122,7 @@ Deno.serve(async (req) => {
       action: resolution,
       reason: report.reason,
       report_id: reportId,
+      target_type: report.target_type,
       post_snapshot: postSnapshot
         ? {
             id: postSnapshot.id,
@@ -128,38 +134,54 @@ Deno.serve(async (req) => {
         : null,
     }
 
-    await supabase.from('notifications').insert({
-      recipient_id: report.reporter_id,
-      actor_id: report.reporter_id, // self — system action; UI treats kind=report_outcome specially
-      type: 'report_outcome',
-      post_id: isDelete ? null : report.target_post_id,
-      metadata: notifMetadata,
-    })
+    {
+      const { error: nErr } = await supabase.from('notifications').insert({
+        recipient_id: report.reporter_id,
+        actor_id: report.reporter_id, // self — system action; UI treats kind=report_outcome specially
+        type: 'report_outcome',
+        post_id: isDelete ? null : report.target_post_id,
+        metadata: notifMetadata,
+      })
+      if (nErr) console.error('reporter notification insert failed', nErr)
+    }
 
-    // If the post was deleted, also notify the post author so they know
-    // their post was removed by moderation.
-    if (isDelete && postSnapshot?.user_id) {
+    // If something was removed, also notify the offending author/user.
+    // - For post reports: notify the post's author
+    // - For user reports: notify the reported user
+    if (isDelete && offenderUserId && offenderUserId !== report.reporter_id) {
       const authorMetadata: Record<string, any> = {
-        kind: 'post_removed',
+        kind: isUserReport ? 'account_warning' : 'post_removed',
         action: 'removed',
         reason: report.reason,
         report_id: reportId,
-        post_snapshot: {
-          id: postSnapshot.id,
-          title: postSnapshot.title,
-          content: postSnapshot.content,
-          thumbnail_url: postSnapshot.thumbnail_url || postSnapshot.preview_image_url,
-          platform: postSnapshot.platform,
-        },
+        target_type: report.target_type,
+        post_snapshot: postSnapshot
+          ? {
+              id: postSnapshot.id,
+              title: postSnapshot.title,
+              content: postSnapshot.content,
+              thumbnail_url: postSnapshot.thumbnail_url || postSnapshot.preview_image_url,
+              platform: postSnapshot.platform,
+            }
+          : null,
       }
-      await supabase.from('notifications').insert({
-        recipient_id: postSnapshot.user_id,
-        actor_id: postSnapshot.user_id, // system action — UI treats kind=post_removed specially
+      const { error: aErr } = await supabase.from('notifications').insert({
+        recipient_id: offenderUserId,
+        actor_id: offenderUserId, // system action — UI treats kind specially
         type: 'report_outcome',
         post_id: null,
         metadata: authorMetadata,
       })
+      if (aErr) console.error('author/user notification insert failed', aErr)
     }
+
+    console.log('moderate-report processed', {
+      reportId,
+      action,
+      isUserReport,
+      hadPost: !!report.target_post_id,
+      offenderUserId,
+    })
 
     const msg = isDelete
       ? '<p>The post has been <strong>deleted</strong> and the reporter has been notified.</p>'
