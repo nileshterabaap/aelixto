@@ -26,17 +26,12 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const { profile: currentProfile } = useCurrentProfile();
   const isActive = (path: string) => {
     if (path === "/profile") {
-      if (location.pathname === "/profile") return true;
-      if (currentProfile?.username && location.pathname === `/u/${currentProfile.username}`) return true;
-      return false;
+      return location.pathname === "/profile";
     }
     if (path === "/discover") {
       if (location.pathname === "/discover") return true;
-      // Viewing someone else's profile counts as being in the search/discover flow
-      if (location.pathname.startsWith("/u/")) {
-        if (currentProfile?.username && location.pathname === `/u/${currentProfile.username}`) return false;
-        return true;
-      }
+      // Any /u/:username route is reached via search/discover
+      if (location.pathname.startsWith("/u/")) return true;
       return false;
     }
     if (path === "/saved") return location.pathname === "/saved";
