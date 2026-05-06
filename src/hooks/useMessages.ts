@@ -14,14 +14,37 @@ export interface Message {
 export const useMessages = (conversationId: string | null) => {
   const { user } = useSession();
   const { toast } = useToast();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = conversationId ? `aelixto-messages-${conversationId}` : null;
+
+  const readCache = (): Message[] => {
+    if (!cacheKey || typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(cacheKey);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const [messages, setMessages] = useState<Message[]>(readCache);
+  const [loading, setLoading] = useState(messages.length === 0);
 
   useEffect(() => {
     if (!conversationId || !user) {
       setMessages([]);
       setLoading(false);
       return;
+    }
+
+    // Seed from cache for instant render
+    const cached = readCache();
+    if (cached.length > 0) {
+      setMessages(cached);
+      setLoading(false);
+    } else {
+      setMessages([]);
     }
 
     fetchMessages();
@@ -41,7 +64,15 @@ export const useMessages = (conversationId: string | null) => {
           filter: `conversation_id=eq.${conversationId}`
         },
         (payload) => {
-          setMessages(prev => [...prev, payload.new as Message]);
+          setMessages(prev => {
+            const next = [...prev, payload.new as Message];
+            if (cacheKey) {
+              try {
+                window.localStorage.setItem(cacheKey, JSON.stringify(next.slice(-100)));
+              } catch { /* ignore */ }
+            }
+            return next;
+          });
         }
       )
       .subscribe();
@@ -62,7 +93,13 @@ export const useMessages = (conversationId: string | null) => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      const list = data || [];
+      setMessages(list);
+      if (cacheKey) {
+        try {
+          window.localStorage.setItem(cacheKey, JSON.stringify(list.slice(-100)));
+        } catch { /* ignore */ }
+      }
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({
