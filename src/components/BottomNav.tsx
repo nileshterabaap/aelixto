@@ -213,16 +213,10 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
         </div>
 
         {/* Floating center + button (rounded square) */}
-        {/* Soft oval shadow underneath to match your screenshot */}
-        <div className="pointer-events-none absolute left-1/2 -top-4 -translate-x-1/2 w-20 h-8">
-          <div className="absolute left-1/2 top-[40px] -translate-x-1/2 h-2 w-14 rounded-full bg-foreground/30 blur-md" />
-          <div className="absolute left-1/2 top-[32px] -translate-x-1/2 h-3 w-16 rounded-full bg-foreground/10 blur-lg" />
-        </div>
-
         <button
           aria-label="Create post"
           onClick={onCreatePost}
-          className="absolute left-1/2 -top-4 h-12 w-12 -translate-x-1/2 rounded-2xl bg-foreground text-background shadow-[0_14px_30px_-14px_hsl(var(--foreground)/0.8)] transition-transform duration-300 ease-out active:scale-90"
+          className="absolute left-1/2 -top-4 h-12 w-12 -translate-x-1/2 rounded-2xl bg-foreground text-background transition-transform duration-300 ease-out active:scale-90"
         >
           <span className="absolute inset-0 rounded-2xl bg-background/10 opacity-0 transition-opacity duration-300 active:opacity-100" />
           <Plus className="relative mx-auto h-5 w-5 stroke-[3] text-background" />
