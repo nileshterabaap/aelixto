@@ -130,6 +130,7 @@ const Settings = () => {
           <Row label="Edit profile" onClick={() => navigate('/edit-profile')} />
           <Row label="Email" onClick={() => setChangeEmailOpen(true)} />
           <Row label="Change password" onClick={() => setChangePasswordOpen(true)} />
+          <Row label="Add account" onClick={async () => { await supabase.auth.signOut(); navigate('/auth'); }} />
           <Row label="Notifications" onClick={() => navigate('/settings/notifications')} />
           <Row label="Privacy settings" onClick={() => navigate('/settings/privacy')} />
         </div>
