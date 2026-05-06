@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { prefetchRoute } from "@/lib/prefetch";
 import { setScrollPosition } from "@/hooks/useScrollRestoration";
 import { useNotificationCount } from "@/hooks/useNotifications";
+import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 
 interface BottomNavProps {
   onCreatePost: () => void;
@@ -22,9 +23,12 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { count: notificationCount } = useNotificationCount();
+  const { profile: currentProfile } = useCurrentProfile();
   const isActive = (path: string) => {
     if (path === "/profile") {
-      return location.pathname === "/profile" || location.pathname.startsWith("/u/");
+      if (location.pathname === "/profile") return true;
+      if (currentProfile?.username && location.pathname === `/u/${currentProfile.username}`) return true;
+      return false;
     }
     if (path === "/saved") return location.pathname === "/saved";
     if (path === "/messages") return location.pathname === "/messages";
