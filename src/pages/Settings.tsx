@@ -4,7 +4,7 @@ import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ChevronRight, Loader2, Plus, Check } from "lucide-react";
+import { ArrowLeft, ChevronRight, Loader2, Plus, Check, X } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -15,6 +15,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import {
+  getKnownAccounts,
+  getStoredSessions,
+  upsertAccountMeta,
+  removeAccount,
+  switchToAccount,
+  type AccountMeta,
+} from "@/lib/accountStore";
+import { useQueryClient } from "@tanstack/react-query";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -32,28 +41,24 @@ const Settings = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
-  const [savedAccounts, setSavedAccounts] = useState<Array<{ id: string; username: string; avatar_url: string | null }>>([]);
+  const [savedAccounts, setSavedAccounts] = useState<AccountMeta[]>([]);
+  const [switching, setSwitching] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  // Track previously signed-in accounts for switcher
+  // Load known accounts on mount and whenever sheet opens
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('aelixto-known-accounts');
-      if (raw) setSavedAccounts(JSON.parse(raw));
-    } catch {}
-  }, []);
+    setSavedAccounts(getKnownAccounts());
+  }, [accountSwitcherOpen]);
 
+  // Persist current account meta whenever profile changes
   useEffect(() => {
     if (!profile || !user) return;
-    try {
-      const raw = localStorage.getItem('aelixto-known-accounts');
-      const list: Array<{ id: string; username: string; avatar_url: string | null }> = raw ? JSON.parse(raw) : [];
-      const next = [
-        { id: user.id, username: profile.username, avatar_url: profile.avatar_url },
-        ...list.filter((a) => a.id !== user.id),
-      ].slice(0, 5);
-      localStorage.setItem('aelixto-known-accounts', JSON.stringify(next));
-      setSavedAccounts(next);
-    } catch {}
+    upsertAccountMeta({
+      id: user.id,
+      username: profile.username,
+      avatar_url: profile.avatar_url,
+    });
+    setSavedAccounts(getKnownAccounts());
   }, [profile, user]);
 
   const handleLogout = async () => {
@@ -62,7 +67,8 @@ const Settings = () => {
   };
 
   const handleAddAccount = async () => {
-    await supabase.auth.signOut();
+    // Don't sign out — keep current session stored so user can switch back
+    setAccountSwitcherOpen(false);
     navigate('/auth');
   };
 
@@ -71,9 +77,38 @@ const Settings = () => {
       setAccountSwitcherOpen(false);
       return;
     }
-    // Supabase only persists one session at a time; sign out and route to /auth
-    await supabase.auth.signOut();
-    navigate('/auth');
+    const hasStored = getStoredSessions().some((s) => s.user_id === accountId);
+    if (!hasStored) {
+      // No stored tokens — fall back to re-auth
+      setAccountSwitcherOpen(false);
+      navigate('/auth');
+      return;
+    }
+    setSwitching(accountId);
+    const ok = await switchToAccount(accountId);
+    setSwitching(null);
+    if (!ok) {
+      toast({
+        title: 'Session expired',
+        description: 'Please sign in to this account again.',
+        variant: 'destructive',
+      });
+      setSavedAccounts(getKnownAccounts());
+      setAccountSwitcherOpen(false);
+      navigate('/auth');
+      return;
+    }
+    // Clear cached queries from previous user so the app re-fetches fresh data
+    queryClient.clear();
+    setAccountSwitcherOpen(false);
+    navigate('/');
+  };
+
+  const handleRemoveStoredAccount = (accountId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (accountId === user?.id) return;
+    removeAccount(accountId);
+    setSavedAccounts(getKnownAccounts());
   };
 
 
@@ -262,10 +297,12 @@ const Settings = () => {
           <div className="px-4 pb-8 space-y-1">
             {savedAccounts.map((account) => {
               const isActive = account.id === user?.id;
+              const hasStored = getStoredSessions().some((s) => s.user_id === account.id);
               return (
                 <button
                   key={account.id}
                   onClick={() => handleSwitchAccount(account.id)}
+                  disabled={switching !== null}
                   className="w-full flex items-center gap-4 py-3 text-left"
                 >
                   <div className="h-14 w-14 rounded-full overflow-hidden bg-muted shrink-0">
@@ -273,10 +310,26 @@ const Settings = () => {
                       <img src={account.avatar_url} alt={account.username} className="h-full w-full object-cover" />
                     ) : null}
                   </div>
-                  <span className="flex-1 text-base font-medium truncate">{account.username}</span>
-                  {isActive && (
+                  <div className="flex-1 min-w-0">
+                    <p className="text-base font-medium truncate">{account.username}</p>
+                    {!isActive && !hasStored && (
+                      <p className="text-xs text-muted-foreground">Tap to sign in</p>
+                    )}
+                  </div>
+                  {switching === account.id ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground shrink-0" />
+                  ) : isActive ? (
                     <span className="h-6 w-6 rounded-full bg-primary flex items-center justify-center shrink-0">
                       <Check className="h-4 w-4 text-primary-foreground" />
+                    </span>
+                  ) : (
+                    <span
+                      role="button"
+                      onClick={(e) => handleRemoveStoredAccount(account.id, e)}
+                      className="h-7 w-7 rounded-full hover:bg-muted flex items-center justify-center shrink-0 text-muted-foreground"
+                      aria-label="Remove account"
+                    >
+                      <X className="h-4 w-4" />
                     </span>
                   )}
                 </button>
