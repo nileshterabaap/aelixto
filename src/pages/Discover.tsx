@@ -5,46 +5,64 @@ import { PullToRefresh } from "@/components/PullToRefresh";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState, useCallback, useEffect } from "react";
-import { useUserSearch } from "@/hooks/useUserSearch";
+import { useNavigate } from "react-router-dom";
+import { useUserSearch, SearchResult } from "@/hooks/useUserSearch";
 import { SearchResultItem } from "@/components/SearchResultItem";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const HISTORY_KEY = "aelixto:search-history";
+const HISTORY_KEY = "aelixto:visited-profiles";
 const MAX_HISTORY = 10;
 
-const loadHistory = (): string[] => {
+type VisitedProfile = {
+  user_id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+};
+
+const loadHistory = (): VisitedProfile[] => {
   try {
     const raw = localStorage.getItem(HISTORY_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((x) => x && typeof x.username === "string" && typeof x.user_id === "string")
+      : [];
   } catch {
     return [];
   }
 };
 
+const saveHistory = (items: VisitedProfile[]) => {
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(items)); } catch {}
+};
+
 const Discover = () => {
+  const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { results, loading, hasMore, loadMore } = useUserSearch(searchQuery, true);
-  const [history, setHistory] = useState<string[]>(() => loadHistory());
+  const [history, setHistory] = useState<VisitedProfile[]>(() => loadHistory());
 
+  // Refresh from storage when returning to this page (e.g., after visiting a profile)
   useEffect(() => {
-    if (!searchQuery.trim()) return;
-    const q = searchQuery.trim();
-    const t = setTimeout(() => {
-      setHistory((prev) => {
-        const next = [q, ...prev.filter((h) => h.toLowerCase() !== q.toLowerCase())].slice(0, MAX_HISTORY);
-        try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch {}
-        return next;
-      });
-    }, 800);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
+    const onFocus = () => setHistory(loadHistory());
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
-  const removeHistoryItem = (item: string) => {
+  const addToHistory = useCallback((p: VisitedProfile) => {
     setHistory((prev) => {
-      const next = prev.filter((h) => h !== item);
-      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch {}
+      const next = [p, ...prev.filter((h) => h.user_id !== p.user_id)].slice(0, MAX_HISTORY);
+      saveHistory(next);
+      return next;
+    });
+  }, []);
+
+  const removeHistoryItem = (user_id: string) => {
+    setHistory((prev) => {
+      const next = prev.filter((h) => h.user_id !== user_id);
+      saveHistory(next);
       return next;
     });
   };
@@ -52,6 +70,20 @@ const Discover = () => {
   const clearHistory = () => {
     setHistory([]);
     try { localStorage.removeItem(HISTORY_KEY); } catch {}
+  };
+
+  const handleResultSelect = (r: SearchResult) => {
+    addToHistory({
+      user_id: r.user_id,
+      username: r.username,
+      display_name: r.display_name,
+      avatar_url: r.avatar_url,
+    });
+  };
+
+  const openVisited = (p: VisitedProfile) => {
+    addToHistory(p);
+    navigate(`/u/${p.username}`);
   };
 
   const handleRefresh = useCallback(async () => {
@@ -97,7 +129,11 @@ const Discover = () => {
                 {results.length > 0 && (
                   <div className="space-y-2">
                     {results.map((result) => (
-                      <SearchResultItem key={result.id} result={result} />
+                      <SearchResultItem
+                        key={result.id}
+                        result={result}
+                        onSelect={() => handleResultSelect(result)}
+                      />
                     ))}
                     {hasMore && (
                       <button
@@ -126,20 +162,32 @@ const Discover = () => {
                   <ul className="space-y-1">
                     {history.map((item) => (
                       <li
-                        key={item}
-                        className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-card transition-colors"
+                        key={item.user_id}
+                        className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent/50 transition-colors"
                       >
                         <button
-                          onClick={() => setSearchQuery(item)}
-                          className="flex items-center gap-3 flex-1 text-left"
+                          onClick={() => openVisited(item)}
+                          className="flex items-center gap-3 flex-1 text-left min-w-0"
                         >
-                          <Search className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm text-foreground truncate">{item}</span>
+                          <Avatar className="h-12 w-12">
+                            <AvatarImage src={item.avatar_url || undefined} alt={item.username} />
+                            <AvatarFallback>
+                              {(item.display_name?.[0] || item.username[0] || "?").toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm truncate">
+                              {item.display_name || item.username}
+                            </p>
+                            <p className="text-muted-foreground text-sm truncate">
+                              @{item.username}
+                            </p>
+                          </div>
                         </button>
                         <button
-                          onClick={() => removeHistoryItem(item)}
-                          aria-label={`Remove ${item}`}
-                          className="p-1 -mr-1 text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => removeHistoryItem(item.user_id)}
+                          aria-label={`Remove ${item.username}`}
+                          className="p-2 text-muted-foreground hover:text-foreground transition-colors"
                         >
                           <X className="h-4 w-4" />
                         </button>
