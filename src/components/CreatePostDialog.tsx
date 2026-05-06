@@ -308,7 +308,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             {/* Blurred backdrop */}
             <DialogPrimitive.Overlay asChild forceMount>
               <motion.div
-                className="fixed inset-0 z-50 bg-foreground/45 backdrop-blur-xl"
+                className="fixed inset-0 z-50 bg-foreground/45 backdrop-blur-md"
                 initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
                 animate={{ opacity: 1, backdropFilter: "blur(18px)" }}
                 exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
