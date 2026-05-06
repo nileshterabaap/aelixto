@@ -30,6 +30,15 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
       if (currentProfile?.username && location.pathname === `/u/${currentProfile.username}`) return true;
       return false;
     }
+    if (path === "/discover") {
+      if (location.pathname === "/discover") return true;
+      // Viewing someone else's profile counts as being in the search/discover flow
+      if (location.pathname.startsWith("/u/")) {
+        if (currentProfile?.username && location.pathname === `/u/${currentProfile.username}`) return false;
+        return true;
+      }
+      return false;
+    }
     if (path === "/saved") return location.pathname === "/saved";
     if (path === "/messages") return location.pathname === "/messages";
     return location.pathname === path;
