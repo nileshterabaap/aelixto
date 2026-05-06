@@ -26,12 +26,28 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const { profile: currentProfile } = useCurrentProfile();
   const isActive = (path: string) => {
     if (path === "/profile") {
-      return location.pathname === "/profile";
+      if (location.pathname === "/profile") return true;
+      // Own profile route counts as profile tab
+      if (
+        currentProfile?.username &&
+        location.pathname === `/u/${currentProfile.username}`
+      ) {
+        return true;
+      }
+      return false;
     }
     if (path === "/discover") {
       if (location.pathname === "/discover") return true;
-      // Any /u/:username route is reached via search/discover
-      if (location.pathname.startsWith("/u/")) return true;
+      // Other users' profiles count as discover; own profile does not
+      if (location.pathname.startsWith("/u/")) {
+        if (
+          currentProfile?.username &&
+          location.pathname === `/u/${currentProfile.username}`
+        ) {
+          return false;
+        }
+        return true;
+      }
       return false;
     }
     if (path === "/saved") return location.pathname === "/saved";
