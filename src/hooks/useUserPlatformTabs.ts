@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
 import instagramIcon from "@/assets/platforms/instagram.svg";
@@ -45,99 +46,89 @@ const PLATFORM_META: Record<string, { label: string; icon: string }> = {
 
 export const useUserPlatformTabs = (userId: string | undefined) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [tabs, setTabs] = useState<PlatformTab[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTabState] = useState<string>("");
 
-  useEffect(() => {
-    if (!userId) {
-      setTabs([]);
-      setLoading(false);
-      return;
-    }
+  const { data: tabs = [], isLoading } = useQuery({
+    queryKey: ["user-platform-tabs", userId],
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    queryFn: async (): Promise<PlatformTab[]> => {
+      const { data, error } = await supabase.rpc("get_user_platform_counts", {
+        target_user: userId!,
+      });
+      if (error) throw error;
 
-    const fetchPlatformCounts = async () => {
-      try {
-        const { data, error } = await supabase.rpc("get_user_platform_counts", {
-          target_user: userId,
+      const [{ data: recentPosts }, { data: recentReposts }] = await Promise.all([
+        supabase
+          .from("posts")
+          .select("platform, created_at")
+          .eq("user_id", userId!)
+          .order("created_at", { ascending: false })
+          .limit(500),
+        supabase
+          .from("reposts")
+          .select("created_at, post_id")
+          .eq("user_id", userId!)
+          .order("created_at", { ascending: false })
+          .limit(200),
+      ]);
+
+      const latestByPlatform: Record<string, string> = {};
+      (recentPosts || []).forEach((p: any) => {
+        if (p.platform && !latestByPlatform[p.platform]) {
+          latestByPlatform[p.platform] = p.created_at;
+        }
+      });
+
+      if (recentReposts && recentReposts.length > 0) {
+        const postIds = recentReposts.map((r: any) => r.post_id);
+        const { data: repostedPosts } = await supabase
+          .from("posts")
+          .select("id, platform")
+          .in("id", postIds);
+
+        const platformByPostId: Record<string, string> = {};
+        (repostedPosts || []).forEach((p: any) => {
+          if (p.platform) platformByPostId[p.id] = p.platform;
         });
 
-        if (error) throw error;
-
-        // Fetch the most recent post date per platform to sort by recency
-        // Include both own posts and reposts
-        const [{ data: recentPosts }, { data: recentReposts }] = await Promise.all([
-          supabase
-            .from("posts")
-            .select("platform, created_at")
-            .eq("user_id", userId)
-            .order("created_at", { ascending: false })
-            .limit(500),
-          supabase
-            .from("reposts")
-            .select("created_at, post_id")
-            .eq("user_id", userId)
-            .order("created_at", { ascending: false })
-            .limit(200),
-        ]);
-
-        const latestByPlatform: Record<string, string> = {};
-        (recentPosts || []).forEach((p: any) => {
-          if (p.platform && !latestByPlatform[p.platform]) {
-            latestByPlatform[p.platform] = p.created_at;
+        recentReposts.forEach((r: any) => {
+          const platform = platformByPostId[r.post_id];
+          if (platform && (!latestByPlatform[platform] || r.created_at > latestByPlatform[platform])) {
+            latestByPlatform[platform] = r.created_at;
           }
         });
-
-        // For reposts, fetch the platform of the original post and use repost timestamp
-        if (recentReposts && recentReposts.length > 0) {
-          const postIds = recentReposts.map((r: any) => r.post_id);
-          const { data: repostedPosts } = await supabase
-            .from("posts")
-            .select("id, platform")
-            .in("id", postIds);
-
-          const platformByPostId: Record<string, string> = {};
-          (repostedPosts || []).forEach((p: any) => {
-            if (p.platform) platformByPostId[p.id] = p.platform;
-          });
-
-          recentReposts.forEach((r: any) => {
-            const platform = platformByPostId[r.post_id];
-            if (platform && (!latestByPlatform[platform] || r.created_at > latestByPlatform[platform])) {
-              latestByPlatform[platform] = r.created_at;
-            }
-          });
-        }
-
-        const platformTabs: PlatformTab[] = (data || [])
-          .map((item: any) => ({
-            key: item.platform,
-            label: PLATFORM_META[item.platform]?.label || item.platform,
-            icon: PLATFORM_META[item.platform]?.icon || externalIcon,
-            count: item.post_count,
-            _latest: latestByPlatform[item.platform] || "1970-01-01",
-          }))
-          .sort((a: any, b: any) => b._latest.localeCompare(a._latest))
-          .map(({ _latest, ...tab }: any) => tab as PlatformTab);
-
-        setTabs(platformTabs);
-
-        // Set active tab from URL or default to first tab
-        const urlPlatform = searchParams.get("platform");
-        if (urlPlatform && platformTabs.some((t) => t.key === urlPlatform)) {
-          setActiveTabState(urlPlatform);
-        } else if (platformTabs.length > 0) {
-          setActiveTabState(platformTabs[0].key);
-        }
-      } catch (error) {
-        console.error("Error fetching platform counts:", error);
-      } finally {
-        setLoading(false);
       }
-    };
 
-    fetchPlatformCounts();
-  }, [userId]);
+      return (data || [])
+        .map((item: any) => ({
+          key: item.platform,
+          label: PLATFORM_META[item.platform]?.label || item.platform,
+          icon: PLATFORM_META[item.platform]?.icon || externalIcon,
+          count: item.post_count,
+          _latest: latestByPlatform[item.platform] || "1970-01-01",
+        }))
+        .sort((a: any, b: any) => b._latest.localeCompare(a._latest))
+        .map(({ _latest, ...tab }: any) => tab as PlatformTab);
+    },
+  });
+
+  // Initialize active tab from URL / first tab whenever tabs change.
+  useEffect(() => {
+    if (!tabs.length) return;
+    const urlPlatform = searchParams.get("platform");
+    if (urlPlatform && tabs.some((t) => t.key === urlPlatform)) {
+      setActiveTabState((prev) => (prev === urlPlatform ? prev : urlPlatform));
+    } else {
+      setActiveTabState((prev) => (prev && tabs.some((t) => t.key === prev) ? prev : tabs[0].key));
+    }
+  }, [tabs, searchParams]);
+
+  const loading = !!userId && isLoading && tabs.length === 0;
 
   const setActiveTab = (platform: string) => {
     setActiveTabState(platform);
