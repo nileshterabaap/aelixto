@@ -57,10 +57,13 @@ const Messages = () => {
             <div className="space-y-1">
               {conversations.map((conversation, i) => {
                 const hasUnread = conversation.unread_count > 0;
+                const lastContent = conversation.last_message?.content || "";
+                const isPostShare = /^https?:\/\/.+\/post\/[a-f0-9-]{36}$/.test(lastContent.trim());
+                const displayContent = isPostShare ? "Sent a post" : lastContent;
                 const lastMessagePreview = conversation.last_message
                   ? conversation.last_message.sender_id === user?.id
-                    ? `You: ${conversation.last_message.content}`
-                    : conversation.last_message.content
+                    ? `You: ${displayContent}`
+                    : displayContent
                   : "No messages yet";
 
                 return (
