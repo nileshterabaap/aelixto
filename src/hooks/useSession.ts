@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { saveSession } from '@/lib/accountStore';
 
 interface SessionData {
   session: Session | null;
@@ -10,6 +11,7 @@ interface SessionData {
 
 const fetchSession = async (): Promise<SessionData> => {
   const { data: { session } } = await supabase.auth.getSession();
+  if (session) saveSession(session);
   return {
     session,
     user: session?.user ?? null,
@@ -36,6 +38,9 @@ export const useSession = () => {
         session,
         user: session?.user ?? null,
       });
+      if (session) {
+        saveSession(session);
+      }
     });
 
     return () => subscription.unsubscribe();
