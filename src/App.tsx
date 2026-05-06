@@ -38,7 +38,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
-      gcTime: 14 * 24 * 60 * 60 * 1000, // 14 days - matches persisted maxAge
+      gcTime: 24 * 60 * 60 * 1000, // 24 hours - keep in cache (must be >= maxAge)
       refetchOnWindowFocus: false,
       refetchOnMount: false,
       refetchOnReconnect: false,
