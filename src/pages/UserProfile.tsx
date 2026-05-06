@@ -57,6 +57,11 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
   useEffect(() => {
     if (username) {
+      // Reset stale state immediately so the previous profile's
+      // counts/follow status don't briefly show on the new profile.
+      setProfile(null);
+      setLoading(true);
+      setIsFollowedByTarget(false);
       fetchProfile();
     }
   }, [username]);
