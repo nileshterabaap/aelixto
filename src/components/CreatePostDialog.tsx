@@ -407,7 +407,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                             <input
                               id="link"
                               type="url"
-                              autoFocus
                               placeholder=" "
                               value={linkUrl}
                               onChange={(e) => setLinkUrl(e.target.value)}
