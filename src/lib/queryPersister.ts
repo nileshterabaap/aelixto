@@ -1,7 +1,7 @@
 import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
 
 const CACHE_KEY = 'aelixto-query-cache';
-const MAX_AGE = 24 * 60 * 60 * 1000; // 24 hours
+const MAX_AGE = 14 * 24 * 60 * 60 * 1000; // 14 days
 
 // Create a localStorage persister for React Query
 export const localStoragePersister = createSyncStoragePersister({
