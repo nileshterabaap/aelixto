@@ -21,14 +21,35 @@ export interface ConversationWithDetails {
 
 export const useConversations = () => {
   const { user } = useSession();
-  const [conversations, setConversations] = useState<ConversationWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = user ? `aelixto-conversations-${user.id}` : null;
+
+  const readCache = (): ConversationWithDetails[] => {
+    if (!cacheKey || typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(cacheKey);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const [conversations, setConversations] = useState<ConversationWithDetails[]>(readCache);
+  const [loading, setLoading] = useState(conversations.length === 0);
 
   useEffect(() => {
     if (!user) {
       setConversations([]);
       setLoading(false);
       return;
+    }
+
+    // Seed from cache immediately on user change for instant render
+    const cached = readCache();
+    if (cached.length > 0) {
+      setConversations(cached);
+      setLoading(false);
     }
 
     fetchConversations();
@@ -143,6 +164,13 @@ export const useConversations = () => {
       }) || [];
 
       setConversations(conversationsWithDetails);
+      if (cacheKey) {
+        try {
+          window.localStorage.setItem(cacheKey, JSON.stringify(conversationsWithDetails));
+        } catch {
+          /* quota exceeded - ignore */
+        }
+      }
     } catch (error) {
       console.error('Error fetching conversations:', error);
     } finally {
