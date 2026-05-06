@@ -11,6 +11,7 @@ interface SessionData {
 
 const fetchSession = async (): Promise<SessionData> => {
   const { data: { session } } = await supabase.auth.getSession();
+  if (session) saveSession(session);
   return {
     session,
     user: session?.user ?? null,
