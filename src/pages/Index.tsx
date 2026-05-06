@@ -194,12 +194,12 @@ const Index = () => {
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <h2 className="text-xl font-semibold">No posts yet</h2>
+              <h2 className="text-xl font-semibold">Nothing here yet 👀</h2>
               <p className="text-sm text-muted-foreground mt-2">
-                Posts from people you follow will appear here once they share something.
+                No algorithm should decide your feed..
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                Start by following creators you like to fill your feed ✨
+                only your follows do.
               </p>
               <Link
                 to="/discover"
