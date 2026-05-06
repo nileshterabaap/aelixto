@@ -93,7 +93,7 @@ export const SharedPostCard = ({ postId, isOwn }: SharedPostCardProps) => {
       ) : null}
       <div className="px-3 py-2">
         <p className="text-xs text-muted-foreground truncate">
-          Sent a post by <span className="font-semibold text-foreground">@{post.profile_username}</span>
+          <span className="font-semibold text-foreground">@{post.profile_username}</span>
         </p>
       </div>
     </div>
