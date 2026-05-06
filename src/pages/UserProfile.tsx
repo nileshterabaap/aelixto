@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { BottomNav } from "@/components/BottomNav";
@@ -27,12 +28,32 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const username = usernameOverride || urlUsername;
   const navigate = useNavigate();
   const { user } = useSession();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
   const [followListOpen, setFollowListOpen] = useState(false);
-  
+
+  const { data: profile = null, isLoading, refetch: refetchProfile } = useQuery({
+    queryKey: ["user-profile", username],
+    enabled: !!username,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
+    queryFn: async (): Promise<Profile | null> => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("username", username!)
+        .single();
+      if (error) throw error;
+      return data as unknown as Profile;
+    },
+  });
+
+  // Only show the skeleton when we truly have no cached data yet.
+  const loading = isLoading && !profile;
+
   const { isFollowing, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
@@ -42,6 +63,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   // Check if the target user follows the current user
   useEffect(() => {
     if (!user || !profile?.user_id || isMe) return;
+    setIsFollowedByTarget(false);
     supabase
       .from("follows")
       .select("id")
@@ -52,36 +74,8 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   }, [user, profile?.user_id, isMe]);
 
   const handleRefresh = useCallback(async () => {
-    await fetchProfile();
-  }, [username]);
-
-  useEffect(() => {
-    if (username) {
-      // Reset stale state immediately so the previous profile's
-      // counts/follow status don't briefly show on the new profile.
-      setProfile(null);
-      setLoading(true);
-      setIsFollowedByTarget(false);
-      fetchProfile();
-    }
-  }, [username]);
-
-  const fetchProfile = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('username', username)
-        .single();
-
-      if (error) throw error;
-      setProfile(data as unknown as Profile);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    await Promise.all([refetchProfile(), refreshFollow()]);
+  }, [refetchProfile, refreshFollow]);
 
   if (loading) {
     return (
