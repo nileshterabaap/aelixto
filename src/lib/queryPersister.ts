@@ -23,7 +23,10 @@ export const localStoragePersister = createSyncStoragePersister({
                  key === 'posts' ||
                  key === 'user-profile' ||
                  key === 'user-platform-tabs' ||
-                 key === 'platform-posts';
+                 key === 'platform-posts' ||
+                 key === 'saved-posts' ||
+                 key === 'collections' ||
+                 key === 'post-drafts';
         }),
       },
     };
