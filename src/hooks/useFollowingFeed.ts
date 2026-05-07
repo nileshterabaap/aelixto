@@ -38,9 +38,10 @@ interface UseFollowingFeedResult {
   hasMore: boolean;
 }
 
+const PAGE_SIZE = 50;
 const fetchFeedPage = async (cursor?: string) => {
   const { data, error } = await supabase.rpc('get_following_feed', {
-    limit_count: 20,
+    limit_count: PAGE_SIZE,
     cursor: cursor || null,
   });
 
@@ -77,7 +78,7 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  const nextCursor = data.length < 20 ? undefined : mappedPosts[mappedPosts.length - 1]?.created_at;
+  const nextCursor = data.length < PAGE_SIZE ? undefined : mappedPosts[mappedPosts.length - 1]?.created_at;
 
   return { posts: mappedPosts, nextCursor };
 };
