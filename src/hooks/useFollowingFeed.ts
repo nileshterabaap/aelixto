@@ -19,6 +19,7 @@ interface FeedPost {
   thumbnail_url: string | null;
   title: string | null;
   is_public: boolean;
+  feed_cursor?: string | null;
   is_repost?: boolean;
   reposted_by_user_id?: string | null;
   reposted_by_username?: string | null;
@@ -40,9 +41,9 @@ interface UseFollowingFeedResult {
 
 const PAGE_SIZE = 20;
 const fetchFeedPage = async (cursor?: string) => {
-  const { data, error } = await supabase.rpc('get_following_feed', {
+  const { data, error } = await supabase.rpc('get_following_feed_v2' as any, {
     limit_count: PAGE_SIZE,
-    cursor: cursor || null,
+    cursor_key: cursor || null,
   });
 
   if (error) throw error;
@@ -68,6 +69,7 @@ const fetchFeedPage = async (cursor?: string) => {
     thumbnail_url: item.thumbnail_url,
     title: item.title,
     is_public: item.is_public,
+    feed_cursor: item.feed_cursor,
     is_repost: item.is_repost,
     reposted_by_user_id: item.reposted_by_user_id,
     reposted_by_username: item.reposted_by_username,
@@ -78,8 +80,7 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  const lastItem = data[data.length - 1] as any;
-  const nextCursor = data.length < PAGE_SIZE ? undefined : lastItem?.reposted_at ?? mappedPosts[mappedPosts.length - 1]?.created_at;
+  const nextCursor = data.length < PAGE_SIZE ? undefined : mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
 
   return { posts: mappedPosts, nextCursor };
 };
