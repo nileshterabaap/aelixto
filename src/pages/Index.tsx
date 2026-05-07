@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
@@ -144,7 +143,11 @@ const Index = () => {
     await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
   }, [queryClient, showDemoFeed]);
 
-  // Prefetch next page when user is within last 5 posts
+  // Prefetch next page far in advance — attach an observer to a post several
+  // items before the end so the next batch is fully loaded before the user
+  // ever reaches the bottom (Instagram/X-style invisible pagination).
+  const PREFETCH_TRIGGER_OFFSET = 5; // start loading when post N-5 enters
+  const prefetchTriggerIndex = Math.max(0, allPosts.length - PREFETCH_TRIGGER_OFFSET);
   const prefetchSentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!hasMore || showDemoFeed) return;
@@ -157,11 +160,11 @@ const Index = () => {
           loadMore();
         }
       },
-      { rootMargin: '1500px', threshold: 0 }
+      { rootMargin: '4000px 0px 4000px 0px', threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, loadMore, showDemoFeed, allPosts.length]);
+  }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
   // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
@@ -216,6 +219,9 @@ const Index = () => {
                   ref={(el) => {
                     registerItem(post.id)(el);
                     if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
+                    if (index === prefetchTriggerIndex) {
+                      (prefetchSentinelRef as any).current = el;
+                    }
                   }}
                   data-feed-item-id={post.id}
                 >
@@ -226,15 +232,8 @@ const Index = () => {
                   />
                 </div>
               ))}
-              {/* Sentinel for prefetching next page ahead of scroll */}
-              {hasMore && !showDemoFeed && (
-                <>
-                  <div ref={prefetchSentinelRef} style={{ height: 1 }} />
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                </>
-              )}
+              {/* No visible loader — pagination happens silently far before
+                  the user reaches the end. */}
               {/* All caught up message */}
               {!hasMore && !showDemoFeed && allPosts.length > 0 && (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
