@@ -39,9 +39,20 @@ interface UseFollowingFeedResult {
   hasMore: boolean;
 }
 
+interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
+  profile_username: string;
+  profile_display_name: string | null;
+  profile_avatar_url: string | null;
+}
+
 const PAGE_SIZE = 20;
 const fetchFeedPage = async (cursor?: string) => {
-  const { data, error } = await supabase.rpc('get_following_feed_v2' as any, {
+  const rpc = supabase.rpc as unknown as (
+    fn: 'get_following_feed_v2',
+    args: { limit_count: number; cursor_key: string | null }
+  ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
+
+  const { data, error } = await rpc('get_following_feed_v2', {
     limit_count: PAGE_SIZE,
     cursor_key: cursor || null,
   });
@@ -53,7 +64,7 @@ const fetchFeedPage = async (cursor?: string) => {
   }
 
   // Map RPC response to FeedPost format
-  const mappedPosts: FeedPost[] = data.map((item: any) => ({
+  const mappedPosts: FeedPost[] = data.map((item) => ({
     id: item.id,
     user_id: item.user_id,
     content: item.content,
