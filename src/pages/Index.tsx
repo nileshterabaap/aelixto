@@ -143,28 +143,16 @@ const Index = () => {
     await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
   }, [queryClient, showDemoFeed]);
 
-  // Prefetch next page far in advance — attach an observer to a post several
-  // items before the end so the next batch is fully loaded before the user
-  // ever reaches the bottom (Instagram/X-style invisible pagination).
-  const PREFETCH_TRIGGER_OFFSET = 5; // start loading when post N-5 enters
-  const prefetchTriggerIndex = Math.max(0, allPosts.length - PREFETCH_TRIGGER_OFFSET);
-  const prefetchSentinelRef = useRef<HTMLDivElement>(null);
+  // Aggressive invisible pagination — start loading the next page the moment
+  // the first post becomes visible, and keep chain-loading subsequent pages
+  // immediately as long as the user is scrolling (or even before). This keeps
+  // a huge buffer of posts ready ahead of the user, Instagram/X-style.
   useEffect(() => {
     if (!hasMore || showDemoFeed) return;
-    const el = prefetchSentinelRef.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          loadMore();
-        }
-      },
-      { rootMargin: '4000px 0px 4000px 0px', threshold: 0 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
+    // Fire immediately on every render where more pages exist — the hook
+    // itself dedupes with isFetchingNextPage, so this is safe.
+    loadMore();
+  }, [hasMore, loadMore, showDemoFeed, allPosts.length]);
 
   // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
@@ -219,9 +207,6 @@ const Index = () => {
                   ref={(el) => {
                     registerItem(post.id)(el);
                     if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
-                    if (index === prefetchTriggerIndex) {
-                      (prefetchSentinelRef as any).current = el;
-                    }
                   }}
                   data-feed-item-id={post.id}
                 >
