@@ -141,8 +141,9 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
 
   // Preload new pages as they arrive
   useEffect(() => {
-    if (data?.pages && data.pages.length > 1) {
-      const latestPage = data.pages[data.pages.length - 1];
+    const pages = data?.pages;
+    if (pages && pages.length > 1) {
+      const latestPage = pages[pages.length - 1];
       if (latestPage.posts.length > 0) {
         preloadAllFeedImages(latestPage.posts.map(post => ({
           profiles: { avatar_url: post.profiles?.avatar_url },
@@ -151,7 +152,7 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
         })));
       }
     }
-  }, [data?.pages?.length]);
+  }, [data?.pages]);
 
   const loadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {
