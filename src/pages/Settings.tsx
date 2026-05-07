@@ -4,26 +4,16 @@ import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ChevronRight, Loader2, Plus, Check, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import {
-  getKnownAccounts,
-  getStoredSessions,
-  upsertAccountMeta,
-  removeAccount,
-  switchToAccount,
-  type AccountMeta,
-} from "@/lib/accountStore";
-import { useQueryClient } from "@tanstack/react-query";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -40,75 +30,10 @@ const Settings = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
-  const [savedAccounts, setSavedAccounts] = useState<AccountMeta[]>([]);
-  const [switching, setSwitching] = useState<string | null>(null);
-  const queryClient = useQueryClient();
-
-  // Load known accounts on mount and whenever sheet opens
-  useEffect(() => {
-    setSavedAccounts(getKnownAccounts());
-  }, [accountSwitcherOpen]);
-
-  // Persist current account meta whenever profile changes
-  useEffect(() => {
-    if (!profile || !user) return;
-    upsertAccountMeta({
-      id: user.id,
-      username: profile.username,
-      avatar_url: profile.avatar_url,
-    });
-    setSavedAccounts(getKnownAccounts());
-  }, [profile, user]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/auth');
-  };
-
-  const handleAddAccount = async () => {
-    // Don't sign out — keep current session stored so user can switch back
-    setAccountSwitcherOpen(false);
-    navigate('/auth');
-  };
-
-  const handleSwitchAccount = async (accountId: string) => {
-    if (accountId === user?.id) {
-      setAccountSwitcherOpen(false);
-      return;
-    }
-    const hasStored = getStoredSessions().some((s) => s.user_id === accountId);
-    if (!hasStored) {
-      // No stored tokens — fall back to re-auth
-      setAccountSwitcherOpen(false);
-      navigate('/auth');
-      return;
-    }
-    setSwitching(accountId);
-    const ok = await switchToAccount(accountId);
-    setSwitching(null);
-    if (!ok) {
-      toast({
-        title: 'Session expired',
-        description: 'Please sign in to this account again.',
-        variant: 'destructive',
-      });
-      setSavedAccounts(getKnownAccounts());
-      setAccountSwitcherOpen(false);
-      navigate('/auth');
-      return;
-    }
-    // Clear cached queries from previous user so the app re-fetches fresh data
-    queryClient.clear();
-    setAccountSwitcherOpen(false);
-    navigate('/');
-  };
-
-  const handleRemoveStoredAccount = (accountId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (accountId === user?.id) return;
-    removeAccount(accountId);
-    setSavedAccounts(getKnownAccounts());
   };
 
 
@@ -205,6 +130,7 @@ const Settings = () => {
           <Row label="Edit profile" onClick={() => navigate('/edit-profile')} />
           <Row label="Email" onClick={() => setChangeEmailOpen(true)} />
           <Row label="Change password" onClick={() => setChangePasswordOpen(true)} />
+          <Row label="Add account" onClick={async () => { await supabase.auth.signOut(); navigate('/auth'); }} />
           <Row label="Notifications" onClick={() => navigate('/settings/notifications')} />
           <Row label="Privacy settings" onClick={() => navigate('/settings/privacy')} />
         </div>
@@ -222,17 +148,6 @@ const Settings = () => {
         <SectionHeader title="" />
         <div className="divide-y divide-border">
           <Row label="Log out" onClick={handleLogout} hasChevron={false} />
-        </div>
-
-        {/* Add / switch account button at the very bottom */}
-        <div className="flex justify-center pt-10 pb-6">
-          <button
-            onClick={() => setAccountSwitcherOpen(true)}
-            className="flex h-12 w-12 items-center justify-center rounded-full border border-border bg-muted/40 text-muted-foreground transition-colors active:bg-muted"
-            aria-label="Switch or add account"
-          >
-            <Plus className="h-6 w-6" />
-          </button>
         </div>
       </main>
 
@@ -286,68 +201,6 @@ const Settings = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Account switcher sheet */}
-      <Sheet open={accountSwitcherOpen} onOpenChange={setAccountSwitcherOpen}>
-        <SheetContent side="bottom" className="rounded-t-2xl p-0">
-          <SheetHeader className="sr-only">
-            <SheetTitle>Switch account</SheetTitle>
-          </SheetHeader>
-          <div className="mx-auto mt-2 mb-4 h-1 w-10 rounded-full bg-muted-foreground/30" />
-          <div className="px-4 pb-8 space-y-1">
-            {savedAccounts.map((account) => {
-              const isActive = account.id === user?.id;
-              const hasStored = getStoredSessions().some((s) => s.user_id === account.id);
-              return (
-                <button
-                  key={account.id}
-                  onClick={() => handleSwitchAccount(account.id)}
-                  disabled={switching !== null}
-                  className="w-full flex items-center gap-4 py-3 text-left"
-                >
-                  <div className="h-14 w-14 rounded-full overflow-hidden bg-muted shrink-0">
-                    {account.avatar_url ? (
-                      <img src={account.avatar_url} alt={account.username} className="h-full w-full object-cover" />
-                    ) : null}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-base font-medium truncate">{account.username}</p>
-                    {!isActive && !hasStored && (
-                      <p className="text-xs text-muted-foreground">Tap to sign in</p>
-                    )}
-                  </div>
-                  {switching === account.id ? (
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground shrink-0" />
-                  ) : isActive ? (
-                    <span className="h-6 w-6 rounded-full bg-primary flex items-center justify-center shrink-0">
-                      <Check className="h-4 w-4 text-primary-foreground" />
-                    </span>
-                  ) : (
-                    <span
-                      role="button"
-                      onClick={(e) => handleRemoveStoredAccount(account.id, e)}
-                      className="h-7 w-7 rounded-full hover:bg-muted flex items-center justify-center shrink-0 text-muted-foreground"
-                      aria-label="Remove account"
-                    >
-                      <X className="h-4 w-4" />
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-
-            <button
-              onClick={handleAddAccount}
-              className="w-full flex items-center gap-4 py-3 text-left"
-            >
-              <div className="h-14 w-14 rounded-full border border-border flex items-center justify-center shrink-0">
-                <Plus className="h-6 w-6" />
-              </div>
-              <span className="flex-1 text-base font-medium">Add account</span>
-            </button>
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 };
