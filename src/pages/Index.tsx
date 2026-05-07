@@ -207,9 +207,6 @@ const Index = () => {
                   ref={(el) => {
                     registerItem(post.id)(el);
                     if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
-                    if (index === prefetchTriggerIndex) {
-                      (prefetchSentinelRef as any).current = el;
-                    }
                   }}
                   data-feed-item-id={post.id}
                 >
