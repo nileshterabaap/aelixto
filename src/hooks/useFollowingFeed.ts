@@ -78,7 +78,8 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  const nextCursor = data.length < PAGE_SIZE ? undefined : mappedPosts[mappedPosts.length - 1]?.created_at;
+  const lastItem = data[data.length - 1] as any;
+  const nextCursor = data.length < PAGE_SIZE ? undefined : lastItem?.reposted_at ?? mappedPosts[mappedPosts.length - 1]?.created_at;
 
   return { posts: mappedPosts, nextCursor };
 };
