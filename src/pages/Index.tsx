@@ -143,16 +143,26 @@ const Index = () => {
     await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
   }, [queryClient, showDemoFeed]);
 
-  // Aggressive invisible pagination — start loading the next page the moment
-  // the first post becomes visible, and keep chain-loading subsequent pages
-  // immediately as long as the user is scrolling (or even before). This keeps
-  // a huge buffer of posts ready ahead of the user, Instagram/X-style.
+  // Data-friendly invisible pagination: load the next page only when the
+  // user reaches a post ~7 items before the end. Uses an IntersectionObserver
+  // attached to that specific post so nothing fetches until it's actually
+  // needed — and no loader is ever shown.
+  const PREFETCH_OFFSET = 7;
+  const prefetchTriggerIndex = Math.max(0, allPosts.length - PREFETCH_OFFSET);
+  const prefetchSentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!hasMore || showDemoFeed) return;
-    // Fire immediately on every render where more pages exist — the hook
-    // itself dedupes with isFetchingNextPage, so this is safe.
-    loadMore();
-  }, [hasMore, loadMore, showDemoFeed, allPosts.length]);
+    const el = prefetchSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadMore();
+      },
+      { rootMargin: '0px', threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
   // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
@@ -207,6 +217,9 @@ const Index = () => {
                   ref={(el) => {
                     registerItem(post.id)(el);
                     if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
+                    if (index === prefetchTriggerIndex) {
+                      prefetchSentinelRef.current = el;
+                    }
                   }}
                   data-feed-item-id={post.id}
                 >
