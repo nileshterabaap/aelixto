@@ -225,9 +225,9 @@ const Index = () => {
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
-                <h3 className="text-lg font-semibold">You're all caught up</h3>
+                <h3 className="text-lg font-semibold">No posts yet</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  You've seen all recent posts from people you follow.
+                  People you follow haven't posted anything yet. Check back soon.
                 </p>
               </div>
             )
