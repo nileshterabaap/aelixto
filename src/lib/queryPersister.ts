@@ -17,8 +17,7 @@ export const localStoragePersister = createSyncStoragePersister({
         queries: data.clientState.queries.filter((query) => {
           // Only persist feed and profile data, not session
           const key = query.queryKey[0];
-          return key === 'following-feed' || 
-                 key === 'profile' || 
+          return key === 'profile' || 
                  key === 'discover-posts' ||
                  key === 'posts' ||
                  key === 'user-profile' ||
