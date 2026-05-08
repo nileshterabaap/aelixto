@@ -41,6 +41,29 @@ const Index = () => {
     enabled: Boolean(user?.id),
     staleTime: 60_000,
   });
+
+  // Check if followings have any public posts at all (ignoring seen state).
+  // If yes but feed is empty → user has caught up on everything.
+  const { data: followingHasAnyPosts } = useQuery({
+    queryKey: ['following-has-posts', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return false;
+      const { data: follows } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', user.id);
+      const ids = (follows ?? []).map((f) => f.following_id);
+      ids.push(user.id);
+      const { count } = await supabase
+        .from('posts')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_public', true)
+        .in('user_id', ids);
+      return (count ?? 0) > 0;
+    },
+    enabled: Boolean(user?.id),
+    staleTime: 60_000,
+  });
   
   
   // Demo feed for signed-out users
@@ -221,6 +244,14 @@ const Index = () => {
                 <Link to="/discover" className="text-sm font-medium text-primary">
                   Discover people to follow
                 </Link>
+              </div>
+            ) : followingHasAnyPosts ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
+                <h3 className="text-lg font-semibold">You're all caught up</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  You've seen all recent posts from people you follow.
+                </p>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
