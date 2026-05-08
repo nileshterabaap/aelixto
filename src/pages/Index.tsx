@@ -180,8 +180,11 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Hard refresh — reload the app like a website refresh / app reopen
+    // Show the spinner spinning briefly before triggering a hard reload
+    await new Promise((resolve) => setTimeout(resolve, 600));
     window.location.reload();
+    // Keep the promise pending so the spinner stays visible until the page unloads
+    await new Promise(() => {});
   }, []);
 
   // Data-friendly invisible pagination: load the next page only when the
