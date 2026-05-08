@@ -140,8 +140,9 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed", user?.id] });
-  }, [queryClient, showDemoFeed, user?.id]);
+    // Hard refresh — reload the app like a website refresh / app reopen
+    window.location.reload();
+  }, []);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
@@ -195,19 +196,11 @@ const Index = () => {
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
-              <h2 className="text-xl font-semibold">Nothing here yet 👀</h2>
-              <p className="text-sm text-muted-foreground mt-2">
-                No algorithm should decide your feed..
-              </p>
+              <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
+              <h3 className="text-lg font-semibold">You're all caught up</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                only your follows do.
+                You've seen all recent posts from people you follow.
               </p>
-              <Link
-                to="/discover"
-                className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
-              >
-                Discover people to follow
-              </Link>
             </div>
           ) : (
             <div className="space-y-6">
