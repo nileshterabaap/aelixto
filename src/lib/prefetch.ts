@@ -64,6 +64,7 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
         is_repost: item.is_repost,
         reposted_by_user_id: item.reposted_by_user_id,
         reposted_by_username: item.reposted_by_username,
+        feed_cursor: item.feed_cursor,
         profiles: {
           username: item.profile_username,
           display_name: item.profile_display_name,
