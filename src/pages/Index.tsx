@@ -14,6 +14,8 @@ import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 import { SwipeableView } from "@/components/SwipeableView";
 const Index = () => {
@@ -24,6 +26,21 @@ const Index = () => {
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
   const { observePost } = useMarkPostSeen(user?.id);
+
+  // Check if the user follows anyone (to differentiate empty state)
+  const { data: followingCount } = useQuery({
+    queryKey: ['following-count', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return 0;
+      const { count } = await supabase
+        .from('follows')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_id', user.id);
+      return count ?? 0;
+    },
+    enabled: Boolean(user?.id),
+    staleTime: 60_000,
+  });
   
   
   // Demo feed for signed-out users
@@ -195,13 +212,25 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
-              <h3 className="text-lg font-semibold">You're all caught up</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                You've seen all recent posts from people you follow.
-              </p>
-            </div>
+            followingCount === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <h3 className="text-lg font-semibold">Your feed is empty</h3>
+                <p className="text-sm text-muted-foreground mt-1 mb-4">
+                  Follow people to see their posts here.
+                </p>
+                <Link to="/discover" className="text-sm font-medium text-primary">
+                  Discover people to follow
+                </Link>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
+                <h3 className="text-lg font-semibold">You're all caught up</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  You've seen all recent posts from people you follow.
+                </p>
+              </div>
+            )
           ) : (
             <div className="space-y-6">
               {allPosts.map((post, index) => (
