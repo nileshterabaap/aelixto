@@ -41,11 +41,28 @@ export const markPostsSeenImmediate = async (userId: string, postIds: string[]) 
 export const useMarkPostSeen = (userId: string | undefined) => {
   const pendingRef = useRef<Set<string>>(new Set());
   const viewTimers = useRef<Map<string, number>>(new Map());
+  const observersRef = useRef<Map<string, IntersectionObserver>>(new Map());
   // Posts currently intersecting the viewport (any visibility), so on
   // refresh we can also count posts the user is looking at right now
   // even if the 1.5s dwell hasn't fired yet.
   const visibleRef = useRef<Set<string>>(new Set());
   const flushing = useRef(false);
+
+  const clearPostTracking = useCallback((postId: string) => {
+    const observer = observersRef.current.get(postId);
+    if (observer) {
+      observer.disconnect();
+      observersRef.current.delete(postId);
+    }
+
+    const timer = viewTimers.current.get(postId);
+    if (timer) {
+      clearTimeout(timer);
+      viewTimers.current.delete(postId);
+    }
+
+    visibleRef.current.delete(postId);
+  }, []);
 
   // Flush pending seen posts to DB
   const flush = useCallback(async () => {
@@ -102,46 +119,53 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      observersRef.current.forEach((observer) => observer.disconnect());
+      observersRef.current.clear();
+      viewTimers.current.forEach((timer) => clearTimeout(timer));
+      viewTimers.current.clear();
+      visibleRef.current.clear();
       flush(); // flush remaining on unmount
     };
   }, [userId, flush]);
 
-  // Returns an IntersectionObserver callback ref for a post element
-  const observePost = useCallback(
-    (postId: string) => {
-      return (el: HTMLDivElement | null) => {
-        if (!el || !userId) return;
+  const setObservedPostElement = useCallback(
+    (postId: string, el: HTMLDivElement | null) => {
+      clearPostTracking(postId);
 
-        const observer = new IntersectionObserver(
-          ([entry]) => {
-            if (entry.isIntersecting) {
-              visibleRef.current.add(postId);
-              // Start timer when post becomes visible
-              if (!viewTimers.current.has(postId)) {
-                viewTimers.current.set(postId, window.setTimeout(() => {
-                  pendingRef.current.add(postId);
-                  viewTimers.current.delete(postId);
-                }, MIN_VIEW_TIME));
-              }
-            } else {
-              visibleRef.current.delete(postId);
-              // Cancel timer if post scrolls out before min time
-              const timer = viewTimers.current.get(postId);
-              if (timer) {
-                clearTimeout(timer);
+      if (!el || !userId) return;
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          const isVisible = entry.isIntersecting && entry.intersectionRatio >= VISIBILITY_THRESHOLD;
+
+          if (isVisible) {
+            visibleRef.current.add(postId);
+
+            if (!pendingRef.current.has(postId) && !viewTimers.current.has(postId)) {
+              viewTimers.current.set(postId, window.setTimeout(() => {
+                pendingRef.current.add(postId);
                 viewTimers.current.delete(postId);
-              }
+              }, MIN_VIEW_TIME));
             }
-          },
-          { threshold: VISIBILITY_THRESHOLD }
-        );
 
-        observer.observe(el);
-        (el as any).__seenObserver = observer;
-      };
+            return;
+          }
+
+          visibleRef.current.delete(postId);
+          const timer = viewTimers.current.get(postId);
+          if (timer) {
+            clearTimeout(timer);
+            viewTimers.current.delete(postId);
+          }
+        },
+        { threshold: [0, VISIBILITY_THRESHOLD, 1] }
+      );
+
+      observersRef.current.set(postId, observer);
+      observer.observe(el);
     },
-    [userId]
+    [clearPostTracking, userId]
   );
 
-  return { observePost, flushNow };
+  return { setObservedPostElement, flushNow };
 };

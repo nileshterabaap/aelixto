@@ -25,7 +25,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const { observePost, flushNow } = useMarkPostSeen(user?.id);
+  const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -180,19 +180,34 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-  // Mark only posts the user actually saw (viewed in viewport, including
-  // ones currently on screen) before reloading. Posts they never scrolled
-  // to will remain in the next feed.
-  try {
-    await flushNow();
-  } catch {
-    // best-effort — proceed with reload regardless
-  }
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  window.location.reload();
-  // Keep the promise pending so the spinner stays visible until the page unloads
-  await new Promise(() => {});
-}, [flushNow]);
+    // Mark only posts the user actually saw, then clear any persisted/stale
+    // feed cache so refresh always asks the backend for the latest eligible feed.
+    try {
+      await flushNow();
+    } catch {
+      // best-effort — proceed with reload regardless
+    }
+
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
+    ]);
+
+    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
+    ]);
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    window.location.reload();
+    await new Promise(() => {});
+  }, [flushNow, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
@@ -279,7 +294,9 @@ const Index = () => {
                   key={post.id} 
                   ref={(el) => {
                     registerItem(post.id)(el);
-                    if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
+                    if (!showDemoFeed) {
+                      setObservedPostElement(post.id, el as HTMLDivElement | null);
+                    }
                     if (index === prefetchTriggerIndex) {
                       prefetchSentinelRef.current = el;
                     }
