@@ -25,7 +25,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const { observePost, flushNow } = useMarkPostSeen(user?.id);
+  const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -279,7 +279,9 @@ const Index = () => {
                   key={post.id} 
                   ref={(el) => {
                     registerItem(post.id)(el);
-                    if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
+                    if (!showDemoFeed) {
+                      setObservedPostElement(post.id, el as HTMLDivElement | null);
+                    }
                     if (index === prefetchTriggerIndex) {
                       prefetchSentinelRef.current = el;
                     }
