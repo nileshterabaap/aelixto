@@ -36,7 +36,7 @@ const Index = () => {
     loading: followingLoading,
     loadMore,
     hasMore,
-  } = useFollowingFeed();
+  } = useFollowingFeed(user?.id);
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
   const isSignedOut = !user;
@@ -140,8 +140,8 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
-  }, [queryClient, showDemoFeed]);
+    await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed", user?.id] });
+  }, [queryClient, showDemoFeed, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
