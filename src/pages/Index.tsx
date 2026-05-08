@@ -12,7 +12,6 @@ import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
-import { markPostsSeenImmediate } from "@/hooks/useMarkPostSeen";
 
 import { useQueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -26,7 +25,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const { observePost } = useMarkPostSeen(user?.id);
+  const { observePost, flushNow } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -181,21 +180,19 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark every post currently loaded in the feed as seen so they
-    // disappear after refresh (Instagram-style "you've seen it" behavior).
-    if (user?.id && allPosts.length > 0) {
-      try {
-        await markPostsSeenImmediate(user.id, allPosts.map((p) => p.id));
-      } catch {
-        // best-effort — still proceed with reload
-      }
-    }
-    // Brief spinner moment, then hard reload
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    window.location.reload();
-    // Keep the promise pending so the spinner stays visible until the page unloads
-    await new Promise(() => {});
-  }, [user?.id, allPosts]);
+  // Mark only posts the user actually saw (viewed in viewport, including
+  // ones currently on screen) before reloading. Posts they never scrolled
+  // to will remain in the next feed.
+  try {
+    await flushNow();
+  } catch {
+    // best-effort — proceed with reload regardless
+  }
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  window.location.reload();
+  // Keep the promise pending so the spinner stays visible until the page unloads
+  await new Promise(() => {});
+}, [flushNow]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
