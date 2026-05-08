@@ -41,6 +41,10 @@ export const markPostsSeenImmediate = async (userId: string, postIds: string[]) 
 export const useMarkPostSeen = (userId: string | undefined) => {
   const pendingRef = useRef<Set<string>>(new Set());
   const viewTimers = useRef<Map<string, number>>(new Map());
+  // Posts currently intersecting the viewport (any visibility), so on
+  // refresh we can also count posts the user is looking at right now
+  // even if the 1.5s dwell hasn't fired yet.
+  const visibleRef = useRef<Set<string>>(new Set());
   const flushing = useRef(false);
 
   // Flush pending seen posts to DB
@@ -57,6 +61,29 @@ export const useMarkPostSeen = (userId: string | undefined) => {
       await supabase.from('post_seen').upsert(rows, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
     } catch (e) {
       // Re-add failed items back to pending
+      postIds.forEach((id) => pendingRef.current.add(id));
+    } finally {
+      flushing.current = false;
+    }
+  }, [userId]);
+
+  // Force-flush: include currently-visible posts and await DB write.
+  // Used by pull-to-refresh so anything the user actually saw disappears next load.
+  const flushNow = useCallback(async () => {
+    if (!userId) return;
+    visibleRef.current.forEach((id) => pendingRef.current.add(id));
+    if (pendingRef.current.size === 0) return;
+    // Wait for any in-flight flush to finish
+    while (flushing.current) {
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    flushing.current = true;
+    const postIds = Array.from(pendingRef.current);
+    pendingRef.current.clear();
+    try {
+      const rows = postIds.map((post_id) => ({ user_id: userId, post_id }));
+      await supabase.from('post_seen').upsert(rows, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
+    } catch {
       postIds.forEach((id) => pendingRef.current.add(id));
     } finally {
       flushing.current = false;
@@ -88,6 +115,7 @@ export const useMarkPostSeen = (userId: string | undefined) => {
         const observer = new IntersectionObserver(
           ([entry]) => {
             if (entry.isIntersecting) {
+              visibleRef.current.add(postId);
               // Start timer when post becomes visible
               if (!viewTimers.current.has(postId)) {
                 viewTimers.current.set(postId, window.setTimeout(() => {
@@ -96,6 +124,7 @@ export const useMarkPostSeen = (userId: string | undefined) => {
                 }, MIN_VIEW_TIME));
               }
             } else {
+              visibleRef.current.delete(postId);
               // Cancel timer if post scrolls out before min time
               const timer = viewTimers.current.get(postId);
               if (timer) {
@@ -114,5 +143,5 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     [userId]
   );
 
-  return { observePost };
+  return { observePost, flushNow };
 };
