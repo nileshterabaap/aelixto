@@ -262,9 +262,9 @@ const Index = () => {
           {!showDemoFeed && followingEmpty ? (
             followingCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <h3 className="text-lg font-semibold">Your feed is empty</h3>
+                <h3 className="text-lg font-semibold">Nothing here yet 👀</h3>
                 <p className="text-sm text-muted-foreground mt-1 mb-4">
-                  Follow people to see their posts here.
+                  No algorithm should decide your feed.. only your follows do.
                 </p>
                 <Link to="/discover" className="text-sm font-medium text-primary">
                   Discover people to follow
