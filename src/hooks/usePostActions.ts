@@ -143,6 +143,14 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
     mutationFn: async () => {
       if (!userId) throw new Error("Not authenticated");
 
+      // Fetch created_at first so we can decide whether to refund the daily credit
+      const { data: existing } = await supabase
+        .from("posts")
+        .select("created_at")
+        .eq("id", postId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
       const { error } = await supabase
         .from("posts")
         .delete()
@@ -150,10 +158,22 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
         .eq("user_id", userId);
 
       if (error) throw error;
+
+      return { createdAt: existing?.created_at as string | undefined };
     },
-    onSuccess: () => {
-      // Refund the daily post credit so the user gets it back
-      try { decrementDailyCount(); } catch { /* ignore */ }
+    onSuccess: (result) => {
+      // Refund the daily post credit only if the post was created today (same local day)
+      let refunded = false;
+      try {
+        if (result?.createdAt) {
+          const createdLocal = new Date(result.createdAt).toLocaleDateString();
+          const todayLocal = new Date().toLocaleDateString();
+          if (createdLocal === todayLocal) {
+            decrementDailyCount();
+            refunded = true;
+          }
+        }
+      } catch { /* ignore */ }
 
       // Invalidate every cache that may contain this post so the UI updates immediately
       queryClient.invalidateQueries({ queryKey: ["posts"] });
@@ -163,7 +183,12 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
       queryClient.invalidateQueries({ queryKey: ["user-posts"] });
       queryClient.invalidateQueries({ queryKey: ["profile-posts"] });
 
-      toast({ title: "Post deleted", description: "Your post has been removed. Daily credit refunded." });
+      toast({
+        title: "Post deleted",
+        description: refunded
+          ? "Your post has been removed. Daily credit refunded."
+          : "Your post has been removed.",
+      });
     },
     onError: () => {
       toast({ 
