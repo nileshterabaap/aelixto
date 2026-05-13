@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 
 export const usePostActions = (postId: string, userId: string | undefined) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { decrement: decrementDailyCount } = useDailyPostLimit();
 
   // Check if post is liked
   const { data: isLiked } = useQuery({
@@ -150,8 +152,18 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
       if (error) throw error;
     },
     onSuccess: () => {
+      // Refund the daily post credit so the user gets it back
+      try { decrementDailyCount(); } catch { /* ignore */ }
+
+      // Invalidate every cache that may contain this post so the UI updates immediately
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-      toast({ title: "Post deleted", description: "Your post has been removed" });
+      queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+      queryClient.invalidateQueries({ queryKey: ["platform-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["saved-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["user-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["profile-posts"] });
+
+      toast({ title: "Post deleted", description: "Your post has been removed. Daily credit refunded." });
     },
     onError: () => {
       toast({ 
