@@ -100,12 +100,12 @@ className="h-14 w-14"
           className="cursor-pointer select-none"
           style={{ perspective: "800px" }}
           onClick={() => {
-            if (flipped || flipInProgress.current) return;
             if (window.location.pathname === '/') {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
               navigate('/');
             }
+            triggerFlip();
           }}
           onTouchStart={(e) => {
             touchStartY.current = e.touches[0]?.clientY ?? null;
@@ -138,13 +138,6 @@ className="h-14 w-14"
             <h1
               className="absolute inset-0 flex items-center justify-center text-3xl font-bold tracking-tight"
               style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
-              onClick={(e) => {
-                // Single tap also flips when on home (already at top)
-                if (window.location.pathname === '/' && window.scrollY <= 4) {
-                  e.stopPropagation();
-                  triggerFlip();
-                }
-              }}
             >
               Aelixto
             </h1>
