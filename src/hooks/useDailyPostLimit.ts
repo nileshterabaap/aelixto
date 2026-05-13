@@ -68,8 +68,19 @@ export const useDailyPostLimit = () => {
     window.dispatchEvent(new Event(EVENT));
   }, []);
 
+  const decrement = useCallback(() => {
+    const current = readState();
+    const next: StoredState = {
+      date: current.date,
+      count: Math.max(0, current.count - 1),
+    };
+    writeState(next);
+    setState(next);
+    window.dispatchEvent(new Event(EVENT));
+  }, []);
+
   const remaining = Math.max(0, DAILY_POST_LIMIT - state.count);
   const reached = state.count >= DAILY_POST_LIMIT;
 
-  return { count: state.count, remaining, limit: DAILY_POST_LIMIT, reached, increment };
+  return { count: state.count, remaining, limit: DAILY_POST_LIMIT, reached, increment, decrement };
 };
