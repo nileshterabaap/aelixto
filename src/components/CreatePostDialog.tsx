@@ -10,6 +10,7 @@ import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
+import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -32,6 +33,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const createPost = useCreatePost();
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
+  const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
 
   // Hydrate from existing draft when opening
   useEffect(() => {
@@ -188,6 +190,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const handlePost = () => {
     if (!linkUrl.trim()) return;
 
+    if (limitReached) {
+      toast.error(`You've reached your ${limit} post limit for today. Resets at midnight.`);
+      return;
+    }
+
     // Use centralised classification
     const platform = classifyUrl(linkUrl, ogType);
     const mediaType = deriveMediaType(linkUrl, platform);
@@ -222,6 +229,10 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       platform: platform,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
+    }, {
+      onSuccess: () => {
+        incrementDailyCount();
+      },
     });
 
     // If posted from a draft, remove it
