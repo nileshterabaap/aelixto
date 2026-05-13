@@ -526,7 +526,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           <motion.div whileTap={{ scale: 0.98 }}>
                             <Button
                               onClick={handlePost}
-                              disabled={submitState !== null}
+                              disabled={submitState !== null || limitReached}
                               className="h-12 w-full rounded-[22px] bg-foreground text-background shadow-[0_18px_38px_-26px_hsl(var(--foreground)/0.9)] hover:bg-foreground/90"
                             >
                               {submitState === "post" ? (
@@ -538,11 +538,22 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                                 >
                                   <Check className="mr-1.5 h-5 w-5" /> Posted
                                 </motion.span>
+                              ) : limitReached ? (
+                                "Daily limit reached"
                               ) : (
                                 "Post"
                               )}
                             </Button>
                           </motion.div>
+                          {limitReached ? (
+                            <p className="text-center text-xs text-muted-foreground">
+                              You've reached your {limit} post limit for today. Resets at midnight.
+                            </p>
+                          ) : (
+                            <p className="text-center text-xs text-muted-foreground">
+                              {remaining} of {limit} posts remaining today
+                            </p>
+                          )}
                           <motion.div whileTap={{ scale: 0.98 }}>
                             <Button
                               onClick={handleSaveAsDraft}
