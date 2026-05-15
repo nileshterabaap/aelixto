@@ -15,6 +15,15 @@ const nativeLovableAuth = createLovableAuth({
   oauthBrokerUrl: "https://aelixto.com/~oauth/initiate",
 });
 
+const GoogleIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.51h6.44c-.28 1.4-1.07 2.59-2.29 3.39v2.82h3.71c2.16-2 3.41-4.96 3.41-8.45z"/>
+    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.71-2.82c-1.03.69-2.34 1.1-3.92 1.1-3.01 0-5.56-2.03-6.47-4.76H1.99v2.91C3.96 21.3 7.7 24 12 24z"/>
+    <path fill="#FBBC05" d="M5.53 14.61c-.23-.69-.36-1.43-.36-2.18s.13-1.49.36-2.18V7.34H1.99C1.27 8.78.86 10.35.86 12s.41 3.22 1.13 4.66l3.54-2.05z"/>
+    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.29-3.29C17.95 1.36 15.24 0 12 0 7.7 0 3.96 2.7 1.99 6.66l3.54 2.91C6.44 6.78 8.99 4.75 12 4.75z"/>
+  </svg>
+);
+
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
