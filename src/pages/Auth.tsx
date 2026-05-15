@@ -15,6 +15,15 @@ const nativeLovableAuth = createLovableAuth({
   oauthBrokerUrl: "https://aelixto.com/~oauth/initiate",
 });
 
+const GoogleIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+    <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.51h6.44c-.28 1.4-1.07 2.59-2.29 3.39v2.82h3.71c2.16-2 3.41-4.96 3.41-8.45z"/>
+    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.71-2.82c-1.03.69-2.34 1.1-3.92 1.1-3.01 0-5.56-2.03-6.47-4.76H1.99v2.91C3.96 21.3 7.7 24 12 24z"/>
+    <path fill="#FBBC05" d="M5.53 14.61c-.23-.69-.36-1.43-.36-2.18s.13-1.49.36-2.18V7.34H1.99C1.27 8.78.86 10.35.86 12s.41 3.22 1.13 4.66l3.54-2.05z"/>
+    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.29-3.29C17.95 1.36 15.24 0 12 0 7.7 0 3.96 2.7 1.99 6.66l3.54 2.91C6.44 6.78 8.99 4.75 12 4.75z"/>
+  </svg>
+);
+
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -22,6 +31,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const [usernameValue, setUsernameValue] = useState("");
+  const [signinIdentifier, setSigninIdentifier] = useState("");
 
   useEffect(() => {
     const checkUser = async () => {
@@ -66,13 +76,29 @@ const Auth = () => {
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const email = formData.get("signin-email") as string;
+    const identifier = (formData.get("signin-identifier") as string)?.trim();
     const password = formData.get("signin-password") as string;
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    // Resolve username -> email if the identifier is not an email
+    let email = identifier;
+    if (!identifier.includes("@")) {
+      const handle = identifier.startsWith("@") ? identifier.slice(1) : identifier;
+      const { data: resolved, error: rpcError } = await supabase.rpc("get_email_for_username", {
+        _username: handle,
+      });
+      if (rpcError || !resolved) {
+        setLoading(false);
+        toast({
+          title: "Sign in failed",
+          description: "No account found with this username.",
+          variant: "destructive",
+        });
+        return;
+      }
+      email = resolved as string;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     setLoading(false);
 
@@ -82,7 +108,7 @@ const Auth = () => {
       toast({
         title: "Sign in failed",
         description: isNoUser
-          ? "No account found with this email or the password is incorrect."
+          ? "Incorrect password, or no account found for this email/username."
           : error.message,
         variant: "destructive",
       });
@@ -122,7 +148,21 @@ const Auth = () => {
     }
   };
 
-  const handleForgotPassword = async (email: string) => {
+  const handleForgotPassword = async (identifier: string) => {
+    let email = identifier.trim();
+    if (email && !email.includes("@")) {
+      const handle = email.startsWith("@") ? email.slice(1) : email;
+      const { data: resolved } = await supabase.rpc("get_email_for_username", { _username: handle });
+      if (!resolved) {
+        toast({
+          title: "Account not found",
+          description: "We couldn't find an account for that username.",
+          variant: "destructive",
+        });
+        return;
+      }
+      email = resolved as string;
+    }
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth`,
@@ -213,20 +253,40 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
+    <div className="relative min-h-screen flex items-center justify-center bg-background p-5 overflow-hidden">
+      {/* Brand ambient glow */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 h-[420px] w-[420px] rounded-full opacity-60 blur-3xl"
+        style={{ background: "var(--gradient-aelixto)" }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-40 -right-20 h-[320px] w-[320px] rounded-full opacity-30 blur-3xl"
+        style={{ background: "radial-gradient(circle, hsl(var(--brand-blue)) 0%, transparent 70%)" }}
+      />
+
+      <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2">Welcome</h1>
-          <p className="text-muted-foreground">Sign in or create an account to continue</p>
+          <h1
+            className="text-6xl font-extrabold tracking-tight mb-3 bg-clip-text text-transparent"
+            style={{ backgroundImage: "var(--gradient-aelixto)" }}
+          >
+            Aelixto
+          </h1>
+          <p className="text-muted-foreground text-base">
+            Your feed. Your follows. No algorithm.
+          </p>
         </div>
 
+        <div className="rounded-3xl border border-border/10 bg-card/80 backdrop-blur-xl shadow-[0_20px_60px_-20px_hsl(var(--brand-blue)/0.25)] p-6">
         <Tabs defaultValue="signup" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-2 rounded-full bg-secondary p-1 h-12">
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
             <TabsTrigger value="signin">Sign In</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="signup">
+          <TabsContent value="signup" className="mt-6">
             <form onSubmit={handleSignUp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
@@ -256,7 +316,11 @@ const Auth = () => {
                 <Label htmlFor="signup-password">Password</Label>
                 <Input id="signup-password" name="signup-password" type="password" placeholder="••••••••" required minLength={6} />
               </div>
-              <Button type="submit" className="w-full" disabled={loading || usernameStatus === "taken"}>
+              <Button
+                type="submit"
+                className="w-full h-12 rounded-full text-base font-semibold shadow-lg"
+                disabled={loading || usernameStatus === "taken"}
+              >
                 {loading ? "Creating account..." : "Create Account"}
               </Button>
 
@@ -265,27 +329,49 @@ const Auth = () => {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or</span>
+                  <span className="bg-card px-2 text-muted-foreground">Or</span>
                 </div>
               </div>
 
-              <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={loading}>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-12 rounded-full text-base font-medium gap-2"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+              >
+                <GoogleIcon />
                 Continue with Google
               </Button>
             </form>
           </TabsContent>
 
-          <TabsContent value="signin">
+          <TabsContent value="signin" className="mt-6">
             <form onSubmit={handleSignIn} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="signin-email">Email</Label>
-                <Input id="signin-email" name="signin-email" type="email" placeholder="you@example.com" required />
+                <Label htmlFor="signin-identifier">Email or username</Label>
+                <Input
+                  id="signin-identifier"
+                  name="signin-identifier"
+                  type="text"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="you@example.com or @username"
+                  value={signinIdentifier}
+                  onChange={(e) => setSigninIdentifier(e.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signin-password">Password</Label>
                 <Input id="signin-password" name="signin-password" type="password" placeholder="••••••••" required />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full h-12 rounded-full text-base font-semibold shadow-lg"
+                disabled={loading}
+              >
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
 
@@ -294,11 +380,10 @@ const Auth = () => {
                 variant="link"
                 className="w-full text-sm text-muted-foreground"
                 onClick={() => {
-                  const email = (document.getElementById('signin-email') as HTMLInputElement)?.value;
-                  if (email) {
-                    handleForgotPassword(email);
+                  if (signinIdentifier) {
+                    handleForgotPassword(signinIdentifier);
                   } else {
-                    toast({ title: "Email required", description: "Please enter your email address first.", variant: "destructive" });
+                    toast({ title: "Email required", description: "Please enter your email above first.", variant: "destructive" });
                   }
                 }}
                 disabled={loading}
@@ -311,16 +396,30 @@ const Auth = () => {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or</span>
+                  <span className="bg-card px-2 text-muted-foreground">Or</span>
                 </div>
               </div>
 
-              <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={loading}>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-12 rounded-full text-base font-medium gap-2"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+              >
+                <GoogleIcon />
                 Continue with Google
               </Button>
             </form>
           </TabsContent>
         </Tabs>
+        </div>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground px-4 leading-relaxed">
+          By continuing, you agree to Aelixto's{" "}
+          <a href="/terms" className="underline underline-offset-2">Terms</a> and{" "}
+          <a href="/privacy" className="underline underline-offset-2">Privacy Policy</a>.
+        </p>
       </div>
     </div>
   );
