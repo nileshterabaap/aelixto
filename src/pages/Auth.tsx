@@ -244,20 +244,40 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
+    <div className="relative min-h-screen flex items-center justify-center bg-background p-5 overflow-hidden">
+      {/* Brand ambient glow */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 h-[420px] w-[420px] rounded-full opacity-60 blur-3xl"
+        style={{ background: "var(--gradient-aelixto)" }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -bottom-40 -right-20 h-[320px] w-[320px] rounded-full opacity-30 blur-3xl"
+        style={{ background: "radial-gradient(circle, hsl(var(--brand-blue)) 0%, transparent 70%)" }}
+      />
+
+      <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2">Welcome</h1>
-          <p className="text-muted-foreground">Sign in or create an account to continue</p>
+          <h1
+            className="text-6xl font-extrabold tracking-tight mb-3 bg-clip-text text-transparent"
+            style={{ backgroundImage: "var(--gradient-aelixto)" }}
+          >
+            Aelixto
+          </h1>
+          <p className="text-muted-foreground text-base">
+            Your feed. Your follows. No algorithm.
+          </p>
         </div>
 
+        <div className="rounded-3xl border border-border/10 bg-card/80 backdrop-blur-xl shadow-[0_20px_60px_-20px_hsl(var(--brand-blue)/0.25)] p-6">
         <Tabs defaultValue="signup" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-2 rounded-full bg-secondary p-1 h-12">
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
             <TabsTrigger value="signin">Sign In</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="signup">
+          <TabsContent value="signup" className="mt-6">
             <form onSubmit={handleSignUp} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
@@ -287,7 +307,11 @@ const Auth = () => {
                 <Label htmlFor="signup-password">Password</Label>
                 <Input id="signup-password" name="signup-password" type="password" placeholder="••••••••" required minLength={6} />
               </div>
-              <Button type="submit" className="w-full" disabled={loading || usernameStatus === "taken"}>
+              <Button
+                type="submit"
+                className="w-full h-12 rounded-full text-base font-semibold shadow-lg"
+                disabled={loading || usernameStatus === "taken"}
+              >
                 {loading ? "Creating account..." : "Create Account"}
               </Button>
 
@@ -296,27 +320,49 @@ const Auth = () => {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or</span>
+                  <span className="bg-card px-2 text-muted-foreground">Or</span>
                 </div>
               </div>
 
-              <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={loading}>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-12 rounded-full text-base font-medium gap-2"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+              >
+                <GoogleIcon />
                 Continue with Google
               </Button>
             </form>
           </TabsContent>
 
-          <TabsContent value="signin">
+          <TabsContent value="signin" className="mt-6">
             <form onSubmit={handleSignIn} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="signin-email">Email</Label>
-                <Input id="signin-email" name="signin-email" type="email" placeholder="you@example.com" required />
+                <Label htmlFor="signin-identifier">Email or username</Label>
+                <Input
+                  id="signin-identifier"
+                  name="signin-identifier"
+                  type="text"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  placeholder="you@example.com or @username"
+                  value={signinIdentifier}
+                  onChange={(e) => setSigninIdentifier(e.target.value)}
+                  required
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signin-password">Password</Label>
                 <Input id="signin-password" name="signin-password" type="password" placeholder="••••••••" required />
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button
+                type="submit"
+                className="w-full h-12 rounded-full text-base font-semibold shadow-lg"
+                disabled={loading}
+              >
                 {loading ? "Signing in..." : "Sign In"}
               </Button>
 
@@ -325,11 +371,10 @@ const Auth = () => {
                 variant="link"
                 className="w-full text-sm text-muted-foreground"
                 onClick={() => {
-                  const email = (document.getElementById('signin-email') as HTMLInputElement)?.value;
-                  if (email) {
-                    handleForgotPassword(email);
+                  if (signinIdentifier) {
+                    handleForgotPassword(signinIdentifier);
                   } else {
-                    toast({ title: "Email required", description: "Please enter your email address first.", variant: "destructive" });
+                    toast({ title: "Email required", description: "Please enter your email above first.", variant: "destructive" });
                   }
                 }}
                 disabled={loading}
@@ -342,16 +387,30 @@ const Auth = () => {
                   <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or</span>
+                  <span className="bg-card px-2 text-muted-foreground">Or</span>
                 </div>
               </div>
 
-              <Button type="button" variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={loading}>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-12 rounded-full text-base font-medium gap-2"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+              >
+                <GoogleIcon />
                 Continue with Google
               </Button>
             </form>
           </TabsContent>
         </Tabs>
+        </div>
+
+        <p className="mt-6 text-center text-xs text-muted-foreground px-4 leading-relaxed">
+          By continuing, you agree to Aelixto's{" "}
+          <a href="/terms" className="underline underline-offset-2">Terms</a> and{" "}
+          <a href="/privacy" className="underline underline-offset-2">Privacy Policy</a>.
+        </p>
       </div>
     </div>
   );
