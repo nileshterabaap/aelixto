@@ -1005,6 +1005,7 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
+      get_email_for_username: { Args: { _username: string }; Returns: string }
       get_following_count: { Args: never; Returns: number }
       get_following_feed: {
         Args: { cursor?: string; limit_count: number }
