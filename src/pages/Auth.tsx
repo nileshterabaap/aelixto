@@ -22,6 +22,7 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const [usernameValue, setUsernameValue] = useState("");
+  const [signinIdentifier, setSigninIdentifier] = useState("");
 
   useEffect(() => {
     const checkUser = async () => {
@@ -66,13 +67,29 @@ const Auth = () => {
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
-    const email = formData.get("signin-email") as string;
+    const identifier = (formData.get("signin-identifier") as string)?.trim();
     const password = formData.get("signin-password") as string;
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    // Resolve username -> email if the identifier is not an email
+    let email = identifier;
+    if (!identifier.includes("@")) {
+      const handle = identifier.startsWith("@") ? identifier.slice(1) : identifier;
+      const { data: resolved, error: rpcError } = await supabase.rpc("get_email_for_username", {
+        _username: handle,
+      });
+      if (rpcError || !resolved) {
+        setLoading(false);
+        toast({
+          title: "Sign in failed",
+          description: "No account found with this username.",
+          variant: "destructive",
+        });
+        return;
+      }
+      email = resolved as string;
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     setLoading(false);
 
@@ -82,7 +99,7 @@ const Auth = () => {
       toast({
         title: "Sign in failed",
         description: isNoUser
-          ? "No account found with this email or the password is incorrect."
+          ? "Incorrect password, or no account found for this email/username."
           : error.message,
         variant: "destructive",
       });
@@ -122,7 +139,21 @@ const Auth = () => {
     }
   };
 
-  const handleForgotPassword = async (email: string) => {
+  const handleForgotPassword = async (identifier: string) => {
+    let email = identifier.trim();
+    if (email && !email.includes("@")) {
+      const handle = email.startsWith("@") ? email.slice(1) : email;
+      const { data: resolved } = await supabase.rpc("get_email_for_username", { _username: handle });
+      if (!resolved) {
+        toast({
+          title: "Account not found",
+          description: "We couldn't find an account for that username.",
+          variant: "destructive",
+        });
+        return;
+      }
+      email = resolved as string;
+    }
     setLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth`,
