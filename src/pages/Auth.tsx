@@ -254,29 +254,11 @@ const Auth = () => {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-background p-5 overflow-hidden">
-      {/* Brand ambient glow */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -top-32 left-1/2 -translate-x-1/2 h-[420px] w-[420px] rounded-full opacity-60 blur-3xl"
-        style={{ background: "var(--gradient-aelixto)" }}
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-40 -right-20 h-[320px] w-[320px] rounded-full opacity-30 blur-3xl"
-        style={{ background: "radial-gradient(circle, hsl(var(--brand-blue)) 0%, transparent 70%)" }}
-      />
-
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
-          <h1
-            className="text-6xl font-extrabold tracking-tight mb-3 bg-clip-text text-transparent"
-            style={{ backgroundImage: "var(--gradient-aelixto)" }}
-          >
+          <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
             Aelixto
           </h1>
-          <p className="text-muted-foreground text-base">
-            Your feed. Your follows. No algorithm.
-          </p>
         </div>
 
         <div className="rounded-3xl border border-border/10 bg-card/80 backdrop-blur-xl shadow-[0_20px_60px_-20px_hsl(var(--brand-blue)/0.25)] p-6">
