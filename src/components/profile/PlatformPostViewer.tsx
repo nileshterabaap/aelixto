@@ -91,17 +91,38 @@ export const PlatformPostViewer = ({
     fetchProfile();
   }, [userId]);
 
-  // Scroll to initial post when items load
+  // Scroll to initial post when items load. Posts above the target hydrate
+  // and grow in height, which would push the target down. Re-anchor on every
+  // animation frame for ~1.8s, or until the user starts scrolling.
   useEffect(() => {
-    if (items.length > 0 && initialPostId) {
-      // Small delay to ensure refs are set
-      setTimeout(() => {
-        const targetRef = postRefs.current.get(initialPostId);
-        if (targetRef) {
-          targetRef.scrollIntoView({ behavior: "auto", block: "start" });
+    if (items.length === 0 || !initialPostId) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    let cancelled = false;
+    const stopAt = performance.now() + 1800;
+
+    const onUserScroll = () => { cancelled = true; };
+    const cancelEvents = ["wheel", "touchstart", "keydown"] as const;
+    cancelEvents.forEach(e => container.addEventListener(e, onUserScroll, { passive: true }));
+
+    const tick = () => {
+      if (cancelled) return;
+      const target = postRefs.current.get(initialPostId);
+      if (target) {
+        const desired = target.offsetTop;
+        if (Math.abs(container.scrollTop - desired) > 1) {
+          container.scrollTop = desired;
         }
-      }, 100);
-    }
+      }
+      if (performance.now() < stopAt) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+
+    return () => {
+      cancelled = true;
+      cancelEvents.forEach(e => container.removeEventListener(e, onUserScroll));
+    };
   }, [items, initialPostId, activeTab]);
 
   // Mark all visible posts as seen when viewing profile posts
@@ -220,7 +241,7 @@ export const PlatformPostViewer = ({
                   startHydrated={(() => {
                     const idx = items.findIndex(p => p.id === initialPostId);
                     const postIdx = items.findIndex(p => p.id === post.id);
-                    return idx >= 0 && Math.abs(postIdx - idx) <= 1;
+                    return idx >= 0 && Math.abs(postIdx - idx) <= 5;
                   })()}
                 />
               </div>
