@@ -37,12 +37,36 @@ export const SavedPostViewer = ({
   onClose,
 }: SavedPostViewerProps) => {
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Keep the target anchored while posts above hydrate and resize.
   useEffect(() => {
-    setTimeout(() => {
-      const el = postRefs.current.get(initialPostId);
-      if (el) el.scrollIntoView({ behavior: "auto", block: "start" });
-    }, 100);
+    const container = scrollContainerRef.current;
+    if (!container || !initialPostId) return;
+
+    let cancelled = false;
+    const stopAt = performance.now() + 1800;
+    const onUserScroll = () => { cancelled = true; };
+    const evts = ["wheel", "touchstart", "keydown"] as const;
+    evts.forEach(e => container.addEventListener(e, onUserScroll, { passive: true }));
+
+    const tick = () => {
+      if (cancelled) return;
+      const target = postRefs.current.get(initialPostId);
+      if (target) {
+        const desired = target.offsetTop;
+        if (Math.abs(container.scrollTop - desired) > 1) {
+          container.scrollTop = desired;
+        }
+      }
+      if (performance.now() < stopAt) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+
+    return () => {
+      cancelled = true;
+      evts.forEach(e => container.removeEventListener(e, onUserScroll));
+    };
   }, [initialPostId]);
 
   // Mark all viewed saved posts as seen
@@ -72,11 +96,11 @@ export const SavedPostViewer = ({
       </div>
 
       {/* Scrollable posts */}
-      <div className="h-[calc(100vh-56px)] overflow-y-auto pb-8">
+      <div ref={scrollContainerRef} className="h-[calc(100vh-56px)] overflow-y-auto pb-8">
         <div className="mx-auto max-w-2xl px-4 py-4 space-y-6">
           {posts.map((post, idx) => {
             const initialIdx = posts.findIndex(p => p.id === initialPostId);
-            const shouldHydrate = initialIdx >= 0 && Math.abs(idx - initialIdx) <= 1;
+            const shouldHydrate = initialIdx >= 0 && Math.abs(idx - initialIdx) <= 5;
 
             return (
               <div
