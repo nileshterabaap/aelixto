@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Link2, Search, Check, Loader2 } from "lucide-react";
+import { buildShortUrl, buildPostPath } from "@/lib/shortUrl";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { useToast } from "@/hooks/use-toast";
@@ -199,8 +200,8 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
     [user, postId, sending, sent, toast]
   );
 
-  const handleCopyLink = () => {
-    const url = `${window.location.origin}/post/${postId}`;
+  const handleCopyLink = async () => {
+    const url = await buildShortUrl(buildPostPath(postId));
     navigator.clipboard.writeText(url);
     toast({ title: "Link copied!" });
   };
