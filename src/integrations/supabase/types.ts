@@ -947,6 +947,27 @@ export type Database = {
           },
         ]
       }
+      short_links: {
+        Row: {
+          click_count: number
+          code: string
+          created_at: string
+          target_path: string
+        }
+        Insert: {
+          click_count?: number
+          code: string
+          created_at?: string
+          target_path: string
+        }
+        Update: {
+          click_count?: number
+          code?: string
+          created_at?: string
+          target_path?: string
+        }
+        Relationships: []
+      }
       suppressed_emails: {
         Row: {
           created_at: string
@@ -997,6 +1018,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_short_link: { Args: { p_target_path: string }; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean

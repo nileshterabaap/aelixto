@@ -18,6 +18,7 @@ import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { FollowListDialog } from "@/components/profile/FollowListDialog";
 import { ProfileOptionsMenu } from "@/components/profile/ProfileOptionsMenu";
+import { AuthCTABar } from "@/components/AuthCTABar";
 
 interface UserProfileProps {
   usernameOverride?: string;
@@ -331,8 +332,12 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
       </main>
       </PullToRefresh>
 
-      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
-      
+      {user ? (
+        <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
+      ) : (
+        <AuthCTABar />
+      )}
+
       <CreatePostDialog 
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen}
