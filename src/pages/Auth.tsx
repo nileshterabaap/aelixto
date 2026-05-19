@@ -262,7 +262,15 @@ const Auth = () => {
         </div>
 
         <div className="rounded-3xl border border-border/10 bg-card/80 backdrop-blur-xl shadow-[0_20px_60px_-20px_hsl(var(--brand-blue)/0.25)] p-6">
-        <Tabs defaultValue="signup" className="w-full">
+        <Tabs
+          defaultValue={
+            typeof window !== "undefined" &&
+            new URLSearchParams(window.location.search).get("mode") === "login"
+              ? "signin"
+              : "signup"
+          }
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-2 rounded-full bg-secondary p-1 h-12">
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
             <TabsTrigger value="signin">Sign In</TabsTrigger>
