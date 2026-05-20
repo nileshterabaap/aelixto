@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
@@ -91,7 +91,7 @@ export const SavedPostViewer = ({
     pendingPrependAnchor.current = null;
   }, [range.start]);
 
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -108,7 +108,11 @@ export const SavedPostViewer = ({
     if (distanceFromBottom < EXPAND_EDGE_PX && range.end < posts.length - 1) {
       setRange(current => ({ ...current, end: Math.min(posts.length - 1, current.end + WINDOW_STEP) }));
     }
-  };
+  }, [posts.length, range.end, range.start, visiblePosts]);
+
+  useEffect(() => {
+    handleScroll();
+  }, [handleScroll]);
 
   // Keep the target anchored while posts above hydrate and resize.
   // The loop only runs after the target ref is mounted, and stops as soon as
