@@ -157,7 +157,7 @@ export const SavedPostViewer = ({
       cancelled = true;
       evts.forEach(e => container.removeEventListener(e, onUserScroll));
     };
-  }, [initialPostId, hasTarget]);
+  }, [initialPostId, hasTarget, range.start]);
 
   // Mark all viewed saved posts as seen
   useEffect(() => {
