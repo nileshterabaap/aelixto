@@ -14,7 +14,7 @@ interface SavedPost {
   platform?: string;
   embed_html?: string;
   thumbnail_url?: string;
-  timestamp: Date;
+  timestamp: Date | string;
   likes: number;
   comments: number;
   shares: number;
@@ -38,6 +38,12 @@ export const SavedPostViewer = ({
 }: SavedPostViewerProps) => {
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const normalizeTimestamp = (value: Date | string) => {
+    if (value instanceof Date) return value;
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+  };
 
   // Confirm the target post exists in the list. If not, we still render the
   // list (avoid a blank modal) and skip anchoring.
@@ -137,6 +143,7 @@ export const SavedPostViewer = ({
                 <HydratedFeedPost
                   post={{
                     ...post,
+                    timestamp: normalizeTimestamp(post.timestamp),
                     likes_count: post.likes || 0,
                     comments_count: post.comments || 0,
                     reposts_count: post.shares || 0,
