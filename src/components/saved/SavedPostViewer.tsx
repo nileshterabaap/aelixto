@@ -186,12 +186,12 @@ export const SavedPostViewer = ({
       </div>
 
       {/* Scrollable posts */}
-      <div ref={scrollContainerRef} className="h-[calc(100vh-56px)] overflow-y-auto pb-8">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="h-[calc(100vh-56px)] overflow-y-auto pb-8">
         <div className="mx-auto max-w-2xl px-4 py-4 space-y-6">
           {(() => {
-            const initialIdx = posts.findIndex(p => p.id === initialPostId);
-            return posts.map((post, idx) => {
-              const shouldHydrate = initialIdx >= 0 && Math.abs(idx - initialIdx) <= 5;
+            return visiblePosts.map((post, visibleIdx) => {
+              const absoluteIdx = range.start + visibleIdx;
+              const shouldHydrate = initialIdx >= 0 && Math.abs(absoluteIdx - initialIdx) <= 5;
 
               return (
                 <div
