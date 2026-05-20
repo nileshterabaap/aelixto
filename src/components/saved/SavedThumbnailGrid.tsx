@@ -44,7 +44,7 @@ export interface SavedPost {
   platform?: string;
   embed_html?: string;
   thumbnail_url?: string;
-  timestamp: Date;
+  timestamp: Date | string;
   likes: number;
   comments: number;
   shares: number;
