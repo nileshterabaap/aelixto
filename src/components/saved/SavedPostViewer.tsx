@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
@@ -30,6 +30,19 @@ interface SavedPostViewerProps {
   onClose: () => void;
 }
 
+const WINDOW_RADIUS = 6;
+const WINDOW_STEP = 6;
+const EXPAND_EDGE_PX = 900;
+
+const getInitialRange = (length: number, index: number) => {
+  if (length === 0) return { start: 0, end: -1 };
+  const safeIndex = index >= 0 ? index : 0;
+  return {
+    start: Math.max(0, safeIndex - WINDOW_RADIUS),
+    end: Math.min(length - 1, safeIndex + WINDOW_RADIUS),
+  };
+};
+
 export const SavedPostViewer = ({
   posts,
   initialPostId,
@@ -38,6 +51,17 @@ export const SavedPostViewer = ({
 }: SavedPostViewerProps) => {
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const pendingPrependAnchor = useRef<{ postId: string; top: number } | null>(null);
+
+  const initialIdx = useMemo(
+    () => posts.findIndex(p => p.id === initialPostId),
+    [posts, initialPostId]
+  );
+  const [range, setRange] = useState(() => getInitialRange(posts.length, initialIdx));
+  const visiblePosts = useMemo(
+    () => posts.slice(range.start, range.end + 1),
+    [posts, range.start, range.end]
+  );
 
   const normalizeTimestamp = (value: Date | string) => {
     if (value instanceof Date) return value;
@@ -47,7 +71,44 @@ export const SavedPostViewer = ({
 
   // Confirm the target post exists in the list. If not, we still render the
   // list (avoid a blank modal) and skip anchoring.
-  const hasTarget = !!initialPostId && posts.some(p => p.id === initialPostId);
+  const hasTarget = initialIdx >= 0;
+
+  useEffect(() => {
+    postRefs.current.clear();
+    pendingPrependAnchor.current = null;
+    setRange(getInitialRange(posts.length, initialIdx));
+  }, [posts.length, initialIdx, initialPostId]);
+
+  useLayoutEffect(() => {
+    const anchor = pendingPrependAnchor.current;
+    const container = scrollContainerRef.current;
+    if (!anchor || !container) return;
+
+    const el = postRefs.current.get(anchor.postId);
+    if (el) {
+      container.scrollTop += el.getBoundingClientRect().top - anchor.top;
+    }
+    pendingPrependAnchor.current = null;
+  }, [range.start]);
+
+  const handleScroll = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    if (container.scrollTop < EXPAND_EDGE_PX && range.start > 0 && visiblePosts.length > 0) {
+      const firstPost = visiblePosts[0];
+      const firstEl = postRefs.current.get(firstPost.id);
+      if (firstEl) {
+        pendingPrependAnchor.current = { postId: firstPost.id, top: firstEl.getBoundingClientRect().top };
+      }
+      setRange(current => ({ ...current, start: Math.max(0, current.start - WINDOW_STEP) }));
+    }
+
+    const distanceFromBottom = container.scrollHeight - container.clientHeight - container.scrollTop;
+    if (distanceFromBottom < EXPAND_EDGE_PX && range.end < posts.length - 1) {
+      setRange(current => ({ ...current, end: Math.min(posts.length - 1, current.end + WINDOW_STEP) }));
+    }
+  };
 
   // Keep the target anchored while posts above hydrate and resize.
   // The loop only runs after the target ref is mounted, and stops as soon as
