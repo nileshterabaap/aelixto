@@ -121,11 +121,13 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
   };
 
   const handleTap = () => {
-    // Single tap = quick half-spin to show credits, then auto-return
     if (dragging.current) return;
     setAnimating(true);
-    setRotationSafe(rotationRef.current + 360);
-    scheduleReturn(0); // already returning via +360
+    // Snap to nearest 180° (credits side), then auto-return to front
+    const current = rotationRef.current;
+    const nearestFront = Math.round(current / 360) * 360;
+    setRotationSafe(nearestFront + 180);
+    scheduleReturn(2500);
   };
 
   // Circular ring math
