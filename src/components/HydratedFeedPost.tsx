@@ -532,16 +532,21 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       </div>
 
-      {/* Caption (non-Instagram renders above media) */}
+      {/* Caption */}
       {(() => {
-        if (detectedPlatform === 'instagram') return null;
-        const captionText = post.content?.trim();
+        // For Instagram posts the original poster's caption is stored in
+        // post.title (from oEmbed). Fall back to it when no user-typed content
+        // exists so every IG post gets the "...more" / "less" toggle.
+        const captionText =
+          post.content?.trim() ||
+          (detectedPlatform === 'instagram' ? (post.title || '').trim() : '');
         return captionText ? (
           <div className="px-5 pb-3">
             <CollapsibleCaption content={captionText} />
           </div>
         ) : null;
       })()}
+
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
@@ -585,17 +590,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       ) : (
         <div ref={embedRef} />
       )}
-
-      {/* Instagram caption — placed below embed, above action buttons */}
-      {detectedPlatform === 'instagram' && (() => {
-        const captionText =
-          post.content?.trim() || (post.title || '').trim();
-        return captionText ? (
-          <div className="px-5 pt-3 pb-1">
-            <CollapsibleCaption content={captionText} />
-          </div>
-        ) : null;
-      })()}
 
       {/* Title for video/image posts */}
       {shouldRenderMediaTitle && (
