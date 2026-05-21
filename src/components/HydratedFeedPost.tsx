@@ -532,14 +532,10 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       </div>
 
-      {/* Caption */}
+      {/* Caption — Instagram captions intentionally hidden (media-only) */}
       {(() => {
-        // For Instagram posts the original poster's caption is stored in
-        // post.title (from oEmbed). Fall back to it when no user-typed content
-        // exists so every IG post gets the "...more" / "less" toggle.
         const captionText =
-          post.content?.trim() ||
-          (detectedPlatform === 'instagram' ? (post.title || '').trim() : '');
+          detectedPlatform === 'instagram' ? '' : (post.content?.trim() || '');
         return captionText ? (
           <div className="px-5 pb-3">
             <CollapsibleCaption content={captionText} />
