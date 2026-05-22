@@ -30,9 +30,28 @@ const Messages = () => {
 
   return (
     <SwipeableView leftRoute="/" leftLabel="Home">
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 relative">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
-      
+
+      <div
+        aria-hidden={!loading}
+        className="absolute inset-x-0 top-0 z-20 pb-20 pointer-events-none transition-opacity duration-500 ease-out"
+        style={{ opacity: loading ? 1 : 0 }}
+      >
+        <main className="container max-w-2xl mx-auto px-4 py-6">
+          <div className="h-8 w-32 bg-muted rounded-md mb-6 animate-shimmer" />
+          <div className="h-10 w-full bg-muted rounded-md mb-6 animate-shimmer" />
+          <MessagesSkeleton />
+        </main>
+      </div>
+
+      <div
+        className="transition-[opacity,filter] duration-500 ease-out"
+        style={{
+          opacity: loading ? 0 : 1,
+          filter: loading ? 'blur(8px)' : 'blur(0px)',
+        }}
+      >
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="container max-w-2xl mx-auto px-4 py-6 animate-fade-in">
           <h2 className="text-2xl font-bold mb-6">Messages</h2>
@@ -47,13 +66,11 @@ const Messages = () => {
           </div>
 
           {/* Conversations List */}
-          {loading ? (
-            <MessagesSkeleton />
-          ) : conversations.length === 0 ? (
+          {!loading && conversations.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               No conversations yet
             </div>
-          ) : (
+          ) : !loading ? (
             <div className="space-y-1">
               {conversations.map((conversation, i) => {
                 const hasUnread = conversation.unread_count > 0;
@@ -116,9 +133,10 @@ const Messages = () => {
                 );
               })}
             </div>
-          )}
+          ) : null}
         </main>
       </PullToRefresh>
+      </div>
 
       <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
       <CreatePostDialog 
