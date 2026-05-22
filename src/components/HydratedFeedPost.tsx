@@ -50,6 +50,7 @@ interface HydratedFeedPostProps {
   userId?: string;
   isActive?: boolean; // Controlled by parent - whether this post is near viewport
   startHydrated?: boolean; // Skip IntersectionObserver, hydrate immediately
+  compactProfileViewer?: boolean; // Static media-first rendering for profile grid drill-in
 }
 
 const formatTimestamp = (date: Date) => {
@@ -97,7 +98,7 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
-export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
+export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false, compactProfileViewer = false }: HydratedFeedPostProps) => {
   // If this post was already revealed in a previous render, skip ALL skeleton/transition work
   const alreadyRevealed = revealedPostsCache.has(post.id);
 
