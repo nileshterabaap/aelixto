@@ -335,6 +335,7 @@ const Index = () => {
 
         <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
       </div>
+      </div>
     </SwipeableView>
   );
 };
