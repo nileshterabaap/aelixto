@@ -442,7 +442,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   // Derive thumbnail: prefer stored, then derive from URL
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
-  const showCard = isTextOnly || embedState === 'ready' || embedState === 'error';
+  const useInstantProfilePreview = compactProfileViewer && detectedPlatform === 'instagram' && !!effectiveThumbnail;
+  const showCard = isTextOnly || useInstantProfilePreview || embedState === 'ready' || embedState === 'error';
 
   return (
     <div className="relative">
@@ -580,6 +581,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
                 thumbnailUrl={effectiveThumbnail}
                 isHydrated={isHydrated}
                 onPlayClick={handlePlayClick}
+                preferStaticPreview={compactProfileViewer}
               />
             </div>
           )}
