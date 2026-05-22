@@ -167,38 +167,22 @@ const Notifications = () => {
   }, [refetch]);
 
   return (
-    <div className="min-h-screen bg-background pb-20 relative">
+    <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
-
-      <div
-        aria-hidden={!isLoading}
-        className="absolute inset-x-0 top-0 z-20 pb-20 pointer-events-none transition-opacity duration-500 ease-out"
-        style={{ opacity: isLoading ? 1 : 0 }}
-      >
-        <main className="mx-auto max-w-2xl px-4 py-6">
-          <div className="h-8 w-40 bg-muted rounded-md mb-6 animate-shimmer" />
-          <div className="space-y-2">
-            {[...Array(5)].map((_, i) => (
-              <NotificationSkeleton key={i} />
-            ))}
-          </div>
-        </main>
-      </div>
-
-      <div
-        className="transition-[opacity,filter] duration-500 ease-out"
-        style={{
-          opacity: isLoading ? 0 : 1,
-          filter: isLoading ? 'blur(8px)' : 'blur(0px)',
-        }}
-      >
+      
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6 animate-fade-in">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold">Notifications</h1>
           </div>
-
-          {!isLoading && notifications.length === 0 ? (
+          
+          {isLoading ? (
+            <div className="space-y-2">
+              {[...Array(5)].map((_, i) => (
+                <NotificationSkeleton key={i} />
+              ))}
+            </div>
+          ) : notifications.length === 0 ? (
             <div className="text-center py-12">
               <Bell className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground">No notifications yet</p>
@@ -206,7 +190,7 @@ const Notifications = () => {
                 When someone interacts with your posts, you'll see it here
               </p>
             </div>
-          ) : !isLoading ? (
+          ) : (
             <div className="space-y-2">
               {notifications.map((notification) => (
                 <NotificationItem
@@ -216,10 +200,9 @@ const Notifications = () => {
                 />
               ))}
             </div>
-          ) : null}
+          )}
         </main>
       </PullToRefresh>
-      </div>
 
       <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
