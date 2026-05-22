@@ -110,6 +110,24 @@ const EditProfile = () => {
     }
   };
 
+  const handleShareProfile = async () => {
+    if (!profile) return;
+    const url = await buildShortUrl(buildProfilePath(profile.username));
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${profile.display_name || profile.username} on Aelixto`,
+          url,
+        });
+      } catch {
+        // user cancelled
+      }
+    } else {
+      navigator.clipboard.writeText(url);
+      sonnerToast.success("Profile link copied");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (usernameStatus === 'taken' || usernameStatus === 'invalid' || usernameStatus === 'checking') {
