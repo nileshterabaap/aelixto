@@ -720,6 +720,7 @@ const arePropsEqual = (prev: HydratedFeedPostProps, next: HydratedFeedPostProps)
   if (prev.userId !== next.userId) return false;
   if (prev.isActive !== next.isActive) return false;
   if (prev.startHydrated !== next.startHydrated) return false;
+  if (prev.compactProfileViewer !== next.compactProfileViewer) return false;
   if (prev.post.id !== next.post.id) return false;
   
   const p = prev.post;
