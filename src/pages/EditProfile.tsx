@@ -361,6 +361,22 @@ const EditProfile = () => {
             </AlertDialog>
           </div>
 
+          <div className="space-y-2">
+            <Label>Share Profile</Label>
+            <p className="text-sm text-muted-foreground mb-2">
+              Copy your profile link or share it with others.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleShareProfile}
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              Share Profile
+            </Button>
+          </div>
+
           <Button type="submit" className="w-full">
             Save Changes
           </Button>
