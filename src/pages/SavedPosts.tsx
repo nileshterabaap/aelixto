@@ -99,23 +99,28 @@ export default function SavedPosts() {
     ]);
   }, [queryClient]);
 
-  if (loading || isLoading) {
-    return (
-      <SwipeableView rightRoute="/" rightLabel="Home">
-        <div className="min-h-screen pb-20">
-          <Header onCreatePost={() => setCreatePostOpen(true)} />
-          <SavedSkeleton />
-          <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
-        </div>
-      </SwipeableView>
-    );
-  }
+  const showSkeleton = loading || isLoading;
 
   return (
     <SwipeableView rightRoute="/" rightLabel="Home">
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-20 relative">
       <Header onCreatePost={() => setCreatePostOpen(true)} />
 
+      <div
+        aria-hidden={!showSkeleton}
+        className="absolute inset-x-0 top-0 z-20 pb-20 pointer-events-none transition-opacity duration-500 ease-out"
+        style={{ opacity: showSkeleton ? 1 : 0 }}
+      >
+        <SavedSkeleton />
+      </div>
+
+      <div
+        className="transition-[opacity,filter] duration-500 ease-out"
+        style={{
+          opacity: showSkeleton ? 0 : 1,
+          filter: showSkeleton ? 'blur(8px)' : 'blur(0px)',
+        }}
+      >
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="container max-w-2xl mx-auto px-4 py-6 animate-fade-in">
           <h1 className="text-2xl font-bold mb-4">Saved</h1>
@@ -154,6 +159,7 @@ export default function SavedPosts() {
           {activeTab === "drafts" && <DraftsGrid drafts={drafts} />}
         </main>
       </PullToRefresh>
+      </div>
 
       <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
       <CreatePostDialog open={createPostOpen} onOpenChange={setCreatePostOpen} />
