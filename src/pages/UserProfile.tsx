@@ -276,7 +276,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
           {/* Bio */}
           {profile.bio && (
-            <p className={`text-center italic text-base mb-6 px-4 ${!(profile.settings as { aelix_score_enabled?: boolean })?.aelix_score_enabled ? 'mt-6' : ''}`}>"{profile.bio}"</p>
+            <p className={`text-center text-base mb-6 px-4 whitespace-pre-wrap ${!(profile.settings as { aelix_score_enabled?: boolean })?.aelix_score_enabled ? 'mt-6' : ''}`}>{profile.bio}</p>
           )}
 
           {/* Spacer when no bio and no aelix score */}
