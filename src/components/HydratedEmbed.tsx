@@ -21,6 +21,7 @@ interface HydratedEmbedProps {
   thumbnailUrl?: string | null;
   isHydrated: boolean;
   onPlayClick: () => void;
+  preferStaticPreview?: boolean;
 }
 
 const HYDRATED_CACHE_LIMIT = 800;
@@ -64,7 +65,8 @@ export const HydratedEmbed = memo(({
   renderer: r, 
   thumbnailUrl, 
   isHydrated, 
-  onPlayClick 
+  onPlayClick,
+  preferStaticPreview = false,
 }: HydratedEmbedProps) => {
   const embedContainerRef = useRef<HTMLDivElement>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -151,6 +153,12 @@ export const HydratedEmbed = memo(({
   const aspectClass = post.platform === 'youtube' && r.url && isYouTubeShort(r.url, post.title, (post as any).content)
     ? 'aspect-[9/16]'
     : 'aspect-video';
+  const shouldUseStaticPreview =
+    preferStaticPreview &&
+    platformHint === 'instagram' &&
+    r.kind === 'raw' &&
+    !!effectiveThumbnail &&
+    !imageError;
   
   
   // If no renderer or none type, show nothing (no placeholder/skeleton either)
@@ -192,6 +200,23 @@ export const HydratedEmbed = memo(({
         ) : (
           <div className="w-full h-full animate-pulse bg-muted" />
         )}
+      </div>
+    );
+  }
+
+  if (shouldUseStaticPreview) {
+    return (
+      <div ref={embedContainerRef} className="relative w-full bg-muted">
+        <ImageViewTracker postId={post.id}>
+          <img
+            src={effectiveThumbnail}
+            alt="Post content"
+            className="w-full aspect-[3/4] object-cover"
+            loading="eager"
+            decoding="async"
+            onError={() => setImageError(true)}
+          />
+        </ImageViewTracker>
       </div>
     );
   }
