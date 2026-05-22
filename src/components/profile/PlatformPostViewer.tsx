@@ -110,7 +110,8 @@ export const PlatformPostViewer = ({
       if (cancelled) return;
       const target = postRefs.current.get(initialPostId);
       if (target) {
-        const desired = target.offsetTop;
+        const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+        const desired = Math.min(target.offsetTop, maxScroll);
         if (Math.abs(container.scrollTop - desired) > 1) {
           container.scrollTop = desired;
         }
