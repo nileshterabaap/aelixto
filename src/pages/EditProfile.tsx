@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Loader2, Check, X } from "lucide-react";
+import { ArrowLeft, Loader2, Check, X, Share2 } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { ImageUploadButton } from "@/components/ImageUploadButton";
@@ -18,6 +18,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { buildShortUrl, buildProfilePath } from "@/lib/shortUrl";
+import { toast as sonnerToast } from "sonner";
 
 const EditProfile = () => {
   const navigate = useNavigate();
