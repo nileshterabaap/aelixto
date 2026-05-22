@@ -238,13 +238,24 @@ const EditProfile = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="bio">Bio</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="bio">Bio</Label>
+              <span className={`text-xs ${formData.bio.length > 150 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                {formData.bio.length}/150
+              </span>
+            </div>
             <Textarea
               id="bio"
               value={formData.bio}
-              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val.length <= 150) {
+                  setFormData({ ...formData, bio: val });
+                }
+              }}
               placeholder="Tell us about yourself..."
               rows={4}
+              maxLength={150}
             />
           </div>
 
