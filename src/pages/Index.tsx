@@ -234,29 +234,33 @@ const Index = () => {
   const loading = showDemoFeed ? demoLoading : followingLoading;
   const shouldShowSkeleton = !hasRenderedOnce.current && (sessionLoading || loading) && allPosts.length === 0;
 
-  if (shouldShowSkeleton) {
-    return (
-      <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
-        <div className="min-h-screen bg-background pb-20">
-          <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
-          <main className="mx-auto max-w-2xl px-4 py-6">
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <PostSkeleton key={i} />
-              ))}
-            </div>
-          </main>
-          <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
-        </div>
-      </SwipeableView>
-    );
-  }
-
   return (
     <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
-      <div className="min-h-screen bg-background pb-20">
+      <div className="min-h-screen bg-background pb-20 relative">
         <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
+      {/* Skeleton overlay — crossfades out once content is ready */}
+      <div
+        aria-hidden={!shouldShowSkeleton}
+        className="absolute inset-x-0 top-0 z-20 pb-20 pointer-events-none transition-opacity duration-500 ease-out"
+        style={{ opacity: shouldShowSkeleton ? 1 : 0 }}
+      >
+        <main className="mx-auto max-w-2xl px-4 py-6">
+          <div className="space-y-6">
+            {[...Array(3)].map((_, i) => (
+              <PostSkeleton key={i} />
+            ))}
+          </div>
+        </main>
+      </div>
+
+      <div
+        className="transition-[opacity,filter] duration-500 ease-out"
+        style={{
+          opacity: shouldShowSkeleton ? 0 : 1,
+          filter: shouldShowSkeleton ? 'blur(8px)' : 'blur(0px)',
+        }}
+      >
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
@@ -330,6 +334,7 @@ const Index = () => {
       <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
         <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
+      </div>
       </div>
     </SwipeableView>
   );

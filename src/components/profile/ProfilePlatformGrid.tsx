@@ -2,7 +2,7 @@ import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import InstagramIcon from "@/assets/platforms/instagram.svg";
 import FacebookIcon from "@/assets/platforms/facebook.svg";
@@ -193,34 +193,36 @@ export const ProfilePlatformGrid = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  const viewKey = showSkeleton
-    ? `${activeTab}-loading`
-    : items.length === 0
-    ? `${activeTab}-empty`
-    : `${activeTab}-grid`;
-
   return (
     <>
       <div className="space-y-4 relative">
-        <AnimatePresence initial={false} mode="popLayout">
-          <motion.div
-            key={viewKey}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+        <div className="relative">
+          {/* Skeleton overlay layer */}
+          <div
+            aria-hidden={!showSkeleton}
+            className="absolute inset-0 z-10 pointer-events-none transition-opacity duration-500 ease-out"
+            style={{ opacity: showSkeleton ? 1 : 0 }}
           >
-            {showSkeleton ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="aspect-[3/4] rounded-2xl relative overflow-hidden bg-muted/70 before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/40 before:to-transparent before:animate-shimmer"
-                    style={{ backgroundSize: "1000px 100%" }}
-                  />
-                ))}
-              </div>
-            ) : items.length === 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="aspect-[3/4] rounded-2xl relative overflow-hidden bg-muted/70 before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/40 before:to-transparent before:animate-shimmer"
+                  style={{ backgroundSize: "1000px 100%" }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Real content layer — blurs in sharply */}
+          <div
+            className="transition-[opacity,filter] duration-500 ease-out"
+            style={{
+              opacity: showSkeleton ? 0 : 1,
+              filter: showSkeleton ? 'blur(8px)' : 'blur(0px)',
+            }}
+          >
+            {!showSkeleton && items.length === 0 ? (
               <div className="px-6 py-16 text-center text-muted-foreground">
                 No posts yet from{" "}
                 {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}.
@@ -246,8 +248,8 @@ export const ProfilePlatformGrid = ({
                 ))}
               </div>
             )}
-          </motion.div>
-        </AnimatePresence>
+          </div>
+        </div>
 
         {hasMore && !isInitialLoading && items.length > 0 && (
           <div className="flex justify-center pt-4">
