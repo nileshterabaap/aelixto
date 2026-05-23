@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
@@ -59,6 +60,7 @@ export const PlatformPostViewer = ({
   const { user } = useSession();
   const { items, loading } = useUserPlatformPosts(userId, activeTab);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   
@@ -90,6 +92,15 @@ export const PlatformPostViewer = ({
     };
     fetchProfile();
   }, [userId]);
+
+  useEffect(() => {
+    setPortalReady(true);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
 
   // Scroll to initial post when items load. Posts above the target hydrate
   // and grow in height, which would push the target down. Re-anchor on every
@@ -161,9 +172,9 @@ export const PlatformPostViewer = ({
 
   const currentTab = tabs.find(t => t.key === activeTab);
 
-  return (
+  const viewer = (
     <div 
-      className="fixed inset-0 z-50 bg-background"
+      className="fixed inset-0 z-[70] bg-background"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -217,7 +228,7 @@ export const PlatformPostViewer = ({
       {/* Scrollable posts */}
       <div 
         ref={scrollContainerRef}
-        className="h-[calc(100vh-56px)] overflow-y-auto pb-8"
+        className="h-[calc(100dvh-56px)] overflow-y-auto overscroll-contain pb-8"
       >
         <div className="mx-auto max-w-2xl px-4 py-4 space-y-6">
           {loading && items.length === 0 ? (
@@ -264,4 +275,7 @@ export const PlatformPostViewer = ({
       </div>
     </div>
   );
+
+  if (!portalReady) return null;
+  return createPortal(viewer, document.body);
 };
