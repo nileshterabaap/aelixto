@@ -50,7 +50,6 @@ interface HydratedFeedPostProps {
   userId?: string;
   isActive?: boolean; // Controlled by parent - whether this post is near viewport
   startHydrated?: boolean; // Skip IntersectionObserver, hydrate immediately
-  compactProfileViewer?: boolean; // Static media-first rendering for profile grid drill-in
 }
 
 const formatTimestamp = (date: Date) => {
@@ -98,7 +97,7 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
-export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false, compactProfileViewer = false }: HydratedFeedPostProps) => {
+export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
   // If this post was already revealed in a previous render, skip ALL skeleton/transition work
   const alreadyRevealed = revealedPostsCache.has(post.id);
 
@@ -442,8 +441,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   // Derive thumbnail: prefer stored, then derive from URL
   const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
-  const useInstantProfilePreview = compactProfileViewer && detectedPlatform === 'instagram' && !!effectiveThumbnail;
-  const showCard = isTextOnly || useInstantProfilePreview || embedState === 'ready' || embedState === 'error';
+  const showCard = isTextOnly || embedState === 'ready' || embedState === 'error';
 
   return (
     <div className="relative">
@@ -581,7 +579,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
                 thumbnailUrl={effectiveThumbnail}
                 isHydrated={isHydrated}
                 onPlayClick={handlePlayClick}
-                preferStaticPreview={compactProfileViewer}
               />
             </div>
           )}
@@ -720,7 +717,6 @@ const arePropsEqual = (prev: HydratedFeedPostProps, next: HydratedFeedPostProps)
   if (prev.userId !== next.userId) return false;
   if (prev.isActive !== next.isActive) return false;
   if (prev.startHydrated !== next.startHydrated) return false;
-  if (prev.compactProfileViewer !== next.compactProfileViewer) return false;
   if (prev.post.id !== next.post.id) return false;
   
   const p = prev.post;
