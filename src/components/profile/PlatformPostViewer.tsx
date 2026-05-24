@@ -102,46 +102,67 @@ export const PlatformPostViewer = ({
     };
   }, []);
 
-  // Scroll to initial post when items load. Posts above the target hydrate
-  // and grow in height, which would push the target down. Re-anchor on every
-  // animation frame for ~1.8s, or until the user starts scrolling.
+  // Scroll to the tapped post. Posts above hydrate asynchronously and grow,
+  // which would push the target down — so we observe size changes on the
+  // posts above the target and re-anchor until the user scrolls manually.
   useEffect(() => {
     if (items.length === 0 || !initialPostId) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    const targetIdx = items.findIndex(p => p.id === initialPostId);
+    if (targetIdx < 0) return;
+
     let cancelled = false;
-    const stopAt = performance.now() + 1800;
+    const onUserScroll = () => { cancelled = true; cleanup(); };
 
-    const onUserScroll = () => { cancelled = true; };
-    const cancelEvents = ["wheel", "touchstart", "keydown"] as const;
-    cancelEvents.forEach(e => container.addEventListener(e, onUserScroll, { passive: true }));
-
-    const tick = () => {
+    const anchor = () => {
       if (cancelled) return;
       const target = postRefs.current.get(initialPostId);
-      if (target) {
-        const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
-        // Compute offset relative to the scroll container (target.offsetTop
-        // is relative to its offsetParent, which is the inner padded wrapper,
-        // not the scroll container — that's why tapping any post landed on
-        // the first one).
-        const targetRect = target.getBoundingClientRect();
-        const containerRect = container.getBoundingClientRect();
-        const offsetWithinContainer =
-          targetRect.top - containerRect.top + container.scrollTop;
-        const desired = Math.min(offsetWithinContainer, maxScroll);
-        if (Math.abs(container.scrollTop - desired) > 1) {
-          container.scrollTop = desired;
-        }
+      if (!target) return;
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const desired =
+        container.scrollTop + (targetRect.top - containerRect.top);
+      const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
+      const clamped = Math.max(0, Math.min(desired, maxScroll));
+      if (Math.abs(container.scrollTop - clamped) > 1) {
+        container.scrollTop = clamped;
       }
-      if (performance.now() < stopAt) requestAnimationFrame(tick);
     };
-    requestAnimationFrame(tick);
+
+    // Initial anchor on next two frames (after layout commit)
+    requestAnimationFrame(() => {
+      anchor();
+      requestAnimationFrame(anchor);
+    });
+
+    // Re-anchor whenever any post above the target resizes (hydration)
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(anchor);
+    });
+    for (let i = 0; i <= targetIdx; i++) {
+      const el = postRefs.current.get(items[i].id);
+      if (el) ro.observe(el);
+    }
+
+    // Safety: stop after 3s regardless
+    const stopTimer = window.setTimeout(() => cleanup(), 3000);
+
+    const cancelEvents = ["wheel", "touchmove", "keydown"] as const;
+    cancelEvents.forEach(e =>
+      container.addEventListener(e, onUserScroll, { passive: true })
+    );
+
+    function cleanup() {
+      ro.disconnect();
+      window.clearTimeout(stopTimer);
+      cancelEvents.forEach(e => container.removeEventListener(e, onUserScroll));
+    }
 
     return () => {
       cancelled = true;
-      cancelEvents.forEach(e => container.removeEventListener(e, onUserScroll));
+      cleanup();
     };
   }, [items, initialPostId, activeTab]);
 
