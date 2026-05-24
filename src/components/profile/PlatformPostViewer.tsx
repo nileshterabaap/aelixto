@@ -263,10 +263,6 @@ export const PlatformPostViewer = ({
             visiblePosts.map((post) => (
               <div
                 key={post.id}
-                ref={(el) => {
-                  if (el) postRefs.current.set(post.id, el);
-                  else postRefs.current.delete(post.id);
-                }}
               >
                 <HydratedFeedPost
                   post={transformPost(post, profileData || undefined)}
