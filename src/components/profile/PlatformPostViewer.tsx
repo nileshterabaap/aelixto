@@ -75,11 +75,19 @@ export const PlatformPostViewer = ({
   onTabChange,
 }: PlatformPostViewerProps) => {
   const { user } = useSession();
-  const { items, loading } = useUserPlatformPosts(userId, activeTab);
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [portalReady, setPortalReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const initialIdx = useMemo(
+    () => posts.findIndex((post) => post.id === initialPostId),
+    [posts, initialPostId]
+  );
+  const [range, setRange] = useState(() => getInitialRange(posts.length, initialIdx));
+  const visiblePosts = useMemo(
+    () => posts.slice(range.start, range.end + 1),
+    [posts, range.start, range.end]
+  );
   
   // Touch handling for swipe
   const touchStartX = useRef<number>(0);
@@ -119,76 +127,36 @@ export const PlatformPostViewer = ({
     };
   }, []);
 
-  // Scroll to the tapped post. Posts above hydrate asynchronously and grow,
-  // which would push the target down — so we observe size changes on the
-  // posts above the target and re-anchor until the user scrolls manually.
   useEffect(() => {
-    if (items.length === 0 || !initialPostId) return;
+    postRefs.current.clear();
+    setRange(getInitialRange(posts.length, initialIdx));
+  }, [posts.length, initialIdx, initialPostId, activeTab]);
+
+  useLayoutEffect(() => {
+    if (!portalReady) return;
+    const container = scrollContainerRef.current;
+    if (container) container.scrollTop = 0;
+  }, [portalReady, initialPostId, activeTab, range.start]);
+
+  const handleScroll = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const targetIdx = items.findIndex(p => p.id === initialPostId);
-    if (targetIdx < 0) return;
-
-    let cancelled = false;
-    const onUserScroll = () => { cancelled = true; cleanup(); };
-
-    const anchor = () => {
-      if (cancelled) return;
-      const target = postRefs.current.get(initialPostId);
-      if (!target) return;
-      const containerRect = container.getBoundingClientRect();
-      const targetRect = target.getBoundingClientRect();
-      const desired =
-        container.scrollTop + (targetRect.top - containerRect.top);
-      const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
-      const clamped = Math.max(0, Math.min(desired, maxScroll));
-      if (Math.abs(container.scrollTop - clamped) > 1) {
-        container.scrollTop = clamped;
-      }
-    };
-
-    // Initial anchor on next two frames (after layout commit)
-    requestAnimationFrame(() => {
-      anchor();
-      requestAnimationFrame(anchor);
-    });
-
-    // Re-anchor whenever any post above the target resizes (hydration)
-    const ro = new ResizeObserver(() => {
-      requestAnimationFrame(anchor);
-    });
-    for (let i = 0; i <= targetIdx; i++) {
-      const el = postRefs.current.get(items[i].id);
-      if (el) ro.observe(el);
+    const distanceFromBottom = container.scrollHeight - container.clientHeight - container.scrollTop;
+    if (distanceFromBottom < EXPAND_EDGE_PX && range.end < posts.length - 1) {
+      setRange((current) => ({
+        ...current,
+        end: Math.min(posts.length - 1, current.end + WINDOW_STEP),
+      }));
     }
-
-    // Safety: stop after 3s regardless
-    const stopTimer = window.setTimeout(() => cleanup(), 3000);
-
-    const cancelEvents = ["wheel", "touchmove", "keydown"] as const;
-    cancelEvents.forEach(e =>
-      container.addEventListener(e, onUserScroll, { passive: true })
-    );
-
-    function cleanup() {
-      ro.disconnect();
-      window.clearTimeout(stopTimer);
-      cancelEvents.forEach(e => container.removeEventListener(e, onUserScroll));
-    }
-
-    return () => {
-      cancelled = true;
-      cleanup();
-    };
-  }, [items, initialPostId, activeTab]);
+  }, [posts.length, range.end]);
 
   // Mark all visible posts as seen when viewing profile posts
   useEffect(() => {
-    if (user?.id && items.length > 0) {
-      markPostsSeenImmediate(user.id, items.map(p => p.id));
+    if (user?.id && posts.length > 0) {
+      markPostsSeenImmediate(user.id, posts.map(p => p.id));
     }
-  }, [user?.id, items]);
+  }, [user?.id, posts]);
 
   // Get adjacent tabs for swipe navigation
   const currentTabIndex = tabs.findIndex(t => t.key === activeTab);
