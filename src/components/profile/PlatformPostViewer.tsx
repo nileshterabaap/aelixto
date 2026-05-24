@@ -122,7 +122,15 @@ export const PlatformPostViewer = ({
       const target = postRefs.current.get(initialPostId);
       if (target) {
         const maxScroll = Math.max(0, container.scrollHeight - container.clientHeight);
-        const desired = Math.min(target.offsetTop, maxScroll);
+        // Compute offset relative to the scroll container (target.offsetTop
+        // is relative to its offsetParent, which is the inner padded wrapper,
+        // not the scroll container — that's why tapping any post landed on
+        // the first one).
+        const targetRect = target.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        const offsetWithinContainer =
+          targetRect.top - containerRect.top + container.scrollTop;
+        const desired = Math.min(offsetWithinContainer, maxScroll);
         if (Math.abs(container.scrollTop - desired) > 1) {
           container.scrollTop = desired;
         }
