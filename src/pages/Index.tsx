@@ -167,9 +167,24 @@ const Index = () => {
   );
 
   useEffect(() => {
-    if (!sessionLoading && !user && !isDemoMode) {
-      navigate("/auth");
+    if (sessionLoading || user || isDemoMode) return;
+    // Guard against a brief flash to /auth before the persisted Supabase
+    // session is rehydrated. If a token exists in localStorage, wait for
+    // onAuthStateChange to populate the user instead of redirecting.
+    let hasStoredToken = false;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
+          hasStoredToken = true;
+          break;
+        }
+      }
+    } catch {
+      // ignore
     }
+    if (hasStoredToken) return;
+    navigate("/auth");
   }, [user, sessionLoading, isDemoMode, navigate]);
 
   // Mark first render complete to prevent flicker on subsequent renders
