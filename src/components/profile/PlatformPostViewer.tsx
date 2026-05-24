@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
-import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts";
+import { PlatformPost } from "@/hooks/useUserPlatformPosts";
 import { useSession } from "@/hooks/useSession";
 import { markPostsSeenImmediate } from "@/hooks/useMarkPostSeen";
 import type { Post } from "@/data/demoData";
@@ -11,6 +11,8 @@ import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 
 interface PlatformPostViewerProps {
   userId: string;
+  posts: PlatformPost[];
+  loading: boolean;
   initialPostId: string;
   tabs: PlatformTab[];
   activeTab: string;
@@ -23,6 +25,19 @@ interface ProfileData {
   display_name: string | null;
   avatar_url: string | null;
 }
+
+const WINDOW_FORWARD = 8;
+const WINDOW_STEP = 6;
+const EXPAND_EDGE_PX = 700;
+
+const getInitialRange = (length: number, index: number) => {
+  if (length === 0) return { start: 0, end: -1 };
+  const safeIndex = index >= 0 ? index : 0;
+  return {
+    start: safeIndex,
+    end: Math.min(length - 1, safeIndex + WINDOW_FORWARD),
+  };
+};
 
 function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { isRealPost: boolean; user_id: string; likes_count: number; comments_count: number } {
   const postUserId = post.original_user_id || post.user_id;
@@ -51,6 +66,8 @@ function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { 
 
 export const PlatformPostViewer = ({
   userId,
+  posts,
+  loading,
   initialPostId,
   tabs,
   activeTab,
