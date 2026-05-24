@@ -266,6 +266,8 @@ export const ProfilePlatformGrid = ({
       {viewerOpen && selectedPostId && (
         <PlatformPostViewer
           userId={userId}
+          posts={items}
+          loading={loading}
           initialPostId={selectedPostId}
           tabs={tabs}
           activeTab={activeTab}
