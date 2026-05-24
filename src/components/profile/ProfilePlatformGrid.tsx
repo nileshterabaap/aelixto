@@ -130,6 +130,7 @@ export const ProfilePlatformGrid = ({
   );
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedPostIndex, setSelectedPostIndex] = useState<number>(-1);
   const location = useLocation();
 
   // Close the viewer when the route/location changes (e.g. user taps a nav button)
@@ -157,8 +158,9 @@ export const ProfilePlatformGrid = ({
     }
   };
 
-  const handlePostClick = (postId: string) => {
+  const handlePostClick = (postId: string, postIndex: number) => {
     setSelectedPostId(postId);
+    setSelectedPostIndex(postIndex);
     setViewerOpen(true);
   };
 
@@ -240,7 +242,7 @@ export const ProfilePlatformGrid = ({
                   >
                     <PostCard
                       post={post}
-                      onClick={() => handlePostClick(post.id)}
+                      onClick={() => handlePostClick(post.id, idx)}
                     />
                   </motion.div>
                 ))}
@@ -269,6 +271,7 @@ export const ProfilePlatformGrid = ({
           posts={items}
           loading={loading}
           initialPostId={selectedPostId}
+          initialPostIndex={selectedPostIndex}
           tabs={tabs}
           activeTab={activeTab}
           onClose={closeViewer}
