@@ -27,18 +27,10 @@ interface ProfileData {
   avatar_url: string | null;
 }
 
-const WINDOW_FORWARD = 8;
-const WINDOW_STEP = 6;
-const EXPAND_EDGE_PX = 700;
-
-const getInitialRange = (length: number, index: number) => {
-  if (length === 0) return { start: 0, end: -1 };
-  const safeIndex = index >= 0 ? index : 0;
-  return {
-    start: safeIndex,
-    end: Math.min(length - 1, safeIndex + WINDOW_FORWARD),
-  };
-};
+// Render all posts so users can scroll UP to see posts above the tapped one
+// and DOWN to see posts below. We anchor the scroll position to the tapped
+// post on mount and keep it anchored while posts above hydrate (their height
+// changes), until the user starts scrolling themselves.
 
 function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { isRealPost: boolean; user_id: string; likes_count: number; comments_count: number } {
   const postUserId = post.original_user_id || post.user_id;
@@ -80,6 +72,7 @@ export const PlatformPostViewer = ({
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [portalReady, setPortalReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const initialIdx = useMemo(
     () => {
       if (initialPostIndex >= 0 && initialPostIndex < posts.length) {
@@ -89,11 +82,7 @@ export const PlatformPostViewer = ({
     },
     [posts, initialPostId, initialPostIndex]
   );
-  const [range, setRange] = useState(() => getInitialRange(posts.length, initialIdx));
-  const visiblePosts = useMemo(
-    () => posts.slice(range.start, range.end + 1),
-    [posts, range.start, range.end]
-  );
+  const targetPostId = initialIdx >= 0 ? posts[initialIdx]?.id : undefined;
   
   // Touch handling for swipe
   const touchStartX = useRef<number>(0);
@@ -133,28 +122,81 @@ export const PlatformPostViewer = ({
     };
   }, []);
 
-  useEffect(() => {
-    setRange(getInitialRange(posts.length, initialIdx));
-  }, [posts.length, initialIdx, initialPostId, activeTab]);
-
+  // Anchor scroll to the tapped post and keep it anchored while posts above
+  // hydrate. Stops anchoring once the user scrolls.
   useLayoutEffect(() => {
-    if (!portalReady) return;
-    const container = scrollContainerRef.current;
-    if (container) container.scrollTop = 0;
-  }, [portalReady, initialPostId, activeTab, range.start]);
-
-  const handleScroll = useCallback(() => {
+    if (!portalReady || !targetPostId) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    const distanceFromBottom = container.scrollHeight - container.clientHeight - container.scrollTop;
-    if (distanceFromBottom < EXPAND_EDGE_PX && range.end < posts.length - 1) {
-      setRange((current) => ({
-        ...current,
-        end: Math.min(posts.length - 1, current.end + WINDOW_STEP),
-      }));
-    }
-  }, [posts.length, range.end]);
+    let userScrolled = false;
+    let cancelled = false;
+
+    const anchor = () => {
+      if (cancelled || userScrolled) return;
+      const target = postRefs.current.get(targetPostId);
+      if (!target) return;
+      const targetRect = target.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const desired =
+        container.scrollTop + (targetRect.top - containerRect.top);
+      const maxScroll = container.scrollHeight - container.clientHeight;
+      const clamped = Math.max(0, Math.min(desired, maxScroll));
+      if (Math.abs(container.scrollTop - clamped) > 1) {
+        container.scrollTop = clamped;
+      }
+    };
+
+    // Initial anchor on two frames to catch layout commit
+    requestAnimationFrame(() => {
+      anchor();
+      requestAnimationFrame(anchor);
+    });
+
+    // Re-anchor whenever posts above (or the target) resize during hydration
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(anchor);
+    });
+    const target = postRefs.current.get(targetPostId);
+    if (target) ro.observe(target);
+    // Observe everything above the target
+    postRefs.current.forEach((el, id) => {
+      const idx = posts.findIndex((p) => p.id === id);
+      if (idx >= 0 && idx < initialIdx) ro.observe(el);
+    });
+
+    let interacted = false;
+    const onUserScroll = () => {
+      if (!interacted) {
+        interacted = true;
+        return;
+      }
+      userScrolled = true;
+      ro.disconnect();
+      container.removeEventListener("wheel", markScrolled);
+      container.removeEventListener("touchmove", markScrolled);
+    };
+    const markScrolled = () => {
+      userScrolled = true;
+      ro.disconnect();
+    };
+    container.addEventListener("wheel", markScrolled, { passive: true });
+    container.addEventListener("touchmove", markScrolled, { passive: true });
+
+    // Safety: stop anchoring after 3s no matter what
+    const safetyTimeout = window.setTimeout(() => {
+      cancelled = true;
+      ro.disconnect();
+    }, 3000);
+
+    return () => {
+      cancelled = true;
+      ro.disconnect();
+      window.clearTimeout(safetyTimeout);
+      container.removeEventListener("wheel", markScrolled);
+      container.removeEventListener("touchmove", markScrolled);
+    };
+  }, [portalReady, targetPostId, posts, initialIdx, activeTab]);
 
   // Mark all visible posts as seen when viewing profile posts
   useEffect(() => {
@@ -247,7 +289,6 @@ export const PlatformPostViewer = ({
       {/* Scrollable posts */}
       <div 
         ref={scrollContainerRef}
-        onScroll={handleScroll}
         className="h-[calc(100dvh-56px)] overflow-y-auto overscroll-contain pb-8"
       >
         <div className="mx-auto max-w-2xl px-4 py-4 space-y-6">
@@ -260,9 +301,13 @@ export const PlatformPostViewer = ({
               <p className="text-muted-foreground">No posts in this section</p>
             </div>
           ) : (
-            visiblePosts.map((post) => (
+            posts.map((post) => (
               <div
                 key={post.id}
+                ref={(el) => {
+                  if (el) postRefs.current.set(post.id, el);
+                  else postRefs.current.delete(post.id);
+                }}
               >
                 <HydratedFeedPost
                   post={transformPost(post, profileData || undefined)}
