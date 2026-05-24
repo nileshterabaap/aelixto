@@ -242,33 +242,31 @@ export const PlatformPostViewer = ({
       {/* Scrollable posts */}
       <div 
         ref={scrollContainerRef}
+        onScroll={handleScroll}
         className="h-[calc(100dvh-56px)] overflow-y-auto overscroll-contain pb-8"
       >
         <div className="mx-auto max-w-2xl px-4 py-4 space-y-6">
-          {loading && items.length === 0 ? (
+          {loading && posts.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">Loading posts...</p>
             </div>
-          ) : items.length === 0 ? (
+          ) : posts.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No posts in this section</p>
             </div>
           ) : (
-            items.map((post) => (
+            visiblePosts.map((post) => (
               <div
                 key={post.id}
                 ref={(el) => {
                   if (el) postRefs.current.set(post.id, el);
+                  else postRefs.current.delete(post.id);
                 }}
               >
                 <HydratedFeedPost
                   post={transformPost(post, profileData || undefined)}
                   userId={user?.id}
-                  startHydrated={(() => {
-                    const idx = items.findIndex(p => p.id === initialPostId);
-                    const postIdx = items.findIndex(p => p.id === post.id);
-                    return idx >= 0 && Math.abs(postIdx - idx) <= 5;
-                  })()}
+                  startHydrated={true}
                 />
               </div>
             ))
