@@ -275,7 +275,11 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
-            followingCount === 0 ? (
+            followingCount === undefined || followingHasAnyPosts === undefined ? (
+              // Empty-state classifier queries haven't resolved yet —
+              // render nothing to avoid a flash of the wrong message.
+              <div className="py-16" />
+            ) : followingCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <h3 className="text-lg font-semibold">Nothing here yet 👀</h3>
                 <p className="text-sm text-muted-foreground mt-1 mb-4">
