@@ -14,6 +14,7 @@ interface PlatformPostViewerProps {
   posts: PlatformPost[];
   loading: boolean;
   initialPostId: string;
+  initialPostIndex: number;
   tabs: PlatformTab[];
   activeTab: string;
   onClose: () => void;
@@ -69,6 +70,7 @@ export const PlatformPostViewer = ({
   posts,
   loading,
   initialPostId,
+  initialPostIndex,
   tabs,
   activeTab,
   onClose,
@@ -78,10 +80,14 @@ export const PlatformPostViewer = ({
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [portalReady, setPortalReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const initialIdx = useMemo(
-    () => posts.findIndex((post) => post.id === initialPostId),
-    [posts, initialPostId]
+    () => {
+      if (initialPostIndex >= 0 && initialPostIndex < posts.length) {
+        return initialPostIndex;
+      }
+      return posts.findIndex((post) => post.id === initialPostId);
+    },
+    [posts, initialPostId, initialPostIndex]
   );
   const [range, setRange] = useState(() => getInitialRange(posts.length, initialIdx));
   const visiblePosts = useMemo(
@@ -128,7 +134,6 @@ export const PlatformPostViewer = ({
   }, []);
 
   useEffect(() => {
-    postRefs.current.clear();
     setRange(getInitialRange(posts.length, initialIdx));
   }, [posts.length, initialIdx, initialPostId, activeTab]);
 
