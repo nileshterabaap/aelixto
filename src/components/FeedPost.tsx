@@ -298,7 +298,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                     <MoreVertical className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-background z-50">
+                <DropdownMenuContent align="end" className="bg-background z-[100]">
                   <DropdownMenuItem
                     onClick={() => deletePost()}
                     disabled={isDeleting}
@@ -457,7 +457,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                     <MoreVertical className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-background z-50">
+                <DropdownMenuContent align="end" className="bg-background z-[100]">
                   <DropdownMenuItem
                     onClick={() => deletePost()}
                     disabled={isDeleting}
