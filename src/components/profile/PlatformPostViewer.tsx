@@ -1,10 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
 import { useSession } from "@/hooks/useSession";
 import { markPostsSeenImmediate } from "@/hooks/useMarkPostSeen";
+import { supabase } from "@/integrations/supabase/client";
 import type { Post } from "@/data/demoData";
 import type { PlatformPost } from "@/hooks/useUserPlatformPosts";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
@@ -69,7 +71,24 @@ export const PlatformPostViewer = ({
   onTabChange,
 }: PlatformPostViewerProps) => {
   const { user } = useSession();
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  // Use react-query so the profile is cached across viewer opens — instant after first load.
+  const { data: profileData = null } = useQuery({
+    queryKey: ["viewer-profile", userId],
+    enabled: !!userId,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    queryFn: async (): Promise<ProfileData | null> => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("username, display_name, avatar_url")
+        .eq("user_id", userId)
+        .single();
+      if (error) return null;
+      return data as ProfileData;
+    },
+  });
   const [portalReady, setPortalReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -87,31 +106,6 @@ export const PlatformPostViewer = ({
   // Touch handling for swipe
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
-
-  // Fetch profile data for post author info
-  useEffect(() => {
-    if (!userId) return;
-    
-    const fetchProfile = async () => {
-      try {
-        const { supabase } = await import("@/integrations/supabase/client");
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("username, display_name, avatar_url")
-          .eq("user_id", userId)
-          .single();
-        
-        if (error) {
-          console.error("[PlatformPostViewer] Error fetching profile:", error);
-          return;
-        }
-        if (data) setProfileData(data);
-      } catch (err) {
-        console.error("[PlatformPostViewer] Failed to fetch profile:", err);
-      }
-    };
-    fetchProfile();
-  }, [userId]);
 
   useEffect(() => {
     setPortalReady(true);
@@ -233,6 +227,10 @@ export const PlatformPostViewer = ({
 
   const currentTab = tabs.find(t => t.key === activeTab);
 
+  // Gate post rendering until profile is loaded so the author header never
+  // flashes "Unknown". Cached profile means subsequent opens render instantly.
+  const profileReady = !!profileData;
+
   const viewer = (
     <div 
       className="fixed inset-0 z-[70] bg-background"
@@ -292,9 +290,9 @@ export const PlatformPostViewer = ({
         className="h-[calc(100dvh-56px)] overflow-y-auto overscroll-contain pb-8"
       >
         <div className="mx-auto max-w-2xl px-4 py-4 space-y-6">
-          {loading && posts.length === 0 ? (
+          {(loading && posts.length === 0) || !profileReady ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground">Loading posts...</p>
+              <div className="mx-auto h-8 w-8 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
             </div>
           ) : posts.length === 0 ? (
             <div className="text-center py-8">
@@ -310,7 +308,7 @@ export const PlatformPostViewer = ({
                 }}
               >
                 <HydratedFeedPost
-                  post={transformPost(post, profileData || undefined)}
+                  post={transformPost(post, profileData)}
                   userId={user?.id}
                   startHydrated={true}
                 />
