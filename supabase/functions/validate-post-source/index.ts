@@ -36,34 +36,55 @@ export async function validate(platform: string | null, url: string | null): Pro
   try {
     // ===== Instagram =====
     if (p === "instagram" || /instagram\.com\//i.test(url)) {
-      if (!meta) return "unknown";
-      const r = await fetchWithTimeout(
-        `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${meta}`
-      );
-      if (r.ok) return "ok";
-      if (r.status === 404 || r.status === 400) {
-        // 400 with subcode 2207006/24 = media not found
-        const text = await r.text();
-        if (/not found|unsupported|invalid|removed|unavailable|object/i.test(text)) return "removed";
-        return "unknown";
+      // 1. Meta oEmbed (authoritative when permission granted)
+      if (meta) {
+        const r = await fetchWithTimeout(
+          `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${meta}`
+        );
+        if (r.ok) return "ok";
+        if (r.status === 404 || r.status === 400) {
+          const text = await r.text();
+          // Any "not found"-style payload → removed/private.
+          // Permission errors (#10, #200) fall through to the redirect check below.
+          if (/not found|does not exist|unsupported|cannot be loaded|object with id|media_id|unavailable/i.test(text)) {
+            return "removed";
+          }
+        }
       }
+      // 2. Redirect check — private/removed IG posts redirect to /accounts/login/
+      try {
+        const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } });
+        const finalUrl = r.url || "";
+        if (/\/accounts\/login\//i.test(finalUrl)) return "removed";
+        if (r.status === 404 || r.status === 410) return "removed";
+        // Public posts return 200 with the post HTML
+        if (r.ok) return "ok";
+      } catch (_e) { /* ignore */ }
       return "unknown";
     }
 
     // ===== Facebook =====
     if (p === "facebook" || /facebook\.com\/|fb\.watch\//i.test(url)) {
-      if (!meta) return "unknown";
-      const ep = /\/videos?\/|\/reel\/|fb\.watch\//i.test(url)
-        ? "oembed_video"
-        : "oembed_post";
-      const r = await fetchWithTimeout(
-        `https://graph.facebook.com/v18.0/${ep}?url=${encodeURIComponent(url)}&access_token=${meta}`
-      );
-      if (r.ok) return "ok";
-      if (r.status === 404 || r.status === 400) {
-        const text = await r.text();
-        if (/not found|unsupported|invalid|removed|unavailable|object/i.test(text)) return "removed";
+      if (meta) {
+        const ep = /\/videos?\/|\/reel\/|fb\.watch\//i.test(url) ? "oembed_video" : "oembed_post";
+        const r = await fetchWithTimeout(
+          `https://graph.facebook.com/v18.0/${ep}?url=${encodeURIComponent(url)}&access_token=${meta}`
+        );
+        if (r.ok) return "ok";
+        if (r.status === 404 || r.status === 400) {
+          const text = await r.text();
+          if (/not found|does not exist|unsupported|cannot be loaded|object with id|unavailable/i.test(text)) {
+            return "removed";
+          }
+        }
       }
+      // Redirect check — private FB content redirects to /login/ or /unsupportedbrowser
+      try {
+        const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } });
+        const finalUrl = r.url || "";
+        if (/\/login\//i.test(finalUrl)) return "removed";
+        if (r.status === 404 || r.status === 410) return "removed";
+      } catch (_e) { /* ignore */ }
       return "unknown";
     }
 
