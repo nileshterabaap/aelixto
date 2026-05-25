@@ -119,7 +119,7 @@ export const PlatformPostViewer = ({
   // Anchor scroll to the tapped post and keep it anchored while posts above
   // hydrate. Stops anchoring once the user scrolls.
   useLayoutEffect(() => {
-    if (!portalReady || !targetPostId) return;
+    if (!portalReady || !targetPostId || !profileData) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -190,7 +190,7 @@ export const PlatformPostViewer = ({
       container.removeEventListener("wheel", markScrolled);
       container.removeEventListener("touchmove", markScrolled);
     };
-  }, [portalReady, targetPostId, posts, initialIdx, activeTab]);
+  }, [portalReady, targetPostId, posts, initialIdx, activeTab, profileData]);
 
   // Mark all visible posts as seen when viewing profile posts
   useEffect(() => {
