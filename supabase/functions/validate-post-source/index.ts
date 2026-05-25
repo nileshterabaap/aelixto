@@ -189,7 +189,18 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
   try {
-    const { postId } = await req.json().catch(() => ({}));
+    const body = await req.json().catch(() => ({} as any));
+    const { postId, url, platform } = body || {};
+
+    // Ad-hoc check mode: validate any URL without touching the database.
+    // Used during post creation to detect private/removed sources.
+    if (!postId && typeof url === "string" && url.trim().length > 0) {
+      const verdict = await validate(platform ?? null, url);
+      return new Response(JSON.stringify({ verdict }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!postId || typeof postId !== "string") {
       return new Response(JSON.stringify({ error: "postId required" }), {
         status: 400,
