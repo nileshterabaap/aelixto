@@ -692,12 +692,15 @@ export type Database = {
       }
       posts: {
         Row: {
+          broken_check_count: number
+          broken_first_seen_at: string | null
           comments_count: number | null
           content: string
           created_at: string
           embed_html: string | null
           id: string
           is_public: boolean
+          last_validated_at: string | null
           likes_count: number | null
           media_type: string | null
           media_url: string | null
@@ -713,12 +716,15 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          broken_check_count?: number
+          broken_first_seen_at?: string | null
           comments_count?: number | null
           content: string
           created_at?: string
           embed_html?: string | null
           id?: string
           is_public?: boolean
+          last_validated_at?: string | null
           likes_count?: number | null
           media_type?: string | null
           media_url?: string | null
@@ -734,12 +740,15 @@ export type Database = {
           user_id: string
         }
         Update: {
+          broken_check_count?: number
+          broken_first_seen_at?: string | null
           comments_count?: number | null
           content?: string
           created_at?: string
           embed_html?: string | null
           id?: string
           is_public?: boolean
+          last_validated_at?: string | null
           likes_count?: number | null
           media_type?: string | null
           media_url?: string | null
