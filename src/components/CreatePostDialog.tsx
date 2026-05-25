@@ -181,6 +181,27 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
       setThumbnailUrl(thumbnail);
       setTitle(videoTitle);
+
+      // Smart privacy check — verify the source is publicly accessible.
+      // If the platform explicitly says the post is missing/private, stop here
+      // so users can't share content they don't have permission to share.
+      try {
+        const platform = classifyUrl(linkUrl, ogType);
+        const { data: validation } = await supabase.functions.invoke(
+          "validate-post-source",
+          { body: { url: linkUrl, platform } }
+        );
+        if (validation?.verdict === "removed") {
+          toast.error(
+            "This content appears to be private or unavailable and can't be shared publicly."
+          );
+          return;
+        }
+      } catch (err) {
+        console.error("[CreatePostDialog] Privacy check failed:", err);
+        // Network issue — don't block, fall through.
+      }
+
       setStep(2);
     } finally {
       setIsLoadingPreview(false);
