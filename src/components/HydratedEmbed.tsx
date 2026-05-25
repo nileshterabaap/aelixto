@@ -1,6 +1,7 @@
 import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import type { Post } from '@/data/demoData';
+import { supabase } from '@/integrations/supabase/client';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
@@ -39,6 +40,15 @@ const rememberHydratedPost = (postId: string) => {
       hydratedPostIds.delete(oldestPostId);
     }
   }
+};
+
+// Session-scoped guard to avoid spamming the validator for the same post
+const validationRequested = new Set<string>();
+const requestSourceValidation = (postId: string) => {
+  if (!postId || validationRequested.has(postId)) return;
+  validationRequested.add(postId);
+  // Fire-and-forget; server side enforces the 2-strike gate before any deletion
+  supabase.functions.invoke('validate-post-source', { body: { postId } }).catch(() => {});
 };
 
 const getYouTubeVideoId = (url: string) => {
@@ -141,7 +151,8 @@ export const HydratedEmbed = memo(({
 
   const handleRawEmbedError = useCallback(() => {
     setRawEmbedFailed(true);
-  }, []);
+    requestSourceValidation(post.id);
+  }, [post.id]);
   
   // For YouTube, prefer their thumbnail
   const effectiveThumbnail = post.platform === 'youtube' && r.url 
