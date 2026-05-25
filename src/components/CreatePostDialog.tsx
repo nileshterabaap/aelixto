@@ -57,6 +57,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     // Auto-generate thumbnail URL and fetch title based on platform
     let thumbnail = "";
     let videoTitle = "";
+    let detectedOgType: string | null = ogType;
     
     console.log('[CreatePostDialog] Processing URL:', linkUrl);
     
@@ -87,7 +88,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           if (!error && ogData) {
             videoTitle = ogData.title || "";
             thumbnail = ogData.image || "";
-            if (ogData.og_type) setOgType(ogData.og_type);
+            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
           }
         } catch (error) {
           console.error('[CreatePostDialog] Reddit fetch failed:', error);
@@ -113,7 +114,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           if (!error && ogData) {
             videoTitle = ogData.title || "";
             thumbnail = ogData.image || "";
-            if (ogData.og_type) setOgType(ogData.og_type);
+            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
           }
         } catch (error) {
           console.error('[CreatePostDialog] Pinterest OG fetch failed:', error);
@@ -156,7 +157,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             console.log('[CreatePostDialog] OG data received:', ogData);
             if (!videoTitle && ogData.title) videoTitle = ogData.title;
             if (ogData.image) thumbnail = ogData.image;
-            if (ogData.og_type) setOgType(ogData.og_type);
+            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
           } else {
             console.error('[CreatePostDialog] OG fetch error:', error);
           }
@@ -186,14 +187,15 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       // If the platform explicitly says the post is missing/private, stop here
       // so users can't share content they don't have permission to share.
       try {
-        const platform = classifyUrl(linkUrl, ogType);
+        const platform = classifyUrl(linkUrl, detectedOgType);
         const { data: validation } = await supabase.functions.invoke(
           "validate-post-source",
           { body: { url: linkUrl, platform } }
         );
         if (validation?.verdict === "removed") {
           toast.error(
-            "This content appears to be private or unavailable and can't be shared publicly."
+            "This post is private or unavailable and can't be shared publicly.",
+            { duration: 5000 }
           );
           return;
         }
