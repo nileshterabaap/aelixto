@@ -65,6 +65,23 @@ interface TextCardThumbnailProps {
   maxChars?: number;
 }
 
+const PLATFORM_LABEL: Record<string, string> = {
+  instagram: "Instagram",
+  youtube: "YouTube",
+  x: "Post on X",
+  twitter: "Post on X",
+  threads: "Threads",
+  spotify: "Spotify",
+  medium: "Medium",
+  facebook: "Facebook",
+  linkedin: "LinkedIn",
+  reddit: "Reddit",
+  tiktok: "TikTok",
+  pinterest: "Pinterest",
+  quora: "Quora",
+  article: "Article",
+};
+
 /**
  * Typographic fallback thumbnail for text-only posts (Threads, X text,
  * LinkedIn, Reddit text, Quora). Renders the first slice of the post's
@@ -82,6 +99,7 @@ export function TextCardThumbnail({
   const icon = ICONS[key];
   const gradient = GRADIENTS[key] || GRADIENTS.external;
   const display = trimText(text, maxChars);
+  const label = PLATFORM_LABEL[key] || "Post";
 
   return (
     <div
@@ -115,14 +133,28 @@ export function TextCardThumbnail({
           </span>
         </div>
       ) : (
-        // No text at all — keep the brand mark centered, large
-        <div className="absolute inset-0 grid place-items-center">
+        // No caption at all — show a clean branded card with logo + platform label
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3">
           {icon && (
             <img
               src={icon}
               alt=""
-              className="w-12 h-12 opacity-70 invert"
+              className="w-10 h-10 opacity-90 invert"
             />
+          )}
+          <span
+            className="text-white/90 font-semibold text-center tracking-wide"
+            style={{ fontSize: "clamp(10px, 3cqw, 14px)" }}
+          >
+            {label}
+          </span>
+          {username && (
+            <span
+              className="text-white/70 font-medium text-center truncate max-w-[90%]"
+              style={{ fontSize: "clamp(9px, 2.6cqw, 12px)" }}
+            >
+              @{username}
+            </span>
           )}
         </div>
       )}
