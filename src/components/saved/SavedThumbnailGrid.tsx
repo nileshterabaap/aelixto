@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import { SavedPostViewer } from "@/components/saved/SavedPostViewer";
+import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 import instagramIcon from "@/assets/platforms/instagram.svg";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
 import xIcon from "@/assets/platforms/x.svg";
@@ -67,12 +68,19 @@ function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void
   const gradient = PLATFORM_GRADIENTS[platform] || "bg-muted";
 
   if (!src || src === "/placeholder.svg") {
+    const textSource =
+      post.content?.trim() || post.title?.trim() || "";
     return (
-      <button onClick={onClick} className={`relative overflow-hidden rounded-2xl aspect-square ${gradient} flex items-center justify-center`}>
-        {icon && <img src={icon} alt="" className="w-10 h-10 opacity-60 invert" />}
-        {post.title && (
-          <span className="absolute bottom-2 left-2 right-2 text-[10px] text-white/80 line-clamp-2 text-left font-medium">{post.title}</span>
-        )}
+      <button
+        onClick={onClick}
+        className="relative overflow-hidden rounded-2xl aspect-square block"
+      >
+        <TextCardThumbnail
+          platform={post.platform}
+          text={textSource}
+          username={post.author?.username}
+          aspect="aspect-square"
+        />
       </button>
     );
   }
