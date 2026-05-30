@@ -289,7 +289,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             <Button 
               variant="outline" 
               className="w-full rounded-full py-4 text-sm font-bold border-2 mb-6 hover:bg-muted active:scale-[0.96] transition-transform duration-200"
-              onClick={() => window.location.href = 'https://aelixto.com/edit-profile'}
+              onClick={() => navigate('/edit-profile')}
             >
               Edit Profile
             </Button>
