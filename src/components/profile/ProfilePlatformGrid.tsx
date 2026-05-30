@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
+import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 import InstagramIcon from "@/assets/platforms/instagram.svg";
 import FacebookIcon from "@/assets/platforms/facebook.svg";
 import YoutubeIcon from "@/assets/platforms/youtube.svg";
@@ -74,14 +75,21 @@ function PostCard({ post, onClick }: {
 
   // Show platform-branded fallback when no thumbnail or image error
   if (!src || src === "/placeholder.svg") {
+    const textSource =
+      (post as any).content?.trim?.() ||
+      (post as any).title?.trim?.() ||
+      "";
+    const aspect = getAspectRatio();
     return (
       <button
         onClick={onClick}
-        className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} ${getPlatformGradient()} flex items-center justify-center`}
+        className={`relative overflow-hidden rounded-2xl ${aspect} block`}
       >
-        {Icon && (
-          <img src={Icon} alt="" className="w-12 h-12 opacity-60 invert" />
-        )}
+        <TextCardThumbnail
+          platform={post.platform}
+          text={textSource}
+          aspect={aspect}
+        />
       </button>
     );
   }
