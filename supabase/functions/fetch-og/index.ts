@@ -133,6 +133,19 @@ serve(async (req) => {
     }
     
     if (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) {
+      if (/reddit\.com\/r\/[^/]+\/s\/[a-z0-9]+\/?(?:[?#].*)?$/i.test(targetUrl)) {
+        console.log('[fetch-og] Reddit mobile share URL is unresolved; skipping generic OG image');
+        return new Response(
+          JSON.stringify({
+            title: 'Reddit Post',
+            image: null,
+            description: 'Open on Reddit',
+            finalUrl: targetUrl,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Use Reddit's JSON API via old.reddit.com - more reliable
       try {
         // Convert to old.reddit.com and append .json

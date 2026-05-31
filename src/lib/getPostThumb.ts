@@ -16,6 +16,8 @@ export function getPostThumb(p: {
   const tu = p.thumbnail_url || p.thumbnailUrl;
   const mu = p.media_url || p.mediaUrl;
 
+  if (platform === "reddit" && isUnresolvedRedditShareUrl(mu)) return null;
+
   // 1) server-derived thumbnail wins (decode HTML entities first),
   //    BUT filter out misleading generic OG placeholders (e.g. Unsplash
   //    fallbacks scraped from Reddit /s/ share links). For platforms where
@@ -43,6 +45,16 @@ export function getPostThumb(p: {
 
   // 4) no reliable image thumbnail — callers can render a branded text tile
   return null;
+}
+
+function isUnresolvedRedditShareUrl(url?: string | null): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    return /(^|\.)reddit\.com$/i.test(parsed.hostname) && /\/s\/[a-z0-9]+\/?$/i.test(parsed.pathname);
+  } catch {
+    return /reddit\.com\/r\/[^/]+\/s\/[a-z0-9]+\/?$/i.test(url);
+  }
 }
 
 /**
