@@ -55,9 +55,12 @@ const NotificationItem = ({
     | 'report_outcome'
     | 'post_removed'
     | 'account_warning'
+    | 'source_removed'
     | undefined;
   const isAuthorRemoval = reportKind === 'post_removed';
   const isAccountWarning = reportKind === 'account_warning';
+  const isSourceRemoved = reportKind === 'source_removed';
+  const sourcePlatform = (notification.metadata?.platform as string | undefined) || '';
   const snapshot = notification.metadata?.post_snapshot as
     | { title?: string; content?: string; thumbnail_url?: string }
     | undefined;
@@ -83,7 +86,9 @@ const NotificationItem = ({
           {isReportOutcome ? (
             <p className="text-sm">
               <span className="font-semibold">
-                {isAccountWarning
+                {isSourceRemoved
+                  ? 'Your post was removed'
+                  : isAccountWarning
                   ? 'Account warning'
                   : isAuthorRemoval
                   ? 'Your post was removed'
@@ -92,7 +97,9 @@ const NotificationItem = ({
                   : 'Report reviewed'}
               </span>{' '}
               <span className="text-muted-foreground">
-                {isAccountWarning
+                {isSourceRemoved
+                  ? `— the original ${sourcePlatform ? sourcePlatform.charAt(0).toUpperCase() + sourcePlatform.slice(1) + ' ' : ''}post was deleted or made private at the source.`
+                  : isAccountWarning
                   ? '— a report against your account was upheld. Repeated violations may lead to account action.'
                   : isAuthorRemoval
                   ? '— it was reported and found to violate our community guidelines.'

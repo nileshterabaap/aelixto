@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
+import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 import InstagramIcon from "@/assets/platforms/instagram.svg";
 import FacebookIcon from "@/assets/platforms/facebook.svg";
 import YoutubeIcon from "@/assets/platforms/youtube.svg";
@@ -71,17 +72,30 @@ function PostCard({ post, onClick }: {
   const rawThumb = getPostThumb(post);
   const src = imageError ? null : maybeProxy(rawThumb, 480);
   const Icon = getPlatformIcon();
+  const platform = (post.platform || "").toLowerCase();
+  const useProfileFallback = ["threads", "reddit", "x", "twitter"].includes(platform);
 
   // Show platform-branded fallback when no thumbnail or image error
   if (!src || src === "/placeholder.svg") {
+    const textSource =
+      post.content?.trim() ||
+      post.title?.trim() ||
+      "";
+    const aspect = getAspectRatio();
     return (
       <button
         onClick={onClick}
-        className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} ${getPlatformGradient()} flex items-center justify-center`}
+        className={`relative overflow-hidden rounded-2xl ${aspect} block`}
       >
-        {Icon && (
-          <img src={Icon} alt="" className="w-12 h-12 opacity-60 invert" />
-        )}
+        <TextCardThumbnail
+          platform={post.platform}
+          text={textSource}
+          username={post.profile_username}
+          displayName={post.profile_display_name}
+          profileAvatarUrl={post.profile_avatar_url}
+          preferProfile={useProfileFallback}
+          aspect={aspect}
+        />
       </button>
     );
   }
@@ -130,6 +144,7 @@ export const ProfilePlatformGrid = ({
   );
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedPostIndex, setSelectedPostIndex] = useState<number>(-1);
   const location = useLocation();
 
   // Close the viewer when the route/location changes (e.g. user taps a nav button)
@@ -157,8 +172,9 @@ export const ProfilePlatformGrid = ({
     }
   };
 
-  const handlePostClick = (postId: string) => {
+  const handlePostClick = (postId: string, postIndex: number) => {
     setSelectedPostId(postId);
+    setSelectedPostIndex(postIndex);
     setViewerOpen(true);
   };
 
@@ -240,7 +256,7 @@ export const ProfilePlatformGrid = ({
                   >
                     <PostCard
                       post={post}
-                      onClick={() => handlePostClick(post.id)}
+                      onClick={() => handlePostClick(post.id, idx)}
                     />
                   </motion.div>
                 ))}
@@ -266,7 +282,10 @@ export const ProfilePlatformGrid = ({
       {viewerOpen && selectedPostId && (
         <PlatformPostViewer
           userId={userId}
+          posts={items}
+          loading={loading}
           initialPostId={selectedPostId}
+          initialPostIndex={selectedPostIndex}
           tabs={tabs}
           activeTab={activeTab}
           onClose={closeViewer}

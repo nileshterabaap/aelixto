@@ -1,6 +1,7 @@
 import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import type { Post } from '@/data/demoData';
+import { supabase } from '@/integrations/supabase/client';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
@@ -8,6 +9,8 @@ import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
+import { OgCardFallback } from '@/components/OgCardFallback';
+import { isUnresolvedRedditShareUrl } from '@/lib/redditUrls';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -39,6 +42,15 @@ const rememberHydratedPost = (postId: string) => {
       hydratedPostIds.delete(oldestPostId);
     }
   }
+};
+
+// Session-scoped guard to avoid spamming the validator for the same post
+const validationRequested = new Set<string>();
+const requestSourceValidation = (postId: string) => {
+  if (!postId || validationRequested.has(postId)) return;
+  validationRequested.add(postId);
+  // Fire-and-forget; server side enforces the 2-strike gate before any deletion
+  supabase.functions.invoke('validate-post-source', { body: { postId } }).catch(() => {});
 };
 
 const getYouTubeVideoId = (url: string) => {
@@ -75,6 +87,12 @@ export const HydratedEmbed = memo(({
   const platformHint = (post.platform || '').toLowerCase();
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
+  const redditFallbackImage =
+    thumbnailUrl ||
+    (post as any).preview_image_url ||
+    (mediaTypeHint === 'image' && mediaUrl && !isUnresolvedRedditShareUrl(mediaUrl) ? mediaUrl : null) ||
+    post.author?.avatar ||
+    null;
 
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
@@ -141,7 +159,8 @@ export const HydratedEmbed = memo(({
 
   const handleRawEmbedError = useCallback(() => {
     setRawEmbedFailed(true);
-  }, []);
+    requestSourceValidation(post.id);
+  }, [post.id]);
   
   // For YouTube, prefer their thumbnail
   const effectiveThumbnail = post.platform === 'youtube' && r.url 
@@ -278,7 +297,17 @@ export const HydratedEmbed = memo(({
         {/* Reddit embed */}
         {r.kind === 'reddit' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <RedditEmbed url={r.url} />
+            {isUnresolvedRedditShareUrl(r.url) ? (
+              <OgCardFallback
+                url={r.url}
+                platform="Reddit"
+                title={post.title || 'View on Reddit'}
+                image={redditFallbackImage || undefined}
+                description={(post as any).content || undefined}
+              />
+            ) : (
+              <RedditEmbed url={r.url} />
+            )}
           </ImageViewTracker>
         )}
         

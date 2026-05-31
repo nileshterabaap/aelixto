@@ -93,6 +93,8 @@ export const useCurrentProfile = () => {
     },
     onSuccess: (data) => {
       queryClient.setQueryData(['profile', user?.id], data);
+      // Invalidate username-keyed profile cache used by UserProfile page
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] });
       toast({
         title: 'Success',
         description: 'Profile updated successfully',

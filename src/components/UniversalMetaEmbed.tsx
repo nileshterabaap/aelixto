@@ -102,7 +102,7 @@ const ThreadsIframeEmbed = ({
       if (!hasLoaded) {
         setFailed(true);
       }
-    }, 12000);
+    }, 6000);
 
     return () => clearTimeout(timeout);
   }, [hasLoaded]);

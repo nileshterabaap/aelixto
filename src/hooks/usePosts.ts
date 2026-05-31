@@ -89,9 +89,26 @@ export const useCreatePost = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+    onSuccess: async () => {
+      await queryClient.cancelQueries({ queryKey: ["posts"] });
+      await queryClient.cancelQueries({ queryKey: ["following-feed"] });
+      await queryClient.cancelQueries({ queryKey: ["platform-posts"] });
+      await queryClient.cancelQueries({ queryKey: ["user-platform-tabs"] });
+      await queryClient.cancelQueries({ queryKey: ["user-posts"] });
+
+      queryClient.removeQueries({ queryKey: ["posts"] });
+      queryClient.removeQueries({ queryKey: ["following-feed"] });
+      queryClient.removeQueries({ queryKey: ["platform-posts"] });
+      queryClient.removeQueries({ queryKey: ["user-platform-tabs"] });
+      queryClient.removeQueries({ queryKey: ["user-posts"] });
+
+      queryClient.invalidateQueries({ queryKey: ["posts"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["following-feed"], refetchType: "all" });
+      // The profile grid + tabs are powered by separate caches.
+      // Without these the new post only appears after a manual refresh.
+      queryClient.invalidateQueries({ queryKey: ["platform-posts"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["user-platform-tabs"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["user-posts"], refetchType: "all" });
       toast({
         title: "Post created!",
         description: "Your post has been published successfully.",

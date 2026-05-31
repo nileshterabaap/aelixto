@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Loader2, Check, X } from "lucide-react";
+import { ArrowLeft, Loader2, Check, X, Share2 } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { ImageUploadButton } from "@/components/ImageUploadButton";
@@ -18,6 +18,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { buildShortUrl, buildProfilePath } from "@/lib/shortUrl";
+import { toast as sonnerToast } from "sonner";
 
 const EditProfile = () => {
   const navigate = useNavigate();
@@ -105,6 +107,24 @@ const EditProfile = () => {
     const url = await uploadImage(file, "covers", user.id);
     if (url) {
       setFormData({ ...formData, cover_url: url });
+    }
+  };
+
+  const handleShareProfile = async () => {
+    if (!profile) return;
+    const url = await buildShortUrl(buildProfilePath(profile.username));
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${profile.display_name || profile.username} on Aelixto`,
+          url,
+        });
+      } catch {
+        // user cancelled
+      }
+    } else {
+      navigator.clipboard.writeText(url);
+      sonnerToast.success("Profile link copied");
     }
   };
 
@@ -218,13 +238,24 @@ const EditProfile = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="bio">Bio</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="bio">Bio</Label>
+              <span className={`text-xs ${formData.bio.length > 150 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                {formData.bio.length}/150
+              </span>
+            </div>
             <Textarea
               id="bio"
               value={formData.bio}
-              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val.length <= 150) {
+                  setFormData({ ...formData, bio: val });
+                }
+              }}
               placeholder="Tell us about yourself..."
               rows={4}
+              maxLength={150}
             />
           </div>
 
@@ -328,6 +359,22 @@ const EditProfile = () => {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Share Profile</Label>
+            <p className="text-sm text-muted-foreground mb-2">
+              Copy your profile link or share it with others.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleShareProfile}
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              Share Profile
+            </Button>
           </div>
 
           <Button type="submit" className="w-full">
