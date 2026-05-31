@@ -3,6 +3,9 @@ import { useSession } from "./useSession";
 
 const STORAGE_KEY_BASE = "aelixto_daily_post_limit";
 export const DAILY_POST_LIMIT = 5;
+// Toggle: set to false to re-enable the daily post limit.
+// Restore phrase: "Bring back post limit.. code 10"
+const LIMIT_DISABLED = true;
 
 interface StoredState {
   date: string;
@@ -87,8 +90,10 @@ export const useDailyPostLimit = () => {
     window.dispatchEvent(new Event(EVENT));
   }, [userId]);
 
-  const remaining = Math.max(0, DAILY_POST_LIMIT - state.count);
-  const reached = state.count >= DAILY_POST_LIMIT;
+  const remaining = LIMIT_DISABLED
+    ? DAILY_POST_LIMIT
+    : Math.max(0, DAILY_POST_LIMIT - state.count);
+  const reached = LIMIT_DISABLED ? false : state.count >= DAILY_POST_LIMIT;
 
   return { count: state.count, remaining, limit: DAILY_POST_LIMIT, reached, increment, decrement };
 };
