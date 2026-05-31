@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
+import { OgCardFallback } from "@/components/OgCardFallback";
 
 export default function RedditEmbed({ url }: { url: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [embedReady, setEmbedReady] = useState(false);
+  const [failed, setFailed] = useState(false);
   
   useEffect(() => {
     setEmbedReady(false);
+    setFailed(false);
 
     let cancelled = false;
 
@@ -90,9 +93,19 @@ export default function RedditEmbed({ url }: { url: string }) {
     
     loadRedditEmbed();
 
+    // If Reddit's widgets.js never produces a real iframe within 5s
+    // (common for /s/ share links and removed/private posts), surface
+    // an OG-style card so the user always has something tappable
+    // instead of a blank box.
     const fallbackTimer = setTimeout(() => {
+      if (cancelled) return;
+      const container = containerRef.current;
+      const hasIframe = container?.querySelector('iframe');
+      if (!hasIframe) {
+        setFailed(true);
+      }
       markReady();
-    }, 8000);
+    }, 5000);
 
     return () => {
       cancelled = true;
@@ -101,6 +114,10 @@ export default function RedditEmbed({ url }: { url: string }) {
     };
   }, [url]);
   
+  if (failed) {
+    return <OgCardFallback url={url} platform="Reddit" />;
+  }
+
   return (
     <div ref={containerRef} data-embed-status={embedReady ? 'ready' : 'loading'}>
       <blockquote className="reddit-card" data-card-created="0">

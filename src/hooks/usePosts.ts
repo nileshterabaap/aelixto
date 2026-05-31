@@ -92,6 +92,11 @@ export const useCreatePost = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["posts"] });
       queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+      // The profile grid + tabs are powered by separate caches.
+      // Without these the new post only appears after a manual refresh.
+      queryClient.invalidateQueries({ queryKey: ["platform-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["user-platform-tabs"] });
+      queryClient.invalidateQueries({ queryKey: ["user-posts"] });
       toast({
         title: "Post created!",
         description: "Your post has been published successfully.",

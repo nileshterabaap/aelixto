@@ -16,8 +16,20 @@ export function getPostThumb(p: {
   const tu = p.thumbnail_url || p.thumbnailUrl;
   const mu = p.media_url || p.mediaUrl;
 
-  // 1) server-derived thumbnail wins (decode HTML entities first)
-  if (tu) return decodeHtmlEntities(tu);
+  // 1) server-derived thumbnail wins (decode HTML entities first),
+  //    BUT filter out misleading generic OG placeholders (e.g. Unsplash
+  //    fallbacks scraped from Reddit /s/ share links). For platforms where
+  //    the thumbnail should plausibly come from the platform itself, drop
+  //    anything hosted on a clearly-foreign domain so the typographic
+  //    TextCardThumbnail can take over instead of showing a wrong image.
+  if (tu) {
+    const decoded = decodeHtmlEntities(tu);
+    if (isMisleadingThumbnail(platform, decoded)) {
+      // Fall through to platform/media derivations or placeholder.
+    } else {
+      return decoded;
+    }
+  }
 
   // 2) platform-based derivations used in Feed
   if (platform === "youtube" && mu) {
@@ -31,6 +43,34 @@ export function getPostThumb(p: {
 
   // 4) safe placeholder
   return "/placeholder.svg";
+}
+
+/**
+ * Returns true for thumbnails that are almost certainly NOT representative
+ * of the actual post (e.g. Unsplash stock images served as OG fallback by
+ * a link-resolver). When this returns true, callers should treat the post
+ * as having no thumbnail and use the platform-branded text card instead.
+ */
+function isMisleadingThumbnail(platform: string, url: string): boolean {
+  const lower = url.toLowerCase();
+  // Generic stock image hosts are never a real post preview.
+  if (lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com")) {
+    return true;
+  }
+  // For Reddit, thumbnails should come from reddit/redd.it/redditmedia/redditstatic
+  // or from our own storage bucket. Anything else is a foreign OG scrape.
+  if (platform === "reddit") {
+    const allowed = [
+      "reddit.com",
+      "redd.it",
+      "redditmedia.com",
+      "redditstatic.com",
+      "/storage/v1/object/public/post-thumbnails/",
+      "post-thumbnails",
+    ];
+    if (!allowed.some((d) => lower.includes(d))) return true;
+  }
+  return false;
 }
 
 /** 
