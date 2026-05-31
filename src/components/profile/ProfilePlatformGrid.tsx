@@ -72,12 +72,14 @@ function PostCard({ post, onClick }: {
   const rawThumb = getPostThumb(post);
   const src = imageError ? null : maybeProxy(rawThumb, 480);
   const Icon = getPlatformIcon();
+  const platform = (post.platform || "").toLowerCase();
+  const useProfileFallback = ["threads", "reddit", "x", "twitter"].includes(platform);
 
   // Show platform-branded fallback when no thumbnail or image error
   if (!src || src === "/placeholder.svg") {
     const textSource =
-      (post as any).content?.trim?.() ||
-      (post as any).title?.trim?.() ||
+      post.content?.trim() ||
+      post.title?.trim() ||
       "";
     const aspect = getAspectRatio();
     return (
@@ -88,6 +90,10 @@ function PostCard({ post, onClick }: {
         <TextCardThumbnail
           platform={post.platform}
           text={textSource}
+          username={post.profile_username}
+          displayName={post.profile_display_name}
+          profileAvatarUrl={post.profile_avatar_url}
+          preferProfile={useProfileFallback}
           aspect={aspect}
         />
       </button>

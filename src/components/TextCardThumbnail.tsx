@@ -1,3 +1,4 @@
+import { useState } from "react";
 import instagramIcon from "@/assets/platforms/instagram.svg";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
 import xIcon from "@/assets/platforms/x.svg";
@@ -60,9 +61,19 @@ interface TextCardThumbnailProps {
   platform?: string | null;
   text?: string | null;
   username?: string | null;
+  displayName?: string | null;
+  profileAvatarUrl?: string | null;
+  preferProfile?: boolean;
   aspect?: string; // tailwind aspect class, e.g. "aspect-square" | "aspect-[3/4]"
   /** Max characters of text to display */
   maxChars?: number;
+}
+
+function initialsFromName(name?: string | null, username?: string | null): string {
+  const source = (name || username || "A").trim();
+  const parts = source.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  return source.slice(0, 2).toUpperCase();
 }
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -92,14 +103,53 @@ export function TextCardThumbnail({
   platform,
   text,
   username,
+  displayName,
+  profileAvatarUrl,
+  preferProfile = false,
   aspect = "aspect-[3/4]",
   maxChars = 140,
 }: TextCardThumbnailProps) {
+  const [avatarError, setAvatarError] = useState(false);
   const key = (platform || "").toLowerCase();
   const icon = ICONS[key];
   const gradient = GRADIENTS[key] || GRADIENTS.external;
   const display = trimText(text, maxChars);
   const label = PLATFORM_LABEL[key] || "Post";
+  const canShowProfile = preferProfile && (!!profileAvatarUrl || !!displayName || !!username);
+  const avatarSrc = profileAvatarUrl && !avatarError ? profileAvatarUrl : null;
+
+  if (canShowProfile) {
+    return (
+      <div
+        className="relative w-full h-full overflow-hidden bg-foreground"
+        style={{ background: gradient }}
+      >
+        {avatarSrc ? (
+          <img
+            src={avatarSrc}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            loading="lazy"
+            onError={() => setAvatarError(true)}
+          />
+        ) : (
+          <div className="absolute inset-0 grid place-items-center">
+            <span className="text-background font-bold text-4xl leading-none">
+              {initialsFromName(displayName, username)}
+            </span>
+          </div>
+        )}
+
+        <div className="absolute inset-0 bg-foreground/10 pointer-events-none" />
+
+        {icon && (
+          <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-foreground/45 backdrop-blur-sm flex items-center justify-center">
+            <img src={icon} alt="" className="w-3.5 h-3.5 invert" />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -119,7 +169,7 @@ export function TextCardThumbnail({
       {display ? (
         <div className="absolute inset-0 flex items-center justify-center px-3">
           <span
-            className="text-white font-semibold text-center leading-snug break-words"
+            className="text-background font-semibold text-center leading-snug break-words"
             style={{
               fontSize: "clamp(11px, 3.4cqw, 18px)",
               display: "-webkit-box",
@@ -142,11 +192,11 @@ export function TextCardThumbnail({
               className="w-10 h-10 opacity-95 invert"
             />
           )}
-          <span className="text-[13px] text-white/95 font-semibold tracking-wide">
+          <span className="text-[13px] text-background font-semibold tracking-wide">
             {label}
           </span>
           {username && (
-            <span className="text-[11px] text-white/75 font-medium truncate max-w-[90%]">
+            <span className="text-[11px] text-background/75 font-medium truncate max-w-[90%]">
               @{username}
             </span>
           )}
@@ -156,7 +206,7 @@ export function TextCardThumbnail({
       {/* Author handle */}
       {username && display && (
         <div className="absolute bottom-1.5 left-2 right-10">
-          <span className="block text-[10px] text-white/80 font-medium truncate">
+          <span className="block text-[10px] text-background/80 font-medium truncate">
             @{username}
           </span>
         </div>
@@ -164,7 +214,7 @@ export function TextCardThumbnail({
 
       {/* Platform badge — always top-right for consistency with image tiles */}
       {icon && display && (
-        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
+        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-foreground/40 backdrop-blur-sm flex items-center justify-center">
           <img src={icon} alt="" className="w-3.5 h-3.5 invert" />
         </div>
       )}
