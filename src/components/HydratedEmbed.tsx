@@ -9,8 +9,6 @@ import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
-import { OgCardFallback } from '@/components/OgCardFallback';
-import { isUnresolvedRedditShareUrl } from '@/lib/redditUrls';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -87,12 +85,6 @@ export const HydratedEmbed = memo(({
   const platformHint = (post.platform || '').toLowerCase();
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
-  const redditFallbackImage =
-    thumbnailUrl ||
-    (post as any).preview_image_url ||
-    (mediaTypeHint === 'image' && mediaUrl && !isUnresolvedRedditShareUrl(mediaUrl) ? mediaUrl : null) ||
-    post.author?.avatar ||
-    null;
 
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
@@ -297,17 +289,7 @@ export const HydratedEmbed = memo(({
         {/* Reddit embed */}
         {r.kind === 'reddit' && r.url && (
           <ImageViewTracker postId={post.id}>
-            {isUnresolvedRedditShareUrl(r.url) ? (
-              <OgCardFallback
-                url={r.url}
-                platform="Reddit"
-                title={post.title || 'View on Reddit'}
-                image={redditFallbackImage || undefined}
-                description={(post as any).content || undefined}
-              />
-            ) : (
-              <RedditEmbed url={r.url} />
-            )}
+            <RedditEmbed url={r.url} />
           </ImageViewTracker>
         )}
         

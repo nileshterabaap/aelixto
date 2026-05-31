@@ -44,7 +44,6 @@ import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
-import { isUnresolvedRedditShareUrl } from "@/lib/redditUrls";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -122,12 +121,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const mediaUrl = post.mediaUrl || (post as any).media_url;
   const previewTitle = (post as any).preview_title;
   const previewText = (post as any).preview_text;
-  const redditFallbackImage =
-    thumbnailUrl ||
-    previewImageUrl ||
-    (post.mediaType === 'image' && mediaUrl && !isUnresolvedRedditShareUrl(mediaUrl) ? mediaUrl : null) ||
-    post.author?.avatar ||
-    null;
   
   
   // Try to get platform from post.platform or detect from URL
@@ -538,17 +531,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  {isUnresolvedRedditShareUrl(r.url) ? (
-                    <OgCardFallback
-                      url={r.url}
-                      platform="Reddit"
-                      title={previewTitle || post.title || 'View on Reddit'}
-                      image={redditFallbackImage || undefined}
-                      description={previewText || undefined}
-                    />
-                  ) : (
-                    <RedditEmbed url={r.url} />
-                  )}
+                  <RedditEmbed url={r.url} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -559,16 +542,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                {isUnresolvedRedditShareUrl(r.url) ? (
-                  <OgCardFallback
-                    url={r.url}
-                    platform="Reddit"
-                    title={post.title || 'View on Reddit'}
-                    image={redditFallbackImage || undefined}
-                  />
-                ) : (
-                  <RedditEmbed url={r.url} />
-                )}
+                <RedditEmbed url={r.url} />
               </LazyEmbed>
             )}
             {r.kind === 'twitter' && post.isRealPost && (
