@@ -23,7 +23,7 @@ export interface PlatformPost {
   profile_avatar_url?: string | null;
 }
 
-const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook", "reddit", "threads"]);
+const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook", "reddit", "threads", "tiktok"]);
 const inflightBackfills = new Set<string>();
 
 const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {

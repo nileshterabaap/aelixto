@@ -286,6 +286,44 @@ async function fetchRedditThumbnail(url: string): Promise<string | null> {
   return ogData.image;
 }
 
+// TikTok oEmbed — public endpoint, no auth, returns thumbnail_url + title
+async function fetchTikTokOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null } | null> {
+  try {
+    // Normalize: strip query/tracking params, follow short links (vm.tiktok.com / vt.tiktok.com)
+    let target = url.trim();
+    if (/^https?:\/\/(vm|vt)\.tiktok\.com\//i.test(target)) {
+      try {
+        const head = await fetch(target, {
+          method: 'GET',
+          redirect: 'follow',
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        });
+        if (head.url) target = head.url.split('?')[0];
+      } catch { /* keep original */ }
+    }
+    const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(target)}`;
+    console.log('[fetch-post-preview] Fetching TikTok oEmbed:', oembedUrl);
+    const res = await fetch(oembedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
+    });
+    if (!res.ok) {
+      console.error(`[fetch-post-preview] TikTok oEmbed failed: ${res.status}`);
+      return null;
+    }
+    const data = await res.json();
+    return {
+      thumbnail_url: data.thumbnail_url || null,
+      title: data.title || data.author_name || null,
+    };
+  } catch (e) {
+    console.error('[fetch-post-preview] TikTok oEmbed error:', e);
+    return null;
+  }
+}
+
 function decodeRedditUrl(url?: string | null): string | null {
   if (!url || typeof url !== 'string') return null;
   const decoded = decodeHtmlEntities(url);
