@@ -286,10 +286,6 @@ function extractRedditMediaThumbnail(post: any): string | null {
   const galleryThumb = decodeRedditUrl(galleryImage);
   if (galleryThumb) return galleryThumb;
 
-  const videoPreview = decodeRedditUrl(post.secure_media?.reddit_video?.fallback_url)
-    || decodeRedditUrl(post.media?.reddit_video?.fallback_url);
-  if (videoPreview) return videoPreview;
-
   const oembedThumb = decodeRedditUrl(post.secure_media?.oembed?.thumbnail_url)
     || decodeRedditUrl(post.media?.oembed?.thumbnail_url);
   if (oembedThumb) return oembedThumb;
