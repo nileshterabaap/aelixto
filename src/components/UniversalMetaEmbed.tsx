@@ -754,6 +754,14 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
   // Show fallback if no embed HTML or if embed failed
   const platform = detectPlatform(expandedUrl);
+
+  // Suppress fallback while we're still waiting for URL expansion to resolve.
+  // Returning a loading sentinel keeps the parent's skeleton in place so the
+  // user never sees a "View on TikTok / Facebook" placeholder flash.
+  if (expansionPending) {
+    return <div data-embed-status="loading" className="w-full" style={{ minHeight: 1 }} />;
+  }
+
   const platformName =
     platform === 'instagram' ? 'Instagram'
     : platform === 'facebook' ? 'Facebook'
