@@ -30,23 +30,23 @@ const ICONS: Record<string, string> = {
   article: blogIcon,
 };
 
-// Brand-tinted HSL gradients tuned for legibility and independent of Tailwind's generated class scan.
+// Brand-tinted gradient tokens tuned for legibility and independent of Tailwind's generated class scan.
 const GRADIENTS: Record<string, string> = {
-  instagram: "linear-gradient(135deg, hsl(262 83% 45%), hsl(330 81% 52%), hsl(25 95% 53%))",
-  youtube: "linear-gradient(135deg, hsl(0 82% 35%), hsl(0 84% 52%))",
-  x: "linear-gradient(135deg, hsl(0 0% 7%), hsl(0 0% 0%))",
-  twitter: "linear-gradient(135deg, hsl(0 0% 7%), hsl(0 0% 0%))",
-  threads: "linear-gradient(135deg, hsl(0 0% 7%), hsl(0 0% 0%))",
-  spotify: "linear-gradient(135deg, hsl(142 76% 24%), hsl(142 70% 45%))",
-  medium: "linear-gradient(135deg, hsl(0 0% 7%), hsl(0 0% 22%))",
-  facebook: "linear-gradient(135deg, hsl(221 83% 40%), hsl(217 91% 60%))",
-  linkedin: "linear-gradient(135deg, hsl(208 90% 35%), hsl(204 74% 49%))",
-  reddit: "linear-gradient(135deg, hsl(16 100% 35%), hsl(16 100% 50%))",
-  tiktok: "linear-gradient(135deg, hsl(0 0% 0%), hsl(0 0% 18%))",
-  pinterest: "linear-gradient(135deg, hsl(0 74% 32%), hsl(0 72% 48%))",
-  quora: "linear-gradient(135deg, hsl(0 74% 24%), hsl(0 69% 40%))",
-  article: "linear-gradient(135deg, hsl(158 64% 26%), hsl(173 80% 36%))",
-  external: "linear-gradient(135deg, hsl(215 25% 27%), hsl(215 16% 47%))",
+  instagram: "var(--thumb-gradient-instagram)",
+  youtube: "var(--thumb-gradient-youtube)",
+  x: "var(--thumb-gradient-dark)",
+  twitter: "var(--thumb-gradient-dark)",
+  threads: "var(--thumb-gradient-dark)",
+  spotify: "var(--thumb-gradient-spotify)",
+  medium: "var(--thumb-gradient-dark)",
+  facebook: "var(--thumb-gradient-facebook)",
+  linkedin: "var(--thumb-gradient-linkedin)",
+  reddit: "var(--thumb-gradient-reddit)",
+  tiktok: "var(--thumb-gradient-dark)",
+  pinterest: "var(--thumb-gradient-pinterest)",
+  quora: "var(--thumb-gradient-quora)",
+  article: "var(--thumb-gradient-article)",
+  external: "var(--thumb-gradient-external)",
 };
 
 function trimText(t?: string | null, max = 140): string {
