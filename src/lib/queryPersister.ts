@@ -38,5 +38,5 @@ export const localStoragePersister = createSyncStoragePersister({
 export const persistOptions = {
   persister: localStoragePersister,
   maxAge: MAX_AGE,
-  buster: 'v6-remove-reddit-threads-posts', // Clears stale saved/feed snapshots after removing broken Reddit/Threads posts
+  buster: 'v5-profile-social-thumbnails', // Clears stale profile grid snapshots so Reddit/Threads use media/profile thumbnails
 };
