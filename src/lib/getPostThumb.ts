@@ -11,7 +11,7 @@ export function getPostThumb(p: {
   thumbnailUrl?: string | null;    // legacy/feed field
   media_url?: string | null;       // server field
   mediaUrl?: string | null;        // legacy/feed field
-}) {
+}): string | null {
   const platform = (p.platform || "").toLowerCase();
   const tu = p.thumbnail_url || p.thumbnailUrl;
   const mu = p.media_url || p.mediaUrl;
@@ -41,8 +41,8 @@ export function getPostThumb(p: {
   // 3) direct image media
   if (mu && /\.(png|jpg|jpeg|webp|gif)(\?|$)/i.test(mu)) return mu;
 
-  // 4) safe placeholder
-  return "/placeholder.svg";
+  // 4) no reliable image thumbnail — callers can render a branded text tile
+  return null;
 }
 
 /**
@@ -80,7 +80,7 @@ function isMisleadingThumbnail(platform: string, url: string): boolean {
  * 3. Provide caching
  */
 export function maybeProxy(url?: string | null, w = 480) {
-  if (!url) return "/placeholder.svg";
+  if (!url) return null;
   
   // Don't proxy local/relative paths or placeholders
   if (url.startsWith("/")) return url;
@@ -89,12 +89,12 @@ export function maybeProxy(url?: string | null, w = 480) {
   try { 
     new URL(url); 
   } catch { 
-    return "/placeholder.svg"; 
+    return null; 
   }
   
   // Only allow HTTPS URLs
   if (!url.startsWith("https://")) {
-    return "/placeholder.svg";
+    return null;
   }
   
   // Return ALL URLs directly - no proxying needed
