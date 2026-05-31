@@ -486,6 +486,23 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   const [showFallback, setShowFallback] = useState(cached?.showFallback ?? false);
   const lastTapRef = useRef<number>(0);
 
+  // Detect URLs that REQUIRE async expansion before we can build a real embed.
+  // While expansion is pending (and we couldn't build immediate HTML), we must
+  // NOT render OgCardFallback — its `data-embed-status="ready"` tells the
+  // parent skeleton to dismiss, causing a "View on TikTok / Facebook" flash.
+  const needsAsyncExpansion = (() => {
+    const lower = url.toLowerCase();
+    return (
+      lower.includes('vm.tiktok.com') ||
+      lower.includes('vt.tiktok.com') ||
+      (lower.includes('tiktok.com') && lower.includes('/t/')) ||
+      lower.includes('fb.watch') ||
+      lower.includes('fb.me') ||
+      (lower.includes('facebook.com') && lower.includes('/share/'))
+    );
+  })();
+  const expansionPending = needsAsyncExpansion && !cached && !embedHtml && !showFallback;
+
   const handleDoubleTap = () => {
     const now = Date.now();
     const timeSinceLastTap = now - lastTapRef.current;
@@ -737,6 +754,14 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
 
   // Show fallback if no embed HTML or if embed failed
   const platform = detectPlatform(expandedUrl);
+
+  // Suppress fallback while we're still waiting for URL expansion to resolve.
+  // Returning a loading sentinel keeps the parent's skeleton in place so the
+  // user never sees a "View on TikTok / Facebook" placeholder flash.
+  if (expansionPending) {
+    return <div data-embed-status="loading" className="w-full" style={{ minHeight: 1 }} />;
+  }
+
   const platformName =
     platform === 'instagram' ? 'Instagram'
     : platform === 'facebook' ? 'Facebook'
