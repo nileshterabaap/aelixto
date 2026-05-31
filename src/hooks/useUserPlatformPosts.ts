@@ -105,10 +105,10 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       return (data || []) as PlatformPost[];
     },
     enabled: !!userId && !!platform,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnMount: "always",
     refetchOnReconnect: false,
   });
 

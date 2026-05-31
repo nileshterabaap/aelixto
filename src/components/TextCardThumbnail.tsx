@@ -103,7 +103,8 @@ export function TextCardThumbnail({
 
   return (
     <div
-      className={`relative w-full h-full ${aspect} ${gradient} overflow-hidden`}
+      className={`relative w-full h-full ${gradient} overflow-hidden`}
+      style={{ containerType: "inline-size" }}
     >
       {/* Subtle paper-grain overlay for depth */}
       <div
@@ -121,7 +122,6 @@ export function TextCardThumbnail({
             className="text-white font-semibold text-center leading-snug break-words"
             style={{
               fontSize: "clamp(11px, 3.4cqw, 18px)",
-              containerType: "inline-size",
               display: "-webkit-box",
               WebkitLineClamp: 6,
               WebkitBoxOrient: "vertical",
@@ -134,25 +134,19 @@ export function TextCardThumbnail({
         </div>
       ) : (
         // No caption at all — show a clean branded card with logo + platform label
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center">
           {icon && (
             <img
               src={icon}
               alt=""
-              className="w-10 h-10 opacity-90 invert"
+              className="w-10 h-10 opacity-95 invert"
             />
           )}
-          <span
-            className="text-white/90 font-semibold text-center tracking-wide"
-            style={{ fontSize: "clamp(10px, 3cqw, 14px)" }}
-          >
+          <span className="text-[13px] text-white/95 font-semibold tracking-wide">
             {label}
           </span>
           {username && (
-            <span
-              className="text-white/70 font-medium text-center truncate max-w-[90%]"
-              style={{ fontSize: "clamp(9px, 2.6cqw, 12px)" }}
-            >
+            <span className="text-[11px] text-white/75 font-medium truncate max-w-[90%]">
               @{username}
             </span>
           )}
