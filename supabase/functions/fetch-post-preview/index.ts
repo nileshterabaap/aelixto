@@ -55,6 +55,24 @@ serve(async (req) => {
     else if (platform === 'reddit') {
       thumbnailUrl = await fetchRedditThumbnail(url);
     }
+    // TikTok - use official oEmbed (no auth required) and store permanently
+    else if (platform === 'tiktok') {
+      const tiktokData = await fetchTikTokOembed(url);
+      if (tiktokData?.thumbnail_url) {
+        thumbnailUrl = await storeThumbnailPermanently(postId, tiktokData.thumbnail_url);
+      }
+      if (tiktokData?.title) {
+        previewText = tiktokData.title;
+      }
+      // Fallback to OG scrape if oEmbed didn't yield a thumbnail
+      if (!thumbnailUrl) {
+        const ogData = await scrapeOgData(url);
+        if (ogData.image) {
+          thumbnailUrl = await storeThumbnailPermanently(postId, ogData.image);
+        }
+        if (!previewText) previewText = ogData.description || ogData.title;
+      }
+    }
     // Generic scraping for other platforms
     else {
       const ogData = await scrapeOgData(url);
