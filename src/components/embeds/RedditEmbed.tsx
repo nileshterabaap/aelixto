@@ -1,128 +1,104 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { OgCardFallback } from "@/components/OgCardFallback";
 
-export default function RedditEmbed({ url }: { url: string }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [embedReady, setEmbedReady] = useState(false);
-  const [failed, setFailed] = useState(false);
-  
-  useEffect(() => {
-    setEmbedReady(false);
-    setFailed(false);
-
-    let cancelled = false;
-
-    const markReady = () => {
-      if (cancelled) return;
-      setEmbedReady(true);
-    };
-
-    const checkReady = () => {
-      const container = containerRef.current;
-      if (!container) return false;
-
-      const iframe = container.querySelector('iframe');
-      const pendingBlockquote = container.querySelector('blockquote.reddit-card[data-card-created="0"]');
-      const processedBlockquote = container.querySelector('blockquote.reddit-card:not([data-card-created="0"])');
-      const hasRenderedChildren = Array.from(container.childNodes).some((node) => {
-        if (!(node instanceof HTMLElement)) return false;
-        if (pendingBlockquote && node === pendingBlockquote) {
-          return node.childElementCount > 1;
-        }
-        return true;
-      });
-
-      if (iframe || processedBlockquote || hasRenderedChildren) {
-        markReady();
-        return true;
-      }
-
-      return false;
-    };
-
-    const observer = new MutationObserver(() => {
-      checkReady();
+/**
+ * Build a direct embed.reddit.com iframe URL from any Reddit post link
+ * (including mobile `/r/<sub>/s/<code>` share links). Reddit's official
+ * widgets.js only matches `/comments/` paths and silently does nothing for
+ * `/s/` links — so we always replicate what widgets.js *would* have done
+ * for valid links, but route every Reddit URL through it.
+ */
+function buildRedditEmbedSrc(rawUrl: string): string | null {
+  try {
+    const u = new URL(rawUrl);
+    if (!/(^|\.)reddit\.com$/.test(u.hostname) && u.hostname !== "redd.it") return null;
+    const path = u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`;
+    const params = new URLSearchParams({
+      embed: "true",
+      ref_source: "embed",
+      ref: "share",
+      utm_medium: "widgets",
+      utm_source: "embedv2",
+      utm_term: "23",
+      utm_name: "post_embed",
+      embed_host_url: typeof window !== "undefined" ? window.location.origin : "",
     });
+    return `https://embed.reddit.com${path}?${params.toString()}`;
+  } catch {
+    return null;
+  }
+}
 
-    if (containerRef.current) {
-      observer.observe(containerRef.current, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['data-card-created', 'class', 'style'],
-      });
-    }
+export default function RedditEmbed({ url }: { url: string }) {
+  const src = useMemo(() => buildRedditEmbedSrc(url), [url]);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(420);
+  const [failed, setFailed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
-    const loadRedditEmbed = async () => {
-      const src = "https://embed.reddit.com/widgets.js";
-      
-      // Check if script already exists
-      let script = document.querySelector<HTMLScriptElement>(`script[src="${src}"]`);
-      
-      if (!script) {
-        // Create and append script
-        script = document.createElement("script");
-        script.src = src;
-        script.async = true;
-        document.body.appendChild(script);
-        
-        // Wait for script to load
-        await new Promise<void>((resolve) => {
-          script!.onload = () => resolve();
-        });
-      }
-      
-      // Initialize Reddit embeds
-      const reddit = (window as any).reddit;
-      if (reddit?.init) {
-        reddit.init();
-      }
-      
-      // Force re-render of this specific embed
-      if (containerRef.current && reddit?.Embed) {
-        const blockquote = containerRef.current.querySelector('blockquote');
-        if (blockquote) {
-          reddit.Embed.init(blockquote);
-        }
-      }
+  // Listen for Reddit's `resize.embed` postMessage to auto-size, mirroring
+  // the protocol used by embed.reddit.com's widgets.js iframe.
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      const iframeWindow = iframeRef.current?.contentWindow;
+      if (!iframeWindow || event.source !== iframeWindow) return;
 
-      requestAnimationFrame(() => {
-        checkReady();
-      });
+      let payload: unknown = event.data;
+      if (typeof payload === "string") {
+        try { payload = JSON.parse(payload); } catch { return; }
+      }
+      if (!payload || typeof payload !== "object") return;
+      const obj = payload as { type?: string; data?: unknown };
+      if (obj.type !== "resize.embed") return;
+      const next = typeof obj.data === "number"
+        ? obj.data
+        : Number(obj.data);
+      if (!Number.isFinite(next) || next < 80) return;
+      setHeight((prev) => (Math.abs(prev - next) > 2 ? Math.round(next) : prev));
     };
-    
-    loadRedditEmbed();
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
-    // If Reddit's widgets.js never produces a real iframe within 5s
-    // (common for /s/ share links and removed/private posts), surface
-    // an OG-style card so the user always has something tappable
-    // instead of a blank box.
-    const fallbackTimer = setTimeout(() => {
-      if (cancelled) return;
-      const container = containerRef.current;
-      const hasIframe = container?.querySelector('iframe');
-      if (!hasIframe) {
-        setFailed(true);
-      }
-      markReady();
-    }, 5000);
+  // If the iframe never reports a load within 8s, fall back to an OG card.
+  useEffect(() => {
+    if (!src) return;
+    const t = setTimeout(() => {
+      if (!loaded) setFailed(true);
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [src, loaded]);
 
-    return () => {
-      cancelled = true;
-      observer.disconnect();
-      clearTimeout(fallbackTimer);
-    };
-  }, [url]);
-  
-  if (failed) {
+  if (!src || failed) {
     return <OgCardFallback url={url} platform="Reddit" />;
   }
 
   return (
-    <div ref={containerRef} data-embed-status={embedReady ? 'ready' : 'loading'}>
-      <blockquote className="reddit-card" data-card-created="0">
-        <a href={url}>View on Reddit</a>
-      </blockquote>
+    <div
+      className="relative w-full overflow-hidden"
+      style={{ height: `${height}px`, minHeight: "260px" }}
+      data-embed-status={loaded ? "ready" : "loading"}
+    >
+      <iframe
+        ref={iframeRef}
+        src={src}
+        title="Reddit post"
+        scrolling="no"
+        loading="lazy"
+        allowFullScreen
+        allow="clipboard-read; clipboard-write"
+        sandbox="allow-scripts allow-same-origin allow-popups"
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+        style={{
+          border: "none",
+          width: "100%",
+          height: "100%",
+          display: "block",
+          borderRadius: "8px",
+          background: "transparent",
+        }}
+      />
     </div>
   );
 }
