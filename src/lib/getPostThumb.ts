@@ -60,15 +60,10 @@ function isMisleadingThumbnail(platform: string, url: string): boolean {
   // For Reddit, thumbnails should come from reddit/redd.it/redditmedia/redditstatic
   // or from our own storage bucket. Anything else is a foreign OG scrape.
   if (platform === "reddit") {
-    const allowed = [
-      "reddit.com",
-      "redd.it",
-      "redditmedia.com",
-      "redditstatic.com",
-      "/storage/v1/object/public/post-thumbnails/",
-      "post-thumbnails",
-    ];
-    if (!allowed.some((d) => lower.includes(d))) return true;
+    // Reddit posts can legitimately point to external image/video hosts
+    // (Imgur, Gfycat/CDN mirrors, news images, etc.). Only reject the known
+    // generic placeholders above; otherwise let real scraped media render.
+    return false;
   }
   return false;
 }
