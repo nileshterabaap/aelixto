@@ -274,26 +274,27 @@ function decodeRedditUrl(url?: string | null): string | null {
   return /^https?:\/\//i.test(decoded) ? decoded : null;
 }
 
-function extractRedditMediaThumbnail(post: any): string | null {
+function extractRedditMediaThumbnail(post: Record<string, unknown> | null | undefined): string | null {
   if (!post) return null;
 
-  const preview = decodeRedditUrl(post.preview?.images?.[0]?.source?.url);
+  const data = post as Record<string, any>;
+  const preview = decodeRedditUrl(data.preview?.images?.[0]?.source?.url);
   if (preview) return preview;
 
-  const galleryItem = post.gallery_data?.items?.[0];
+  const galleryItem = data.gallery_data?.items?.[0];
   const mediaId = galleryItem?.media_id;
-  const galleryImage = mediaId ? post.media_metadata?.[mediaId]?.s?.u : null;
+  const galleryImage = mediaId ? data.media_metadata?.[mediaId]?.s?.u : null;
   const galleryThumb = decodeRedditUrl(galleryImage);
   if (galleryThumb) return galleryThumb;
 
-  const oembedThumb = decodeRedditUrl(post.secure_media?.oembed?.thumbnail_url)
-    || decodeRedditUrl(post.media?.oembed?.thumbnail_url);
+  const oembedThumb = decodeRedditUrl(data.secure_media?.oembed?.thumbnail_url)
+    || decodeRedditUrl(data.media?.oembed?.thumbnail_url);
   if (oembedThumb) return oembedThumb;
 
-  const urlThumb = decodeRedditUrl(post.url_overridden_by_dest || post.url);
+  const urlThumb = decodeRedditUrl(data.url_overridden_by_dest || data.url);
   if (urlThumb && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(urlThumb)) return urlThumb;
 
-  const thumbnail = decodeRedditUrl(post.thumbnail);
+  const thumbnail = decodeRedditUrl(data.thumbnail);
   if (thumbnail && !/(default|self|nsfw|spoiler)$/i.test(thumbnail)) return thumbnail;
 
   return null;
