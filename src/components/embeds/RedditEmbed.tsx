@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { OgCardFallback } from "@/components/OgCardFallback";
 
+type RedditEmbedProps = {
+  url: string;
+  title?: string | null;
+  thumbnailUrl?: string | null;
+  description?: string | null;
+  authorAvatar?: string | null;
+};
+
 /**
  * Build a direct embed.reddit.com iframe URL from any Reddit post link
  * (including mobile `/r/<sub>/s/<code>` share links). Reddit's official
@@ -29,8 +37,18 @@ function buildRedditEmbedSrc(rawUrl: string): string | null {
   }
 }
 
-export default function RedditEmbed({ url }: { url: string }) {
+function isRedditShortShareUrl(rawUrl: string): boolean {
+  try {
+    const u = new URL(rawUrl);
+    return /\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
+export default function RedditEmbed({ url, title, thumbnailUrl, description, authorAvatar }: RedditEmbedProps) {
   const src = useMemo(() => buildRedditEmbedSrc(url), [url]);
+  const previewOnly = useMemo(() => isRedditShortShareUrl(url), [url]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(420);
   const [failed, setFailed] = useState(false);
@@ -60,17 +78,27 @@ export default function RedditEmbed({ url }: { url: string }) {
     return () => window.removeEventListener("message", handler);
   }, []);
 
-  // If the iframe never reports a load within 8s, fall back to an OG card.
+  // If the iframe never reports a load within 8s, fall back to a rich preview.
   useEffect(() => {
-    if (!src) return;
+    if (!src || previewOnly) return;
     const t = setTimeout(() => {
       if (!loaded) setFailed(true);
     }, 8000);
     return () => clearTimeout(t);
-  }, [src, loaded]);
+  }, [src, loaded, previewOnly]);
 
-  if (!src || failed) {
-    return <OgCardFallback url={url} platform="Reddit" />;
+  if (!src || failed || previewOnly) {
+    return (
+      <div data-embed-status="ready">
+        <OgCardFallback
+          url={url}
+          platform="Reddit"
+          title={title || undefined}
+          image={thumbnailUrl || authorAvatar || undefined}
+          description={description || undefined}
+        />
+      </div>
+    );
   }
 
   return (
