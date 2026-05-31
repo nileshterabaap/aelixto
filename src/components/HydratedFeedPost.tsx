@@ -37,7 +37,6 @@ import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
-import { getPostThumb } from "@/lib/getPostThumb";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
@@ -439,14 +438,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setIsHydrated(true);
   }, []);
 
-  // Derive thumbnail: filter misleading Reddit placeholders, then derive from URL
-  const effectiveThumbnail = getPostThumb({
-    platform: post.platform,
-    thumbnailUrl,
-    thumbnail_url: (post as any).thumbnail_url,
-    mediaUrl: mediaUrl,
-    media_url: (post as any).media_url,
-  }) || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
+  // Derive thumbnail: prefer stored, then derive from URL
+  const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
   const showCard = isTextOnly || embedState === 'ready' || embedState === 'error';
 
