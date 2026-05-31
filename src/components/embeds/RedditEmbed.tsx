@@ -2,16 +2,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { OgCardFallback } from "@/components/OgCardFallback";
 
 /**
- * Build a direct embed.reddit.com iframe URL from any Reddit post link
- * (including mobile `/r/<sub>/s/<code>` share links). Reddit's official
- * widgets.js only matches `/comments/` paths and silently does nothing for
- * `/s/` links — so we always replicate what widgets.js *would* have done
- * for valid links, but route every Reddit URL through it.
+ * Build a direct embed.reddit.com iframe URL only for canonical Reddit post
+ * URLs. Mobile `/r/<sub>/s/<code>` share links are personalized redirectors;
+ * Reddit's embed host returns a real HTTP 200 with a visible "Page not found"
+ * screen for them, so never iframe those unresolved links.
  */
 function buildRedditEmbedSrc(rawUrl: string): string | null {
   try {
     const u = new URL(rawUrl);
     if (!/(^|\.)reddit\.com$/.test(u.hostname) && u.hostname !== "redd.it") return null;
+    if (!/\/comments\/[a-z0-9_]+/i.test(u.pathname)) return null;
     const path = u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`;
     const params = new URLSearchParams({
       embed: "true",
