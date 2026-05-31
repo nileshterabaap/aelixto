@@ -45,6 +45,18 @@ All colors MUST be HSL.
     --brand-blue: 213 100% 50%;
     --shadow-soft: 0 0% 0% / 0.15;
 
+    --thumb-gradient-instagram: linear-gradient(135deg, hsl(262 83% 45%), hsl(330 81% 52%), hsl(25 95% 53%));
+    --thumb-gradient-youtube: linear-gradient(135deg, hsl(0 82% 35%), hsl(0 84% 52%));
+    --thumb-gradient-dark: linear-gradient(135deg, hsl(0 0% 7%), hsl(0 0% 0%));
+    --thumb-gradient-spotify: linear-gradient(135deg, hsl(142 76% 24%), hsl(142 70% 45%));
+    --thumb-gradient-facebook: linear-gradient(135deg, hsl(221 83% 40%), hsl(217 91% 60%));
+    --thumb-gradient-linkedin: linear-gradient(135deg, hsl(208 90% 35%), hsl(204 74% 49%));
+    --thumb-gradient-reddit: linear-gradient(135deg, hsl(16 100% 35%), hsl(16 100% 50%));
+    --thumb-gradient-pinterest: linear-gradient(135deg, hsl(0 74% 32%), hsl(0 72% 48%));
+    --thumb-gradient-quora: linear-gradient(135deg, hsl(0 74% 24%), hsl(0 69% 40%));
+    --thumb-gradient-article: linear-gradient(135deg, hsl(158 64% 26%), hsl(173 80% 36%));
+    --thumb-gradient-external: linear-gradient(135deg, hsl(215 25% 27%), hsl(215 16% 47%));
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
