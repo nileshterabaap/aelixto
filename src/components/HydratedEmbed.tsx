@@ -9,6 +9,8 @@ import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
+import { OgCardFallback } from '@/components/OgCardFallback';
+import { isUnresolvedRedditShareUrl } from '@/lib/redditUrls';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -289,7 +291,17 @@ export const HydratedEmbed = memo(({
         {/* Reddit embed */}
         {r.kind === 'reddit' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <RedditEmbed url={r.url} />
+            {isUnresolvedRedditShareUrl(r.url) ? (
+              <OgCardFallback
+                url={r.url}
+                platform="Reddit"
+                title={post.title || 'View on Reddit'}
+                image={effectiveThumbnail || undefined}
+                description={(post as any).content || undefined}
+              />
+            ) : (
+              <RedditEmbed url={r.url} />
+            )}
           </ImageViewTracker>
         )}
         

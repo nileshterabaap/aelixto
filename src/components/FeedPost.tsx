@@ -44,6 +44,7 @@ import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
+import { isUnresolvedRedditShareUrl } from "@/lib/redditUrls";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -531,7 +532,17 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <RedditEmbed url={r.url} />
+                  {isUnresolvedRedditShareUrl(r.url) ? (
+                    <OgCardFallback
+                      url={r.url}
+                      platform="Reddit"
+                      title={previewTitle || post.title || 'View on Reddit'}
+                      image={(thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform)) || undefined}
+                      description={previewText || undefined}
+                    />
+                  ) : (
+                    <RedditEmbed url={r.url} />
+                  )}
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -542,7 +553,16 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <RedditEmbed url={r.url} />
+                {isUnresolvedRedditShareUrl(r.url) ? (
+                  <OgCardFallback
+                    url={r.url}
+                    platform="Reddit"
+                    title={post.title || 'View on Reddit'}
+                    image={(thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform)) || undefined}
+                  />
+                ) : (
+                  <RedditEmbed url={r.url} />
+                )}
               </LazyEmbed>
             )}
             {r.kind === 'twitter' && post.isRealPost && (
