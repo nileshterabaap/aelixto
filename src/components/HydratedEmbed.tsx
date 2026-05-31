@@ -87,6 +87,12 @@ export const HydratedEmbed = memo(({
   const platformHint = (post.platform || '').toLowerCase();
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
+  const redditFallbackImage =
+    thumbnailUrl ||
+    (post as any).preview_image_url ||
+    (mediaTypeHint === 'image' && mediaUrl && !isUnresolvedRedditShareUrl(mediaUrl) ? mediaUrl : null) ||
+    post.author?.avatar ||
+    null;
 
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
@@ -296,6 +302,7 @@ export const HydratedEmbed = memo(({
                 url={r.url}
                 platform="Reddit"
                 title={post.title || 'View on Reddit'}
+                image={redditFallbackImage || undefined}
                 description={(post as any).content || undefined}
               />
             ) : (
