@@ -18,6 +18,9 @@ export interface PlatformPost {
   is_public: boolean;
   is_repost: boolean;
   original_user_id: string | null;
+  profile_username?: string | null;
+  profile_display_name?: string | null;
+  profile_avatar_url?: string | null;
 }
 
 const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook"]);
@@ -119,7 +122,27 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
         if (!cursor) break;
       }
 
-      return all;
+      const userIds = [...new Set(all.map((post) => post.user_id).filter(Boolean))];
+      if (userIds.length === 0) return all;
+
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, username, display_name, avatar_url")
+        .in("user_id", userIds);
+
+      const profileByUserId = new Map(
+        (profiles || []).map((profile) => [profile.user_id, profile])
+      );
+
+      return all.map((post) => {
+        const profile = profileByUserId.get(post.user_id);
+        return {
+          ...post,
+          profile_username: profile?.username || null,
+          profile_display_name: profile?.display_name || null,
+          profile_avatar_url: profile?.avatar_url || null,
+        };
+      });
     },
     enabled: !!userId && !!platform,
     staleTime: 30 * 1000,
