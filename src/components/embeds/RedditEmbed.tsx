@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { OgCardFallback } from "@/components/OgCardFallback";
+import { buildRedditEmbedSrc } from "@/lib/redditUrls";
 
 /**
  * Build a direct embed.reddit.com iframe URL only for canonical Reddit post
@@ -7,28 +8,6 @@ import { OgCardFallback } from "@/components/OgCardFallback";
  * Reddit's embed host returns a real HTTP 200 with a visible "Page not found"
  * screen for them, so never iframe those unresolved links.
  */
-function buildRedditEmbedSrc(rawUrl: string): string | null {
-  try {
-    const u = new URL(rawUrl);
-    if (!/(^|\.)reddit\.com$/.test(u.hostname) && u.hostname !== "redd.it") return null;
-    if (!/\/comments\/[a-z0-9_]+/i.test(u.pathname)) return null;
-    const path = u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`;
-    const params = new URLSearchParams({
-      embed: "true",
-      ref_source: "embed",
-      ref: "share",
-      utm_medium: "widgets",
-      utm_source: "embedv2",
-      utm_term: "23",
-      utm_name: "post_embed",
-      embed_host_url: typeof window !== "undefined" ? window.location.origin : "",
-    });
-    return `https://embed.reddit.com${path}?${params.toString()}`;
-  } catch {
-    return null;
-  }
-}
-
 export default function RedditEmbed({ url }: { url: string }) {
   const src = useMemo(() => buildRedditEmbedSrc(url), [url]);
   const iframeRef = useRef<HTMLIFrameElement>(null);
