@@ -486,6 +486,23 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   const [showFallback, setShowFallback] = useState(cached?.showFallback ?? false);
   const lastTapRef = useRef<number>(0);
 
+  // Detect URLs that REQUIRE async expansion before we can build a real embed.
+  // While expansion is pending (and we couldn't build immediate HTML), we must
+  // NOT render OgCardFallback — its `data-embed-status="ready"` tells the
+  // parent skeleton to dismiss, causing a "View on TikTok / Facebook" flash.
+  const needsAsyncExpansion = (() => {
+    const lower = url.toLowerCase();
+    return (
+      lower.includes('vm.tiktok.com') ||
+      lower.includes('vt.tiktok.com') ||
+      (lower.includes('tiktok.com') && lower.includes('/t/')) ||
+      lower.includes('fb.watch') ||
+      lower.includes('fb.me') ||
+      (lower.includes('facebook.com') && lower.includes('/share/'))
+    );
+  })();
+  const expansionPending = needsAsyncExpansion && !cached && !embedHtml && !showFallback;
+
   const handleDoubleTap = () => {
     const now = Date.now();
     const timeSinceLastTap = now - lastTapRef.current;
