@@ -4,6 +4,8 @@ import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
+import { PostSkeleton } from "@/components/PostSkeleton";
+import { motion } from "framer-motion";
 import { useSession } from "@/hooks/useSession";
 import { markPostsSeenImmediate } from "@/hooks/useMarkPostSeen";
 import { supabase } from "@/integrations/supabase/client";
@@ -232,7 +234,11 @@ export const PlatformPostViewer = ({
   const profileReady = !!profileData;
 
   const viewer = (
-    <div 
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       className="fixed inset-0 z-[70] bg-background"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -291,20 +297,36 @@ export const PlatformPostViewer = ({
       >
         <div className="mx-auto max-w-2xl px-4 py-4 space-y-6">
           {(loading && posts.length === 0) || !profileReady ? (
-            <div className="text-center py-8">
-              <div className="mx-auto h-8 w-8 rounded-full border-2 border-muted-foreground/30 border-t-foreground animate-spin" />
-            </div>
+            <>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <PostSkeleton />
+                </motion.div>
+              ))}
+            </>
           ) : posts.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No posts in this section</p>
             </div>
           ) : (
-            posts.map((post) => (
-              <div
+            posts.map((post, idx) => (
+              <motion.div
                 key={post.id}
                 ref={(el) => {
                   if (el) postRefs.current.set(post.id, el);
                   else postRefs.current.delete(post.id);
+                }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.28,
+                  delay: Math.min(Math.abs(idx - initialIdx), 4) * 0.04,
+                  ease: [0.22, 1, 0.36, 1],
                 }}
               >
                 <HydratedFeedPost
@@ -312,7 +334,7 @@ export const PlatformPostViewer = ({
                   userId={user?.id}
                   startHydrated={true}
                 />
-              </div>
+              </motion.div>
             ))
           )}
         </div>
@@ -329,7 +351,7 @@ export const PlatformPostViewer = ({
           />
         ))}
       </div>
-    </div>
+    </motion.div>
   );
 
   if (!portalReady) return null;
