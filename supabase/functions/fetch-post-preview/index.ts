@@ -274,27 +274,41 @@ function decodeRedditUrl(url?: string | null): string | null {
   return /^https?:\/\//i.test(decoded) ? decoded : null;
 }
 
+function readNestedString(value: unknown, path: Array<string | number>): string | null {
+  let current: unknown = value;
+  for (const key of path) {
+    if (typeof key === 'number') {
+      if (!Array.isArray(current)) return null;
+      current = current[key];
+    } else {
+      if (!current || typeof current !== 'object') return null;
+      current = (current as Record<string, unknown>)[key];
+    }
+  }
+  return typeof current === 'string' ? current : null;
+}
+
 function extractRedditMediaThumbnail(post: Record<string, unknown> | null | undefined): string | null {
   if (!post) return null;
 
-  const data = post as Record<string, any>;
-  const preview = decodeRedditUrl(data.preview?.images?.[0]?.source?.url);
+  const preview = decodeRedditUrl(readNestedString(post, ['preview', 'images', 0, 'source', 'url']));
   if (preview) return preview;
 
-  const galleryItem = data.gallery_data?.items?.[0];
-  const mediaId = galleryItem?.media_id;
-  const galleryImage = mediaId ? data.media_metadata?.[mediaId]?.s?.u : null;
+  const mediaId = readNestedString(post, ['gallery_data', 'items', 0, 'media_id']);
+  const galleryImage = mediaId ? readNestedString(post, ['media_metadata', mediaId, 's', 'u']) : null;
   const galleryThumb = decodeRedditUrl(galleryImage);
   if (galleryThumb) return galleryThumb;
 
-  const oembedThumb = decodeRedditUrl(data.secure_media?.oembed?.thumbnail_url)
-    || decodeRedditUrl(data.media?.oembed?.thumbnail_url);
+  const oembedThumb = decodeRedditUrl(readNestedString(post, ['secure_media', 'oembed', 'thumbnail_url']))
+    || decodeRedditUrl(readNestedString(post, ['media', 'oembed', 'thumbnail_url']));
   if (oembedThumb) return oembedThumb;
 
-  const urlThumb = decodeRedditUrl(data.url_overridden_by_dest || data.url);
+  const urlThumb = decodeRedditUrl(
+    readNestedString(post, ['url_overridden_by_dest']) || readNestedString(post, ['url'])
+  );
   if (urlThumb && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(urlThumb)) return urlThumb;
 
-  const thumbnail = decodeRedditUrl(data.thumbnail);
+  const thumbnail = decodeRedditUrl(readNestedString(post, ['thumbnail']));
   if (thumbnail && !/(default|self|nsfw|spoiler)$/i.test(thumbnail)) return thumbnail;
 
   return null;
