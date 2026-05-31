@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { BottomNav } from "@/components/BottomNav";
@@ -73,9 +72,9 @@ const Index = () => {
         embed_html: post.embed_html,
         timestamp: new Date(post.created_at),
         saves: post.saves_count,
-        likes_count: (post as any).likes_count || 0,
-        comments_count: (post as any).comments_count || 0,
-        hide_likes: (post.profiles as any)?.settings?.hide_likes || false,
+        likes_count: post.likes_count || 0,
+        comments_count: post.comments_count || 0,
+        hide_likes: post.profiles?.settings?.hide_likes || false,
         isRealPost: true,
       }))
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
@@ -144,24 +143,26 @@ const Index = () => {
     await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
   }, [queryClient, showDemoFeed]);
 
-  // Prefetch next page when user is within last 5 posts
-  const prefetchSentinelRef = useRef<HTMLDivElement>(null);
+  // Data-friendly invisible pagination: load the next page only when the
+  // user reaches a post ~7 items before the end. Uses an IntersectionObserver
+  // attached to that specific post so nothing fetches until it's actually
+  // needed — and no loader is ever shown.
+  const PREFETCH_OFFSET = 7;
+  const prefetchTriggerIndex = Math.max(0, allPosts.length - PREFETCH_OFFSET);
+  const prefetchSentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!hasMore || showDemoFeed) return;
     const el = prefetchSentinelRef.current;
     if (!el) return;
-
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          loadMore();
-        }
+        if (entry.isIntersecting) loadMore();
       },
-      { rootMargin: '1500px', threshold: 0 }
+      { rootMargin: '0px', threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, loadMore, showDemoFeed, allPosts.length]);
+  }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
   // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
@@ -216,6 +217,9 @@ const Index = () => {
                   ref={(el) => {
                     registerItem(post.id)(el);
                     if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
+                    if (index === prefetchTriggerIndex) {
+                      prefetchSentinelRef.current = el;
+                    }
                   }}
                   data-feed-item-id={post.id}
                 >
@@ -226,15 +230,8 @@ const Index = () => {
                   />
                 </div>
               ))}
-              {/* Sentinel for prefetching next page ahead of scroll */}
-              {hasMore && !showDemoFeed && (
-                <>
-                  <div ref={prefetchSentinelRef} style={{ height: 1 }} />
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                </>
-              )}
+              {/* No visible loader — pagination happens silently far before
+                  the user reaches the end. */}
               {/* All caught up message */}
               {!hasMore && !showDemoFeed && allPosts.length > 0 && (
                 <div className="flex flex-col items-center justify-center py-10 text-center">

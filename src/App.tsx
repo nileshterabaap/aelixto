@@ -73,7 +73,9 @@ const AnimatedRoutes = () => {
       pattern: "/u/:username", 
       // Extract username from path for the KeepAlive version
       element: (path: string) => {
-        const username = path.split('/u/')[1];
+        const raw = path.split('/u/')[1] ?? '';
+        let username = raw;
+        try { username = decodeURIComponent(raw); } catch {}
         return <UserProfile key={path} usernameOverride={username} />;
       }
     }
