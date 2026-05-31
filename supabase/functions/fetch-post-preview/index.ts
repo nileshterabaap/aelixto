@@ -244,15 +244,21 @@ async function storeThumbnailPermanently(postId: string, imageUrl: string): Prom
 
 async function fetchRedditThumbnail(url: string): Promise<string | null> {
   try {
-    const jsonUrl = url.replace(/\/$/, '') + '.json';
+    let jsonUrl = url.split('?')[0].replace(/\/$/, '');
+    jsonUrl = jsonUrl.replace('www.reddit.com', 'old.reddit.com');
+    jsonUrl += '.json';
     const res = await fetch(jsonUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
     });
     
     if (res.ok) {
       const json = await res.json();
       const post = json[0]?.data?.children?.[0]?.data;
-      return post?.thumbnail?.startsWith('http') ? post.thumbnail : null;
+      const thumbnail = extractRedditMediaThumbnail(post);
+      if (thumbnail) return thumbnail;
     }
   } catch (e) {
     console.log('[fetch-post-preview] Reddit JSON fetch failed');
@@ -260,6 +266,41 @@ async function fetchRedditThumbnail(url: string): Promise<string | null> {
   
   const ogData = await scrapeOgData(url);
   return ogData.image;
+}
+
+function decodeRedditUrl(url?: string | null): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const decoded = decodeHtmlEntities(url);
+  return /^https?:\/\//i.test(decoded) ? decoded : null;
+}
+
+function extractRedditMediaThumbnail(post: any): string | null {
+  if (!post) return null;
+
+  const preview = decodeRedditUrl(post.preview?.images?.[0]?.source?.url);
+  if (preview) return preview;
+
+  const galleryItem = post.gallery_data?.items?.[0];
+  const mediaId = galleryItem?.media_id;
+  const galleryImage = mediaId ? post.media_metadata?.[mediaId]?.s?.u : null;
+  const galleryThumb = decodeRedditUrl(galleryImage);
+  if (galleryThumb) return galleryThumb;
+
+  const videoPreview = decodeRedditUrl(post.secure_media?.reddit_video?.fallback_url)
+    || decodeRedditUrl(post.media?.reddit_video?.fallback_url);
+  if (videoPreview) return videoPreview;
+
+  const oembedThumb = decodeRedditUrl(post.secure_media?.oembed?.thumbnail_url)
+    || decodeRedditUrl(post.media?.oembed?.thumbnail_url);
+  if (oembedThumb) return oembedThumb;
+
+  const urlThumb = decodeRedditUrl(post.url_overridden_by_dest || post.url);
+  if (urlThumb && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(urlThumb)) return urlThumb;
+
+  const thumbnail = decodeRedditUrl(post.thumbnail);
+  if (thumbnail && !/(default|self|nsfw|spoiler)$/i.test(thumbnail)) return thumbnail;
+
+  return null;
 }
 
 function decodeHtmlEntities(text: string): string {
