@@ -30,23 +30,23 @@ const ICONS: Record<string, string> = {
   article: blogIcon,
 };
 
-// Brand-tinted gradients tuned for legibility of white text
+// Brand-tinted HSL gradients tuned for legibility and independent of Tailwind's generated class scan.
 const GRADIENTS: Record<string, string> = {
-  instagram: "bg-gradient-to-br from-purple-600 via-pink-600 to-orange-500",
-  youtube: "bg-gradient-to-br from-red-700 to-red-500",
-  x: "bg-gradient-to-br from-neutral-900 to-black",
-  twitter: "bg-gradient-to-br from-neutral-900 to-black",
-  threads: "bg-gradient-to-br from-neutral-900 to-black",
-  spotify: "bg-gradient-to-br from-green-700 to-green-500",
-  medium: "bg-gradient-to-br from-neutral-900 to-neutral-700",
-  facebook: "bg-gradient-to-br from-blue-700 to-blue-500",
-  linkedin: "bg-gradient-to-br from-[#0A66C2] to-[#1f86db]",
-  reddit: "bg-gradient-to-br from-orange-700 to-orange-500",
-  tiktok: "bg-gradient-to-br from-black to-neutral-800",
-  pinterest: "bg-gradient-to-br from-red-800 to-red-600",
-  quora: "bg-gradient-to-br from-red-900 to-red-700",
-  article: "bg-gradient-to-br from-emerald-700 to-teal-500",
-  external: "bg-gradient-to-br from-slate-700 to-slate-500",
+  instagram: "linear-gradient(135deg, hsl(262 83% 45%), hsl(330 81% 52%), hsl(25 95% 53%))",
+  youtube: "linear-gradient(135deg, hsl(0 82% 35%), hsl(0 84% 52%))",
+  x: "linear-gradient(135deg, hsl(0 0% 7%), hsl(0 0% 0%))",
+  twitter: "linear-gradient(135deg, hsl(0 0% 7%), hsl(0 0% 0%))",
+  threads: "linear-gradient(135deg, hsl(0 0% 7%), hsl(0 0% 0%))",
+  spotify: "linear-gradient(135deg, hsl(142 76% 24%), hsl(142 70% 45%))",
+  medium: "linear-gradient(135deg, hsl(0 0% 7%), hsl(0 0% 22%))",
+  facebook: "linear-gradient(135deg, hsl(221 83% 40%), hsl(217 91% 60%))",
+  linkedin: "linear-gradient(135deg, hsl(208 90% 35%), hsl(204 74% 49%))",
+  reddit: "linear-gradient(135deg, hsl(16 100% 35%), hsl(16 100% 50%))",
+  tiktok: "linear-gradient(135deg, hsl(0 0% 0%), hsl(0 0% 18%))",
+  pinterest: "linear-gradient(135deg, hsl(0 74% 32%), hsl(0 72% 48%))",
+  quora: "linear-gradient(135deg, hsl(0 74% 24%), hsl(0 69% 40%))",
+  article: "linear-gradient(135deg, hsl(158 64% 26%), hsl(173 80% 36%))",
+  external: "linear-gradient(135deg, hsl(215 25% 27%), hsl(215 16% 47%))",
 };
 
 function trimText(t?: string | null, max = 140): string {
@@ -103,8 +103,8 @@ export function TextCardThumbnail({
 
   return (
     <div
-      className={`relative w-full h-full ${gradient} overflow-hidden`}
-      style={{ containerType: "inline-size" }}
+      className="relative w-full h-full overflow-hidden bg-foreground"
+      style={{ containerType: "inline-size", background: gradient }}
     >
       {/* Subtle paper-grain overlay for depth */}
       <div
