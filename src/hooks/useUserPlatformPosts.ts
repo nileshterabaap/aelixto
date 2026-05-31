@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -88,6 +88,11 @@ async function persistExistingThumbnail(post: PlatformPost) {
 
 export const useUserPlatformPosts = (userId: string | undefined, platform: string | undefined) => {
   const queryClient = useQueryClient();
+  const [visibleCount, setVisibleCount] = useState(50);
+
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [userId, platform]);
 
   const { data: items = [], isLoading: loading } = useQuery({
     queryKey: ["platform-posts", userId, platform],
@@ -97,7 +102,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       const { data, error } = await supabase.rpc("get_user_platform_posts", {
         target_user: userId,
         platform_name: platform,
-        limit_count: 50,
+          limit_count: 500,
         cursor: null,
       });
 
@@ -148,5 +153,11 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
     };
   }, [items, platform, queryClient, userId]);
 
-  return { items, loading, error: null, hasMore: false, loadMore: () => {} };
+  const visibleItems = useMemo(() => items.slice(0, visibleCount), [items, visibleCount]);
+  const hasMore = visibleCount < items.length;
+  const loadMore = useCallback(() => {
+    setVisibleCount((current) => Math.min(current + 50, items.length));
+  }, [items.length]);
+
+  return { items: visibleItems, loading, error: null, hasMore, loadMore };
 };
