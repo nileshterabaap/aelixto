@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -88,21 +88,38 @@ async function persistExistingThumbnail(post: PlatformPost) {
 
 export const useUserPlatformPosts = (userId: string | undefined, platform: string | undefined) => {
   const queryClient = useQueryClient();
+  const [visibleCount, setVisibleCount] = useState(50);
+
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [userId, platform]);
 
   const { data: items = [], isLoading: loading } = useQuery({
     queryKey: ["platform-posts", userId, platform],
     queryFn: async () => {
       if (!userId || !platform) return [];
 
-      const { data, error } = await supabase.rpc("get_user_platform_posts", {
-        target_user: userId,
-        platform_name: platform,
-        limit_count: 50,
-        cursor: null,
-      });
+      const all: PlatformPost[] = [];
+      let cursor: string | null = null;
 
-      if (error) throw error;
-      return (data || []) as PlatformPost[];
+      for (let page = 0; page < 20; page += 1) {
+        const { data, error } = await supabase.rpc("get_user_platform_posts", {
+          target_user: userId,
+          platform_name: platform,
+          limit_count: 50,
+          cursor,
+        });
+
+        if (error) throw error;
+
+        const pageItems = (data || []) as PlatformPost[];
+        all.push(...pageItems);
+        if (pageItems.length < 50) break;
+        cursor = pageItems[pageItems.length - 1]?.created_at || null;
+        if (!cursor) break;
+      }
+
+      return all;
     },
     enabled: !!userId && !!platform,
     staleTime: 30 * 1000,
@@ -148,5 +165,11 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
     };
   }, [items, platform, queryClient, userId]);
 
-  return { items, loading, error: null, hasMore: false, loadMore: () => {} };
+  const visibleItems = useMemo(() => items.slice(0, visibleCount), [items, visibleCount]);
+  const hasMore = visibleCount < items.length;
+  const loadMore = useCallback(() => {
+    setVisibleCount((current) => Math.min(current + 50, items.length));
+  }, [items.length]);
+
+  return { items: visibleItems, loading, error: null, hasMore, loadMore };
 };

@@ -38,5 +38,5 @@ export const localStoragePersister = createSyncStoragePersister({
 export const persistOptions = {
   persister: localStoragePersister,
   maxAge: MAX_AGE,
-  buster: 'v3-live-following-feed', // Clears previously persisted home-feed snapshots so refresh always re-fetches live feed data
+  buster: 'v4-profile-grid-thumbnails', // Clears stale profile grid snapshots so text-only social tiles re-render correctly
 };
