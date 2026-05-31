@@ -10,6 +10,7 @@ import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
 import { OgCardFallback } from '@/components/OgCardFallback';
+import { isUnresolvedRedditShareUrl } from '@/lib/redditUrls';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -68,16 +69,6 @@ const isYouTubeShort = (url: string, title?: string | null, content?: string | n
 const getYouTubeThumbnail = (url: string) => {
   const videoId = getYouTubeVideoId(url);
   return videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : null;
-};
-
-const isUnresolvedRedditShareUrl = (url?: string | null) => {
-  if (!url) return false;
-  try {
-    const parsed = new URL(url);
-    return (/([^.]|^)reddit\.com$/i.test(parsed.hostname) || parsed.hostname === 'redd.it') && /\/s\/[a-z0-9]+\/?$/i.test(parsed.pathname);
-  } catch {
-    return /reddit\.com\/r\/[^/]+\/s\/[a-z0-9]+\/?$/i.test(url);
-  }
 };
 
 export const HydratedEmbed = memo(({ 
