@@ -296,7 +296,6 @@ export const HydratedEmbed = memo(({
                 url={r.url}
                 platform="Reddit"
                 title={post.title || 'View on Reddit'}
-                image={effectiveThumbnail || undefined}
                 description={(post as any).content || undefined}
               />
             ) : (
