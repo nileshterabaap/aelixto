@@ -23,7 +23,7 @@ export interface PlatformPost {
   profile_avatar_url?: string | null;
 }
 
-const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook"]);
+const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook", "reddit", "threads"]);
 const inflightBackfills = new Set<string>();
 
 const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
@@ -152,7 +152,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
     refetchOnReconnect: false,
   });
 
-  // Background thumbnail backfill for Instagram/Facebook posts missing thumbnails.
+  // Background thumbnail backfill for platforms that can expose media previews after creation.
   useEffect(() => {
     if (!items.length) return;
 
