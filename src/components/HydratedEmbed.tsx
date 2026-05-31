@@ -289,7 +289,13 @@ export const HydratedEmbed = memo(({
         {/* Reddit embed */}
         {r.kind === 'reddit' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <RedditEmbed url={r.url} />
+            <RedditEmbed
+              url={r.url}
+              title={post.title}
+              thumbnailUrl={effectiveThumbnail}
+              description={(post as any).preview_text || (post as any).previewText || undefined}
+              authorAvatar={(post as any).author?.avatar || (post as any).profiles?.avatar_url || null}
+            />
           </ImageViewTracker>
         )}
         
