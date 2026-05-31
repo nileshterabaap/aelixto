@@ -10,7 +10,6 @@ import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
-import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -33,7 +32,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const createPost = useCreatePost();
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
-  const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
 
   // Hydrate from existing draft when opening
   useEffect(() => {
@@ -57,7 +55,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     // Auto-generate thumbnail URL and fetch title based on platform
     let thumbnail = "";
     let videoTitle = "";
-    let detectedOgType: string | null = ogType;
     
     console.log('[CreatePostDialog] Processing URL:', linkUrl);
     
@@ -88,7 +85,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           if (!error && ogData) {
             videoTitle = ogData.title || "";
             thumbnail = ogData.image || "";
-            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
+            if (ogData.og_type) setOgType(ogData.og_type);
           }
         } catch (error) {
           console.error('[CreatePostDialog] Reddit fetch failed:', error);
@@ -114,7 +111,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           if (!error && ogData) {
             videoTitle = ogData.title || "";
             thumbnail = ogData.image || "";
-            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
+            if (ogData.og_type) setOgType(ogData.og_type);
           }
         } catch (error) {
           console.error('[CreatePostDialog] Pinterest OG fetch failed:', error);
@@ -157,7 +154,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             console.log('[CreatePostDialog] OG data received:', ogData);
             if (!videoTitle && ogData.title) videoTitle = ogData.title;
             if (ogData.image) thumbnail = ogData.image;
-            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
+            if (ogData.og_type) setOgType(ogData.og_type);
           } else {
             console.error('[CreatePostDialog] OG fetch error:', error);
           }
@@ -182,28 +179,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
       setThumbnailUrl(thumbnail);
       setTitle(videoTitle);
-
-      // Smart privacy check — verify the source is publicly accessible.
-      // If the platform explicitly says the post is missing/private, stop here
-      // so users can't share content they don't have permission to share.
-      try {
-        const platform = classifyUrl(linkUrl, detectedOgType);
-        const { data: validation } = await supabase.functions.invoke(
-          "validate-post-source",
-          { body: { url: linkUrl, platform } }
-        );
-        if (validation?.verdict === "removed") {
-          toast.error(
-            "This post is private or unavailable and can't be shared publicly.",
-            { duration: 5000 }
-          );
-          return;
-        }
-      } catch (err) {
-        console.error("[CreatePostDialog] Privacy check failed:", err);
-        // Network issue — don't block, fall through.
-      }
-
       setStep(2);
     } finally {
       setIsLoadingPreview(false);
@@ -212,11 +187,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
   const handlePost = () => {
     if (!linkUrl.trim()) return;
-
-    if (limitReached) {
-      toast.error(`You've reached your ${limit} post limit for today. Resets at midnight.`);
-      return;
-    }
 
     // Use centralised classification
     const platform = classifyUrl(linkUrl, ogType);
@@ -252,10 +222,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       platform: platform,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
-    }, {
-      onSuccess: () => {
-        incrementDailyCount();
-      },
     });
 
     // If posted from a draft, remove it
@@ -549,7 +515,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           <motion.div whileTap={{ scale: 0.98 }}>
                             <Button
                               onClick={handlePost}
-                              disabled={submitState !== null || limitReached}
+                              disabled={submitState !== null}
                               className="h-12 w-full rounded-[22px] bg-foreground text-background shadow-[0_18px_38px_-26px_hsl(var(--foreground)/0.9)] hover:bg-foreground/90"
                             >
                               {submitState === "post" ? (
@@ -561,22 +527,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                                 >
                                   <Check className="mr-1.5 h-5 w-5" /> Posted
                                 </motion.span>
-                              ) : limitReached ? (
-                                "Daily limit reached"
                               ) : (
                                 "Post"
                               )}
                             </Button>
                           </motion.div>
-                          {limitReached ? (
-                            <p className="text-center text-xs text-muted-foreground">
-                              You've reached your {limit} post limit for today. Resets at midnight.
-                            </p>
-                          ) : (
-                            <p className="text-center text-xs text-muted-foreground">
-                              {remaining} of {limit} posts remaining today
-                            </p>
-                          )}
                           <motion.div whileTap={{ scale: 0.98 }}>
                             <Button
                               onClick={handleSaveAsDraft}

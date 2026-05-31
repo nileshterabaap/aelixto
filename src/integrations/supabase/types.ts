@@ -692,15 +692,12 @@ export type Database = {
       }
       posts: {
         Row: {
-          broken_check_count: number
-          broken_first_seen_at: string | null
           comments_count: number | null
           content: string
           created_at: string
           embed_html: string | null
           id: string
           is_public: boolean
-          last_validated_at: string | null
           likes_count: number | null
           media_type: string | null
           media_url: string | null
@@ -716,15 +713,12 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          broken_check_count?: number
-          broken_first_seen_at?: string | null
           comments_count?: number | null
           content: string
           created_at?: string
           embed_html?: string | null
           id?: string
           is_public?: boolean
-          last_validated_at?: string | null
           likes_count?: number | null
           media_type?: string | null
           media_url?: string | null
@@ -740,15 +734,12 @@ export type Database = {
           user_id: string
         }
         Update: {
-          broken_check_count?: number
-          broken_first_seen_at?: string | null
           comments_count?: number | null
           content?: string
           created_at?: string
           embed_html?: string | null
           id?: string
           is_public?: boolean
-          last_validated_at?: string | null
           likes_count?: number | null
           media_type?: string | null
           media_url?: string | null
@@ -956,27 +947,6 @@ export type Database = {
           },
         ]
       }
-      short_links: {
-        Row: {
-          click_count: number
-          code: string
-          created_at: string
-          target_path: string
-        }
-        Insert: {
-          click_count?: number
-          code: string
-          created_at?: string
-          target_path: string
-        }
-        Update: {
-          click_count?: number
-          code?: string
-          created_at?: string
-          target_path?: string
-        }
-        Relationships: []
-      }
       suppressed_emails: {
         Row: {
           created_at: string
@@ -1027,7 +997,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      create_short_link: { Args: { p_target_path: string }; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -1036,7 +1005,6 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
-      get_email_for_username: { Args: { _username: string }; Returns: string }
       get_following_count: { Args: never; Returns: number }
       get_following_feed: {
         Args: { cursor?: string; limit_count: number }
@@ -1045,38 +1013,6 @@ export type Database = {
           content: string
           created_at: string
           embed_html: string
-          id: string
-          is_public: boolean
-          is_repost: boolean
-          likes_count: number
-          media_type: string
-          media_url: string
-          platform: string
-          preview_image_url: string
-          preview_text: string
-          preview_title: string
-          profile_avatar_url: string
-          profile_display_name: string
-          profile_id: string
-          profile_username: string
-          reposted_at: string
-          reposted_by_user_id: string
-          reposted_by_username: string
-          reposts_count: number
-          saves_count: number
-          thumbnail_url: string
-          title: string
-          user_id: string
-        }[]
-      }
-      get_following_feed_v2: {
-        Args: { cursor_key?: string; limit_count: number }
-        Returns: {
-          comments_count: number
-          content: string
-          created_at: string
-          embed_html: string
-          feed_cursor: string
           id: string
           is_public: boolean
           is_repost: boolean

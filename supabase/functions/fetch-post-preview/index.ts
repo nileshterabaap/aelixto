@@ -244,21 +244,15 @@ async function storeThumbnailPermanently(postId: string, imageUrl: string): Prom
 
 async function fetchRedditThumbnail(url: string): Promise<string | null> {
   try {
-    let jsonUrl = url.split('?')[0].replace(/\/$/, '');
-    jsonUrl = jsonUrl.replace('www.reddit.com', 'old.reddit.com');
-    jsonUrl += '.json';
+    const jsonUrl = url.replace(/\/$/, '') + '.json';
     const res = await fetch(jsonUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-      },
+      headers: { 'User-Agent': 'Mozilla/5.0' },
     });
     
     if (res.ok) {
       const json = await res.json();
       const post = json[0]?.data?.children?.[0]?.data;
-      const thumbnail = extractRedditMediaThumbnail(post);
-      if (thumbnail) return thumbnail;
+      return post?.thumbnail?.startsWith('http') ? post.thumbnail : null;
     }
   } catch (e) {
     console.log('[fetch-post-preview] Reddit JSON fetch failed');
@@ -266,52 +260,6 @@ async function fetchRedditThumbnail(url: string): Promise<string | null> {
   
   const ogData = await scrapeOgData(url);
   return ogData.image;
-}
-
-function decodeRedditUrl(url?: string | null): string | null {
-  if (!url || typeof url !== 'string') return null;
-  const decoded = decodeHtmlEntities(url);
-  return /^https?:\/\//i.test(decoded) ? decoded : null;
-}
-
-function readNestedString(value: unknown, path: Array<string | number>): string | null {
-  let current: unknown = value;
-  for (const key of path) {
-    if (typeof key === 'number') {
-      if (!Array.isArray(current)) return null;
-      current = current[key];
-    } else {
-      if (!current || typeof current !== 'object') return null;
-      current = (current as Record<string, unknown>)[key];
-    }
-  }
-  return typeof current === 'string' ? current : null;
-}
-
-function extractRedditMediaThumbnail(post: Record<string, unknown> | null | undefined): string | null {
-  if (!post) return null;
-
-  const preview = decodeRedditUrl(readNestedString(post, ['preview', 'images', 0, 'source', 'url']));
-  if (preview) return preview;
-
-  const mediaId = readNestedString(post, ['gallery_data', 'items', 0, 'media_id']);
-  const galleryImage = mediaId ? readNestedString(post, ['media_metadata', mediaId, 's', 'u']) : null;
-  const galleryThumb = decodeRedditUrl(galleryImage);
-  if (galleryThumb) return galleryThumb;
-
-  const oembedThumb = decodeRedditUrl(readNestedString(post, ['secure_media', 'oembed', 'thumbnail_url']))
-    || decodeRedditUrl(readNestedString(post, ['media', 'oembed', 'thumbnail_url']));
-  if (oembedThumb) return oembedThumb;
-
-  const urlThumb = decodeRedditUrl(
-    readNestedString(post, ['url_overridden_by_dest']) || readNestedString(post, ['url'])
-  );
-  if (urlThumb && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(urlThumb)) return urlThumb;
-
-  const thumbnail = decodeRedditUrl(readNestedString(post, ['thumbnail']));
-  if (thumbnail && !/(default|self|nsfw|spoiler)$/i.test(thumbnail)) return thumbnail;
-
-  return null;
 }
 
 function decodeHtmlEntities(text: string): string {

@@ -41,9 +41,7 @@ import { PostReportMenu } from "@/components/PostReportMenu";
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
 const revealedPostsCache = new Set<string>();
-// Hydrate posts well ahead of the viewport so the next ~6–7 posts in the
-// feed are always ready to display the moment the user scrolls to them.
-const HYDRATION_ROOT_MARGIN = '4500px 0px';
+const HYDRATION_ROOT_MARGIN = '3000px 0px';
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -510,7 +508,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-background z-[100]">
+              <DropdownMenuContent align="end" className="bg-background z-50">
                 <DropdownMenuItem
                   onClick={() => deletePost()}
                   disabled={isDeleting}
@@ -532,10 +530,14 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       </div>
 
-      {/* Caption — Instagram captions intentionally hidden (media-only) */}
+      {/* Caption */}
       {(() => {
+        // For Instagram posts the original poster's caption is stored in
+        // post.title (from oEmbed). Fall back to it when no user-typed content
+        // exists so every IG post gets the "...more" / "less" toggle.
         const captionText =
-          detectedPlatform === 'instagram' ? '' : (post.content?.trim() || '');
+          post.content?.trim() ||
+          (detectedPlatform === 'instagram' ? (post.title || '').trim() : '');
         return captionText ? (
           <div className="px-5 pb-3">
             <CollapsibleCaption content={captionText} />

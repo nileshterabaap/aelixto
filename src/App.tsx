@@ -32,7 +32,6 @@ import TermsOfService from "./pages/TermsOfService";
 import ChildSafety from "./pages/ChildSafety";
 import AuthBridge from "./pages/AuthBridge";
 import Unsubscribe from "./pages/Unsubscribe";
-import ShortLinkRedirect from "./pages/ShortLinkRedirect";
 
 // Configure QueryClient with aggressive caching for instant navigation
 const queryClient = new QueryClient({
@@ -74,9 +73,7 @@ const AnimatedRoutes = () => {
       pattern: "/u/:username", 
       // Extract username from path for the KeepAlive version
       element: (path: string) => {
-        const raw = path.split('/u/')[1] ?? '';
-        let username = raw;
-        try { username = decodeURIComponent(raw); } catch {}
+        const username = path.split('/u/')[1];
         return <UserProfile key={path} usernameOverride={username} />;
       }
     }
@@ -105,8 +102,6 @@ const AnimatedRoutes = () => {
             <Route path="/terms" element={<PageTransition><TermsOfService /></PageTransition>} />
             <Route path="/child-safety" element={<PageTransition><ChildSafety /></PageTransition>} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
-            {/* Short-link redirect */}
-            <Route path="/s/:code" element={<ShortLinkRedirect />} />
             {/* Native OAuth bridge — converts web redirect into a custom-scheme deep link */}
             <Route path="/~auth-bridge" element={<AuthBridge />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

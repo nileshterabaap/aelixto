@@ -17,7 +17,8 @@ export const localStoragePersister = createSyncStoragePersister({
         queries: data.clientState.queries.filter((query) => {
           // Only persist feed and profile data, not session
           const key = query.queryKey[0];
-          return key === 'profile' || 
+          return key === 'following-feed' || 
+                 key === 'profile' || 
                  key === 'discover-posts' ||
                  key === 'posts' ||
                  key === 'user-profile' ||
@@ -38,5 +39,5 @@ export const localStoragePersister = createSyncStoragePersister({
 export const persistOptions = {
   persister: localStoragePersister,
   maxAge: MAX_AGE,
-  buster: 'v5-profile-social-thumbnails', // Clears stale profile grid snapshots so Reddit/Threads use media/profile thumbnails
+  buster: 'v1', // Change this to invalidate all cached data
 };

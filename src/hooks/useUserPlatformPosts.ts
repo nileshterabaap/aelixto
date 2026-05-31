@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,12 +18,9 @@ export interface PlatformPost {
   is_public: boolean;
   is_repost: boolean;
   original_user_id: string | null;
-  profile_username?: string | null;
-  profile_display_name?: string | null;
-  profile_avatar_url?: string | null;
 }
 
-const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook", "reddit", "threads"]);
+const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook"]);
 const inflightBackfills = new Set<string>();
 
 const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
@@ -91,68 +88,31 @@ async function persistExistingThumbnail(post: PlatformPost) {
 
 export const useUserPlatformPosts = (userId: string | undefined, platform: string | undefined) => {
   const queryClient = useQueryClient();
-  const [visibleCount, setVisibleCount] = useState(50);
-
-  useEffect(() => {
-    setVisibleCount(50);
-  }, [userId, platform]);
 
   const { data: items = [], isLoading: loading } = useQuery({
     queryKey: ["platform-posts", userId, platform],
     queryFn: async () => {
       if (!userId || !platform) return [];
 
-      const all: PlatformPost[] = [];
-      let cursor: string | null = null;
-
-      for (let page = 0; page < 20; page += 1) {
-        const { data, error } = await supabase.rpc("get_user_platform_posts", {
-          target_user: userId,
-          platform_name: platform,
-          limit_count: 50,
-          cursor,
-        });
-
-        if (error) throw error;
-
-        const pageItems = (data || []) as PlatformPost[];
-        all.push(...pageItems);
-        if (pageItems.length < 50) break;
-        cursor = pageItems[pageItems.length - 1]?.created_at || null;
-        if (!cursor) break;
-      }
-
-      const userIds = [...new Set(all.map((post) => post.user_id).filter(Boolean))];
-      if (userIds.length === 0) return all;
-
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, username, display_name, avatar_url")
-        .in("user_id", userIds);
-
-      const profileByUserId = new Map(
-        (profiles || []).map((profile) => [profile.user_id, profile])
-      );
-
-      return all.map((post) => {
-        const profile = profileByUserId.get(post.user_id);
-        return {
-          ...post,
-          profile_username: profile?.username || null,
-          profile_display_name: profile?.display_name || null,
-          profile_avatar_url: profile?.avatar_url || null,
-        };
+      const { data, error } = await supabase.rpc("get_user_platform_posts", {
+        target_user: userId,
+        platform_name: platform,
+        limit_count: 50,
+        cursor: null,
       });
+
+      if (error) throw error;
+      return (data || []) as PlatformPost[];
     },
     enabled: !!userId && !!platform,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: "always",
+    refetchOnMount: false,
     refetchOnReconnect: false,
   });
 
-  // Background thumbnail backfill for platforms that can expose media previews after creation.
+  // Background thumbnail backfill for Instagram/Facebook posts missing thumbnails.
   useEffect(() => {
     if (!items.length) return;
 
@@ -188,11 +148,5 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
     };
   }, [items, platform, queryClient, userId]);
 
-  const visibleItems = useMemo(() => items.slice(0, visibleCount), [items, visibleCount]);
-  const hasMore = visibleCount < items.length;
-  const loadMore = useCallback(() => {
-    setVisibleCount((current) => Math.min(current + 50, items.length));
-  }, [items.length]);
-
-  return { items: visibleItems, loading, error: null, hasMore, loadMore };
+  return { items, loading, error: null, hasMore: false, loadMore: () => {} };
 };

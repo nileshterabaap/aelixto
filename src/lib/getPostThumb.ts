@@ -11,27 +11,13 @@ export function getPostThumb(p: {
   thumbnailUrl?: string | null;    // legacy/feed field
   media_url?: string | null;       // server field
   mediaUrl?: string | null;        // legacy/feed field
-}): string | null {
+}) {
   const platform = (p.platform || "").toLowerCase();
   const tu = p.thumbnail_url || p.thumbnailUrl;
   const mu = p.media_url || p.mediaUrl;
 
-  if (platform === "reddit" && isUnresolvedRedditShareUrl(mu)) return null;
-
-  // 1) server-derived thumbnail wins (decode HTML entities first),
-  //    BUT filter out misleading generic OG placeholders (e.g. Unsplash
-  //    fallbacks scraped from Reddit /s/ share links). For platforms where
-  //    the thumbnail should plausibly come from the platform itself, drop
-  //    anything hosted on a clearly-foreign domain so the typographic
-  //    TextCardThumbnail can take over instead of showing a wrong image.
-  if (tu) {
-    const decoded = decodeHtmlEntities(tu);
-    if (isMisleadingThumbnail(platform, decoded)) {
-      // Fall through to platform/media derivations or placeholder.
-    } else {
-      return decoded;
-    }
-  }
+  // 1) server-derived thumbnail wins (decode HTML entities first)
+  if (tu) return decodeHtmlEntities(tu);
 
   // 2) platform-based derivations used in Feed
   if (platform === "youtube" && mu) {
@@ -43,41 +29,8 @@ export function getPostThumb(p: {
   // 3) direct image media
   if (mu && /\.(png|jpg|jpeg|webp|gif)(\?|$)/i.test(mu)) return mu;
 
-  // 4) no reliable image thumbnail — callers can render a branded text tile
-  return null;
-}
-
-function isUnresolvedRedditShareUrl(url?: string | null): boolean {
-  if (!url) return false;
-  try {
-    const parsed = new URL(url);
-    return /(^|\.)reddit\.com$/i.test(parsed.hostname) && /\/s\/[a-z0-9]+\/?$/i.test(parsed.pathname);
-  } catch {
-    return /reddit\.com\/r\/[^/]+\/s\/[a-z0-9]+\/?$/i.test(url);
-  }
-}
-
-/**
- * Returns true for thumbnails that are almost certainly NOT representative
- * of the actual post (e.g. Unsplash stock images served as OG fallback by
- * a link-resolver). When this returns true, callers should treat the post
- * as having no thumbnail and use the platform-branded text card instead.
- */
-function isMisleadingThumbnail(platform: string, url: string): boolean {
-  const lower = url.toLowerCase();
-  // Generic stock image hosts are never a real post preview.
-  if (lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com")) {
-    return true;
-  }
-  // For Reddit, thumbnails should come from reddit/redd.it/redditmedia/redditstatic
-  // or from our own storage bucket. Anything else is a foreign OG scrape.
-  if (platform === "reddit") {
-    // Reddit posts can legitimately point to external image/video hosts
-    // (Imgur, Gfycat/CDN mirrors, news images, etc.). Only reject the known
-    // generic placeholders above; otherwise let real scraped media render.
-    return false;
-  }
-  return false;
+  // 4) safe placeholder
+  return "/placeholder.svg";
 }
 
 /** 
@@ -87,7 +40,7 @@ function isMisleadingThumbnail(platform: string, url: string): boolean {
  * 3. Provide caching
  */
 export function maybeProxy(url?: string | null, w = 480) {
-  if (!url) return null;
+  if (!url) return "/placeholder.svg";
   
   // Don't proxy local/relative paths or placeholders
   if (url.startsWith("/")) return url;
@@ -96,12 +49,12 @@ export function maybeProxy(url?: string | null, w = 480) {
   try { 
     new URL(url); 
   } catch { 
-    return null; 
+    return "/placeholder.svg"; 
   }
   
   // Only allow HTTPS URLs
   if (!url.startsWith("https://")) {
-    return null;
+    return "/placeholder.svg";
   }
   
   // Return ALL URLs directly - no proxying needed
