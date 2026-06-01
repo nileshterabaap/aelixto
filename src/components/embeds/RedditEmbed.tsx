@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { OgCardFallback } from "@/components/OgCardFallback";
 import { supabase } from "@/integrations/supabase/client";
+import redditIcon from "@/assets/platforms/reddit.svg";
 
 type RedditEmbedProps = {
   url: string;
@@ -81,8 +82,15 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [thumbBroken, setThumbBroken] = useState(false);
-  const fallbackImage =
-    (thumbnailUrl && !thumbBroken ? thumbnailUrl : authorAvatar) || undefined;
+  // A Reddit thumbnail is only trustworthy when it loads AND it is not
+  // accidentally the Aelixto post author's own profile picture (which can
+  // happen when the OG scrape returned no image and a downstream resolver
+  // substituted the user's avatar). The Aelixto author avatar is NEVER used
+  // as a fallback for Reddit posts.
+  const thumbMatchesOwnAvatar =
+    !!thumbnailUrl && !!authorAvatar && thumbnailUrl.trim() === authorAvatar.trim();
+  const validThumb = !!thumbnailUrl && !thumbBroken && !thumbMatchesOwnAvatar;
+  const fallbackImage = validThumb ? thumbnailUrl! : undefined;
   const iframeUrl = useMemo(() => resolvedUrl ? toRedditIframeUrl(resolvedUrl) : null, [resolvedUrl]);
 
   // Detect broken/blocked Reddit thumbnails (e.g. URLs that 403 or 404) so the
@@ -90,13 +98,13 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   // broken <img>, matching the X/Threads behavior.
   useEffect(() => {
     setThumbBroken(false);
-    if (!thumbnailUrl) return;
+    if (!thumbnailUrl || thumbMatchesOwnAvatar) return;
     let cancelled = false;
     const probe = new Image();
     probe.onerror = () => { if (!cancelled) setThumbBroken(true); };
     probe.src = thumbnailUrl;
     return () => { cancelled = true; };
-  }, [thumbnailUrl]);
+  }, [thumbnailUrl, thumbMatchesOwnAvatar]);
 
   // Expand mobile `/s/` links and other short shares before rendering Reddit's official iframe.
   useEffect(() => {
@@ -156,7 +164,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   if (!resolvedUrl || !iframeUrl || failed) {
     return (
       <div data-embed-status="ready">
-        {fallbackImage || title || description ? (
+        {fallbackImage ? (
           <a
             href={ensureProtocol(url)}
             target="_blank"
@@ -176,10 +184,15 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
             href={ensureProtocol(url)}
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full border-y border-border bg-card px-5 py-6 text-foreground transition-colors hover:bg-accent"
+            className="block w-full border-y border-border bg-card px-5 py-8 text-foreground transition-colors hover:bg-accent"
           >
-            <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">Reddit</div>
-            <div className="mt-1 text-base font-semibold leading-snug">Open Reddit post</div>
+            <div className="flex flex-col items-center justify-center gap-2 text-center">
+              <img src={redditIcon} alt="" className="w-10 h-10" />
+              <div className="text-base font-semibold leading-snug">Reddit Post</div>
+              {title ? (
+                <div className="text-sm text-muted-foreground line-clamp-2 max-w-md">{title}</div>
+              ) : null}
+            </div>
           </a>
         )}
       </div>
