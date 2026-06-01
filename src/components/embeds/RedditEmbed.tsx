@@ -137,10 +137,15 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     const attachIframe = () => {
       const iframe = container.querySelector("iframe") as HTMLIFrameElement | null;
       if (!iframe) return false;
-      if (handledIframes.has(iframe)) return true;
-      handledIframes.add(iframe);
+      iframe.style.display = "block";
       iframe.style.maxWidth = "100%";
       iframe.style.width = "100%";
+      iframe.style.minHeight = `${REDDIT_EMBED_HEIGHT}px`;
+      if (!iframe.style.height || iframe.style.height === "auto") {
+        iframe.style.height = `${REDDIT_EMBED_HEIGHT}px`;
+      }
+      if (handledIframes.has(iframe)) return true;
+      handledIframes.add(iframe);
       iframe.addEventListener("load", markReady, { once: true });
       iframe.addEventListener("error", markReady, { once: true });
       return true;
@@ -226,8 +231,8 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden"
-      style={{ minHeight: loaded ? undefined : REDDIT_EMBED_HEIGHT }}
+      className="relative w-full"
+      style={{ minHeight: REDDIT_EMBED_HEIGHT }}
       data-embed-status={loaded ? "ready" : "loading"}
     />
   );
