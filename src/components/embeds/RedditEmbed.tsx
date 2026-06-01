@@ -12,6 +12,7 @@ type RedditEmbedProps = {
 
 const REDDIT_WIDGET_SRC = "https://embed.reddit.com/widgets.js";
 const REDDIT_EMBED_HEIGHT = 316;
+const REDDIT_FALLBACK_DELAY = 8500;
 
 function ensureProtocol(rawUrl: string): string {
   const trimmed = rawUrl.trim().split(/\s+/)[0];
@@ -70,6 +71,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const [resolving, setResolving] = useState(needsExpansion && !directUrl);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const fallbackImage = thumbnailUrl || authorAvatar || undefined;
 
   // Expand mobile `/s/` links and other short shares before asking widgets.js to hydrate.
   useEffect(() => {
@@ -169,7 +171,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
       } else {
         markReady();
       }
-    }, 8500);
+    }, REDDIT_FALLBACK_DELAY);
 
     requestAnimationFrame(() => {
       if (cancelled) return;
@@ -198,13 +200,25 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   if (!resolvedUrl || failed) {
     return (
       <div data-embed-status="ready">
-        <OgCardFallback
-          url={url}
-          platform="Reddit"
-          title={title || undefined}
-          image={thumbnailUrl || authorAvatar || undefined}
-          description={description || undefined}
-        />
+        {fallbackImage || title || description ? (
+          <OgCardFallback
+            url={url}
+            platform="Reddit"
+            title={title || undefined}
+            image={fallbackImage}
+            description={description || undefined}
+          />
+        ) : (
+          <a
+            href={ensureProtocol(url)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full border-y border-border bg-card px-5 py-6 text-foreground transition-colors hover:bg-accent"
+          >
+            <div className="text-xs font-semibold uppercase tracking-normal text-muted-foreground">Reddit</div>
+            <div className="mt-1 text-base font-semibold leading-snug">Open Reddit post</div>
+          </a>
+        )}
       </div>
     );
   }
