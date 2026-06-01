@@ -79,10 +79,9 @@ function PostCard({ post, onClick }: {
 
   // Show platform-branded fallback when no thumbnail or image error
   if (!src || src === "/placeholder.svg") {
-    const textSource =
-      post.content?.trim() ||
-      post.title?.trim() ||
-      "";
+    const textSource = platform === "reddit"
+      ? ""
+      : (post.content?.trim() || post.title?.trim() || "");
     const aspect = getAspectRatio();
     return (
       <button
