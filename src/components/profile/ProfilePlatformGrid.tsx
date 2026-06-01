@@ -73,7 +73,9 @@ function PostCard({ post, onClick }: {
   const src = imageError ? null : maybeProxy(rawThumb, 480);
   const Icon = getPlatformIcon();
   const platform = (post.platform || "").toLowerCase();
-  const useProfileFallback = ["threads", "reddit", "x", "twitter"].includes(platform);
+  // Reddit intentionally does NOT use the Aelixto author's avatar — show the
+  // branded Reddit placeholder card instead.
+  const useProfileFallback = ["threads", "x", "twitter"].includes(platform);
 
   // Show platform-branded fallback when no thumbnail or image error
   if (!src || src === "/placeholder.svg") {
