@@ -74,7 +74,35 @@ function shouldExpandRedditUrl(rawUrl: string): boolean {
   }
 }
 
+function sameUrl(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false;
+  return a.trim() === b.trim();
+}
+
+function isDirectRedditMediaUrl(rawUrl?: string | null): boolean {
+  if (!rawUrl) return false;
+  try {
+    const u = new URL(ensureProtocol(rawUrl));
+    const host = u.hostname.toLowerCase();
+    return (
+      /\.(png|jpe?g|webp|gif)(\?|$)/i.test(u.href) ||
+      host === "i.redd.it" ||
+      host === "preview.redd.it" ||
+      host.endsWith("redditmedia.com") ||
+      host.endsWith("redd.it")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isVideoUrl(rawUrl?: string | null): boolean {
+  if (!rawUrl) return false;
+  return /\.(mp4|webm|mov)(\?|$)/i.test(rawUrl);
+}
+
 export default function RedditEmbed({ url, title, thumbnailUrl, description, authorAvatar }: RedditEmbedProps) {
+  const normalizedUrl = useMemo(() => ensureProtocol(url), [url]);
   const directUrl = useMemo(() => normalizeRedditEmbedUrl(url), [url]);
   const needsExpansion = useMemo(() => shouldExpandRedditUrl(url), [url]);
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(directUrl);
@@ -82,14 +110,8 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [thumbBroken, setThumbBroken] = useState(false);
-  // A Reddit thumbnail is only trustworthy when it loads AND it is not
-  // accidentally the Aelixto post author's own profile picture (which can
-  // happen when the OG scrape returned no image and a downstream resolver
-  // substituted the user's avatar). The Aelixto author avatar is NEVER used
-  // as a fallback for Reddit posts.
-  const thumbMatchesOwnAvatar =
-    !!thumbnailUrl && !!authorAvatar && thumbnailUrl.trim() === authorAvatar.trim();
-  const validThumb = !!thumbnailUrl && !thumbBroken && !thumbMatchesOwnAvatar;
+  const isDirectMedia = isDirectRedditMediaUrl(normalizedUrl);
+  const validThumb = !!thumbnailUrl && !thumbBroken && !sameUrl(thumbnailUrl, authorAvatar);
   const fallbackImage = validThumb ? thumbnailUrl! : undefined;
   const iframeUrl = useMemo(() => resolvedUrl ? toRedditIframeUrl(resolvedUrl) : null, [resolvedUrl]);
 
@@ -98,13 +120,13 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   // broken <img>, matching the X/Threads behavior.
   useEffect(() => {
     setThumbBroken(false);
-    if (!thumbnailUrl || thumbMatchesOwnAvatar) return;
+    if (!thumbnailUrl || sameUrl(thumbnailUrl, authorAvatar)) return;
     let cancelled = false;
     const probe = new Image();
     probe.onerror = () => { if (!cancelled) setThumbBroken(true); };
     probe.src = thumbnailUrl;
     return () => { cancelled = true; };
-  }, [thumbnailUrl, thumbMatchesOwnAvatar]);
+  }, [thumbnailUrl, authorAvatar]);
 
   // Expand mobile `/s/` links and other short shares before rendering Reddit's official iframe.
   useEffect(() => {
@@ -164,15 +186,28 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   if (!resolvedUrl || !iframeUrl || failed) {
     return (
       <div data-embed-status="ready">
-        {fallbackImage ? (
+        {isDirectMedia ? (
           <a
-            href={ensureProtocol(url)}
+            href={normalizedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full bg-card"
+          >
+            {isVideoUrl(normalizedUrl) ? (
+              <video src={normalizedUrl} className="w-full h-auto" controls playsInline />
+            ) : (
+              <img src={normalizedUrl} alt={title || "Reddit post"} className="w-full h-auto object-cover" loading="eager" />
+            )}
+          </a>
+        ) : fallbackImage ? (
+          <a
+            href={normalizedUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="block w-full"
           >
             <OgCardFallback
-              url={ensureProtocol(url)}
+              url={normalizedUrl}
               platform="Reddit"
               title={title || undefined}
               image={fallbackImage}
@@ -181,7 +216,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
           </a>
         ) : (
           <a
-            href={ensureProtocol(url)}
+            href={normalizedUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="block w-full border-y border-border bg-card px-5 py-8 text-foreground transition-colors hover:bg-accent"
