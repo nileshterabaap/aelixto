@@ -53,6 +53,9 @@ export function getPostThumb(p: {
  */
 function isMisleadingThumbnail(platform: string, url: string): boolean {
   const lower = url.toLowerCase();
+  if (platform === "reddit" && lower.includes("images.unsplash.com/photo-1611162617474-5b21e879e113")) {
+    return true;
+  }
   if (platform === "reddit" && isRedditSelfPreview(lower)) {
     return true;
   }
