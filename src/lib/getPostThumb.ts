@@ -11,10 +11,17 @@ export function getPostThumb(p: {
   thumbnailUrl?: string | null;    // legacy/feed field
   media_url?: string | null;       // server field
   mediaUrl?: string | null;        // legacy/feed field
+  // Aelixto post author's avatar — used to detect misleading OG scrapes
+  // (e.g. Reddit posts whose thumbnail_url accidentally captured the poster's
+  // Aelixto profile picture). When the stored thumbnail equals the user's
+  // own avatar, treat it as no thumbnail.
+  author_avatar_url?: string | null;
+  profile_avatar_url?: string | null;
 }): string | null {
   const platform = (p.platform || "").toLowerCase();
   const tu = p.thumbnail_url || p.thumbnailUrl;
   const mu = p.media_url || p.mediaUrl;
+  const authorAvatar = p.author_avatar_url || p.profile_avatar_url || null;
 
   // 1) server-derived thumbnail wins (decode HTML entities first),
   //    BUT filter out misleading generic OG placeholders (e.g. Unsplash
@@ -24,7 +31,11 @@ export function getPostThumb(p: {
   //    TextCardThumbnail can take over instead of showing a wrong image.
   if (tu) {
     const decoded = decodeHtmlEntities(tu);
-    if (isMisleadingThumbnail(platform, decoded)) {
+    const matchesOwnAvatar =
+      platform === "reddit" &&
+      !!authorAvatar &&
+      decoded.trim() === authorAvatar.trim();
+    if (matchesOwnAvatar || isMisleadingThumbnail(platform, decoded)) {
       // Fall through to platform/media derivations or placeholder.
     } else {
       return decoded;
