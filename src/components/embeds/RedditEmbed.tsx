@@ -132,9 +132,12 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
       container.dispatchEvent(new CustomEvent("embedReady", { bubbles: true }));
     };
 
+    const handledIframes = new WeakSet<HTMLIFrameElement>();
     const attachIframe = () => {
       const iframe = container.querySelector("iframe") as HTMLIFrameElement | null;
       if (!iframe) return false;
+      if (handledIframes.has(iframe)) return true;
+      handledIframes.add(iframe);
       iframe.style.maxWidth = "100%";
       iframe.style.width = "100%";
       iframe.addEventListener("load", markReady, { once: true });
