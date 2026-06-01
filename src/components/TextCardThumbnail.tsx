@@ -50,6 +50,8 @@ const GRADIENTS: Record<string, string> = {
   external: "var(--thumb-gradient-external)",
 };
 
+const LIGHT_CARD_PLATFORMS = new Set(["reddit"]);
+
 function trimText(t?: string | null, max = 140): string {
   if (!t) return "";
   const clean = t.replace(/\s+/g, " ").trim();
@@ -117,6 +119,7 @@ export function TextCardThumbnail({
   const label = PLATFORM_LABEL[key] || "Post";
   const canShowProfile = preferProfile && (!!profileAvatarUrl || !!displayName || !!username);
   const avatarSrc = profileAvatarUrl && !avatarError ? profileAvatarUrl : null;
+  const lightCard = LIGHT_CARD_PLATFORMS.has(key);
 
   if (canShowProfile) {
     return (
@@ -143,8 +146,8 @@ export function TextCardThumbnail({
         <div className="absolute inset-0 bg-foreground/10 pointer-events-none" />
 
         {icon && (
-          <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-foreground/45 backdrop-blur-sm flex items-center justify-center">
-            <img src={icon} alt="" className="w-3.5 h-3.5 invert" />
+          <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-background/70 backdrop-blur-sm flex items-center justify-center">
+            <img src={icon} alt="" className="w-3.5 h-3.5" />
           </div>
         )}
       </div>
@@ -153,8 +156,13 @@ export function TextCardThumbnail({
 
   return (
     <div
-      className="relative w-full h-full overflow-hidden bg-foreground"
-      style={{ containerType: "inline-size", background: gradient }}
+      className={`relative w-full h-full overflow-hidden ${lightCard ? "bg-muted" : "bg-foreground"}`}
+      style={{
+        containerType: "inline-size",
+        background: lightCard
+          ? "linear-gradient(135deg, hsl(var(--muted)), hsl(var(--background)))"
+          : gradient,
+      }}
     >
       {/* Subtle paper-grain overlay for depth */}
       <div
@@ -169,14 +177,14 @@ export function TextCardThumbnail({
       {display ? (
         <div className="absolute inset-0 flex items-center justify-center px-3">
           <span
-            className="text-background font-semibold text-center leading-snug break-words"
+            className={`${lightCard ? "text-foreground" : "text-background"} font-semibold text-center leading-snug break-words`}
             style={{
               fontSize: "clamp(11px, 3.4cqw, 18px)",
               display: "-webkit-box",
               WebkitLineClamp: 6,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
-              textShadow: "0 1px 2px rgba(0,0,0,0.25)",
+              textShadow: lightCard ? "none" : "0 1px 2px rgba(0,0,0,0.25)",
             }}
           >
             {display}
@@ -189,14 +197,14 @@ export function TextCardThumbnail({
             <img
               src={icon}
               alt=""
-              className="w-10 h-10 opacity-95 invert"
+              className="w-10 h-10 opacity-95"
             />
           )}
-          <span className="text-[13px] text-background font-semibold tracking-wide">
+          <span className="text-[13px] text-foreground font-semibold tracking-wide">
             {label}
           </span>
           {username && (
-            <span className="text-[11px] text-background/75 font-medium truncate max-w-[90%]">
+            <span className="text-[11px] text-muted-foreground font-medium truncate max-w-[90%]">
               @{username}
             </span>
           )}
@@ -206,7 +214,7 @@ export function TextCardThumbnail({
       {/* Author handle */}
       {username && display && (
         <div className="absolute bottom-1.5 left-2 right-10">
-          <span className="block text-[10px] text-background/80 font-medium truncate">
+          <span className={`block text-[10px] ${lightCard ? "text-muted-foreground" : "text-background/80"} font-medium truncate`}>
             @{username}
           </span>
         </div>
@@ -214,8 +222,8 @@ export function TextCardThumbnail({
 
       {/* Platform badge — always top-right for consistency with image tiles */}
       {icon && display && (
-        <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-foreground/40 backdrop-blur-sm flex items-center justify-center">
-          <img src={icon} alt="" className="w-3.5 h-3.5 invert" />
+        <div className={`absolute top-2 right-2 w-5 h-5 rounded-full ${lightCard ? "bg-background/80" : "bg-foreground/40"} backdrop-blur-sm flex items-center justify-center`}>
+          <img src={icon} alt="" className={`w-3.5 h-3.5 ${lightCard ? "" : "invert"}`} />
         </div>
       )}
     </div>

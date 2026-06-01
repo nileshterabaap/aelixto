@@ -53,6 +53,9 @@ export function getPostThumb(p: {
  */
 function isMisleadingThumbnail(platform: string, url: string): boolean {
   const lower = url.toLowerCase();
+  if (platform === "reddit" && isRedditSelfPreview(lower)) {
+    return true;
+  }
   // Generic stock image hosts are never a real post preview.
   if (lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com")) {
     return true;
@@ -66,6 +69,23 @@ function isMisleadingThumbnail(platform: string, url: string): boolean {
     return false;
   }
   return false;
+}
+
+function isRedditSelfPreview(lowerUrl: string): boolean {
+  try {
+    const u = new URL(lowerUrl);
+    const host = u.hostname.replace(/^www\./, "");
+    return (
+      host === "redditstatic.com" ||
+      host.endsWith(".redditstatic.com") ||
+      u.pathname.includes("/desktop2x/img/renderTimingPixel.png") ||
+      u.pathname.includes("/static/noimage") ||
+      u.pathname.includes("/self_default") ||
+      u.pathname.includes("/default_")
+    );
+  } catch {
+    return lowerUrl.includes("redditstatic.com/render") || lowerUrl.includes("redditstatic.com/static/noimage");
+  }
 }
 
 /** 
