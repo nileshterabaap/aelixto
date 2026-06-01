@@ -9,6 +9,16 @@ export type Renderer =
   | { kind: 'video'; url: string }
   | { kind: 'none' };
 
+type RenderablePost = {
+  mediaUrl?: string | null;
+  media_url?: string | null;
+  url?: string | null;
+  platform?: string | null;
+  mediaType?: string | null;
+  media_type?: string | null;
+  embed_html?: string | null;
+};
+
 export function isRedditUrl(u?: string) {
   if (!u) return false;
   try {
@@ -18,7 +28,7 @@ export function isRedditUrl(u?: string) {
   } catch { return false; }
 }
 
-export function resolveRenderer(post: any): Renderer {
+export function resolveRenderer(post: RenderablePost): Renderer {
   const url: string | undefined = post?.mediaUrl || post?.media_url || post?.url;
   const platform = String(post?.platform || '').toLowerCase();
   const mediaType = post?.mediaType || post?.media_type;
