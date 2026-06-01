@@ -295,6 +295,8 @@ export const HydratedEmbed = memo(({
               thumbnailUrl={effectiveThumbnail}
               description={(post as any).preview_text || (post as any).previewText || undefined}
               authorAvatar={(post as any).author?.avatar || (post as any).profiles?.avatar_url || null}
+              content={post.content}
+              embedHtml={(post as any).embed_html || null}
             />
           </ImageViewTracker>
         )}
