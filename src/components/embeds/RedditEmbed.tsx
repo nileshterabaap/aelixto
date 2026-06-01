@@ -80,8 +80,23 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const [resolving, setResolving] = useState(needsExpansion && !directUrl);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const fallbackImage = thumbnailUrl || authorAvatar || undefined;
+  const [thumbBroken, setThumbBroken] = useState(false);
+  const fallbackImage =
+    (thumbnailUrl && !thumbBroken ? thumbnailUrl : authorAvatar) || undefined;
   const iframeUrl = useMemo(() => resolvedUrl ? toRedditIframeUrl(resolvedUrl) : null, [resolvedUrl]);
+
+  // Detect broken/blocked Reddit thumbnails (e.g. URLs that 403 or 404) so the
+  // fallback card swaps to the author's profile picture instead of rendering a
+  // broken <img>, matching the X/Threads behavior.
+  useEffect(() => {
+    setThumbBroken(false);
+    if (!thumbnailUrl) return;
+    let cancelled = false;
+    const probe = new Image();
+    probe.onerror = () => { if (!cancelled) setThumbBroken(true); };
+    probe.src = thumbnailUrl;
+    return () => { cancelled = true; };
+  }, [thumbnailUrl]);
 
   // Expand mobile `/s/` links and other short shares before rendering Reddit's official iframe.
   useEffect(() => {
