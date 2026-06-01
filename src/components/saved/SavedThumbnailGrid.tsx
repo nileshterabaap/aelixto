@@ -66,7 +66,7 @@ function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void
   const platform = (post.platform || "").toLowerCase();
   const icon = PLATFORM_ICONS[platform];
   const gradient = PLATFORM_GRADIENTS[platform] || "bg-muted";
-  const useProfileFallback = ["threads", "x", "twitter"].includes(platform);
+  const useProfileFallback = ["threads", "reddit", "x", "twitter"].includes(platform);
 
   if (!src || src === "/placeholder.svg") {
     const textSource =
