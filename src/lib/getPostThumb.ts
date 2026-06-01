@@ -38,12 +38,12 @@ export function getPostThumb(p: {
     if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
   }
 
-  // 2b) Reddit: when no thumbnail_url is stored, return the post URL as-is so
-  //     downstream callers know there's "something" — the <img> will fail to
-  //     load and SavedThumbnailGrid will fall through to TextCardThumbnail
-  //     (platform icon + title) instead of rendering a blank tile.
-  if (platform === "reddit" && mu) {
-    return mu;
+  // 2b) Reddit: when no thumbnail_url is stored, return null so the Saved grid
+  //     falls through to TextCardThumbnail (which uses the author profile
+  //     picture for reddit via preferProfile), instead of rendering a broken
+  //     <img> pointed at the post URL.
+  if (platform === "reddit") {
+    return null;
   }
 
   // 3) direct image media
