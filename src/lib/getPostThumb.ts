@@ -20,8 +20,7 @@ function isDirectImageUrl(url?: string | null): boolean {
       /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url) ||
       host === "i.redd.it" ||
       host === "preview.redd.it" ||
-      host.endsWith("redditmedia.com") ||
-      (host === "redd.it" && !path.includes("/comments/"))
+      host.endsWith("redditmedia.com")
     );
   } catch {
     return false;

@@ -88,8 +88,7 @@ function isDirectRedditMediaUrl(rawUrl?: string | null): boolean {
       /\.(png|jpe?g|webp|gif)(\?|$)/i.test(u.href) ||
       host === "i.redd.it" ||
       host === "preview.redd.it" ||
-      host.endsWith("redditmedia.com") ||
-      host.endsWith("redd.it")
+      host.endsWith("redditmedia.com")
     );
   } catch {
     return false;
