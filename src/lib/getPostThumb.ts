@@ -5,6 +5,29 @@ function decodeHtmlEntities(text: string): string {
   return doc.body.textContent || '';
 }
 
+function sameUrl(a?: string | null, b?: string | null): boolean {
+  if (!a || !b) return false;
+  return a.trim() === b.trim();
+}
+
+function isDirectImageUrl(url?: string | null): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname.toLowerCase();
+    return (
+      /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url) ||
+      host === "i.redd.it" ||
+      host === "preview.redd.it" ||
+      host.endsWith("redditmedia.com") ||
+      (host === "redd.it" && !path.includes("/comments/"))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function getPostThumb(p: {
   platform?: string | null;
   thumbnail_url?: string | null;   // server field
@@ -31,10 +54,7 @@ export function getPostThumb(p: {
   //    TextCardThumbnail can take over instead of showing a wrong image.
   if (tu) {
     const decoded = decodeHtmlEntities(tu);
-    const matchesOwnAvatar =
-      platform === "reddit" &&
-      !!authorAvatar &&
-      decoded.trim() === authorAvatar.trim();
+    const matchesOwnAvatar = platform === "reddit" && sameUrl(decoded, authorAvatar);
     if (matchesOwnAvatar || isMisleadingThumbnail(platform, decoded)) {
       // Fall through to platform/media derivations or placeholder.
     } else {
@@ -49,11 +69,11 @@ export function getPostThumb(p: {
     if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
   }
 
-  // 2b) Reddit: when no thumbnail_url is stored, return null so the Saved grid
-  //     falls through to TextCardThumbnail (which uses the author profile
-  //     picture for reddit via preferProfile), instead of rendering a broken
-  //     <img> pointed at the post URL.
+  // 2b) Reddit: only use media_url when it is the actual image/media asset.
+  //     Never return a reddit post page URL as an <img> src, and never fall
+  //     back to the Aelixto user's avatar.
   if (platform === "reddit") {
+    if (isDirectImageUrl(mu)) return mu!;
     return null;
   }
 
