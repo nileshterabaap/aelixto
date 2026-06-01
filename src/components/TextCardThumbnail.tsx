@@ -166,15 +166,21 @@ export function TextCardThumbnail({
     >
       {/* Subtle paper-grain overlay for depth */}
       <div
-        className="absolute inset-0 opacity-[0.08] mix-blend-overlay pointer-events-none"
+        className={`absolute inset-0 ${key === "reddit" ? "opacity-[0.16]" : "opacity-[0.08] mix-blend-overlay"} pointer-events-none`}
         style={{
           backgroundImage:
             "radial-gradient(circle at 30% 20%, white 0%, transparent 40%), radial-gradient(circle at 70% 80%, white 0%, transparent 40%)",
         }}
       />
 
+      {key === "reddit" && icon && (
+        <div className="absolute inset-0 flex items-center justify-center px-4">
+          <img src={icon} alt="" className="w-full max-w-[78%] invert opacity-95" />
+        </div>
+      )}
+
       {/* Text content */}
-      {display ? (
+      {display && key !== "reddit" ? (
         <div className="absolute inset-0 flex items-center justify-center px-3">
           <span
             className={`${lightCard ? "text-foreground" : "text-background"} font-semibold text-center leading-snug break-words`}
@@ -190,7 +196,7 @@ export function TextCardThumbnail({
             {display}
           </span>
         </div>
-      ) : (
+      ) : key !== "reddit" ? (
         // No caption at all — show a clean branded card with logo + platform label
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-3 text-center">
           {icon && (
@@ -209,10 +215,10 @@ export function TextCardThumbnail({
             </span>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* Author handle */}
-      {username && display && (
+      {username && display && key !== "reddit" && (
         <div className="absolute bottom-1.5 left-2 right-10">
           <span className={`block text-[10px] ${lightCard ? "text-muted-foreground" : "text-background/80"} font-medium truncate`}>
             @{username}
@@ -221,7 +227,7 @@ export function TextCardThumbnail({
       )}
 
       {/* Platform badge — always top-right for consistency with image tiles */}
-      {icon && display && (
+      {icon && display && key !== "reddit" && (
         <div className={`absolute top-2 right-2 w-5 h-5 rounded-full ${lightCard ? "bg-background/80" : "bg-foreground/40"} backdrop-blur-sm flex items-center justify-center`}>
           <img src={icon} alt="" className={`w-3.5 h-3.5 ${lightCard ? "" : "invert"}`} />
         </div>
