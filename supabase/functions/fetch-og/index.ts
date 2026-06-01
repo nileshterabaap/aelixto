@@ -156,10 +156,17 @@ serve(async (req) => {
           const data = await redditRes.json();
           const post = data?.[0]?.data?.children?.[0]?.data;
           if (post) {
-            // Reddit provides thumbnail or preview images
+            // Reddit provides thumbnail or preview images. Only return a real
+            // Reddit media URL, never a generic stock placeholder.
             let thumbnail = null;
             if (post.preview?.images?.[0]?.source?.url) {
               thumbnail = post.preview.images[0].source.url.replace(/&amp;/g, '&');
+            } else if (post.gallery_data?.items?.[0]?.media_id && post.media_metadata?.[post.gallery_data.items[0].media_id]?.s?.u) {
+              thumbnail = post.media_metadata[post.gallery_data.items[0].media_id].s.u.replace(/&amp;/g, '&');
+            } else if (post.secure_media?.oembed?.thumbnail_url || post.media?.oembed?.thumbnail_url) {
+              thumbnail = post.secure_media?.oembed?.thumbnail_url || post.media?.oembed?.thumbnail_url;
+            } else if (post.url_overridden_by_dest && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(post.url_overridden_by_dest)) {
+              thumbnail = post.url_overridden_by_dest;
             } else if (post.thumbnail && post.thumbnail !== 'self' && post.thumbnail !== 'default' && post.thumbnail !== 'nsfw' && post.thumbnail !== 'spoiler') {
               thumbnail = post.thumbnail;
             }
@@ -257,9 +264,9 @@ serve(async (req) => {
         if (urlLower.includes('quora.com')) {
           platformName = 'Quora';
           placeholderImage = 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&h=630&fit=crop';
-        } else if (urlLower.includes('reddit.com')) {
+        } else if (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) {
           platformName = 'Reddit';
-          placeholderImage = 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=1200&h=630&fit=crop';
+          placeholderImage = '';
         } else if (urlLower.includes('medium.com')) {
           platformName = 'Medium';
           placeholderImage = 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=1200&h=630&fit=crop';
@@ -268,7 +275,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ 
             title: `${platformName} Post`,
-            image: placeholderImage,
+            image: placeholderImage || null,
             description: `View this post on ${platformName}`,
             finalUrl: targetUrl
           }),
