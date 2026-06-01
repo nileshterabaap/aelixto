@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { OgCardFallback } from "@/components/OgCardFallback";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -10,9 +10,8 @@ type RedditEmbedProps = {
   authorAvatar?: string | null;
 };
 
-const REDDIT_WIDGET_SRC = "https://embed.reddit.com/widgets.js";
 const REDDIT_EMBED_HEIGHT = 316;
-const REDDIT_FALLBACK_DELAY = 8500;
+const REDDIT_IFRAME_TIMEOUT = 8500;
 
 function ensureProtocol(rawUrl: string): string {
   const trimmed = rawUrl.trim().split(/\s+/)[0];
@@ -53,6 +52,17 @@ function normalizeRedditEmbedUrl(rawUrl: string): string | null {
   }
 }
 
+function toRedditIframeUrl(canonicalUrl: string): string | null {
+  try {
+    const u = new URL(canonicalUrl);
+    if (!/(^|\.)reddit\.com$/i.test(u.hostname)) return null;
+    const params = new URLSearchParams({ embed: "true", showmedia: "true" });
+    return `https://embed.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}?${params.toString()}`;
+  } catch {
+    return null;
+  }
+}
+
 function shouldExpandRedditUrl(rawUrl: string): boolean {
   try {
     const u = new URL(ensureProtocol(rawUrl));
@@ -66,12 +76,12 @@ function shouldExpandRedditUrl(rawUrl: string): boolean {
 export default function RedditEmbed({ url, title, thumbnailUrl, description, authorAvatar }: RedditEmbedProps) {
   const directUrl = useMemo(() => normalizeRedditEmbedUrl(url), [url]);
   const needsExpansion = useMemo(() => shouldExpandRedditUrl(url), [url]);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [resolvedUrl, setResolvedUrl] = useState<string | null>(directUrl);
   const [resolving, setResolving] = useState(needsExpansion && !directUrl);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const fallbackImage = thumbnailUrl || authorAvatar || undefined;
+  const iframeUrl = useMemo(() => resolvedUrl ? toRedditIframeUrl(resolvedUrl) : null, [resolvedUrl]);
 
   // Expand mobile `/s/` links and other short shares before asking widgets.js to hydrate.
   useEffect(() => {
