@@ -36,8 +36,7 @@ function normalizeRedditEmbedUrl(rawUrl: string): string | null {
       return null;
     }
 
-    const galleryId = u.pathname.match(/^\/gallery\/([a-z0-9_]+)/i)?.[1];
-    if (galleryId) return `https://www.reddit.com/comments/${galleryId}/`;
+    if (/^\/gallery\/[a-z0-9_]+/i.test(u.pathname)) return null;
 
     if (/^\/(?:r|user)\/[^/]+\/comments\/[a-z0-9_]+(?:\/.*)?$/i.test(u.pathname)) {
       return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
