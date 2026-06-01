@@ -76,8 +76,11 @@ function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void
   const useProfileFallback = ["threads", "x", "twitter"].includes(platform);
 
   if (!src || src === "/placeholder.svg") {
-    const textSource =
-      post.content?.trim() || post.title?.trim() || "";
+    // Reddit: show the branded logo + label card (no caption text, no avatar),
+    // matching the in-feed Reddit fallback.
+    const textSource = platform === "reddit"
+      ? ""
+      : (post.content?.trim() || post.title?.trim() || "");
     return (
       <button
         onClick={onClick}
