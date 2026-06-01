@@ -37,7 +37,13 @@ function normalizeRedditEmbedUrl(rawUrl: string): string | null {
       return null;
     }
 
-    if (/^\/gallery\/[a-z0-9_]+/i.test(u.pathname)) return null;
+    if (/^\/gallery\/[a-z0-9_]+/i.test(u.pathname)) {
+      return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
+    }
+
+    if (/^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(u.pathname)) {
+      return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
+    }
 
     if (/^\/(?:r|user)\/[^/]+\/comments\/[a-z0-9_]+(?:\/.*)?$/i.test(u.pathname)) {
       return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
@@ -68,7 +74,7 @@ function shouldExpandRedditUrl(rawUrl: string): boolean {
   try {
     const u = new URL(ensureProtocol(rawUrl));
     if (!isRedditHost(u.hostname)) return false;
-    return !normalizeRedditEmbedUrl(rawUrl) || /\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(u.pathname);
+    return !normalizeRedditEmbedUrl(rawUrl);
   } catch {
     return false;
   }
