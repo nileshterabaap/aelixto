@@ -32,11 +32,8 @@ function normalizeRedditEmbedUrl(rawUrl: string): string | null {
     const u = new URL(ensureProtocol(rawUrl));
     if (!isRedditHost(u.hostname)) return null;
 
-    const parts = u.pathname.split("/").filter(Boolean);
-
     if (/^redd\.it$/i.test(u.hostname)) {
-      const id = parts[0];
-      return id ? `https://www.reddit.com/comments/${id}/` : null;
+      return null;
     }
 
     const galleryId = u.pathname.match(/^\/gallery\/([a-z0-9_]+)/i)?.[1];
@@ -145,6 +142,22 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
       return true;
     };
 
+    container.replaceChildren();
+
+    const blockquote = document.createElement("blockquote");
+    blockquote.className = "reddit-embed-bq";
+    blockquote.setAttribute("data-embed-height", String(REDDIT_EMBED_HEIGHT));
+    blockquote.setAttribute("data-embed-showmedia", "true");
+    blockquote.style.height = `${REDDIT_EMBED_HEIGHT}px`;
+
+    const link = document.createElement("a");
+    link.href = resolvedUrl;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = title || "Reddit post";
+    blockquote.appendChild(link);
+    container.appendChild(blockquote);
+
     const observer = new MutationObserver(() => { attachIframe(); });
     observer.observe(container, { childList: true, subtree: true });
 
@@ -171,9 +184,10 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
       cancelled = true;
       observer.disconnect();
       window.clearTimeout(fallback);
+      container.replaceChildren();
       if (script?.parentNode) script.parentNode.removeChild(script);
     };
-  }, [resolvedUrl, resolving, failed]);
+  }, [resolvedUrl, resolving, failed, title]);
 
   if (resolving || (!resolvedUrl && !failed)) {
     return <div data-embed-status="loading" className="w-full" style={{ minHeight: REDDIT_EMBED_HEIGHT }} />;
@@ -199,18 +213,6 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
       className="relative w-full overflow-hidden"
       style={{ minHeight: loaded ? undefined : REDDIT_EMBED_HEIGHT }}
       data-embed-status={loaded ? "ready" : "loading"}
-    >
-      <blockquote
-        key={resolvedUrl}
-        className="reddit-embed-bq"
-        data-embed-height={String(REDDIT_EMBED_HEIGHT)}
-        data-embed-showmedia="true"
-        style={{ height: REDDIT_EMBED_HEIGHT }}
-      >
-        <a href={resolvedUrl} target="_blank" rel="noopener noreferrer">
-          {title || "Reddit post"}
-        </a>
-      </blockquote>
-    </div>
+    />
   );
 }
