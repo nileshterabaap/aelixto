@@ -102,6 +102,28 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
     queryFn: async () => {
       if (!userId || !platform) return [];
 
+      // [DEBUG] Reddit tab diagnostics — log exact platform string passed to RPC
+      // and the distinct platform values actually stored for this user.
+      console.log("[useUserPlatformPosts] RPC platform_name =", JSON.stringify(platform), "userId =", userId);
+      try {
+        const { data: allUserPosts, error: debugErr } = await supabase
+          .from("posts")
+          .select("platform")
+          .eq("user_id", userId);
+        if (debugErr) {
+          console.warn("[useUserPlatformPosts][debug] distinct platforms query failed:", debugErr);
+        } else {
+          const counts = (allUserPosts || []).reduce<Record<string, number>>((acc, row: any) => {
+            const key = row.platform === null ? "<null>" : JSON.stringify(row.platform);
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+          }, {});
+          console.log("[useUserPlatformPosts][debug] distinct platforms for user:", counts);
+        }
+      } catch (e) {
+        console.warn("[useUserPlatformPosts][debug] exception:", e);
+      }
+
       const all: PlatformPost[] = [];
       let cursor: string | null = null;
 
