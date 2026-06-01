@@ -61,16 +61,26 @@ interface SavedThumbnailGridProps {
 
 function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void }) {
   const [imgError, setImgError] = useState(false);
-  const rawThumb = getPostThumb({ platform: post.platform, thumbnail_url: post.thumbnail_url, media_url: post.mediaUrl });
+  const rawThumb = getPostThumb({
+    platform: post.platform,
+    thumbnail_url: post.thumbnail_url,
+    media_url: post.mediaUrl,
+    author_avatar_url: post.author?.avatar,
+  });
   const src = imgError ? null : maybeProxy(rawThumb, 480);
   const platform = (post.platform || "").toLowerCase();
   const icon = PLATFORM_ICONS[platform];
   const gradient = PLATFORM_GRADIENTS[platform] || "bg-muted";
-  const useProfileFallback = ["threads", "reddit", "x", "twitter"].includes(platform);
+  // Reddit intentionally does NOT use the Aelixto author's avatar as a
+  // fallback — show the branded Reddit placeholder card instead.
+  const useProfileFallback = ["threads", "x", "twitter"].includes(platform);
 
   if (!src || src === "/placeholder.svg") {
-    const textSource =
-      post.content?.trim() || post.title?.trim() || "";
+    // Reddit: show the branded logo + label card (no caption text, no avatar),
+    // matching the in-feed Reddit fallback.
+    const textSource = platform === "reddit"
+      ? ""
+      : (post.content?.trim() || post.title?.trim() || "");
     return (
       <button
         onClick={onClick}
