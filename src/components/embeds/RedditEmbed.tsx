@@ -142,13 +142,20 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     return (
       <div data-embed-status="ready">
         {fallbackImage || title || description ? (
-          <OgCardFallback
-            url={url}
-            platform="Reddit"
-            title={title || undefined}
-            image={fallbackImage}
-            description={description || undefined}
-          />
+          <a
+            href={ensureProtocol(url)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full"
+          >
+            <OgCardFallback
+              url={ensureProtocol(url)}
+              platform="Reddit"
+              title={title || undefined}
+              image={fallbackImage}
+              description={description || undefined}
+            />
+          </a>
         ) : (
           <a
             href={ensureProtocol(url)}
