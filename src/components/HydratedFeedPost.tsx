@@ -446,6 +446,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     thumbnail_url: (post as any).thumbnail_url,
     mediaUrl: mediaUrl,
     media_url: (post as any).media_url,
+    author_avatar_url: post.author?.avatar,
   }) || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
   const showCard = isTextOnly || embedState === 'ready' || embedState === 'error';

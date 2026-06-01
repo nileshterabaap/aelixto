@@ -283,7 +283,8 @@ async function fetchRedditThumbnail(url: string): Promise<string | null> {
   }
   
   const ogData = await scrapeOgData(url);
-  return ogData.image;
+  if (ogData.image && !isMisleadingRedditThumbnail(ogData.image)) return ogData.image;
+  return null;
 }
 
 // TikTok oEmbed — public endpoint, no auth, returns thumbnail_url + title
@@ -368,6 +369,11 @@ function extractRedditMediaThumbnail(post: Record<string, unknown> | null | unde
   if (thumbnail && !/(default|self|nsfw|spoiler)$/i.test(thumbnail)) return thumbnail;
 
   return null;
+}
+
+function isMisleadingRedditThumbnail(url: string): boolean {
+  const lower = url.toLowerCase();
+  return lower.includes('images.unsplash.com') || lower.includes('source.unsplash.com');
 }
 
 function decodeHtmlEntities(text: string): string {
