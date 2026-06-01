@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RedditPostEmbed } from "./RedditPostEmbed";
+import RedditEmbed from "@/components/embeds/RedditEmbed";
 import { ArticleContentEmbed } from "./ArticleContentEmbed";
 import { LinkPreviewCard } from "./LinkPreviewCard";
 
@@ -199,9 +199,12 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
   // Reddit posts - use official Reddit embed (no fallback card)
   if (rendererType === 'reddit' && data.kind === 'reddit-post') {
     return (
-      <div data-embed-status="ready">
-        <RedditPostEmbed url={data.resolvedUrl} data={data} />
-      </div>
+      <RedditEmbed
+        url={data.resolvedUrl}
+        title={data.meta.title}
+        thumbnailUrl={data.meta.image}
+        description={data.meta.description}
+      />
     );
   }
 
