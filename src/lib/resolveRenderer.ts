@@ -9,6 +9,16 @@ export type Renderer =
   | { kind: 'video'; url: string }
   | { kind: 'none' };
 
+type RendererPostInput = {
+  mediaUrl?: string | null;
+  media_url?: string | null;
+  url?: string | null;
+  platform?: string | null;
+  embed_html?: string | null;
+  mediaType?: string | null;
+  media_type?: string | null;
+};
+
 export function isRedditUrl(u?: string) {
   if (!u) return false;
   try {
@@ -18,8 +28,8 @@ export function isRedditUrl(u?: string) {
   } catch { return false; }
 }
 
-export function resolveRenderer(post: any): Renderer {
-  const url: string | undefined = post?.mediaUrl || post?.media_url || post?.url;
+export function resolveRenderer(post: RendererPostInput): Renderer {
+  const url = post?.mediaUrl || post?.media_url || post?.url || undefined;
   const platform = String(post?.platform || '').toLowerCase();
 
   // 1) Platform-specific renderers that need their own SDKs — BEFORE raw HTML
