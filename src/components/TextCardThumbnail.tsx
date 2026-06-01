@@ -50,7 +50,7 @@ const GRADIENTS: Record<string, string> = {
   external: "var(--thumb-gradient-external)",
 };
 
-const LIGHT_CARD_PLATFORMS = new Set(["reddit"]);
+const LIGHT_CARD_PLATFORMS = new Set<string>();
 
 function trimText(t?: string | null, max = 140): string {
   if (!t) return "";
@@ -161,6 +161,8 @@ export function TextCardThumbnail({
         containerType: "inline-size",
         background: lightCard
           ? "linear-gradient(135deg, hsl(var(--muted)), hsl(var(--background)))"
+          : key === "reddit"
+          ? "var(--thumb-gradient-reddit)"
           : gradient,
       }}
     >
