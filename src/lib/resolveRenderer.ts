@@ -13,7 +13,7 @@ export function isRedditUrl(u?: string) {
   if (!u) return false;
   try {
     const x = new URL(u);
-    return /(^|\.)reddit\.com$/.test(x.hostname) || /(^|\.)redd\.it$/.test(x.hostname);
+    return /(^|\.)reddit\.com$/.test(x.hostname) || x.hostname === 'redd.it';
   } catch { return false; }
 }
 
