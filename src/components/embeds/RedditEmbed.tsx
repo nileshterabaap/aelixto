@@ -109,6 +109,15 @@ function isVideoUrl(rawUrl?: string | null): boolean {
   return /\.(mp4|webm|mov)(\?|$)/i.test(rawUrl);
 }
 
+function isRedditShareUrl(rawUrl: string): boolean {
+  try {
+    const u = new URL(ensureProtocol(rawUrl));
+    return isRedditHost(u.hostname) && /^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(u.pathname);
+  } catch {
+    return false;
+  }
+}
+
 export default function RedditEmbed({ url, title, thumbnailUrl, description, authorAvatar }: RedditEmbedProps) {
   const normalizedUrl = useMemo(() => ensureProtocol(url), [url]);
   const directUrl = useMemo(() => normalizeRedditEmbedUrl(url), [url]);
@@ -121,6 +130,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const isDirectMedia = isDirectRedditMediaUrl(normalizedUrl);
   const validThumb = !!thumbnailUrl && !thumbBroken && !sameUrl(thumbnailUrl, authorAvatar);
   const fallbackImage = validThumb ? thumbnailUrl! : undefined;
+  const shouldRenderStoredImage = !isDirectMedia && validThumb && isRedditShareUrl(normalizedUrl);
   const iframeUrl = useMemo(() => resolvedUrl ? toRedditIframeUrl(resolvedUrl) : null, [resolvedUrl]);
 
   // Detect broken/blocked Reddit thumbnails (e.g. URLs that 403 or 404) so the
@@ -186,6 +196,21 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     const fallback = window.setTimeout(() => setLoaded(true), REDDIT_IFRAME_TIMEOUT);
     return () => window.clearTimeout(fallback);
   }, [resolvedUrl, resolving, failed, iframeUrl, loaded]);
+
+  if (shouldRenderStoredImage) {
+    return (
+      <div data-embed-status="ready">
+        <a
+          href={normalizedUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block w-full bg-card"
+        >
+          <img src={fallbackImage} alt={title || "Reddit post"} className="w-full h-auto object-cover" loading="eager" />
+        </a>
+      </div>
+    );
+  }
 
   if (resolving || (!resolvedUrl && !failed)) {
     return <div data-embed-status="loading" className="w-full" style={{ minHeight: REDDIT_EMBED_HEIGHT }} />;
