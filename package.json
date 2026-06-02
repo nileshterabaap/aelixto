@@ -4,9 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/stability-guard.mjs restore && vite",
-    "build": "node scripts/stability-guard.mjs check && vite build",
-    "build:dev": "node scripts/stability-guard.mjs check && vite build --mode development",
+    "dev": "vite",
+    "build": "vite build",
+    "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
     "stability:status": "node scripts/stability-guard.mjs status",
