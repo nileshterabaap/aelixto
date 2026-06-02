@@ -41,8 +41,11 @@ function normalizeRedditEmbedUrl(rawUrl: string): string | null {
       return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
     }
 
+    // Mobile share URLs (`/r/.../s/...`) are not accepted by embed.reddit.com;
+    // sending them straight to the iframe renders Reddit's own "Page not found".
+    // Force these through expand-url first so we iframe the canonical /comments/ URL.
     if (/^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(u.pathname)) {
-      return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
+      return null;
     }
 
     if (/^\/(?:r|user)\/[^/]+\/comments\/[a-z0-9_]+(?:\/.*)?$/i.test(u.pathname)) {
