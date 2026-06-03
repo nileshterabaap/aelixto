@@ -25,6 +25,7 @@ serve(async (req) => {
 
     let thumbnailUrl: string | null = null;
     let previewText: string | null = null;
+    let previewTitle: string | null = null;
 
     // YouTube special handling - reliable thumbnails
     if (platform === 'youtube') {
@@ -60,10 +61,12 @@ serve(async (req) => {
     else if (platform === 'article' || platform === 'medium') {
       const mediumData = await fetchMediumRssPreview(url);
       if (mediumData) {
+        previewTitle = mediumData.title;
         thumbnailUrl = mediumData.image;
         previewText = mediumData.description || mediumData.title;
       } else {
         const ogData = await scrapeOgData(url);
+        previewTitle = ogData.title;
         thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
         previewText = ogData.description || ogData.title;
       }
@@ -98,9 +101,12 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    const updatePayload: Record<string, string | null> = { thumbnail_url: thumbnailUrl, preview_text: previewText };
+    if (previewTitle) updatePayload.title = previewTitle;
+
     const { error: updateError } = await supabase
       .from('posts')
-      .update({ thumbnail_url: thumbnailUrl, preview_text: previewText })
+      .update(updatePayload)
       .eq('id', postId);
 
     if (updateError) {
