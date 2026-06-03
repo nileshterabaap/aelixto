@@ -90,11 +90,12 @@ serve(async (req) => {
         if (!previewText) previewText = ogData.description || ogData.title;
       }
     }
-    // Generic scraping for other platforms
+    // Generic scraping for other platforms / unclassified URLs
     else {
       const ogData = await scrapeOgData(url);
       thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
       previewText = ogData.description || ogData.title;
+      if (ogData.title) previewTitle = ogData.title;
     }
 
     // Update database
