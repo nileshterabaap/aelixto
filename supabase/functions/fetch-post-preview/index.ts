@@ -389,6 +389,86 @@ function isMisleadingRedditThumbnail(url: string): boolean {
   return lower.includes('images.unsplash.com') || lower.includes('source.unsplash.com');
 }
 
+function isGenericPlaceholderImage(url: string): boolean {
+  const lower = url.toLowerCase();
+  return lower.includes('images.unsplash.com') || lower.includes('source.unsplash.com');
+}
+
+function stripHtml(text: string): string {
+  return decodeHtmlEntities(text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+}
+
+function extractXmlTag(xml: string, tag: string): string | null {
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const cdata = xml.match(new RegExp(`<${escaped}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${escaped}>`, 'i'));
+  if (cdata?.[1]) return decodeHtmlEntities(cdata[1].trim());
+  const plain = xml.match(new RegExp(`<${escaped}[^>]*>([\\s\\S]*?)<\\/${escaped}>`, 'i'));
+  return plain?.[1] ? decodeHtmlEntities(plain[1].trim()) : null;
+}
+
+function getMediumFeedUrl(targetUrl: string): { feedUrl: string; postId: string | null; slug: string | null } | null {
+  try {
+    const parsed = new URL(targetUrl);
+    const host = parsed.hostname.toLowerCase();
+    const postId = parsed.pathname.match(/(?:-|\/p\/)([a-f0-9]{10,})(?:[/?#]|$)/i)?.[1] || null;
+    const lastSegment = parsed.pathname.split('/').filter(Boolean).pop() || '';
+    const slug = lastSegment.replace(/-[a-f0-9]{10,}$/i, '').toLowerCase() || null;
+
+    if (host === 'medium.com' || host === 'www.medium.com') {
+      const author = parsed.pathname.match(/^\/@([^/]+)/)?.[1];
+      return author ? { feedUrl: `https://medium.com/feed/@${author}`, postId, slug } : null;
+    }
+
+    if (host.endsWith('.medium.com')) {
+      return { feedUrl: `https://${host}/feed`, postId, slug };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function fetchMediumRssPreview(url: string): Promise<{ title: string; image: string | null; description: string | null } | null> {
+  const info = getMediumFeedUrl(url);
+  if (!info) return null;
+
+  try {
+    const response = await fetch(info.feedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/rss+xml,text/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+    if (!response.ok) return null;
+
+    const xml = await response.text();
+    const items = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
+    const item = items.find((entry) => {
+      const link = extractXmlTag(entry, 'link') || '';
+      const guid = extractXmlTag(entry, 'guid') || '';
+      const haystack = `${link} ${guid} ${entry}`.toLowerCase();
+      return (!!info.postId && haystack.includes(info.postId.toLowerCase())) || (!!info.slug && haystack.includes(info.slug));
+    });
+    if (!item) return null;
+
+    const title = extractXmlTag(item, 'title');
+    const content = extractXmlTag(item, 'content:encoded') || extractXmlTag(item, 'description') || '';
+    const subtitle = content.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1];
+    const firstParagraph = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i)?.[1];
+    const image = content.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] || null;
+
+    if (!title) return null;
+    return {
+      title: stripHtml(title),
+      image: image ? decodeHtmlEntities(image) : null,
+      description: subtitle ? stripHtml(subtitle) : (firstParagraph ? stripHtml(firstParagraph) : null),
+    };
+  } catch (error) {
+    console.error('[fetch-post-preview] Medium RSS error:', error);
+    return null;
+  }
+}
+
 function decodeHtmlEntities(text: string): string {
   if (!text) return text;
   return text
