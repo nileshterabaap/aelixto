@@ -56,19 +56,20 @@ serve(async (req) => {
     else if (platform === 'reddit') {
       thumbnailUrl = await fetchRedditThumbnail(url);
     }
-    // Medium / article handling — Medium often blocks normal HTML fetches,
-    // but the author RSS feed exposes the exact title and first article image.
+    // Article handling — try Medium RSS first (because Medium blocks the
+    // normal HTML fetch for some posts), then fall back to the universal
+    // metadata scraper that works on any website.
     else if (platform === 'article' || platform === 'medium') {
       const mediumData = await fetchMediumRssPreview(url);
-      if (mediumData) {
+      if (mediumData && mediumData.image) {
         previewTitle = mediumData.title;
         thumbnailUrl = mediumData.image;
         previewText = mediumData.description || mediumData.title;
       } else {
         const ogData = await scrapeOgData(url);
-        previewTitle = ogData.title;
+        previewTitle = (mediumData?.title) || ogData.title;
         thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
-        previewText = ogData.description || ogData.title;
+        previewText = (mediumData?.description) || ogData.description || ogData.title;
       }
     }
     // TikTok - use official oEmbed (no auth required) and store permanently
