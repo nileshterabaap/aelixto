@@ -23,7 +23,7 @@ export interface PlatformPost {
   profile_avatar_url?: string | null;
 }
 
-const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook", "reddit", "threads", "tiktok"]);
+const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook", "reddit", "threads", "tiktok", "article", "medium"]);
 const inflightBackfills = new Set<string>();
 
 const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
@@ -40,11 +40,17 @@ const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
   );
 };
 
+const isGenericPlaceholderThumbnail = (url?: string | null) => {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com");
+};
+
 async function backfillThumbnail(post: PlatformPost) {
   if (!post.media_url || !post.platform) return;
   const platform = post.platform.toLowerCase();
   if (!THUMB_BACKFILL_PLATFORMS.has(platform)) return;
-  if (post.thumbnail_url) return;
+  if (post.thumbnail_url && !isGenericPlaceholderThumbnail(post.thumbnail_url)) return;
 
   const key = `${post.id}:${platform}`;
   if (inflightBackfills.has(key)) return;
@@ -181,7 +187,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
     const platformLower = (platform || "").toLowerCase();
     if (!THUMB_BACKFILL_PLATFORMS.has(platformLower)) return;
 
-    const missing = items.filter((p) => !p.thumbnail_url && !!p.media_url);
+    const missing = items.filter((p) => (!p.thumbnail_url || isGenericPlaceholderThumbnail(p.thumbnail_url)) && !!p.media_url);
     const expiring = items.filter((p) => isLikelyExpiringMetaCdnUrl(p.thumbnail_url));
     if (!missing.length && !expiring.length) return;
 

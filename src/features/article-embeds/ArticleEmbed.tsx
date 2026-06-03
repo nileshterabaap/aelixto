@@ -91,7 +91,9 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
           console.error('[ArticleEmbed] Error:', fetchError);
         }
 
-        let unfurledData = result as UnfurlResult | null;
+        let unfurledData = result && (result as UnfurlResult).meta
+          ? (result as UnfurlResult)
+          : null;
 
         // If unfurl failed or returned a poor title (just the domain), enhance with OG data
         const titleLooksLikeDomain = unfurledData?.meta?.title && (
@@ -111,13 +113,15 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
               const ogTitle = ogData.meta?.title || ogData.title;
               const ogImage = ogData.meta?.image || ogData.image;
               const ogDescription = ogData.meta?.description || ogData.description;
+              const ogFinalUrl = ogData.meta?.finalUrl || ogData.finalUrl || cleanedUrl;
+              const ogType = ogData.og_type || ogData.meta?.og_type;
               
               if (!unfurledData) {
-                let domain = cleanedUrl;
-                try { domain = new URL(cleanedUrl).hostname; } catch {}
+                let domain = ogFinalUrl;
+                try { domain = new URL(ogFinalUrl).hostname; } catch {}
                 unfurledData = {
-                  kind: 'generic-article',
-                  resolvedUrl: cleanedUrl,
+                  kind: ogType === 'article' ? 'medium-article' : 'generic-article',
+                  resolvedUrl: ogFinalUrl,
                   site: { name: domain.replace('www.', ''), domain, favicon: '' },
                   meta: { title: ogTitle || domain, description: ogDescription || '', image: ogImage || null, publishedTime: null },
                   content: { html: '' },
