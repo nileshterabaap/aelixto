@@ -346,16 +346,19 @@ serve(async (req) => {
     }
     
     if (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) {
-      // Use Reddit's JSON API via old.reddit.com - more reliable
+      // Use Reddit's public JSON API - append .json to the post URL.
+      // Only handle proper post URLs (reddit.com/r/*/comments/*).
       try {
-        // Convert to old.reddit.com and append .json
-        let jsonUrl = targetUrl.split('?')[0]; // Remove query params
-        jsonUrl = jsonUrl.replace('www.reddit.com', 'old.reddit.com');
-        if (!jsonUrl.endsWith('/')) jsonUrl += '/';
+        let jsonUrl = targetUrl.split('?')[0].split('#')[0];
+        const isPostUrl = /reddit\.com\/r\/[^/]+\/comments\/[^/]+/i.test(jsonUrl);
+        if (!isPostUrl) {
+          throw new Error('Not a Reddit post URL, skipping JSON API');
+        }
+        if (jsonUrl.endsWith('/')) jsonUrl = jsonUrl.slice(0, -1);
         jsonUrl += '.json';
-        
+
         console.log('[fetch-og] Trying Reddit JSON:', jsonUrl);
-        
+
         const redditRes = await fetch(jsonUrl, {
           headers: { 
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -369,19 +372,23 @@ serve(async (req) => {
           const data = await redditRes.json();
           const post = data?.[0]?.data?.children?.[0]?.data;
           if (post) {
-            // Reddit provides thumbnail or preview images. Only return a real
-            // Reddit media URL, never a generic stock placeholder.
-            let thumbnail = null;
-            if (post.preview?.images?.[0]?.source?.url) {
+            // Prefer the post's thumbnail field; fall back to a real media URL.
+            // Reject sentinel values ("self", "nsfw", "default", "spoiler", "image").
+            const invalidThumbs = new Set(['self', 'nsfw', 'default', 'spoiler', 'image', '']);
+            let thumbnail: string | null = null;
+            const rawThumb = typeof post.thumbnail === 'string' ? post.thumbnail.trim() : '';
+            if (rawThumb && !invalidThumbs.has(rawThumb.toLowerCase()) && /^https?:\/\//i.test(rawThumb)) {
+              thumbnail = rawThumb.replace(/&amp;/g, '&');
+            } else if (post.url_overridden_by_dest && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(post.url_overridden_by_dest)) {
+              thumbnail = post.url_overridden_by_dest;
+            } else if (typeof post.url === 'string' && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(post.url)) {
+              thumbnail = post.url;
+            } else if (post.preview?.images?.[0]?.source?.url) {
               thumbnail = post.preview.images[0].source.url.replace(/&amp;/g, '&');
             } else if (post.gallery_data?.items?.[0]?.media_id && post.media_metadata?.[post.gallery_data.items[0].media_id]?.s?.u) {
               thumbnail = post.media_metadata[post.gallery_data.items[0].media_id].s.u.replace(/&amp;/g, '&');
             } else if (post.secure_media?.oembed?.thumbnail_url || post.media?.oembed?.thumbnail_url) {
               thumbnail = post.secure_media?.oembed?.thumbnail_url || post.media?.oembed?.thumbnail_url;
-            } else if (post.url_overridden_by_dest && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(post.url_overridden_by_dest)) {
-              thumbnail = post.url_overridden_by_dest;
-            } else if (post.thumbnail && post.thumbnail !== 'self' && post.thumbnail !== 'default' && post.thumbnail !== 'nsfw' && post.thumbnail !== 'spoiler') {
-              thumbnail = post.thumbnail;
             }
             
             console.log('[fetch-og] Reddit JSON API success:', thumbnail?.substring(0, 60) || 'no image');
