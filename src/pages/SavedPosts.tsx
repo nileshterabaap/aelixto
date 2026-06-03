@@ -15,6 +15,12 @@ import { SavedSkeleton } from "@/components/saved/SavedSkeleton";
 import { DraftsGrid } from "@/components/saved/DraftsGrid";
 import { useDrafts } from "@/hooks/useDrafts";
 
+const isGenericPlaceholderThumbnail = (url?: string | null) => {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com");
+};
+
 export default function SavedPosts() {
   const { session, loading } = useSession();
   const navigate = useNavigate();
@@ -98,6 +104,33 @@ export default function SavedPosts() {
       queryClient.invalidateQueries({ queryKey: ["post-drafts"] }),
     ]);
   }, [queryClient]);
+
+  useEffect(() => {
+    const targets = savedPosts.filter((post: any) => {
+      const platform = (post.platform || "").toLowerCase();
+      return ["article", "medium", "reddit"].includes(platform)
+        && post.mediaUrl
+        && (!post.thumbnail_url || isGenericPlaceholderThumbnail(post.thumbnail_url));
+    });
+    if (!targets.length) return;
+
+    let cancelled = false;
+    (async () => {
+      for (const post of targets.slice(0, 6) as any[]) {
+        if (cancelled) return;
+        await supabase.functions.invoke("fetch-post-preview", {
+          body: { postId: post.id, url: post.mediaUrl, platform: post.platform },
+        }).catch(() => {});
+      }
+      if (!cancelled) {
+        queryClient.invalidateQueries({ queryKey: ["saved-posts", session?.user?.id] });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [savedPosts, queryClient, session?.user?.id]);
 
   if (loading || isLoading) {
     return (
