@@ -56,19 +56,20 @@ serve(async (req) => {
     else if (platform === 'reddit') {
       thumbnailUrl = await fetchRedditThumbnail(url);
     }
-    // Medium / article handling — Medium often blocks normal HTML fetches,
-    // but the author RSS feed exposes the exact title and first article image.
+    // Article handling — try Medium RSS first (because Medium blocks the
+    // normal HTML fetch for some posts), then fall back to the universal
+    // metadata scraper that works on any website.
     else if (platform === 'article' || platform === 'medium') {
       const mediumData = await fetchMediumRssPreview(url);
-      if (mediumData) {
+      if (mediumData && mediumData.image) {
         previewTitle = mediumData.title;
         thumbnailUrl = mediumData.image;
         previewText = mediumData.description || mediumData.title;
       } else {
         const ogData = await scrapeOgData(url);
-        previewTitle = ogData.title;
+        previewTitle = (mediumData?.title) || ogData.title;
         thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
-        previewText = ogData.description || ogData.title;
+        previewText = (mediumData?.description) || ogData.description || ogData.title;
       }
     }
     // TikTok - use official oEmbed (no auth required) and store permanently
@@ -89,11 +90,12 @@ serve(async (req) => {
         if (!previewText) previewText = ogData.description || ogData.title;
       }
     }
-    // Generic scraping for other platforms
+    // Generic scraping for other platforms / unclassified URLs
     else {
       const ogData = await scrapeOgData(url);
       thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
       previewText = ogData.description || ogData.title;
+      if (ogData.title) previewTitle = ogData.title;
     }
 
     // Update database
@@ -490,7 +492,9 @@ async function scrapeOgData(url: string): Promise<{ image: string | null; title:
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
       },
       redirect: 'follow',
     });
@@ -500,23 +504,146 @@ async function scrapeOgData(url: string): Promise<{ image: string | null; title:
     }
 
     const html = await response.text();
-
-    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-                         html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
-    const twitterImageMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
-    
-    const image = ogImageMatch?.[1] ? decodeHtmlEntities(ogImageMatch[1]) : 
-                  (twitterImageMatch?.[1] ? decodeHtmlEntities(twitterImageMatch[1]) : null);
-
-    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
-    const title = ogTitleMatch?.[1] ? decodeHtmlEntities(ogTitleMatch[1]) : null;
-
-    const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
-    const description = ogDescMatch?.[1] ? decodeHtmlEntities(ogDescMatch[1]) : null;
-
-    return { image, title, description };
+    return extractArticleMetadata(html, response.url || url);
   } catch (error) {
     console.error('[fetch-post-preview] Scraping error:', error);
     return { image: null, title: null, description: null };
+  }
+}
+
+/**
+ * Universal article metadata extractor. Works across any website by trying
+ * (in order): Open Graph, Twitter Cards, JSON-LD structured data, the first
+ * <h1> in the document, and the first reasonable <img> inside <article>/<main>
+ * or the page body. Resolves relative URLs against the page's final URL.
+ */
+export function extractArticleMetadata(
+  html: string,
+  baseUrl: string
+): { image: string | null; title: string | null; description: string | null } {
+  const meta = (name: string): string | null => {
+    const patterns = [
+      new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)["']`, 'i'),
+      new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${name}["']`, 'i'),
+    ];
+    for (const p of patterns) {
+      const m = html.match(p);
+      if (m?.[1]) return decodeHtmlEntities(m[1]).trim();
+    }
+    return null;
+  };
+
+  // --- JSON-LD ---
+  let jsonLdTitle: string | null = null;
+  let jsonLdImage: string | null = null;
+  let jsonLdDesc: string | null = null;
+  const ldBlocks = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+  for (const block of ldBlocks) {
+    const inner = block.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '').trim();
+    if (!inner) continue;
+    try {
+      const parsed = JSON.parse(inner);
+      const nodes: any[] = Array.isArray(parsed) ? parsed : (parsed['@graph'] && Array.isArray(parsed['@graph']) ? parsed['@graph'] : [parsed]);
+      for (const node of nodes) {
+        if (!node || typeof node !== 'object') continue;
+        const t = node.headline || node.name;
+        const d = node.description;
+        let img: any = node.image || node.thumbnailUrl || node.thumbnail;
+        if (Array.isArray(img)) img = img[0];
+        if (img && typeof img === 'object') img = img.url || img['@id'] || null;
+        if (!jsonLdTitle && typeof t === 'string') jsonLdTitle = t.trim();
+        if (!jsonLdDesc && typeof d === 'string') jsonLdDesc = d.trim();
+        if (!jsonLdImage && typeof img === 'string') jsonLdImage = img.trim();
+        if (jsonLdTitle && jsonLdImage) break;
+      }
+    } catch { /* ignore malformed JSON-LD */ }
+    if (jsonLdTitle && jsonLdImage) break;
+  }
+
+  // --- Title ---
+  const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+  const h1Tag = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
+  const title =
+    meta('og:title') ||
+    meta('twitter:title') ||
+    jsonLdTitle ||
+    (h1Tag ? decodeHtmlEntities(h1Tag.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) : null) ||
+    (titleTag ? decodeHtmlEntities(titleTag.trim()) : null);
+
+  // --- Description ---
+  const description =
+    meta('og:description') ||
+    meta('twitter:description') ||
+    meta('description') ||
+    jsonLdDesc;
+
+  // --- Image ---
+  let image =
+    meta('og:image') ||
+    meta('og:image:secure_url') ||
+    meta('og:image:url') ||
+    meta('twitter:image') ||
+    meta('twitter:image:src') ||
+    jsonLdImage ||
+    findFirstContentImage(html);
+
+  if (image) {
+    image = resolveUrl(image, baseUrl);
+    if (image && !isLikelyRealContentImage(image)) image = findFirstContentImage(html);
+    if (image) image = resolveUrl(image, baseUrl);
+  }
+
+  return { image: image || null, title: title || null, description: description || null };
+}
+
+function findFirstContentImage(html: string): string | null {
+  // Prefer images inside <article> / <main>; fall back to body.
+  const scopes: string[] = [];
+  const articleMatch = html.match(/<article[\s\S]*?<\/article>/i);
+  if (articleMatch) scopes.push(articleMatch[0]);
+  const mainMatch = html.match(/<main[\s\S]*?<\/main>/i);
+  if (mainMatch) scopes.push(mainMatch[0]);
+  scopes.push(html);
+
+  for (const scope of scopes) {
+    const imgRegex = /<img[^>]+>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = imgRegex.exec(scope)) !== null) {
+      const tag = m[0];
+      const src =
+        tag.match(/\s(?:data-src|data-original|data-lazy-src|data-srcset|srcset)=["']([^"']+)["']/i)?.[1] ||
+        tag.match(/\ssrc=["']([^"']+)["']/i)?.[1];
+      if (!src) continue;
+      // srcset → take first URL
+      const candidate = decodeHtmlEntities(src.split(',')[0].trim().split(/\s+/)[0]);
+      if (isLikelyRealContentImage(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
+function isLikelyRealContentImage(url: string): boolean {
+  if (!url) return false;
+  const u = url.trim();
+  if (!u || u.startsWith('data:')) return false;
+  if (/\.svg(\?|#|$)/i.test(u)) return false;
+  const lower = u.toLowerCase();
+  const blockedHints = [
+    'sprite', 'icon', 'favicon', 'logo', 'avatar', 'profile-photo',
+    'blank.gif', 'spacer.gif', 'pixel.gif', '1x1', 'tracking', 'analytics',
+    'badge', 'emoji',
+  ];
+  if (blockedHints.some((h) => lower.includes(h))) return false;
+  // Reject tiny dimensions hinted in URL (?w=16, =32x32)
+  if (/[?&=_/-](?:w|width)=(?:8|16|24|32|48|64)\b/i.test(u)) return false;
+  if (/(^|[/_-])(?:16|24|32|48|64)x(?:16|24|32|48|64)([._/]|$)/i.test(u)) return false;
+  return true;
+}
+
+function resolveUrl(maybeRelative: string, baseUrl: string): string | null {
+  try {
+    return new URL(maybeRelative, baseUrl).toString();
+  } catch {
+    return null;
   }
 }
