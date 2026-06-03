@@ -60,6 +60,92 @@ function isValidExternalUrl(url: string): boolean {
   }
 }
 
+const decodeHtmlEntities = (text: string): string => {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+};
+
+const stripHtml = (text: string): string =>
+  decodeHtmlEntities(text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+
+const extractXmlTag = (xml: string, tag: string): string | null => {
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const cdata = xml.match(new RegExp(`<${escaped}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${escaped}>`, 'i'));
+  if (cdata?.[1]) return decodeHtmlEntities(cdata[1].trim());
+  const plain = xml.match(new RegExp(`<${escaped}[^>]*>([\\s\\S]*?)<\\/${escaped}>`, 'i'));
+  return plain?.[1] ? decodeHtmlEntities(plain[1].trim()) : null;
+};
+
+const getMediumFeedUrl = (targetUrl: string): { feedUrl: string; postId: string | null; slug: string | null } | null => {
+  try {
+    const parsed = new URL(targetUrl);
+    const host = parsed.hostname.toLowerCase();
+    const postId = parsed.pathname.match(/(?:-|\/p\/)([a-f0-9]{10,})(?:[/?#]|$)/i)?.[1] || null;
+    const lastSegment = parsed.pathname.split('/').filter(Boolean).pop() || '';
+    const slug = lastSegment.replace(/-[a-f0-9]{10,}$/i, '').toLowerCase() || null;
+
+    if (host === 'medium.com' || host === 'www.medium.com') {
+      const author = parsed.pathname.match(/^\/@([^/]+)/)?.[1];
+      return author ? { feedUrl: `https://medium.com/feed/@${author}`, postId, slug } : null;
+    }
+
+    if (host.endsWith('.medium.com')) {
+      return { feedUrl: `https://${host}/feed`, postId, slug };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+};
+
+async function fetchMediumRssPreview(targetUrl: string): Promise<{ title: string; image: string | null; description: string | null; finalUrl: string } | null> {
+  const info = getMediumFeedUrl(targetUrl);
+  if (!info) return null;
+
+  try {
+    const res = await fetch(info.feedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/rss+xml,text/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+    if (!res.ok) return null;
+
+    const xml = await res.text();
+    const items = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
+    const item = items.find((entry) => {
+      const link = extractXmlTag(entry, 'link') || '';
+      const guid = extractXmlTag(entry, 'guid') || '';
+      const haystack = `${link} ${guid} ${entry}`.toLowerCase();
+      return (!!info.postId && haystack.includes(info.postId.toLowerCase())) || (!!info.slug && haystack.includes(info.slug));
+    });
+    if (!item) return null;
+
+    const title = extractXmlTag(item, 'title');
+    const link = extractXmlTag(item, 'link') || targetUrl;
+    const content = extractXmlTag(item, 'content:encoded') || extractXmlTag(item, 'description') || '';
+    const subtitle = content.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1];
+    const firstParagraph = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i)?.[1];
+    const image = content.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] || null;
+
+    if (!title) return null;
+    return {
+      title: stripHtml(title),
+      image: image ? decodeHtmlEntities(image) : null,
+      description: subtitle ? stripHtml(subtitle) : (firstParagraph ? stripHtml(firstParagraph) : null),
+      finalUrl: link,
+    };
+  } catch (error) {
+    console.log('[fetch-og] Medium RSS failed:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -88,7 +174,18 @@ serve(async (req) => {
 
     const urlLower = targetUrl.toLowerCase();
     
-    // Try oEmbed APIs first for specific platforms (more reliable)
+    // Try oEmbed/RSS APIs first for specific platforms (more reliable)
+    if (urlLower.includes('medium.com')) {
+      const mediumData = await fetchMediumRssPreview(targetUrl);
+      if (mediumData) {
+        console.log('[fetch-og] Medium RSS success:', mediumData.title);
+        return new Response(
+          JSON.stringify({ ...mediumData, og_type: 'article' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     if (urlLower.includes('spotify.com') || urlLower.includes('open.spotify.com')) {
       try {
         const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(targetUrl)}`;
@@ -269,7 +366,7 @@ serve(async (req) => {
           placeholderImage = '';
         } else if (urlLower.includes('medium.com')) {
           platformName = 'Medium';
-          placeholderImage = 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=1200&h=630&fit=crop';
+          placeholderImage = '';
         }
         
         return new Response(
@@ -288,17 +385,6 @@ serve(async (req) => {
 
     const html = await response.text();
     const finalUrl = response.url;
-
-    // Helper to decode HTML entities
-    const decodeHtmlEntities = (text: string): string => {
-      return text
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/&nbsp;/g, ' ');
-    };
 
     // Extract Open Graph metadata with multiple fallbacks (handle both attribute orders)
     // Pattern 1: property="og:X" content="Y"
