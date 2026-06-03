@@ -70,6 +70,114 @@ const decodeHtmlEntities = (text: string): string => {
     .replace(/&nbsp;/g, ' ');
 };
 
+function resolveUrl(maybeRelative: string, baseUrl: string): string | null {
+  try { return new URL(maybeRelative, baseUrl).toString(); } catch { return null; }
+}
+
+function isLikelyRealContentImage(url: string): boolean {
+  if (!url) return false;
+  const u = url.trim();
+  if (!u || u.startsWith('data:')) return false;
+  if (/\.svg(\?|#|$)/i.test(u)) return false;
+  const lower = u.toLowerCase();
+  const blockedHints = ['sprite','icon','favicon','logo','avatar','profile-photo','blank.gif','spacer.gif','pixel.gif','1x1','tracking','analytics','badge','emoji'];
+  if (blockedHints.some(h => lower.includes(h))) return false;
+  if (/[?&=_/-](?:w|width)=(?:8|16|24|32|48|64)\b/i.test(u)) return false;
+  if (/(^|[/_-])(?:16|24|32|48|64)x(?:16|24|32|48|64)([._/]|$)/i.test(u)) return false;
+  return true;
+}
+
+function findFirstContentImage(html: string): string | null {
+  const scopes: string[] = [];
+  const articleMatch = html.match(/<article[\s\S]*?<\/article>/i);
+  if (articleMatch) scopes.push(articleMatch[0]);
+  const mainMatch = html.match(/<main[\s\S]*?<\/main>/i);
+  if (mainMatch) scopes.push(mainMatch[0]);
+  scopes.push(html);
+  for (const scope of scopes) {
+    const imgRegex = /<img[^>]+>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = imgRegex.exec(scope)) !== null) {
+      const tag = m[0];
+      const src =
+        tag.match(/\s(?:data-src|data-original|data-lazy-src|data-srcset|srcset)=["']([^"']+)["']/i)?.[1] ||
+        tag.match(/\ssrc=["']([^"']+)["']/i)?.[1];
+      if (!src) continue;
+      const candidate = decodeHtmlEntities(src.split(',')[0].trim().split(/\s+/)[0]);
+      if (isLikelyRealContentImage(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
+function extractArticleMetadata(
+  html: string,
+  baseUrl: string
+): { image: string | null; title: string | null; description: string | null } {
+  const meta = (name: string): string | null => {
+    const patterns = [
+      new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)["']`, 'i'),
+      new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${name}["']`, 'i'),
+    ];
+    for (const p of patterns) {
+      const m = html.match(p);
+      if (m?.[1]) return decodeHtmlEntities(m[1]).trim();
+    }
+    return null;
+  };
+
+  let jsonLdTitle: string | null = null;
+  let jsonLdImage: string | null = null;
+  let jsonLdDesc: string | null = null;
+  const ldBlocks = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+  for (const block of ldBlocks) {
+    const inner = block.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '').trim();
+    if (!inner) continue;
+    try {
+      const parsed = JSON.parse(inner);
+      const nodes: any[] = Array.isArray(parsed) ? parsed : (parsed['@graph'] && Array.isArray(parsed['@graph']) ? parsed['@graph'] : [parsed]);
+      for (const node of nodes) {
+        if (!node || typeof node !== 'object') continue;
+        const t = node.headline || node.name;
+        const d = node.description;
+        let img: any = node.image || node.thumbnailUrl || node.thumbnail;
+        if (Array.isArray(img)) img = img[0];
+        if (img && typeof img === 'object') img = img.url || img['@id'] || null;
+        if (!jsonLdTitle && typeof t === 'string') jsonLdTitle = t.trim();
+        if (!jsonLdDesc && typeof d === 'string') jsonLdDesc = d.trim();
+        if (!jsonLdImage && typeof img === 'string') jsonLdImage = img.trim();
+        if (jsonLdTitle && jsonLdImage) break;
+      }
+    } catch { /* ignore */ }
+    if (jsonLdTitle && jsonLdImage) break;
+  }
+
+  const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+  const h1Tag = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
+  const title =
+    meta('og:title') ||
+    meta('twitter:title') ||
+    jsonLdTitle ||
+    (h1Tag ? decodeHtmlEntities(h1Tag.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) : null) ||
+    (titleTag ? decodeHtmlEntities(titleTag.trim()) : null);
+
+  const description =
+    meta('og:description') || meta('twitter:description') || meta('description') || jsonLdDesc;
+
+  let image =
+    meta('og:image') || meta('og:image:secure_url') || meta('og:image:url') ||
+    meta('twitter:image') || meta('twitter:image:src') ||
+    jsonLdImage || findFirstContentImage(html);
+
+  if (image) {
+    image = resolveUrl(image, baseUrl);
+    if (image && !isLikelyRealContentImage(image)) image = findFirstContentImage(html);
+    if (image) image = resolveUrl(image, baseUrl);
+  }
+
+  return { image: image || null, title: title || null, description: description || null };
+}
+
 const stripHtml = (text: string): string =>
   decodeHtmlEntities(text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
 
