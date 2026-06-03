@@ -55,6 +55,19 @@ serve(async (req) => {
     else if (platform === 'reddit') {
       thumbnailUrl = await fetchRedditThumbnail(url);
     }
+    // Medium / article handling — Medium often blocks normal HTML fetches,
+    // but the author RSS feed exposes the exact title and first article image.
+    else if (platform === 'article' || platform === 'medium') {
+      const mediumData = await fetchMediumRssPreview(url);
+      if (mediumData) {
+        thumbnailUrl = mediumData.image;
+        previewText = mediumData.description || mediumData.title;
+      } else {
+        const ogData = await scrapeOgData(url);
+        thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
+        previewText = ogData.description || ogData.title;
+      }
+    }
     // TikTok - use official oEmbed (no auth required) and store permanently
     else if (platform === 'tiktok') {
       const tiktokData = await fetchTikTokOembed(url);
@@ -76,7 +89,7 @@ serve(async (req) => {
     // Generic scraping for other platforms
     else {
       const ogData = await scrapeOgData(url);
-      thumbnailUrl = ogData.image;
+      thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
       previewText = ogData.description || ogData.title;
     }
 
