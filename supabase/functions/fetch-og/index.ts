@@ -386,16 +386,10 @@ serve(async (req) => {
     const html = await response.text();
     const finalUrl = response.url;
 
-    // Extract Open Graph metadata with multiple fallbacks (handle both attribute orders)
-    // Pattern 1: property="og:X" content="Y"
-    // Pattern 2: content="Y" property="og:X"
     const extractMeta = (propName: string): string | null => {
-      // Try property first, then name
       const patterns = [
-        new RegExp(`<meta[^>]+property=["']${propName}["'][^>]+content=["']([^"']+)["']`, 'i'),
-        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${propName}["']`, 'i'),
-        new RegExp(`<meta[^>]+name=["']${propName}["'][^>]+content=["']([^"']+)["']`, 'i'),
-        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${propName}["']`, 'i'),
+        new RegExp(`<meta[^>]+(?:property|name)=["']${propName}["'][^>]+content=["']([^"']+)["']`, 'i'),
+        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${propName}["']`, 'i'),
       ];
       for (const pattern of patterns) {
         const match = html.match(pattern);
@@ -403,18 +397,14 @@ serve(async (req) => {
       }
       return null;
     };
-    
-    // Try multiple property names for each field
-    const title = extractMeta('og:title') || extractMeta('twitter:title') || 
-                  (html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ? decodeHtmlEntities(html.match(/<title[^>]*>([^<]+)<\/title>/i)![1]) : null);
-    
-    const image = extractMeta('og:image') || extractMeta('og:image:url') || 
-                  extractMeta('og:image:secure_url') || extractMeta('twitter:image') ||
-                  extractMeta('twitter:image:src');
-    
-    const description = extractMeta('og:description') || extractMeta('twitter:description') || 
-                        extractMeta('description');
 
+    // Use the universal article metadata extractor so titles/images work
+    // across any website (Open Graph → Twitter → JSON-LD → <h1> → first
+    // real <img> inside <article>/<main>).
+    const meta = extractArticleMetadata(html, finalUrl);
+    const title = meta.title;
+    const image = meta.image;
+    const description = meta.description;
     const ogType = extractMeta('og:type');
 
     console.log('[fetch-og] Extracted OG data:', { title, image, description, ogType, finalUrl });
