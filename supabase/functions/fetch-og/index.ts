@@ -154,12 +154,20 @@ function extractArticleMetadata(
 
   const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
   const h1Tag = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
-  const title =
+  let title =
     meta('og:title') ||
+    (titleTag ? decodeHtmlEntities(titleTag.trim()) : null) ||
     meta('twitter:title') ||
     jsonLdTitle ||
-    (h1Tag ? decodeHtmlEntities(h1Tag.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) : null) ||
-    (titleTag ? decodeHtmlEntities(titleTag.trim()) : null);
+    (h1Tag ? decodeHtmlEntities(h1Tag.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) : null);
+
+  if (!title) {
+    try {
+      title = new URL(baseUrl).hostname.replace(/^www\./, '');
+    } catch {
+      title = null;
+    }
+  }
 
   const description =
     meta('og:description') || meta('twitter:description') || meta('description') || jsonLdDesc;
