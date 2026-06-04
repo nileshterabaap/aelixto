@@ -307,7 +307,7 @@ const Index = () => {
               </div>
             )
           ) : (
-            <div className="divide-y divide-[#E5E7EB]">
+            <div className="-mx-4 divide-y divide-[#E5E7EB]">
               {allPosts.map((post, index) => (
                 <div 
                   key={post.id} 
