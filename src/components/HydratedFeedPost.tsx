@@ -1,5 +1,6 @@
 import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, RefreshCw } from "lucide-react";
 import { motion, useAnimation } from "framer-motion";
+import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -455,7 +456,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {/* Skeleton placeholder — occupies space until card reveals */}
       {!isTextOnly && skeletonVisible && (
         <div
-          className="overflow-hidden transition-opacity duration-300 ease-in-out"
+          className="rounded-xl overflow-hidden transition-opacity duration-300 ease-in-out"
           style={{
             opacity: showCard ? 0 : 1,
             pointerEvents: showCard ? 'none' : 'auto',
@@ -469,7 +470,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       {/* Real card — hidden until embed loads, fades in blurred, then sharpens */}
       <div
         ref={cardMeasureRef}
-        className={`overflow-hidden ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
+        className={`overflow-hidden rounded-xl ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',
@@ -477,17 +478,17 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           transition: 'opacity 250ms ease-in-out, filter 400ms ease-out',
         }}
       >
-    <div className="overflow-hidden bg-transparent">
+    <Card className="overflow-hidden border border-border rounded-xl">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
-        <div className="flex items-center gap-2 px-4 pt-4 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
           <Repeat2 className="w-4 h-4" />
           <span>Reposted by <UsernameLink username={post.repostedByUsername} className="font-semibold text-foreground">@{post.repostedByUsername}</UsernameLink></span>
         </div>
       )}
       
       {/* Standardized Header: avatar, bold username, timestamp + platform icon top-right */}
-      <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+      <div className="flex items-center gap-3 px-5 pt-4 pb-3">
         <Avatar className="h-12 w-12 shrink-0">
           {post.author.avatar ? (
             <AvatarImage src={post.author.avatar} alt={post.author.username} />
@@ -544,7 +545,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         const captionText =
           detectedPlatform === 'instagram' ? '' : (post.content?.trim() || '');
         return captionText ? (
-          <div className="px-4 pb-3">
+          <div className="px-5 pb-3">
             <CollapsibleCaption content={captionText} />
           </div>
         ) : null;
@@ -596,7 +597,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* Title for video/image posts */}
       {shouldRenderMediaTitle && (
-        <div className="px-4 pt-3">
+        <div className="px-5 pt-3">
           {isYouTubePost ? (
             <YouTubeTitleFallback mediaUrl={mediaUrl} title={post.title} />
           ) : (
@@ -607,7 +608,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {/* Interaction Bar - tight spacing, professional layout */}
       {/* For Instagram: pull bar up to cover native action buttons */}
-      <div className={`flex items-center justify-around px-4 py-3 relative z-10 bg-background ${detectedPlatform === 'instagram' ? '-mt-10' : ''}`}>
+      <div className={`flex items-center justify-around px-3 py-3 relative z-10 bg-background ${detectedPlatform === 'instagram' ? '-mt-10' : ''}`}>
         <motion.button
           onClick={handleLikeClick}
           animate={likeControls}
@@ -713,7 +714,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           userId={userId}
         />
       )}
-    </div>
+    </Card>
       </div>
     </div>
   );
