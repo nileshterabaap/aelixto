@@ -77,6 +77,25 @@ function PostCard({ post, onClick }: {
   // branded Reddit placeholder card instead.
   const useProfileFallback = ["threads", "x", "twitter"].includes(platform);
 
+  // Smart playable detection: only show the play overlay when we can
+  // confidently say this post is a video. media_type alone is unreliable
+  // because many platforms (X, Reddit, Threads, LinkedIn, etc.) default
+  // image/text posts to "video" when scraped from their iframe wrappers.
+  const isPlayable = (() => {
+    const url = (post.media_url || "").toLowerCase();
+    const mt = (post.media_type || "").toLowerCase();
+    // Native video platforms — always playable
+    if (platform === "youtube" || platform === "tiktok" || platform === "spotify") return true;
+    // Direct video file
+    if (/\.(mp4|mov|webm|m4v|m3u8)(\?|$)/i.test(url)) return true;
+    // URL path hints that strongly imply video content
+    if (/\/(video|videos|reel|reels|shorts|watch|clip|clips)\//.test(url)) return true;
+    if (/\/v\//.test(url) && (platform === "facebook" || platform === "instagram")) return true;
+    // Only trust media_type === 'video' for platforms where it's reliable
+    if (mt === "video" && (platform === "facebook" || platform === "instagram")) return true;
+    return false;
+  })();
+
   // Show platform-branded fallback when no thumbnail or image error
   if (!src || src === "/placeholder.svg") {
     const textSource = platform === "reddit"
@@ -115,7 +134,7 @@ function PostCard({ post, onClick }: {
       />
 
       {/* Play button overlay for videos */}
-      {post.media_type === "video" && (
+      {isPlayable && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <div className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm grid place-items-center">
             <div className="w-0 h-0 border-l-[14px] border-l-white border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent ml-1" />
