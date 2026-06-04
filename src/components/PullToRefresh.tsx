@@ -22,6 +22,8 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const [refreshing, setRefreshing] = useState(false);
   const pullY = useMotionValue(0);
   const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
+  const directionLocked = useRef<"none" | "vertical" | "horizontal">("none");
   const pulling = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -54,6 +56,8 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       if (!touch) return;
 
       touchStartY.current = touch.clientY;
+      touchStartX.current = touch.clientX;
+      directionLocked.current = "none";
       pulling.current = true;
     };
 
@@ -63,7 +67,24 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       const touch = event.touches[0];
       if (!touch) return;
 
-      const diff = touch.clientY - touchStartY.current;
+      const diffY = touch.clientY - touchStartY.current;
+      const diffX = touch.clientX - touchStartX.current;
+
+      // Lock direction after small movement; bail on horizontal swipes (e.g. SwipeableView)
+      if (directionLocked.current === "none") {
+        if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
+          directionLocked.current =
+            Math.abs(diffX) > Math.abs(diffY) ? "horizontal" : "vertical";
+        }
+      }
+
+      if (directionLocked.current === "horizontal") {
+        pulling.current = false;
+        pullY.set(0);
+        return;
+      }
+
+      const diff = diffY;
 
       if (diff > 0 && isAtTop()) {
         // 1:1 tracking up to threshold, then gentle resistance for elastic over-pull
