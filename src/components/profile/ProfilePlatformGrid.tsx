@@ -84,6 +84,7 @@ function PostCard({ post, onClick }: {
   const isPlayable = (() => {
     const url = (post.media_url || "").toLowerCase();
     const mt = (post.media_type || "").toLowerCase();
+    const thumb = (rawThumb || "").toLowerCase();
     // Native video platforms — always playable
     if (platform === "youtube" || platform === "tiktok" || platform === "spotify") return true;
     // Direct video file
@@ -91,6 +92,9 @@ function PostCard({ post, onClick }: {
     // URL path hints that strongly imply video content
     if (/\/(video|videos|reel|reels|shorts|watch|clip|clips)\//.test(url)) return true;
     if (/\/v\//.test(url) && (platform === "facebook" || platform === "instagram")) return true;
+    // Thumbnail URL hints — twitter/X video posters live at amplify_video_thumb /
+    // ext_tw_video_thumb / tweet_video_thumb. Reddit videos use v.redd.it posters.
+    if (/video_thumb|amplify_video|ext_tw_video|tweet_video|v\.redd\.it/.test(thumb)) return true;
     // Only trust media_type === 'video' for platforms where it's reliable
     if (mt === "video" && (platform === "facebook" || platform === "instagram")) return true;
     return false;
