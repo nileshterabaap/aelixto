@@ -266,7 +266,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   // This does not touch Reddit or any other renderer.
   if (EMBED_FEATURE_FLAGS.quora_preview && isQuoraUrl) {
     return (
-      <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
+      <Card className="post-card border-0 shadow-none">
         <div className="p-5">
           {/* Author Info */}
           <div className="flex items-center gap-3 mb-4">
@@ -417,7 +417,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const r = resolveRenderer(post);
 
   return (
-    <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
+    <Card className="post-card border-0 shadow-none">
       <div className="p-5">
         {/* Repost Indicator */}
         {post.isRepost && post.repostedByUsername && (
