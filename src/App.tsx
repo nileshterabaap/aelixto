@@ -109,6 +109,8 @@ const AnimatedRoutes = () => {
             <Route path="/s/:code" element={<ShortLinkRedirect />} />
             {/* Native OAuth bridge — converts web redirect into a custom-scheme deep link */}
             <Route path="/~auth-bridge" element={<AuthBridge />} />
+            {/* Username vanity route — must stay just above the catch-all */}
+            <Route path="/:username" element={<PageTransition><UserProfile /></PageTransition>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
           </Routes>

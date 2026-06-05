@@ -19,6 +19,7 @@ import { PullToRefresh } from "@/components/PullToRefresh";
 import { FollowListDialog } from "@/components/profile/FollowListDialog";
 import { ProfileOptionsMenu } from "@/components/profile/ProfileOptionsMenu";
 import { AuthCTABar } from "@/components/AuthCTABar";
+import { Lock } from "lucide-react";
 
 interface UserProfileProps {
   usernameOverride?: string;
@@ -57,6 +58,9 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
   const [isFollowedByTarget, setIsFollowedByTarget] = useState(false);
+
+  const isPrivate = !!(profile?.settings as { is_private?: boolean } | null)?.is_private;
+  const canViewPosts = !isPrivate || isMe || isFollowing;
 
   // Preload cover + avatar so we don't reveal the page mid-paint.
   const [coverReady, setCoverReady] = useState(false);
@@ -319,7 +323,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           ) : null}
 
           {/* Dynamic Platform Buttons */}
-          {tabs.length > 0 && (
+          {tabs.length > 0 && canViewPosts && (
             <div className="overflow-x-auto no-scrollbar mb-8">
               <div className="flex gap-3 min-w-max">
                 {tabs.map((tab) => (
@@ -346,7 +350,15 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             </div>
           )}
 
-          {!tabsLoading && tabs.length > 0 ? (
+          {!canViewPosts ? (
+            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+              <div className="h-16 w-16 rounded-full border-2 border-foreground flex items-center justify-center mb-4">
+                <Lock className="h-7 w-7" />
+              </div>
+              <p className="text-base font-semibold mb-1">This account is private</p>
+              <p className="text-sm text-muted-foreground">Follow @{profile.username} to see their posts.</p>
+            </div>
+          ) : !tabsLoading && tabs.length > 0 ? (
             <ProfilePlatformGrid userId={profile.user_id} activeTab={activeTab} tabs={tabs} onTabChange={setActiveTab} />
           ) : !tabsLoading ? (
             <p className="text-center text-muted-foreground py-12 text-base">
