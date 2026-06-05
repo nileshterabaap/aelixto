@@ -165,12 +165,14 @@ export const PlatformPostViewer = ({
     // after this effect runs) plus the inner scroll-content so any embed
     // hydration above the target re-anchors us to the right post.
     const ro = new ResizeObserver(() => {
+      if (userScrolled) return;
       requestAnimationFrame(anchor);
     });
     postRefs.current.forEach((el) => ro.observe(el));
     // Observe new posts as they mount, and re-anchor on any DOM mutation
     // (embeds inject iframes/images that change height long after mount).
     const mo = new MutationObserver(() => {
+      if (userScrolled) return;
       postRefs.current.forEach((el) => {
         try { ro.observe(el); } catch { /* already observed */ }
       });
@@ -179,6 +181,7 @@ export const PlatformPostViewer = ({
     mo.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class", "height"] });
     // Iframe load events are the strongest signal for embed height changes.
     const onAnyLoad = (e: Event) => {
+      if (userScrolled) return;
       const t = e.target as HTMLElement | null;
       if (!t) return;
       if (t.tagName === "IFRAME" || t.tagName === "IMG") {
@@ -187,23 +190,14 @@ export const PlatformPostViewer = ({
     };
     container.addEventListener("load", onAnyLoad, true);
 
-    let interacted = false;
-    const onUserScroll = () => {
-      if (!interacted) {
-        interacted = true;
-        return;
-      }
-      userScrolled = true;
-      ro.disconnect();
-      container.removeEventListener("wheel", markScrolled);
-      container.removeEventListener("touchmove", markScrolled);
-    };
     const markScrolled = () => {
       userScrolled = true;
       ro.disconnect();
+      mo.disconnect();
     };
     container.addEventListener("wheel", markScrolled, { passive: true });
     container.addEventListener("touchmove", markScrolled, { passive: true });
+    container.addEventListener("pointerdown", markScrolled, { passive: true });
 
     // Safety: stop anchoring after 12s — long enough for slow embeds to
     // finish hydrating, short enough to never feel sticky.
