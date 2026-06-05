@@ -201,6 +201,8 @@ export const PlatformPostViewer = ({
     const markScrolled = () => {
       userScrolled = true;
       ro.disconnect();
+      mo.disconnect();
+      container.removeEventListener("load", onAnyLoad, true);
     };
     container.addEventListener("wheel", markScrolled, { passive: true });
     container.addEventListener("touchmove", markScrolled, { passive: true });
