@@ -26,6 +26,7 @@ function PostCard({ post, onClick }: {
   onClick: () => void;
 }) {
   const [imageError, setImageError] = useState(false);
+  const layoutId = `pgrid-hero-${post.id}`;
   
   // YouTube uses 16:9, all others use 3:4 portrait
   const getAspectRatio = () => post.platform === "youtube" ? "aspect-video" : "aspect-[3/4]";
@@ -107,9 +108,11 @@ function PostCard({ post, onClick }: {
       : (post.content?.trim() || post.title?.trim() || "");
     const aspect = getAspectRatio();
     return (
-      <button
+      <motion.button
+        layoutId={layoutId}
         onClick={onClick}
         className={`relative overflow-hidden rounded-2xl ${aspect} block`}
+        transition={{ type: "spring", stiffness: 320, damping: 34, mass: 0.7 }}
       >
         <TextCardThumbnail
           platform={post.platform}
@@ -120,14 +123,16 @@ function PostCard({ post, onClick }: {
           preferProfile={useProfileFallback}
           aspect={aspect}
         />
-      </button>
+      </motion.button>
     );
   }
 
   return (
-    <button
+    <motion.button
+      layoutId={layoutId}
       onClick={onClick}
       className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} bg-muted/50 group`}
+      transition={{ type: "spring", stiffness: 320, damping: 34, mass: 0.7 }}
     >
       <img
         src={src}
@@ -145,7 +150,7 @@ function PostCard({ post, onClick }: {
           </div>
         </div>
       )}
-    </button>
+    </motion.button>
   );
 }
 
