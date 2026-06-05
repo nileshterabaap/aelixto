@@ -174,6 +174,7 @@ export const ProfilePlatformGrid = ({
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedPostIndex, setSelectedPostIndex] = useState<number>(-1);
+  const [selectedThumb, setSelectedThumb] = useState<string | null>(null);
   const location = useLocation();
 
   // Close the viewer when the route/location changes (e.g. user taps a nav button)
@@ -202,6 +203,13 @@ export const ProfilePlatformGrid = ({
   };
 
   const handlePostClick = (postId: string, postIndex: number) => {
+    const post = items[postIndex];
+    if (post) {
+      const raw = getPostThumb(post);
+      setSelectedThumb(raw ? maybeProxy(raw, 960) : null);
+    } else {
+      setSelectedThumb(null);
+    }
     setSelectedPostId(postId);
     setSelectedPostIndex(postIndex);
     setViewerOpen(true);
@@ -308,21 +316,25 @@ export const ProfilePlatformGrid = ({
         )}
       </div>
 
-      {viewerOpen && selectedPostId && (
-        <PlatformPostViewer
-          userId={userId}
-          posts={items}
-          loading={loading}
-          initialPostId={selectedPostId}
-          initialPostIndex={selectedPostIndex}
-          tabs={tabs}
-          activeTab={activeTab}
-          onClose={closeViewer}
-          onTabChange={(tab) => {
-            onTabChange(tab);
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {viewerOpen && selectedPostId && (
+          <PlatformPostViewer
+            key="platform-post-viewer"
+            userId={userId}
+            posts={items}
+            loading={loading}
+            initialPostId={selectedPostId}
+            initialPostIndex={selectedPostIndex}
+            initialThumb={selectedThumb}
+            tabs={tabs}
+            activeTab={activeTab}
+            onClose={closeViewer}
+            onTabChange={(tab) => {
+              onTabChange(tab);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 };
