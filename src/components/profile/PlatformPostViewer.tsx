@@ -214,6 +214,7 @@ export const PlatformPostViewer = ({
       window.clearTimeout(safetyTimeout);
       container.removeEventListener("wheel", markScrolled);
       container.removeEventListener("touchmove", markScrolled);
+      container.removeEventListener("pointerdown", markScrolled);
       container.removeEventListener("load", onAnyLoad, true);
     };
   }, [portalReady, contentReady, targetPostId, posts, initialIdx, activeTab, profileData]);
