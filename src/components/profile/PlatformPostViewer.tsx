@@ -92,6 +92,11 @@ export const PlatformPostViewer = ({
     },
   });
   const [portalReady, setPortalReady] = useState(false);
+  // Gate the inner content for one paint so the modal's enter animation
+  // (opacity/scale) always plays visibly — otherwise, when profile + posts
+  // are cached, content commits on the same frame as the modal mounts and
+  // the user perceives an instant jump with no transition.
+  const [contentReady, setContentReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const initialIdx = useMemo(
@@ -118,18 +123,21 @@ export const PlatformPostViewer = ({
     };
   }, []);
 
+  // Reveal content shortly after mount so the entry animation always plays.
+  useEffect(() => {
+    const t = window.setTimeout(() => setContentReady(true), 180);
+    return () => window.clearTimeout(t);
+  }, []);
+
   // Anchor scroll to the tapped post and keep it anchored while posts above
   // hydrate. Stops anchoring once the user scrolls.
   useLayoutEffect(() => {
-    if (!portalReady || !targetPostId || !profileData) return;
+    if (!portalReady || !contentReady || !targetPostId || !profileData) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
     let userScrolled = false;
     let cancelled = false;
-    // Track the scrollTop we set programmatically so we can distinguish
-    // user-initiated scroll from our own anchoring writes.
-    let lastSetScrollTop = container.scrollTop;
 
     const anchor = () => {
       if (cancelled || userScrolled) return;
@@ -143,7 +151,6 @@ export const PlatformPostViewer = ({
       const clamped = Math.max(0, Math.min(desired, maxScroll));
       if (Math.abs(container.scrollTop - clamped) > 1) {
         container.scrollTop = clamped;
-        lastSetScrollTop = clamped;
       }
     };
 
@@ -154,17 +161,23 @@ export const PlatformPostViewer = ({
     });
 
     // Re-anchor whenever posts above (or the target) resize during hydration.
+    // We observe ALL post refs (including the live set that get registered
+    // after this effect runs) plus the inner scroll-content so any embed
+    // hydration above the target re-anchors us to the right post.
     const ro = new ResizeObserver(() => {
       requestAnimationFrame(anchor);
     });
     postRefs.current.forEach((el) => ro.observe(el));
+    // Observe new posts as they mount, and re-anchor on any DOM mutation
+    // (embeds inject iframes/images that change height long after mount).
     const mo = new MutationObserver(() => {
       postRefs.current.forEach((el) => {
         try { ro.observe(el); } catch { /* already observed */ }
       });
       requestAnimationFrame(anchor);
     });
-    mo.observe(container, { childList: true, subtree: true });
+    mo.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class", "height"] });
+    // Iframe load events are the strongest signal for embed height changes.
     const onAnyLoad = (e: Event) => {
       const t = e.target as HTMLElement | null;
       if (!t) return;
@@ -174,46 +187,42 @@ export const PlatformPostViewer = ({
     };
     container.addEventListener("load", onAnyLoad, true);
 
-    const stopAnchoring = () => {
+    let interacted = false;
+    const onUserScroll = () => {
+      if (!interacted) {
+        interacted = true;
+        return;
+      }
       userScrolled = true;
       ro.disconnect();
-      mo.disconnect();
+      container.removeEventListener("wheel", markScrolled);
+      container.removeEventListener("touchmove", markScrolled);
     };
-    // Any direct user input means: stop anchoring NOW. This prevents the
-    // "treadmill" feel where embed hydrations keep snapping the user back.
-    const onUserInput = () => stopAnchoring();
-    // Also detect scroll drift in case touch events get swallowed by an
-    // iframe — if scrollTop diverges from what we last set, the user moved.
-    const onScroll = () => {
-      if (userScrolled) return;
-      if (Math.abs(container.scrollTop - lastSetScrollTop) > 6) {
-        stopAnchoring();
-      }
+    const markScrolled = () => {
+      userScrolled = true;
+      ro.disconnect();
     };
-    container.addEventListener("wheel", onUserInput, { passive: true });
-    container.addEventListener("touchstart", onUserInput, { passive: true });
-    container.addEventListener("touchmove", onUserInput, { passive: true });
-    container.addEventListener("scroll", onScroll, { passive: true });
+    container.addEventListener("wheel", markScrolled, { passive: true });
+    container.addEventListener("touchmove", markScrolled, { passive: true });
 
-    // Safety: stop anchoring after 2.5s. Beyond this, any further re-pin
-    // would feel like the page is fighting the user.
+    // Safety: stop anchoring after 12s — long enough for slow embeds to
+    // finish hydrating, short enough to never feel sticky.
     const safetyTimeout = window.setTimeout(() => {
-      stopAnchoring();
       cancelled = true;
-    }, 2500);
+      ro.disconnect();
+      mo.disconnect();
+    }, 12000);
 
     return () => {
       cancelled = true;
       ro.disconnect();
       mo.disconnect();
       window.clearTimeout(safetyTimeout);
-      container.removeEventListener("wheel", onUserInput);
-      container.removeEventListener("touchstart", onUserInput);
-      container.removeEventListener("touchmove", onUserInput);
-      container.removeEventListener("scroll", onScroll);
+      container.removeEventListener("wheel", markScrolled);
+      container.removeEventListener("touchmove", markScrolled);
       container.removeEventListener("load", onAnyLoad, true);
     };
-  }, [portalReady, targetPostId, posts, initialIdx, activeTab, profileData]);
+  }, [portalReady, contentReady, targetPostId, posts, initialIdx, activeTab, profileData]);
 
   // Mark all visible posts as seen when viewing profile posts
   useEffect(() => {
@@ -251,15 +260,16 @@ export const PlatformPostViewer = ({
   const currentTab = tabs.find(t => t.key === activeTab);
 
   // Gate post rendering until profile is loaded so the author header never
-  // flashes "Unknown".
-  const profileReady = !!profileData;
+  // flashes "Unknown". Also wait for one paint after mount so the modal's
+  // enter animation has a chance to play (otherwise cached opens look instant).
+  const profileReady = !!profileData && contentReady;
 
   const viewer = (
     <motion.div
-      initial={{ opacity: 0, scale: 0.96, y: 12 }}
-      animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.97, y: 8 }}
-      transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       className="fixed inset-0 z-[70] bg-background"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
