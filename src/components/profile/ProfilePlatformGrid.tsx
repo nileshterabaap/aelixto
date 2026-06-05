@@ -270,13 +270,11 @@ export const ProfilePlatformGrid = ({
                 {items.map((post, idx) => (
                   <motion.div
                     key={`${activeTab}-${post.id}`}
-                    initial={{ opacity: 0, y: -14, scale: 0.985 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
                     transition={{
-                      duration: 0.32,
-                      // Top-down cascade: every row gets a small stagger so
-                      // posts visibly flow in from the top, Pinterest-style.
-                      delay: Math.min(idx, 24) * 0.025,
+                      duration: 0.35,
+                      delay: Math.min(idx, 8) * 0.035,
                       ease: [0.22, 1, 0.36, 1],
                     }}
                   >
