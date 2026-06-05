@@ -92,6 +92,11 @@ export const PlatformPostViewer = ({
     },
   });
   const [portalReady, setPortalReady] = useState(false);
+  // Gate the inner content for one paint so the modal's enter animation
+  // (opacity/scale) always plays visibly — otherwise, when profile + posts
+  // are cached, content commits on the same frame as the modal mounts and
+  // the user perceives an instant jump with no transition.
+  const [contentReady, setContentReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const initialIdx = useMemo(
@@ -118,10 +123,16 @@ export const PlatformPostViewer = ({
     };
   }, []);
 
+  // Reveal content shortly after mount so the entry animation always plays.
+  useEffect(() => {
+    const t = window.setTimeout(() => setContentReady(true), 180);
+    return () => window.clearTimeout(t);
+  }, []);
+
   // Anchor scroll to the tapped post and keep it anchored while posts above
   // hydrate. Stops anchoring once the user scrolls.
   useLayoutEffect(() => {
-    if (!portalReady || !targetPostId || !profileData) return;
+    if (!portalReady || !contentReady || !targetPostId || !profileData) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -149,17 +160,32 @@ export const PlatformPostViewer = ({
       requestAnimationFrame(anchor);
     });
 
-    // Re-anchor whenever posts above (or the target) resize during hydration
+    // Re-anchor whenever posts above (or the target) resize during hydration.
+    // We observe ALL post refs (including the live set that get registered
+    // after this effect runs) plus the inner scroll-content so any embed
+    // hydration above the target re-anchors us to the right post.
     const ro = new ResizeObserver(() => {
       requestAnimationFrame(anchor);
     });
-    const target = postRefs.current.get(targetPostId);
-    if (target) ro.observe(target);
-    // Observe everything above the target
-    postRefs.current.forEach((el, id) => {
-      const idx = posts.findIndex((p) => p.id === id);
-      if (idx >= 0 && idx < initialIdx) ro.observe(el);
+    postRefs.current.forEach((el) => ro.observe(el));
+    // Observe new posts as they mount, and re-anchor on any DOM mutation
+    // (embeds inject iframes/images that change height long after mount).
+    const mo = new MutationObserver(() => {
+      postRefs.current.forEach((el) => {
+        try { ro.observe(el); } catch { /* already observed */ }
+      });
+      requestAnimationFrame(anchor);
     });
+    mo.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class", "height"] });
+    // Iframe load events are the strongest signal for embed height changes.
+    const onAnyLoad = (e: Event) => {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.tagName === "IFRAME" || t.tagName === "IMG") {
+        requestAnimationFrame(anchor);
+      }
+    };
+    container.addEventListener("load", onAnyLoad, true);
 
     let interacted = false;
     const onUserScroll = () => {
@@ -179,20 +205,24 @@ export const PlatformPostViewer = ({
     container.addEventListener("wheel", markScrolled, { passive: true });
     container.addEventListener("touchmove", markScrolled, { passive: true });
 
-    // Safety: stop anchoring after 3s no matter what
+    // Safety: stop anchoring after 12s — long enough for slow embeds to
+    // finish hydrating, short enough to never feel sticky.
     const safetyTimeout = window.setTimeout(() => {
       cancelled = true;
       ro.disconnect();
-    }, 3000);
+      mo.disconnect();
+    }, 12000);
 
     return () => {
       cancelled = true;
       ro.disconnect();
+      mo.disconnect();
       window.clearTimeout(safetyTimeout);
       container.removeEventListener("wheel", markScrolled);
       container.removeEventListener("touchmove", markScrolled);
+      container.removeEventListener("load", onAnyLoad, true);
     };
-  }, [portalReady, targetPostId, posts, initialIdx, activeTab, profileData]);
+  }, [portalReady, contentReady, targetPostId, posts, initialIdx, activeTab, profileData]);
 
   // Mark all visible posts as seen when viewing profile posts
   useEffect(() => {
@@ -230,8 +260,9 @@ export const PlatformPostViewer = ({
   const currentTab = tabs.find(t => t.key === activeTab);
 
   // Gate post rendering until profile is loaded so the author header never
-  // flashes "Unknown". Cached profile means subsequent opens render instantly.
-  const profileReady = !!profileData;
+  // flashes "Unknown". Also wait for one paint after mount so the modal's
+  // enter animation has a chance to play (otherwise cached opens look instant).
+  const profileReady = !!profileData && contentReady;
 
   const viewer = (
     <motion.div
