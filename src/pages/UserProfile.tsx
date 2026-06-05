@@ -323,7 +323,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           ) : null}
 
           {/* Dynamic Platform Buttons */}
-          {tabs.length > 0 && (
+          {tabs.length > 0 && canViewPosts && (
             <div className="overflow-x-auto no-scrollbar mb-8">
               <div className="flex gap-3 min-w-max">
                 {tabs.map((tab) => (
