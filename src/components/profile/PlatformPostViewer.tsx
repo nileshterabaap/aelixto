@@ -138,6 +138,7 @@ export const PlatformPostViewer = ({
 
     let userScrolled = false;
     let cancelled = false;
+    let lastAnchoredTop = container.scrollTop;
 
     const anchor = () => {
       if (cancelled || userScrolled) return;
@@ -151,13 +152,17 @@ export const PlatformPostViewer = ({
       const clamped = Math.max(0, Math.min(desired, maxScroll));
       if (Math.abs(container.scrollTop - clamped) > 1) {
         container.scrollTop = clamped;
+        lastAnchoredTop = clamped;
       }
     };
 
     // Initial anchor on two frames to catch layout commit
     requestAnimationFrame(() => {
       anchor();
-      requestAnimationFrame(anchor);
+      requestAnimationFrame(() => {
+        anchor();
+        lastAnchoredTop = container.scrollTop;
+      });
     });
 
     // Re-anchor whenever posts above (or the target) resize during hydration.
@@ -187,31 +192,37 @@ export const PlatformPostViewer = ({
     };
     container.addEventListener("load", onAnyLoad, true);
 
-    let interacted = false;
-    const onUserScroll = () => {
-      if (!interacted) {
-        interacted = true;
-        return;
-      }
-      userScrolled = true;
-      ro.disconnect();
-      container.removeEventListener("wheel", markScrolled);
-      container.removeEventListener("touchmove", markScrolled);
-    };
     const markScrolled = () => {
+      if (userScrolled) return;
       userScrolled = true;
       ro.disconnect();
+      mo.disconnect();
     };
+    // Any direct user input immediately stops anchoring so we never
+    // fight the user's scroll (the "treadmill" bug).
     container.addEventListener("wheel", markScrolled, { passive: true });
     container.addEventListener("touchmove", markScrolled, { passive: true });
+    container.addEventListener("touchstart", markScrolled, { passive: true });
+    container.addEventListener("pointerdown", markScrolled, { passive: true });
+    container.addEventListener("keydown", markScrolled, true);
+    // Belt-and-suspenders: if scrollTop drifts away from the last position
+    // we anchored to (without us setting it), it's the user — release.
+    const onScrollDrift = () => {
+      if (userScrolled) return;
+      if (Math.abs(container.scrollTop - lastAnchoredTop) > 2) {
+        markScrolled();
+      }
+    };
+    container.addEventListener("scroll", onScrollDrift, { passive: true });
 
-    // Safety: stop anchoring after 12s — long enough for slow embeds to
-    // finish hydrating, short enough to never feel sticky.
+    // Safety: stop anchoring after 2.5s. Long enough for embeds to settle
+    // into the right post on first open, short enough that it never feels
+    // sticky / treadmill-y when the user starts scrolling.
     const safetyTimeout = window.setTimeout(() => {
       cancelled = true;
       ro.disconnect();
       mo.disconnect();
-    }, 12000);
+    }, 2500);
 
     return () => {
       cancelled = true;
@@ -220,6 +231,10 @@ export const PlatformPostViewer = ({
       window.clearTimeout(safetyTimeout);
       container.removeEventListener("wheel", markScrolled);
       container.removeEventListener("touchmove", markScrolled);
+      container.removeEventListener("touchstart", markScrolled);
+      container.removeEventListener("pointerdown", markScrolled);
+      container.removeEventListener("keydown", markScrolled, true);
+      container.removeEventListener("scroll", onScrollDrift);
       container.removeEventListener("load", onAnyLoad, true);
     };
   }, [portalReady, contentReady, targetPostId, posts, initialIdx, activeTab, profileData]);
