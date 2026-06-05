@@ -270,11 +270,11 @@ export const ProfilePlatformGrid = ({
                 {items.map((post, idx) => (
                   <motion.div
                     key={`${activeTab}-${post.id}`}
-                    initial={{ opacity: 0, scale: 0.96 }}
-                    animate={{ opacity: 1, scale: 1 }}
+                    initial={{ opacity: 0, y: 18 }}
+                    animate={{ opacity: 1, y: 0 }}
                     transition={{
-                      duration: 0.35,
-                      delay: Math.min(idx, 8) * 0.035,
+                      duration: 0.42,
+                      delay: Math.min(idx, 12) * 0.045,
                       ease: [0.22, 1, 0.36, 1],
                     }}
                   >
