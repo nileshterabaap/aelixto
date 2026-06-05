@@ -330,24 +330,25 @@ export const PlatformPostViewer = ({
           target post slot. Fades out once layout animation settles, revealing
           the real embed underneath. */}
       {heroLayoutId && heroVisible && (
-        <motion.div
-          layoutId={heroLayoutId}
-          className={`pointer-events-none fixed left-1/2 -translate-x-1/2 z-[5] overflow-hidden rounded-2xl bg-muted ${heroAspect}`}
-          style={{ top: 72, width: "min(calc(100vw - 32px), 640px)" }}
-          transition={{ type: "spring", stiffness: 320, damping: 34, mass: 0.7 }}
-          onLayoutAnimationComplete={() => setHeroVisible(false)}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { duration: 0.22 } }}
-        >
-          {initialThumb ? (
-            <img
-              src={initialThumb}
-              alt=""
-              className="w-full h-full object-cover"
-              draggable={false}
-            />
-          ) : null}
-        </motion.div>
+        <div className="pointer-events-none fixed inset-x-0 z-[5] flex justify-center px-4" style={{ top: 72 }}>
+          <motion.div
+            layoutId={heroLayoutId}
+            className={`overflow-hidden rounded-2xl bg-muted ${heroAspect} w-full max-w-[640px]`}
+            transition={{ type: "spring", stiffness: 320, damping: 34, mass: 0.7 }}
+            onLayoutAnimationComplete={() => setHeroVisible(false)}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.22 } }}
+          >
+            {initialThumb ? (
+              <img
+                src={initialThumb}
+                alt=""
+                className="w-full h-full object-cover"
+                draggable={false}
+              />
+            ) : null}
+          </motion.div>
+        </div>
       )}
 
       {/* Scrollable posts */}
