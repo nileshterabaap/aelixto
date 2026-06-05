@@ -19,6 +19,7 @@ interface PlatformPostViewerProps {
   loading: boolean;
   initialPostId: string;
   initialPostIndex: number;
+  initialThumb?: string | null;
   tabs: PlatformTab[];
   activeTab: string;
   onClose: () => void;
@@ -67,6 +68,7 @@ export const PlatformPostViewer = ({
   loading,
   initialPostId,
   initialPostIndex,
+  initialThumb = null,
   tabs,
   activeTab,
   onClose,
@@ -92,11 +94,10 @@ export const PlatformPostViewer = ({
     },
   });
   const [portalReady, setPortalReady] = useState(false);
-  // Gate the inner content for one paint so the modal's enter animation
-  // (opacity/scale) always plays visibly — otherwise, when profile + posts
-  // are cached, content commits on the same frame as the modal mounts and
-  // the user perceives an instant jump with no transition.
-  const [contentReady, setContentReady] = useState(false);
+  // Hero phase: while true, the shared-element thumbnail overlay covers the
+  // target post media. Once the zoom-in layout animation completes (or the
+  // safety timer fires), we fade the hero out and reveal the real embed.
+  const [heroVisible, setHeroVisible] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const initialIdx = useMemo(
@@ -123,16 +124,17 @@ export const PlatformPostViewer = ({
     };
   }, []);
 
-  // Reveal content shortly after mount so the entry animation always plays.
+  // Safety: hide the hero overlay after a max window even if the
+  // layoutAnimationComplete callback never fires (e.g. fast cached opens).
   useEffect(() => {
-    const t = window.setTimeout(() => setContentReady(true), 180);
+    const t = window.setTimeout(() => setHeroVisible(false), 900);
     return () => window.clearTimeout(t);
   }, []);
 
   // Anchor scroll to the tapped post and keep it anchored while posts above
   // hydrate. Stops anchoring once the user scrolls.
   useLayoutEffect(() => {
-    if (!portalReady || !contentReady || !targetPostId || !profileData) return;
+    if (!portalReady || !targetPostId || !profileData) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -222,7 +224,7 @@ export const PlatformPostViewer = ({
       container.removeEventListener("touchmove", markScrolled);
       container.removeEventListener("load", onAnyLoad, true);
     };
-  }, [portalReady, contentReady, targetPostId, posts, initialIdx, activeTab, profileData]);
+  }, [portalReady, targetPostId, posts, initialIdx, activeTab, profileData]);
 
   // Mark all visible posts as seen when viewing profile posts
   useEffect(() => {
@@ -260,16 +262,19 @@ export const PlatformPostViewer = ({
   const currentTab = tabs.find(t => t.key === activeTab);
 
   // Gate post rendering until profile is loaded so the author header never
-  // flashes "Unknown". Also wait for one paint after mount so the modal's
-  // enter animation has a chance to play (otherwise cached opens look instant).
-  const profileReady = !!profileData && contentReady;
+  // flashes "Unknown".
+  const profileReady = !!profileData;
+
+  const heroLayoutId = targetPostId ? `pgrid-hero-${targetPostId}` : undefined;
+  const heroAspect =
+    activeTab === "youtube" ? "aspect-video" : "aspect-[3/4]";
 
   const viewer = (
     <motion.div
-      initial={{ opacity: 0, scale: 0.98 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.98 }}
-      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
       className="fixed inset-0 z-[70] bg-background"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -320,6 +325,31 @@ export const PlatformPostViewer = ({
           <div className="w-10" /> {/* Spacer for centering */}
         </div>
       </div>
+
+      {/* Shared-element hero: zooms from the tapped grid thumb into the
+          target post slot. Fades out once layout animation settles, revealing
+          the real embed underneath. */}
+      {heroLayoutId && heroVisible && (
+        <div className="pointer-events-none fixed inset-x-0 z-[5] flex justify-center px-4" style={{ top: 72 }}>
+          <motion.div
+            layoutId={heroLayoutId}
+            className={`overflow-hidden rounded-2xl bg-muted ${heroAspect} w-full max-w-[640px]`}
+            transition={{ type: "spring", stiffness: 320, damping: 34, mass: 0.7 }}
+            onLayoutAnimationComplete={() => setHeroVisible(false)}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, transition: { duration: 0.22 } }}
+          >
+            {initialThumb ? (
+              <img
+                src={initialThumb}
+                alt=""
+                className="w-full h-full object-cover"
+                draggable={false}
+              />
+            ) : null}
+          </motion.div>
+        </div>
+      )}
 
       {/* Scrollable posts */}
       <div 

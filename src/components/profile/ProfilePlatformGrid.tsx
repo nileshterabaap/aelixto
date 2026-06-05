@@ -26,6 +26,7 @@ function PostCard({ post, onClick }: {
   onClick: () => void;
 }) {
   const [imageError, setImageError] = useState(false);
+  const layoutId = `pgrid-hero-${post.id}`;
   
   // YouTube uses 16:9, all others use 3:4 portrait
   const getAspectRatio = () => post.platform === "youtube" ? "aspect-video" : "aspect-[3/4]";
@@ -107,9 +108,11 @@ function PostCard({ post, onClick }: {
       : (post.content?.trim() || post.title?.trim() || "");
     const aspect = getAspectRatio();
     return (
-      <button
+      <motion.button
+        layoutId={layoutId}
         onClick={onClick}
         className={`relative overflow-hidden rounded-2xl ${aspect} block`}
+        transition={{ type: "spring", stiffness: 320, damping: 34, mass: 0.7 }}
       >
         <TextCardThumbnail
           platform={post.platform}
@@ -120,14 +123,16 @@ function PostCard({ post, onClick }: {
           preferProfile={useProfileFallback}
           aspect={aspect}
         />
-      </button>
+      </motion.button>
     );
   }
 
   return (
-    <button
+    <motion.button
+      layoutId={layoutId}
       onClick={onClick}
       className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} bg-muted/50 group`}
+      transition={{ type: "spring", stiffness: 320, damping: 34, mass: 0.7 }}
     >
       <img
         src={src}
@@ -145,7 +150,7 @@ function PostCard({ post, onClick }: {
           </div>
         </div>
       )}
-    </button>
+    </motion.button>
   );
 }
 
@@ -169,6 +174,7 @@ export const ProfilePlatformGrid = ({
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedPostIndex, setSelectedPostIndex] = useState<number>(-1);
+  const [selectedThumb, setSelectedThumb] = useState<string | null>(null);
   const location = useLocation();
 
   // Close the viewer when the route/location changes (e.g. user taps a nav button)
@@ -197,6 +203,13 @@ export const ProfilePlatformGrid = ({
   };
 
   const handlePostClick = (postId: string, postIndex: number) => {
+    const post = items[postIndex];
+    if (post) {
+      const raw = getPostThumb(post);
+      setSelectedThumb(raw ? maybeProxy(raw, 960) : null);
+    } else {
+      setSelectedThumb(null);
+    }
     setSelectedPostId(postId);
     setSelectedPostIndex(postIndex);
     setViewerOpen(true);
@@ -303,21 +316,25 @@ export const ProfilePlatformGrid = ({
         )}
       </div>
 
-      {viewerOpen && selectedPostId && (
-        <PlatformPostViewer
-          userId={userId}
-          posts={items}
-          loading={loading}
-          initialPostId={selectedPostId}
-          initialPostIndex={selectedPostIndex}
-          tabs={tabs}
-          activeTab={activeTab}
-          onClose={closeViewer}
-          onTabChange={(tab) => {
-            onTabChange(tab);
-          }}
-        />
-      )}
+      <AnimatePresence>
+        {viewerOpen && selectedPostId && (
+          <PlatformPostViewer
+            key="platform-post-viewer"
+            userId={userId}
+            posts={items}
+            loading={loading}
+            initialPostId={selectedPostId}
+            initialPostIndex={selectedPostIndex}
+            initialThumb={selectedThumb}
+            tabs={tabs}
+            activeTab={activeTab}
+            onClose={closeViewer}
+            onTabChange={(tab) => {
+              onTabChange(tab);
+            }}
+          />
+        )}
+      </AnimatePresence>
     </>
   );
 };
