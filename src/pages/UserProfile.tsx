@@ -62,6 +62,20 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const isPrivate = !!(profile?.settings as { is_private?: boolean } | null)?.is_private;
   const canViewPosts = !isPrivate || isMe || isFollowing;
 
+  const { data: mutualsData } = useQuery({
+    queryKey: ["mutuals", profile?.user_id, user?.id],
+    enabled: !!profile && !!user && !isMe,
+    queryFn: async (): Promise<{ username: string; display_name: string | null; total_count: number }[] | null> => {
+      const { data, error } = await supabase
+        .rpc("get_mutual_followers_with_count", {
+          viewer_id: user!.id,
+          profile_owner_id: profile!.user_id,
+        });
+      if (error) throw error;
+      return (data as unknown as { username: string; display_name: string | null; total_count: number }[]) || null;
+    },
+  });
+
   // Preload cover + avatar so we don't reveal the page mid-paint.
   const [coverReady, setCoverReady] = useState(false);
   const [avatarReady, setAvatarReady] = useState(false);
