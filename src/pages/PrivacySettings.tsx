@@ -1,15 +1,19 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Loader2, Ban, Heart } from "lucide-react";
+import { ArrowLeft, Loader2, Ban, Heart, Users, UserCheck } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { InteractionPermissions } from "@/components/settings/InteractionPermissions";
 import type { CommentPermission, MessagePermission, MentionPermission } from "@/hooks/useInteractionPermissions";
 import { useBlockedUsers } from "@/hooks/useBlockedUsers";
 import { useToast } from "@/hooks/use-toast";
+
+type FollowVisibility = "everyone" | "followers" | "no_one";
 
 const PrivacySettings = () => {
   const navigate = useNavigate();
@@ -20,6 +24,8 @@ const PrivacySettings = () => {
 
   const [isPrivate, setIsPrivate] = useState(false);
   const [hideLikes, setHideLikes] = useState(false);
+  const [whoCanSeeFollowers, setWhoCanSeeFollowers] = useState<FollowVisibility>("everyone");
+  const [whoCanSeeFollowing, setWhoCanSeeFollowing] = useState<FollowVisibility>("everyone");
   const [whoCanComment, setWhoCanComment] = useState<CommentPermission>('everyone');
   const [whoCanMessage, setWhoCanMessage] = useState<MessagePermission>('everyone');
   const [whoCanMention, setWhoCanMention] = useState<MentionPermission>('everyone');
@@ -29,6 +35,8 @@ const PrivacySettings = () => {
       const s = profile.settings as any;
       setIsPrivate(s.is_private || false);
       setHideLikes(s.hide_likes || false);
+      setWhoCanSeeFollowers(s.who_can_see_followers || (s.is_private ? 'followers' : 'everyone'));
+      setWhoCanSeeFollowing(s.who_can_see_following || (s.is_private ? 'followers' : 'everyone'));
       setWhoCanComment(s.who_can_comment || 'everyone');
       setWhoCanMessage(s.who_can_message || 'everyone');
       setWhoCanMention(s.who_can_mention || 'everyone');
@@ -51,6 +59,16 @@ const PrivacySettings = () => {
   const handleHideLikesToggle = (checked: boolean) => {
     setHideLikes(checked);
     saveSettings({ hide_likes: checked });
+  };
+
+  const handleSeeFollowersChange = (v: FollowVisibility) => {
+    setWhoCanSeeFollowers(v);
+    saveSettings({ who_can_see_followers: v });
+  };
+
+  const handleSeeFollowingChange = (v: FollowVisibility) => {
+    setWhoCanSeeFollowing(v);
+    saveSettings({ who_can_see_following: v });
   };
 
   const handleCommentChange = (v: CommentPermission) => {
@@ -123,6 +141,23 @@ const PrivacySettings = () => {
             onChangeComment={handleCommentChange}
             onChangeMessage={handleMessageChange}
             onChangeMention={handleMentionChange}
+          />
+        </div>
+
+        {/* Follow list visibility */}
+        <p className="text-base text-muted-foreground pt-6 pb-2">Follow lists</p>
+        <div className="divide-y divide-border">
+          <FollowVisibilityGroup
+            icon={Users}
+            label="Who can see my followers"
+            value={whoCanSeeFollowers}
+            onChange={handleSeeFollowersChange}
+          />
+          <FollowVisibilityGroup
+            icon={UserCheck}
+            label="Who can see who I follow"
+            value={whoCanSeeFollowing}
+            onChange={handleSeeFollowingChange}
           />
         </div>
 
