@@ -15,6 +15,39 @@ import { useToast } from "@/hooks/use-toast";
 
 type FollowVisibility = "everyone" | "followers" | "no_one";
 
+const FollowVisibilityGroup = ({
+  icon: Icon,
+  label,
+  value,
+  onChange,
+}: {
+  icon: any;
+  label: string;
+  value: FollowVisibility;
+  onChange: (v: FollowVisibility) => void;
+}) => (
+  <div className="p-4 space-y-3">
+    <div className="flex items-center gap-3">
+      <Icon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+      <p className="font-medium">{label}</p>
+    </div>
+    <RadioGroup value={value} onValueChange={(v) => onChange(v as FollowVisibility)} className="pl-8 space-y-2">
+      {[
+        { value: 'everyone', label: 'Everyone' },
+        { value: 'followers', label: 'Followers' },
+        { value: 'no_one', label: 'No one' },
+      ].map((opt) => (
+        <div key={opt.value} className="flex items-center gap-2">
+          <RadioGroupItem value={opt.value} id={`${label}-${opt.value}`} />
+          <Label htmlFor={`${label}-${opt.value}`} className="text-sm font-normal cursor-pointer">
+            {opt.label}
+          </Label>
+        </div>
+      ))}
+    </RadioGroup>
+  </div>
+);
+
 const PrivacySettings = () => {
   const navigate = useNavigate();
   const { user } = useSession();
