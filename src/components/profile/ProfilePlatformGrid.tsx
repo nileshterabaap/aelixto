@@ -24,8 +24,10 @@ import { PlatformPostViewer } from "./PlatformPostViewer";
 function PostCard({ post, onClick }: { 
   post: PlatformPost; 
   onClick: () => void;
+  eager?: boolean;
 }) {
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   
   // YouTube uses 16:9, all others use 3:4 portrait
   const getAspectRatio = () => post.platform === "youtube" ? "aspect-video" : "aspect-[3/4]";
@@ -127,14 +129,22 @@ function PostCard({ post, onClick }: {
   return (
     <button
       onClick={onClick}
-      className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} bg-muted/50 group`}
+      className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} bg-muted/70 group`}
     >
+      {!imageLoaded && (
+        <div
+          className="absolute inset-0 bg-muted/70 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/40 before:to-transparent before:animate-shimmer"
+          style={{ backgroundSize: "1000px 100%" }}
+        />
+      )}
       <img
         src={src}
         alt=""
         onError={() => setImageError(true)}
-        className="w-full h-full object-cover"
-        loading="lazy"
+        onLoad={() => setImageLoaded(true)}
+        className={`relative w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
+        loading="eager"
+        decoding="async"
       />
 
       {/* Play button overlay for videos */}
@@ -268,21 +278,12 @@ export const ProfilePlatformGrid = ({
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
                 {items.map((post, idx) => (
-                  <motion.div
-                    key={`${activeTab}-${post.id}`}
-                    initial={{ opacity: 0, scale: 0.96 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{
-                      duration: 0.35,
-                      delay: Math.min(idx, 8) * 0.035,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
-                  >
+                  <div key={`${activeTab}-${post.id}`}>
                     <PostCard
                       post={post}
                       onClick={() => handlePostClick(post.id, idx)}
                     />
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             )}
