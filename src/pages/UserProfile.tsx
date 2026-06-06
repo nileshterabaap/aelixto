@@ -16,7 +16,7 @@ import { useStartConversation } from "@/hooks/useStartConversation";
 import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
 import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { FollowListDialog } from "@/components/profile/FollowListDialog";
+import { FollowListDialog, getFollowVisibility } from "@/components/profile/FollowListDialog";
 import { ProfileOptionsMenu } from "@/components/profile/ProfileOptionsMenu";
 import { AuthCTABar } from "@/components/AuthCTABar";
 import { Lock } from "lucide-react";
@@ -61,6 +61,20 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
   const isPrivate = !!(profile?.settings as { is_private?: boolean } | null)?.is_private;
   const canViewPosts = !isPrivate || isMe || isFollowing;
+
+  const { data: mutualsData } = useQuery({
+    queryKey: ["mutuals", profile?.user_id, user?.id],
+    enabled: !!profile && !!user && !isMe,
+    queryFn: async (): Promise<{ username: string; display_name: string | null; total_count: number }[] | null> => {
+      const { data, error } = await supabase
+        .rpc("get_mutual_followers_with_count", {
+          viewer_id: user!.id,
+          profile_owner_id: profile!.user_id,
+        });
+      if (error) throw error;
+      return (data as unknown as { username: string; display_name: string | null; total_count: number }[]) || null;
+    },
+  });
 
   // Preload cover + avatar so we don't reveal the page mid-paint.
   const [coverReady, setCoverReady] = useState(false);
@@ -286,6 +300,28 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           {/* Spacer when no bio and no aelix score */}
           {!profile.bio && !(profile.settings as { aelix_score_enabled?: boolean })?.aelix_score_enabled && (
             <div className="mt-6" />
+          )}
+
+          {/* Mutual followers line */}
+          {!isMe && user && mutualsData && mutualsData.length > 0 && (
+            <p className="text-center text-sm text-muted-foreground mb-4 px-4">
+              {(() => {
+                const followersVis = getFollowVisibility((profile?.settings as Record<string, any>) || null, "followers");
+                const total = mutualsData[0]?.total_count ?? mutualsData.length;
+                if (followersVis === "no_one") {
+                  return `Followed by ${total} mutual${total !== 1 ? "s" : ""}`;
+                }
+                const names = mutualsData.slice(0, 2).map((m) => m.display_name || m.username);
+                if (total === 1) {
+                  return `Followed by ${names[0]}`;
+                }
+                if (total === 2) {
+                  return `Followed by ${names[0]} and ${names[1]}`;
+                }
+                const others = total - 2;
+                return `Followed by ${names[0]}, ${names[1]} and ${others} other${others !== 1 ? "s" : ""}`;
+              })()}
+            </p>
           )}
 
           {/* Action Buttons - Edit or Follow/Message */}

@@ -1101,6 +1101,21 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_mutual_followers: {
+        Args: { profile_owner_id: string; viewer_id: string }
+        Returns: {
+          display_name: string
+          username: string
+        }[]
+      }
+      get_mutual_followers_with_count: {
+        Args: { profile_owner_id: string; viewer_id: string }
+        Returns: {
+          display_name: string
+          total_count: number
+          username: string
+        }[]
+      }
       get_user_platform_counts: {
         Args: { target_user: string }
         Returns: {
