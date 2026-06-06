@@ -302,6 +302,28 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             <div className="mt-6" />
           )}
 
+          {/* Mutual followers line */}
+          {!isMe && user && mutualsData && mutualsData.length > 0 && (
+            <p className="text-center text-sm text-muted-foreground mb-4 px-4">
+              {(() => {
+                const followersVis = getFollowVisibility((profile?.settings as Record<string, any>) || null, "followers");
+                const total = mutualsData[0]?.total_count ?? mutualsData.length;
+                if (followersVis === "no_one") {
+                  return `Followed by ${total} mutual${total !== 1 ? "s" : ""}`;
+                }
+                const names = mutualsData.slice(0, 2).map((m) => m.display_name || m.username);
+                if (total === 1) {
+                  return `Followed by ${names[0]}`;
+                }
+                if (total === 2) {
+                  return `Followed by ${names[0]} and ${names[1]}`;
+                }
+                const others = total - 2;
+                return `Followed by ${names[0]}, ${names[1]} and ${others} other${others !== 1 ? "s" : ""}`;
+              })()}
+            </p>
+          )}
+
           {/* Action Buttons - Edit or Follow/Message */}
           {isMe ? (
             <Button 
