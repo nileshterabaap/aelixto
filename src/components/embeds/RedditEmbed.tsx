@@ -146,7 +146,11 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const effectiveThumb = thumbnailUrl || fetchedThumb;
   const validThumb = !!effectiveThumb && !thumbBroken && !sameUrl(effectiveThumb, authorAvatar);
   const fallbackImage = validThumb ? effectiveThumb! : undefined;
-  const shouldRenderStoredImage = !isDirectMedia && validThumb && isRedditShareUrl(normalizedUrl);
+  // Prefer the stored media thumbnail for ALL Reddit posts (not just /s/ shares).
+  // embed.reddit.com renders inside a fixed-height iframe that crops tall
+  // image/gallery posts, so when we have the real media we display it
+  // edge-to-edge and link to Reddit — matching how blog oEmbed cards behave.
+  const shouldRenderStoredImage = !isDirectMedia && validThumb;
   const embedSrc = useMemo(() => (resolvedUrl ? toRedditEmbedSrc(resolvedUrl) : null), [resolvedUrl]);
 
   // Detect broken/blocked Reddit thumbnails (e.g. URLs that 403 or 404) so the

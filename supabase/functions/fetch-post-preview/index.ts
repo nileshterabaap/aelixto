@@ -293,12 +293,15 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
   const oembedData = await fetchRedditOembed(canonicalUrl || url);
 
   try {
-    let jsonUrl = (canonicalUrl || url).split('?')[0].replace(/\/$/, '');
-    jsonUrl = jsonUrl.replace('www.reddit.com', 'old.reddit.com');
-    jsonUrl += '.json';
-    const res = await fetch(jsonUrl, {
+    // Reddit now blocks unauthenticated JSON fetches (both www and old).
+    // Use the OAuth installed-client token against oauth.reddit.com instead.
+    const parsed = new URL(canonicalUrl || url);
+    const pathOnly = parsed.pathname.replace(/\/$/, '') + '.json';
+    const token = await getRedditInstalledClientToken();
+    const res = await fetch(`https://oauth.reddit.com${pathOnly}`, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Authorization': token ? `Bearer ${token}` : '',
+        'User-Agent': 'Aelixto/1.0',
         'Accept': 'application/json',
       },
     });
