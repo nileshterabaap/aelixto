@@ -89,6 +89,7 @@ export const SharedPostCard = ({ postId, isOwn }: SharedPostCardProps) => {
     getPostThumb({
       platform: post.platform,
       thumbnail_url: post.thumbnail_url,
+      preview_image_url: post.preview_image_url,
       media_url: post.media_url,
       profile_avatar_url: post.profile_avatar_url,
     }) ||

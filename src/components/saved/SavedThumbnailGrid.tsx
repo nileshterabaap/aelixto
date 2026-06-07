@@ -46,6 +46,9 @@ export interface SavedPost {
   platform?: string;
   embed_html?: string;
   thumbnail_url?: string;
+  preview_text?: string | null;
+  preview_title?: string | null;
+  preview_image_url?: string | null;
   timestamp: Date | string;
   likes: number;
   comments: number;
@@ -66,6 +69,7 @@ function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void
   const rawThumb = getPostThumb({
     platform: post.platform,
     thumbnail_url: post.thumbnail_url,
+    preview_image_url: post.preview_image_url,
     media_url: post.mediaUrl,
     author_avatar_url: post.author?.avatar,
   });

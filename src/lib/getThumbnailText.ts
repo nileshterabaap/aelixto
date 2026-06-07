@@ -12,11 +12,18 @@ function decode(text?: string | null): string {
 
 function isGenericTitle(title: string): boolean {
   if (!title) return true;
-  if (title === "Reddit Post" || title === "Web Post") return true;
+  if (title === "Reddit Post" || title === "Web Post" || title === "Threads" || title === "Medium Post") return true;
   // "@handle on Threads" / "Foo on Threads"
   if (/ on Threads$/i.test(title)) return true;
   // "X on Threads" / "X on X" / "Post on X"
   if (/^Post on (X|Twitter|Threads)$/i.test(title)) return true;
+  return false;
+}
+
+function isGenericPreviewText(text: string): boolean {
+  if (!text) return true;
+  if (isGenericTitle(text)) return true;
+  if (/^Posted by u\/[\w-]+$/i.test(text)) return true;
   return false;
 }
 
@@ -77,7 +84,7 @@ export function getThumbnailText(post: ThumbnailTextSource): string {
   if (!isGenericTitle(title)) return title;
   if (content) return content;
   if (previewTitle && !isGenericTitle(previewTitle)) return previewTitle;
-  if (previewText) return previewText;
+  if (previewText && !isGenericPreviewText(previewText)) return previewText;
 
   const fromEmbed = extractFromEmbedHtml(platform, post.embed_html);
   if (fromEmbed) return fromEmbed;

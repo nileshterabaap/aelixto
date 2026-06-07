@@ -15,6 +15,9 @@ export interface PlatformPost {
   embed_html: string | null;
   thumbnail_url: string | null;
   title: string | null;
+  preview_text?: string | null;
+  preview_title?: string | null;
+  preview_image_url?: string | null;
   is_public: boolean;
   is_repost: boolean;
   original_user_id: string | null;
@@ -49,7 +52,11 @@ const isGenericPlaceholderThumbnail = (url?: string | null) => {
 const hasUsableTextThumbnail = (post: PlatformPost) => {
   const title = (post.title || "").trim();
   const content = (post.content || "").trim();
-  return !!content || (!!title && title !== "Reddit Post" && title !== "Web Post" && !/^(?:@?[^\s]+|.+) on Threads$/i.test(title));
+  const previewTitle = (post.preview_title || "").trim();
+  const previewText = (post.preview_text || "").trim();
+  const hasTitle = !!title && title !== "Reddit Post" && title !== "Web Post" && title !== "Threads" && !/^(?:@?[^\s]+|.+) on Threads$/i.test(title);
+  const hasPreviewTitle = !!previewTitle && previewTitle !== "Reddit Post" && previewTitle !== "Web Post" && previewTitle !== "Threads";
+  return !!content || hasTitle || hasPreviewTitle || (!!previewText && previewText !== "Threads");
 };
 
 async function backfillThumbnail(post: PlatformPost) {
@@ -136,14 +143,33 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
         if (error) throw error;
 
         const pageItems = (data || []) as PlatformPost[];
-        all.push(...pageItems);
+        all.push(...pageItems.map((post) => ({
+          ...post,
+          preview_text: (post as any).preview_text ?? null,
+          preview_title: (post as any).preview_title ?? null,
+          preview_image_url: (post as any).preview_image_url ?? null,
+        })));
         if (pageItems.length < 50) break;
         cursor = pageItems[pageItems.length - 1]?.created_at || null;
         if (!cursor) break;
       }
 
-      const userIds = [...new Set(all.map((post) => post.user_id).filter(Boolean))];
-      if (userIds.length === 0) return all;
+      const postIds = all.map((post) => post.id).filter(Boolean);
+      const { data: postDetails } = postIds.length
+        ? await supabase
+            .from("posts")
+            .select("id, title, content, thumbnail_url, preview_text, preview_title, preview_image_url")
+            .in("id", postIds)
+        : { data: [] };
+
+      const detailsById = new Map((postDetails || []).map((post) => [post.id, post]));
+      const enrichedPosts = all.map((post) => ({
+        ...post,
+        ...(detailsById.get(post.id) || {}),
+      }));
+
+      const userIds = [...new Set(enrichedPosts.map((post) => post.user_id).filter(Boolean))];
+      if (userIds.length === 0) return enrichedPosts;
 
       const { data: profiles } = await supabase
         .from("profiles")
@@ -154,7 +180,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
         (profiles || []).map((profile) => [profile.user_id, profile])
       );
 
-      return all.map((post) => {
+      return enrichedPosts.map((post) => {
         const profile = profileByUserId.get(post.user_id);
         return {
           ...post,
