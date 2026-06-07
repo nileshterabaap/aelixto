@@ -87,11 +87,12 @@ serve(async (req) => {
     console.log('[expand-url] Expanding URL:', targetUrl);
 
     const parsedTarget = new URL(targetUrl);
-    const redditShareFallback =
-      /^www\.reddit\.com$/i.test(parsedTarget.hostname) &&
-      /^\/r\/[^/]+\/s\/[^/]+\/?$/i.test(parsedTarget.pathname)
-        ? `https://reddit.com${parsedTarget.pathname}${parsedTarget.search}`
-        : targetUrl;
+    const isRedditShortShare =
+      /^(?:www\.)?reddit\.com$/i.test(parsedTarget.hostname) &&
+      /^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(parsedTarget.pathname);
+    const redditShareFallback = isRedditShortShare
+      ? `https://reddit.com${parsedTarget.pathname}${parsedTarget.search}`
+      : targetUrl;
 
     // Some platforms, especially Reddit mobile /s/ shares, block HEAD or
     // www-prefixed short links. Use a real browser-like GET and, for Reddit,
@@ -99,7 +100,7 @@ serve(async (req) => {
     // /comments/ URL before Reddit's bot protection page appears.
     const response = await fetch(redditShareFallback, {
       method: 'GET',
-      redirect: 'follow',
+      redirect: isRedditShortShare ? 'manual' : 'follow',
       headers: {
         'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -107,7 +108,10 @@ serve(async (req) => {
       },
     });
 
-    const finalUrl = response.url;
+    const redirectLocation = response.headers.get('location');
+    const finalUrl = redirectLocation && /^https?:\/\//i.test(redirectLocation)
+      ? redirectLocation
+      : response.url;
     console.log('[expand-url] Final URL:', finalUrl);
 
     return new Response(

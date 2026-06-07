@@ -42,8 +42,10 @@ function normalizeRedditEmbedUrl(rawUrl: string): string | null {
       return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
     }
 
+    // Mobile share links (`/s/<code>`) are not directly embeddable. They must
+    // first be expanded to Reddit's canonical `/comments/<id>/...` URL.
     if (/^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(u.pathname)) {
-      return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
+      return null;
     }
 
     if (/^\/(?:r|user)\/[^/]+\/comments\/[a-z0-9_]+(?:\/.*)?$/i.test(u.pathname)) {
