@@ -12,7 +12,7 @@ function decode(text?: string | null): string {
 
 function isGenericTitle(title: string): boolean {
   if (!title) return true;
-  if (title === "Reddit Post" || title === "Web Post") return true;
+  if (title === "Reddit Post" || title === "Web Post" || title === "Threads" || title === "Medium Post") return true;
   // "@handle on Threads" / "Foo on Threads"
   if (/ on Threads$/i.test(title)) return true;
   // "X on Threads" / "X on X" / "Post on X"

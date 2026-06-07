@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 import { getThumbnailText } from "@/lib/getThumbnailText";
-import { supabase } from "@/integrations/supabase/client";
 import InstagramIcon from "@/assets/platforms/instagram.svg";
 import FacebookIcon from "@/assets/platforms/facebook.svg";
 import YoutubeIcon from "@/assets/platforms/youtube.svg";
@@ -182,36 +181,6 @@ export const ProfilePlatformGrid = ({
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedPostIndex, setSelectedPostIndex] = useState<number>(-1);
   const location = useLocation();
-
-  useEffect(() => {
-    const needsDetails = items.filter((post) => {
-      const platform = (post.platform || "").toLowerCase();
-      return ["threads", "reddit", "article", "medium"].includes(platform)
-        && (!post.preview_text && !post.preview_title && !post.preview_image_url);
-    });
-    if (!needsDetails.length) return;
-
-    let cancelled = false;
-    (async () => {
-      const { data } = await supabase
-        .from("posts")
-        .select("id, preview_text, preview_title, preview_image_url")
-        .in("id", needsDetails.map((post) => post.id));
-
-      if (cancelled || !data?.length) return;
-      const byId = new Map(data.map((row) => [row.id, row]));
-      const enriched = items.map((post) => {
-        const details = byId.get(post.id);
-        return details ? { ...post, ...details } : post;
-      });
-
-      queryClient.setQueryData(["platform-posts", userId, activeTab], enriched);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [items, queryClient, userId, activeTab]);
 
   // Close the viewer when the route/location changes (e.g. user taps a nav button)
   useEffect(() => {

@@ -38,5 +38,5 @@ export const localStoragePersister = createSyncStoragePersister({
 export const persistOptions = {
   persister: localStoragePersister,
   maxAge: MAX_AGE,
-  buster: 'v5-profile-social-thumbnails', // Clears stale profile grid snapshots so Reddit/Threads use media/profile thumbnails
+  buster: 'v6-unified-thumbnail-preview-fields', // Clears stale profile/saved grid snapshots so preview metadata renders everywhere
 };
