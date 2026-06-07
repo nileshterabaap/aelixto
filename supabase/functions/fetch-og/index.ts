@@ -262,6 +262,39 @@ async function fetchMediumRssPreview(targetUrl: string): Promise<{ title: string
   }
 }
 
+async function resolveRedditCanonicalUrl(targetUrl: string): Promise<string> {
+  try {
+    const parsed = new URL(targetUrl);
+    const isShortShare = /^www\.reddit\.com$/i.test(parsed.hostname) && /^\/r\/[^/]+\/s\/[^/]+\/?$/i.test(parsed.pathname);
+    if (!isShortShare) return targetUrl;
+    const res = await fetch(`https://reddit.com${parsed.pathname}${parsed.search}`, {
+      method: 'GET',
+      redirect: 'manual',
+      headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' },
+    });
+    const location = res.headers.get('location');
+    return location && /\/comments\//i.test(location) ? location : targetUrl;
+  } catch {
+    return targetUrl;
+  }
+}
+
+async function fetchRedditOembed(targetUrl: string): Promise<{ title: string | null; description: string | null } | null> {
+  try {
+    const res = await fetch(`https://www.reddit.com/oembed?url=${encodeURIComponent(targetUrl)}`, {
+      headers: { 'User-Agent': 'Aelixto/1.0', 'Accept': 'application/json' },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return {
+      title: typeof data.title === 'string' ? decodeHtmlEntities(data.title) : null,
+      description: typeof data.author_name === 'string' ? `Posted by u/${data.author_name}` : 'View on Reddit',
+    };
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
