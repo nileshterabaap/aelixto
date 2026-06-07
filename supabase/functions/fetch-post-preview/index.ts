@@ -95,10 +95,22 @@ serve(async (req) => {
     }
     // Generic scraping for other platforms / unclassified URLs
     else {
-      const ogData = await scrapeOgData(url);
+      // Threads serves OG metadata only to crawler UAs; use facebookexternalhit.
+      const isThreads = platform === 'threads' || /(?:^|\.)threads\.(?:net|com)\//i.test(url);
+      const ogData = isThreads
+        ? await scrapeOgData(url, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)')
+        : await scrapeOgData(url);
       thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
       previewText = ogData.description || ogData.title;
       if (ogData.title) previewTitle = ogData.title;
+
+      // For Threads: og:image is almost always the author's profile picture
+      // (cdninstagram.com/.../profile_pic). That isn't a real post preview —
+      // strip it so the typographic text card renders the post copy instead,
+      // matching the X/Reddit behavior for text-only posts.
+      if (isThreads && thumbnailUrl && isThreadsProfilePicture(thumbnailUrl)) {
+        thumbnailUrl = null;
+      }
     }
 
     // Update database
@@ -580,11 +592,13 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&nbsp;/g, ' ');
 }
 
-async function scrapeOgData(url: string): Promise<{ image: string | null; title: string | null; description: string | null }> {
+async function scrapeOgData(url: string, userAgent?: string): Promise<{ image: string | null; title: string | null; description: string | null }> {
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'User-Agent':
+          userAgent ||
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
@@ -601,6 +615,17 @@ async function scrapeOgData(url: string): Promise<{ image: string | null; title:
     console.error('[fetch-post-preview] Scraping error:', error);
     return { image: null, title: null, description: null };
   }
+}
+
+function isThreadsProfilePicture(url: string): boolean {
+  const lower = url.toLowerCase();
+  if (!lower) return false;
+  // Threads profile pictures live on cdninstagram.com under /v/... with
+  // a profile_pic encode tag. Other Threads media (photos/videos) live
+  // under different paths or scontent-*.cdninstagram.com/o1/v/t2/.
+  if (lower.includes('cdninstagram.com/v/') && lower.includes('profile_pic')) return true;
+  if (lower.includes('stp=dst-jpg') && lower.includes('profile_pic')) return true;
+  return false;
 }
 
 /**
