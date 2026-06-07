@@ -32,6 +32,12 @@ function isTextOnlySocialAvatar(platform: string, url: string): boolean {
   if ((platform === "twitter" || platform === "x") && lower.includes("pbs.twimg.com/profile_images/")) {
     return true;
   }
+  if ((platform === "twitter" || platform === "x") && lower.includes("abs.twimg.com/")) {
+    return true;
+  }
+  if (platform === "threads" && (lower.includes("cdninstagram.com/v/") || lower.includes("scontent-") && lower.includes("/profile/"))) {
+    return true;
+  }
   return false;
 }
 
@@ -61,7 +67,12 @@ export function getPostThumb(p: {
   //    TextCardThumbnail can take over instead of showing a wrong image.
   if (tu) {
     const decoded = decodeHtmlEntities(tu);
-    const matchesOwnAvatar = platform === "reddit" && sameUrl(decoded, authorAvatar);
+    // If the stored thumbnail happens to be the Aelixto poster's own
+    // avatar (a known creation-time bug for text-only posts on X /
+    // Threads / Reddit), treat the post as having no thumbnail so the
+    // typographic TextCardThumbnail can render the actual text instead
+    // of a misleading avatar tile.
+    const matchesOwnAvatar = !!authorAvatar && sameUrl(decoded, authorAvatar);
     if (matchesOwnAvatar || isMisleadingThumbnail(platform, decoded) || isTextOnlySocialAvatar(platform, decoded)) {
       // Fall through to platform/media derivations or placeholder.
     } else {
