@@ -338,9 +338,9 @@ async function resolveRedditCanonicalUrl(url: string): Promise<string | null> {
       return url;
     }
     // Reddit's /s/ links return a 30x to the canonical /comments/ URL only when
-    // the request looks like a real desktop browser. Using `follow` and reading
-    // `res.url` is the most reliable way to grab the resolved location across
-    // multi-hop redirects (m.reddit.com -> www.reddit.com -> /comments/).
+    // the request looks like a browser. Capture the first redirect before Reddit
+    // bot protection can hide the final page; if the Location header is stripped,
+    // the tiny redirect body still contains the canonical href.
     const res = await fetch(`https://reddit.com${parsed.pathname}${parsed.search}`, {
       method: 'GET',
       redirect: 'manual',
@@ -352,6 +352,9 @@ async function resolveRedditCanonicalUrl(url: string): Promise<string | null> {
     });
     const location = res.headers.get('location');
     if (location && /\/comments\/[a-z0-9_]+/i.test(location)) return location;
+    const body = await res.text();
+    const bodyRedirect = body.match(/https:\/\/www\.reddit\.com\/(?:r|user)\/[^"'<>\s]+\/comments\/[a-z0-9_]+[^"'<>\s]*/i)?.[0];
+    if (bodyRedirect) return bodyRedirect.replace(/&amp;/g, '&');
     const finalUrl = res.url || '';
     if (/\/comments\/[a-z0-9_]+/i.test(finalUrl)) return finalUrl;
     // Some responses include the canonical URL as a <link rel="canonical">

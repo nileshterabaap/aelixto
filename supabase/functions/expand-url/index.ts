@@ -109,9 +109,15 @@ serve(async (req) => {
     });
 
     const redirectLocation = response.headers.get('location');
-    const finalUrl = redirectLocation && /^https?:\/\//i.test(redirectLocation)
+    let finalUrl = redirectLocation && /^https?:\/\//i.test(redirectLocation)
       ? redirectLocation
       : response.url;
+
+    if (isRedditShortShare && !/\/comments\/[a-z0-9_]+/i.test(finalUrl)) {
+      const body = await response.text();
+      const bodyRedirect = body.match(/https:\/\/www\.reddit\.com\/(?:r|user)\/[^"'<>\s]+\/comments\/[a-z0-9_]+[^"'<>\s]*/i)?.[0];
+      if (bodyRedirect) finalUrl = bodyRedirect.replace(/&amp;/g, '&');
+    }
     console.log('[expand-url] Final URL:', finalUrl);
 
     return new Response(
