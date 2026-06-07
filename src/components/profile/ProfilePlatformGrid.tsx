@@ -21,6 +21,30 @@ import ExternalIcon from "@/assets/platforms/external.svg";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 import { PlatformPostViewer } from "./PlatformPostViewer";
 
+function decodeHtml(text?: string | null): string {
+  if (!text) return "";
+  const doc = new DOMParser().parseFromString(text, "text/html");
+  return (doc.body.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function getThumbnailText(post: PlatformPost): string {
+  const platform = (post.platform || "").toLowerCase();
+  const title = decodeHtml(post.title);
+  const content = decodeHtml(post.content);
+  const genericTitle =
+    !title ||
+    title === "Reddit Post" ||
+    title === "Web Post" ||
+    /^(?:@?[^\s]+|.+) on Threads$/i.test(title);
+  if (!genericTitle) return title;
+  if (content) return content;
+  if (platform === "reddit" && post.embed_html) {
+    const doc = new DOMParser().parseFromString(post.embed_html, "text/html");
+    return decodeHtml(doc.querySelector('a[href*="/comments/"]')?.textContent || "");
+  }
+  return "";
+}
+
 function PostCard({ post, onClick }: { 
   post: PlatformPost; 
   onClick: () => void;
@@ -104,7 +128,7 @@ function PostCard({ post, onClick }: {
 
   // Show platform-branded fallback when no thumbnail or image error
   if (!src || src === "/placeholder.svg") {
-    const textSource = (post.title?.trim() || post.content?.trim() || "");
+    const textSource = getThumbnailText(post);
     const useProfileFallback =
       !textSource && ["threads", "x", "twitter"].includes(platform);
     const aspect = getAspectRatio();
