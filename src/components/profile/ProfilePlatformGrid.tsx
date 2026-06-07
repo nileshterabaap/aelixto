@@ -5,6 +5,7 @@ import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
+import { getThumbnailText } from "@/lib/getThumbnailText";
 import InstagramIcon from "@/assets/platforms/instagram.svg";
 import FacebookIcon from "@/assets/platforms/facebook.svg";
 import YoutubeIcon from "@/assets/platforms/youtube.svg";
@@ -20,30 +21,6 @@ import QuoraIcon from "@/assets/platforms/quora.svg";
 import ExternalIcon from "@/assets/platforms/external.svg";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 import { PlatformPostViewer } from "./PlatformPostViewer";
-
-function decodeHtml(text?: string | null): string {
-  if (!text) return "";
-  const doc = new DOMParser().parseFromString(text, "text/html");
-  return (doc.body.textContent || "").replace(/\s+/g, " ").trim();
-}
-
-function getThumbnailText(post: PlatformPost): string {
-  const platform = (post.platform || "").toLowerCase();
-  const title = decodeHtml(post.title);
-  const content = decodeHtml(post.content);
-  const genericTitle =
-    !title ||
-    title === "Reddit Post" ||
-    title === "Web Post" ||
-    /^(?:@?[^\s]+|.+) on Threads$/i.test(title);
-  if (!genericTitle) return title;
-  if (content) return content;
-  if (platform === "reddit" && post.embed_html) {
-    const doc = new DOMParser().parseFromString(post.embed_html, "text/html");
-    return decodeHtml(doc.querySelector('a[href*="/comments/"]')?.textContent || "");
-  }
-  return "";
-}
 
 function PostCard({ post, onClick }: { 
   post: PlatformPost; 
