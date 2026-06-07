@@ -666,6 +666,9 @@ export function extractArticleMetadata(
   html: string,
   baseUrl: string
 ): { image: string | null; title: string | null; description: string | null } {
+  type JsonLdValue = string | { url?: string; '@id'?: string } | Array<string | { url?: string; '@id'?: string }> | null | undefined;
+  type JsonLdNode = Record<string, JsonLdValue>;
+
   const meta = (name: string): string | null => {
     const patterns = [
       new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)["']`, 'i'),
@@ -687,13 +690,14 @@ export function extractArticleMetadata(
     const inner = block.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '').trim();
     if (!inner) continue;
     try {
-      const parsed = JSON.parse(inner);
-      const nodes: any[] = Array.isArray(parsed) ? parsed : (parsed['@graph'] && Array.isArray(parsed['@graph']) ? parsed['@graph'] : [parsed]);
+      const parsed = JSON.parse(inner) as JsonLdNode | JsonLdNode[];
+      const graph = !Array.isArray(parsed) && Array.isArray(parsed['@graph']) ? parsed['@graph'] : null;
+      const nodes: JsonLdNode[] = Array.isArray(parsed) ? parsed : (graph as JsonLdNode[] | null) || [parsed];
       for (const node of nodes) {
         if (!node || typeof node !== 'object') continue;
         const t = node.headline || node.name;
         const d = node.description;
-        let img: any = node.image || node.thumbnailUrl || node.thumbnail;
+        let img = node.image || node.thumbnailUrl || node.thumbnail;
         if (Array.isArray(img)) img = img[0];
         if (img && typeof img === 'object') img = img.url || img['@id'] || null;
         if (!jsonLdTitle && typeof t === 'string') jsonLdTitle = t.trim();
