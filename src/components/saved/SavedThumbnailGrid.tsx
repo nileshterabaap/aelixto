@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import { SavedPostViewer } from "@/components/saved/SavedPostViewer";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
+import { getThumbnailText } from "@/lib/getThumbnailText";
 import instagramIcon from "@/assets/platforms/instagram.svg";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
 import xIcon from "@/assets/platforms/x.svg";
@@ -34,30 +35,6 @@ const PLATFORM_GRADIENTS: Record<string, string> = {
   article: "bg-gradient-to-br from-emerald-600 to-teal-400",
   external: "bg-gradient-to-br from-gray-600 to-gray-400",
 };
-
-function decodeHtml(text?: string | null): string {
-  if (!text) return "";
-  const doc = new DOMParser().parseFromString(text, "text/html");
-  return (doc.body.textContent || "").replace(/\s+/g, " ").trim();
-}
-
-function getThumbnailText(post: SavedPost): string {
-  const platform = (post.platform || "").toLowerCase();
-  const title = decodeHtml(post.title);
-  const content = decodeHtml(post.content);
-  const genericTitle =
-    !title ||
-    title === "Reddit Post" ||
-    title === "Web Post" ||
-    /^(?:@?[^\s]+|.+) on Threads$/i.test(title);
-  if (!genericTitle) return title;
-  if (content) return content;
-  if (platform === "reddit" && post.embed_html) {
-    const doc = new DOMParser().parseFromString(post.embed_html, "text/html");
-    return decodeHtml(doc.querySelector('a[href*="/comments/"]')?.textContent || "");
-  }
-  return "";
-}
 
 export interface SavedPost {
   id: string;
