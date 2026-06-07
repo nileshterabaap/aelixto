@@ -337,17 +337,16 @@ async function resolveRedditCanonicalUrl(url: string): Promise<string | null> {
     if (!/^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(parsed.pathname)) {
       return url;
     }
-    // Reddit's /s/ links return a 30x to the canonical /comments/ URL only when
-    // the request looks like a browser. Capture the first redirect before Reddit
-    // bot protection can hide the final page; if the Location header is stripped,
-    // the tiny redirect body still contains the canonical href.
-    const res = await fetch(`https://reddit.com${parsed.pathname}${parsed.search}`, {
+    const accessToken = await getRedditInstalledClientToken();
+    if (!accessToken) return null;
+
+    const res = await fetch(`https://oauth.reddit.com${parsed.pathname}${parsed.search}`, {
       method: 'GET',
       redirect: 'manual',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Authorization': `Bearer ${accessToken}`,
+        'User-Agent': 'Aelixto/1.0',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
       },
     });
     const location = res.headers.get('location');
@@ -357,15 +356,29 @@ async function resolveRedditCanonicalUrl(url: string): Promise<string | null> {
     if (bodyRedirect) return bodyRedirect.replace(/&amp;/g, '&');
     const finalUrl = res.url || '';
     if (/\/comments\/[a-z0-9_]+/i.test(finalUrl)) return finalUrl;
-    // Some responses include the canonical URL as a <link rel="canonical">
-    try {
-      const html = await res.text();
-      const canonical = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i)?.[1];
-      if (canonical && /\/comments\/[a-z0-9_]+/i.test(canonical)) return canonical;
-      const ogUrl = html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i)?.[1];
-      if (ogUrl && /\/comments\/[a-z0-9_]+/i.test(ogUrl)) return ogUrl;
-    } catch { /* ignore */ }
     return null;
+  } catch {
+    return null;
+  }
+}
+
+async function getRedditInstalledClientToken(): Promise<string | null> {
+  try {
+    const res = await fetch('https://www.reddit.com/api/v1/access_token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${btoa('6N9uN0krSDE-ig:')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Aelixto/1.0',
+      },
+      body: new URLSearchParams({
+        grant_type: 'https://oauth.reddit.com/grants/installed_client',
+        device_id: 'DO_NOT_TRACK_THIS_DEVICE',
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data?.access_token === 'string' ? data.access_token : null;
   } catch {
     return null;
   }
