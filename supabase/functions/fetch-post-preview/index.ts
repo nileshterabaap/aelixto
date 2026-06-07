@@ -284,9 +284,12 @@ async function storeThumbnailPermanently(postId: string, imageUrl: string): Prom
   }
 }
 
-async function fetchRedditThumbnail(url: string): Promise<string | null> {
+async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string | null; title: string | null; description: string | null }> {
+  const canonicalUrl = await resolveRedditCanonicalUrl(url);
+  const oembedData = await fetchRedditOembed(canonicalUrl || url);
+
   try {
-    let jsonUrl = url.split('?')[0].replace(/\/$/, '');
+    let jsonUrl = (canonicalUrl || url).split('?')[0].replace(/\/$/, '');
     jsonUrl = jsonUrl.replace('www.reddit.com', 'old.reddit.com');
     jsonUrl += '.json';
     const res = await fetch(jsonUrl, {
@@ -300,15 +303,61 @@ async function fetchRedditThumbnail(url: string): Promise<string | null> {
       const json = await res.json();
       const post = json[0]?.data?.children?.[0]?.data;
       const thumbnail = extractRedditMediaThumbnail(post);
-      if (thumbnail) return thumbnail;
+      if (thumbnail || post?.title) {
+        return {
+          thumbnail_url: thumbnail,
+          title: typeof post?.title === 'string' ? post.title : oembedData.title,
+          description: typeof post?.selftext === 'string' && post.selftext.trim() ? post.selftext : oembedData.description,
+        };
+      }
     }
   } catch (e) {
     console.log('[fetch-post-preview] Reddit JSON fetch failed');
   }
   
-  const ogData = await scrapeOgData(url);
-  if (ogData.image && !isMisleadingRedditThumbnail(ogData.image)) return ogData.image;
-  return null;
+  const ogData = await scrapeOgData(canonicalUrl || url);
+  return {
+    thumbnail_url: ogData.image && !isMisleadingRedditThumbnail(ogData.image) ? ogData.image : null,
+    title: oembedData.title || ogData.title,
+    description: oembedData.description || ogData.description,
+  };
+}
+
+async function resolveRedditCanonicalUrl(url: string): Promise<string | null> {
+  try {
+    const parsed = new URL(url);
+    if (!/^www\.reddit\.com$/i.test(parsed.hostname) || !/^\/r\/[^/]+\/s\/[^/]+\/?$/i.test(parsed.pathname)) {
+      return url;
+    }
+    const res = await fetch(`https://reddit.com${parsed.pathname}${parsed.search}`, {
+      method: 'GET',
+      redirect: 'manual',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+    const location = res.headers.get('location');
+    return location && /\/comments\//i.test(location) ? location : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchRedditOembed(url: string): Promise<{ title: string | null; description: string | null }> {
+  try {
+    const res = await fetch(`https://www.reddit.com/oembed?url=${encodeURIComponent(url)}`, {
+      headers: { 'User-Agent': 'Aelixto/1.0', 'Accept': 'application/json' },
+    });
+    if (!res.ok) return { title: null, description: null };
+    const data = await res.json();
+    return {
+      title: typeof data.title === 'string' ? decodeHtmlEntities(data.title) : null,
+      description: typeof data.author_name === 'string' ? `Posted by u/${data.author_name}` : null,
+    };
+  } catch {
+    return { title: null, description: null };
+  }
 }
 
 // TikTok oEmbed — public endpoint, no auth, returns thumbnail_url + title
