@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import { SavedPostViewer } from "@/components/saved/SavedPostViewer";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
@@ -141,13 +142,14 @@ export const SavedThumbnailGrid = ({ posts, userId }: SavedThumbnailGridProps) =
         ))}
       </div>
 
-      {selectedPostId && (
+      {selectedPostId && createPortal(
         <SavedPostViewer
           posts={posts}
           initialPostId={selectedPostId}
           userId={userId}
           onClose={() => setSelectedPostId(null)}
-        />
+        />,
+        document.body
       )}
     </>
   );
