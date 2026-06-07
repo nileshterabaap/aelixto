@@ -60,6 +60,45 @@ function isValidExternalUrl(url: string): boolean {
   }
 }
 
+async function resolveRedditAppShareUrl(parsedTarget: URL): Promise<string | null> {
+  const tokenResponse = await fetch('https://www.reddit.com/api/v1/access_token', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Basic ${btoa('6N9uN0krSDE-ig:')}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': 'Aelixto/1.0',
+    },
+    body: new URLSearchParams({
+      grant_type: 'https://oauth.reddit.com/grants/installed_client',
+      device_id: 'DO_NOT_TRACK_THIS_DEVICE',
+    }),
+  });
+
+  if (!tokenResponse.ok) return null;
+  const tokenData = await tokenResponse.json();
+  const accessToken = typeof tokenData?.access_token === 'string' ? tokenData.access_token : null;
+  if (!accessToken) return null;
+
+  const response = await fetch(`https://oauth.reddit.com${parsedTarget.pathname}${parsedTarget.search}`, {
+    method: 'GET',
+    redirect: 'manual',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'User-Agent': 'Aelixto/1.0',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    },
+  });
+
+  const location = response.headers.get('location');
+  if (location && /\/comments\/[a-z0-9_]+/i.test(location)) {
+    return location.replace(/&amp;/g, '&');
+  }
+
+  const body = await response.text();
+  const bodyRedirect = body.match(/https:\/\/www\.reddit\.com\/(?:r|user)\/[^"'<>\s]+\/comments\/[a-z0-9_]+[^"'<>\s]*/i)?.[0];
+  return bodyRedirect ? bodyRedirect.replace(/&amp;/g, '&') : null;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -90,17 +129,20 @@ serve(async (req) => {
     const isRedditShortShare =
       /^(?:www\.)?reddit\.com$/i.test(parsedTarget.hostname) &&
       /^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(parsedTarget.pathname);
-    const redditShareFallback = isRedditShortShare
-      ? `https://reddit.com${parsedTarget.pathname}${parsedTarget.search}`
-      : targetUrl;
+    if (isRedditShortShare) {
+      const redditFinalUrl = await resolveRedditAppShareUrl(parsedTarget);
+      if (redditFinalUrl) {
+        console.log('[expand-url] Final URL:', redditFinalUrl);
+        return new Response(
+          JSON.stringify({ finalUrl: redditFinalUrl }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
-    // Some platforms, especially Reddit mobile /s/ shares, block HEAD or
-    // www-prefixed short links. Use a real browser-like GET and, for Reddit,
-    // prefer reddit.com so the first public redirect exposes the canonical
-    // /comments/ URL before Reddit's bot protection page appears.
-    const response = await fetch(redditShareFallback, {
+    const response = await fetch(targetUrl, {
       method: 'GET',
-      redirect: isRedditShortShare ? 'manual' : 'follow',
+      redirect: 'follow',
       headers: {
         'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -113,11 +155,6 @@ serve(async (req) => {
       ? redirectLocation
       : response.url;
 
-    if (isRedditShortShare && !/\/comments\/[a-z0-9_]+/i.test(finalUrl)) {
-      const body = await response.text();
-      const bodyRedirect = body.match(/https:\/\/www\.reddit\.com\/(?:r|user)\/[^"'<>\s]+\/comments\/[a-z0-9_]+[^"'<>\s]*/i)?.[0];
-      if (bodyRedirect) finalUrl = bodyRedirect.replace(/&amp;/g, '&');
-    }
     console.log('[expand-url] Final URL:', finalUrl);
 
     return new Response(
