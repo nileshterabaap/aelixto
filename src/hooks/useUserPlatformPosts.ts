@@ -57,7 +57,14 @@ async function backfillThumbnail(post: PlatformPost) {
   const platform = post.platform.toLowerCase();
   if (!THUMB_BACKFILL_PLATFORMS.has(platform)) return;
   if (post.thumbnail_url && !isGenericPlaceholderThumbnail(post.thumbnail_url)) return;
-  if (!post.thumbnail_url && hasUsableTextThumbnail(post)) return;
+  // For Reddit/Instagram/Facebook/TikTok, ALWAYS try to recover the real
+  // media thumbnail even when we have usable text — an image post should
+  // show the image, not its title. For pure text platforms (Threads, X,
+  // article) we can skip backfill when text is already usable.
+  const imageFirstPlatform =
+    platform === "reddit" || platform === "instagram" ||
+    platform === "facebook" || platform === "tiktok" || platform === "pinterest";
+  if (!post.thumbnail_url && !imageFirstPlatform && hasUsableTextThumbnail(post)) return;
 
   const key = `${post.id}:${platform}`;
   if (inflightBackfills.has(key)) return;
@@ -172,7 +179,16 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
     const platformLower = (platform || "").toLowerCase();
     if (!THUMB_BACKFILL_PLATFORMS.has(platformLower)) return;
 
-    const missing = items.filter((p) => (!p.thumbnail_url || isGenericPlaceholderThumbnail(p.thumbnail_url)) && !hasUsableTextThumbnail(p) && !!p.media_url);
+    const imageFirstPlatform =
+      platformLower === "reddit" || platformLower === "instagram" ||
+      platformLower === "facebook" || platformLower === "tiktok" || platformLower === "pinterest";
+    const missing = items.filter((p) => {
+      if (!p.media_url) return false;
+      const noThumb = !p.thumbnail_url || isGenericPlaceholderThumbnail(p.thumbnail_url);
+      if (!noThumb) return false;
+      if (imageFirstPlatform) return true;
+      return !hasUsableTextThumbnail(p);
+    });
     const expiring = items.filter((p) => isLikelyExpiringMetaCdnUrl(p.thumbnail_url));
     if (!missing.length && !expiring.length) return;
 
