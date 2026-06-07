@@ -20,6 +20,13 @@ function isGenericTitle(title: string): boolean {
   return false;
 }
 
+function isGenericPreviewText(text: string): boolean {
+  if (!text) return true;
+  if (isGenericTitle(text)) return true;
+  if (/^Posted by u\/[\w-]+$/i.test(text)) return true;
+  return false;
+}
+
 function extractFromEmbedHtml(platform: string, embedHtml?: string | null): string {
   if (!embedHtml) return "";
   try {
@@ -77,7 +84,7 @@ export function getThumbnailText(post: ThumbnailTextSource): string {
   if (!isGenericTitle(title)) return title;
   if (content) return content;
   if (previewTitle && !isGenericTitle(previewTitle)) return previewTitle;
-  if (previewText) return previewText;
+  if (previewText && !isGenericPreviewText(previewText)) return previewText;
 
   const fromEmbed = extractFromEmbedHtml(platform, post.embed_html);
   if (fromEmbed) return fromEmbed;
