@@ -97,9 +97,10 @@ serve(async (req) => {
     // www-prefixed short links. Use a real browser-like GET and, for Reddit,
     // prefer reddit.com so the first public redirect exposes the canonical
     // /comments/ URL before Reddit's bot protection page appears.
+    const isRedditShareFallback = redditShareFallback !== targetUrl;
     const response = await fetch(redditShareFallback, {
       method: 'GET',
-      redirect: 'follow',
+      redirect: isRedditShareFallback ? 'manual' : 'follow',
       headers: {
         'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -107,7 +108,10 @@ serve(async (req) => {
       },
     });
 
-    const finalUrl = response.url;
+    const redirectLocation = response.headers.get('location');
+    const finalUrl = redirectLocation && /^https?:\/\//i.test(redirectLocation)
+      ? redirectLocation
+      : response.url;
     console.log('[expand-url] Final URL:', finalUrl);
 
     return new Response(

@@ -341,15 +341,17 @@ async function resolveRedditCanonicalUrl(url: string): Promise<string | null> {
     // the request looks like a real desktop browser. Using `follow` and reading
     // `res.url` is the most reliable way to grab the resolved location across
     // multi-hop redirects (m.reddit.com -> www.reddit.com -> /comments/).
-    const res = await fetch(`https://www.reddit.com${parsed.pathname}${parsed.search}`, {
+    const res = await fetch(`https://reddit.com${parsed.pathname}${parsed.search}`, {
       method: 'GET',
-      redirect: 'follow',
+      redirect: 'manual',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
       },
     });
+    const location = res.headers.get('location');
+    if (location && /\/comments\/[a-z0-9_]+/i.test(location)) return location;
     const finalUrl = res.url || '';
     if (/\/comments\/[a-z0-9_]+/i.test(finalUrl)) return finalUrl;
     // Some responses include the canonical URL as a <link rel="canonical">
