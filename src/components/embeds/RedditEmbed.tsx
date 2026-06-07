@@ -42,10 +42,12 @@ function normalizeRedditEmbedUrl(rawUrl: string): string | null {
       return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
     }
 
-    // Mobile share links (`/s/<code>`) are not directly embeddable. They must
-    // first be expanded to Reddit's canonical `/comments/<id>/...` URL.
+    // Mobile share links (`/s/<code>`). Reddit's CDN blocks server-side
+    // expansion from most cloud egress IPs, but the user's own browser is not
+    // blocked, so we pass the short URL straight to embed.reddit.com and let
+    // the official embed script resolve it client-side.
     if (/^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(u.pathname)) {
-      return null;
+      return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
     }
 
     if (/^\/(?:r|user)\/[^/]+\/comments\/[a-z0-9_]+(?:\/.*)?$/i.test(u.pathname)) {
