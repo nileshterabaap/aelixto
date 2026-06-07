@@ -54,7 +54,10 @@ serve(async (req) => {
     }
     // Reddit special handling
     else if (platform === 'reddit') {
-      thumbnailUrl = await fetchRedditThumbnail(url);
+      const redditData = await fetchRedditPreview(url);
+      thumbnailUrl = redditData.thumbnail_url;
+      previewTitle = redditData.title;
+      previewText = redditData.description || redditData.title;
     }
     // Article handling — try Medium RSS first (because Medium blocks the
     // normal HTML fetch for some posts), then fall back to the universal
@@ -118,7 +121,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ thumbnail_url: thumbnailUrl, preview_text: previewText }),
+      JSON.stringify({ thumbnail_url: thumbnailUrl, title: previewTitle, preview_text: previewText }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
