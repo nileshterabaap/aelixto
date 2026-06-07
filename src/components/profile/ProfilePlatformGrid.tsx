@@ -75,9 +75,9 @@ function PostCard({ post, onClick }: {
   const src = imageError ? null : maybeProxy(rawThumb, 480);
   const Icon = getPlatformIcon();
   const platform = (post.platform || "").toLowerCase();
-  // Reddit intentionally does NOT use the Aelixto author's avatar — show the
-  // branded Reddit placeholder card instead.
-  const useProfileFallback = ["threads", "x", "twitter"].includes(platform);
+  // Prefer the post's own text/title as the thumbnail. Only fall back to the
+  // author's profile avatar when the post has no usable copy at all (and even
+  // then, never for Reddit — Reddit uses the branded logo card).
 
   // Smart playable detection: only show the play overlay when we can
   // confidently say this post is a video. media_type alone is unreliable
@@ -104,9 +104,9 @@ function PostCard({ post, onClick }: {
 
   // Show platform-branded fallback when no thumbnail or image error
   if (!src || src === "/placeholder.svg") {
-    const textSource = platform === "reddit"
-      ? ""
-      : (post.content?.trim() || post.title?.trim() || "");
+    const textSource = (post.title?.trim() || post.content?.trim() || "");
+    const useProfileFallback =
+      !textSource && ["threads", "x", "twitter"].includes(platform);
     const aspect = getAspectRatio();
     return (
       <button
