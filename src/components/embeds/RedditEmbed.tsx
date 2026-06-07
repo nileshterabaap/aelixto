@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { OgCardFallback } from "@/components/OgCardFallback";
 import { supabase } from "@/integrations/supabase/client";
+import { loadRedditEmbed } from "@/lib/ScriptLoader";
 import redditIcon from "@/assets/platforms/reddit.svg";
 
 type RedditEmbedProps = {
@@ -63,17 +64,6 @@ function normalizeRedditEmbedUrl(rawUrl: string): string | null {
   }
 }
 
-function toRedditIframeUrl(canonicalUrl: string): string | null {
-  try {
-    const u = new URL(canonicalUrl);
-    if (!/(^|\.)reddit\.com$/i.test(u.hostname)) return null;
-    const params = new URLSearchParams({ embed: "true", showmedia: "true" });
-    return `https://embed.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}?${params.toString()}`;
-  } catch {
-    return null;
-  }
-}
-
 function shouldExpandRedditUrl(rawUrl: string): boolean {
   try {
     const u = new URL(ensureProtocol(rawUrl));
@@ -129,12 +119,12 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const [loaded, setLoaded] = useState(false);
   const [thumbBroken, setThumbBroken] = useState(false);
   const [fetchedThumb, setFetchedThumb] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const isDirectMedia = isDirectRedditMediaUrl(normalizedUrl);
   const effectiveThumb = thumbnailUrl || fetchedThumb;
   const validThumb = !!effectiveThumb && !thumbBroken && !sameUrl(effectiveThumb, authorAvatar);
   const fallbackImage = validThumb ? effectiveThumb! : undefined;
   const shouldRenderStoredImage = !isDirectMedia && validThumb && isRedditShareUrl(normalizedUrl);
-  const iframeUrl = useMemo(() => resolvedUrl ? toRedditIframeUrl(resolvedUrl) : null, [resolvedUrl]);
 
   // Detect broken/blocked Reddit thumbnails (e.g. URLs that 403 or 404) so the
   // fallback card swaps to the author's profile picture instead of rendering a
@@ -213,10 +203,42 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   }, [directUrl, needsExpansion, url]);
 
   useEffect(() => {
-    if (!resolvedUrl || resolving || failed || !iframeUrl || loaded) return;
+    if (!resolvedUrl || resolving || failed || loaded) return;
+    if (!containerRef.current) return;
+
+    // Mount Reddit's official blockquote widget. embed.reddit.com/widgets.js
+    // scans the DOM for `blockquote.reddit-embed-bq` and replaces them with
+    // an iframe that correctly renders image, gallery, and video posts.
+    const container = containerRef.current;
+    container.innerHTML = "";
+    const bq = document.createElement("blockquote");
+    bq.className = "reddit-embed-bq";
+    bq.setAttribute("data-embed-height", String(REDDIT_EMBED_HEIGHT));
+    bq.setAttribute("data-embed-showmedia", "true");
+    const a = document.createElement("a");
+    a.href = resolvedUrl;
+    a.textContent = title || "Reddit post";
+    bq.appendChild(a);
+    container.appendChild(bq);
+
+    // Observe iframe insertion to mark ready
+    const observer = new MutationObserver(() => {
+      if (container.querySelector("iframe")) {
+        setLoaded(true);
+        container.dispatchEvent(new CustomEvent("embedReady", { bubbles: true }));
+        observer.disconnect();
+      }
+    });
+    observer.observe(container, { childList: true, subtree: true });
+
+    loadRedditEmbed().catch(() => {});
+
     const fallback = window.setTimeout(() => setLoaded(true), REDDIT_IFRAME_TIMEOUT);
-    return () => window.clearTimeout(fallback);
-  }, [resolvedUrl, resolving, failed, iframeUrl, loaded]);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(fallback);
+    };
+  }, [resolvedUrl, resolving, failed, loaded, title]);
 
   if (shouldRenderStoredImage) {
     return (
@@ -237,7 +259,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     return <div data-embed-status="loading" className="w-full" style={{ minHeight: REDDIT_EMBED_HEIGHT }} />;
   }
 
-  if (!resolvedUrl || !iframeUrl || failed) {
+  if (!resolvedUrl || failed) {
     return (
       <div data-embed-status="ready">
         {isDirectMedia ? (
@@ -294,16 +316,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
       style={{ minHeight: REDDIT_EMBED_HEIGHT }}
       data-embed-status={loaded ? "ready" : "loading"}
     >
-      <iframe
-        src={iframeUrl}
-        title={title || "Reddit post"}
-        className="block w-full border-0 bg-card"
-        style={{ minHeight: REDDIT_EMBED_HEIGHT }}
-        loading="lazy"
-        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-        onLoad={() => setLoaded(true)}
-        onError={() => setFailed(true)}
-      />
+      <div ref={containerRef} className="w-full" />
     </div>
   );
 }
