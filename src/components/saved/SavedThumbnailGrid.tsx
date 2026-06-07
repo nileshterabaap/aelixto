@@ -35,6 +35,30 @@ const PLATFORM_GRADIENTS: Record<string, string> = {
   external: "bg-gradient-to-br from-gray-600 to-gray-400",
 };
 
+function decodeHtml(text?: string | null): string {
+  if (!text) return "";
+  const doc = new DOMParser().parseFromString(text, "text/html");
+  return (doc.body.textContent || "").replace(/\s+/g, " ").trim();
+}
+
+function getThumbnailText(post: SavedPost): string {
+  const platform = (post.platform || "").toLowerCase();
+  const title = decodeHtml(post.title);
+  const content = decodeHtml(post.content);
+  const genericTitle =
+    !title ||
+    title === "Reddit Post" ||
+    title === "Web Post" ||
+    /^(?:@?[^\s]+|.+) on Threads$/i.test(title);
+  if (!genericTitle) return title;
+  if (content) return content;
+  if (platform === "reddit" && post.embed_html) {
+    const doc = new DOMParser().parseFromString(post.embed_html, "text/html");
+    return decodeHtml(doc.querySelector('a[href*="/comments/"]')?.textContent || "");
+  }
+  return "";
+}
+
 export interface SavedPost {
   id: string;
   user_id: string;
@@ -75,7 +99,7 @@ function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void
   if (!src || src === "/placeholder.svg") {
     // Prefer the post's title/text as the thumbnail content. Only fall back to
     // the author's profile avatar when there is no usable text at all.
-    const textSource = (post.title?.trim() || post.content?.trim() || "");
+    const textSource = getThumbnailText(post);
     const useProfileFallback =
       !textSource && ["threads", "x", "twitter"].includes(platform);
     return (

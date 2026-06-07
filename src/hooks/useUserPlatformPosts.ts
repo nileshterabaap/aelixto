@@ -46,11 +46,18 @@ const isGenericPlaceholderThumbnail = (url?: string | null) => {
   return lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com");
 };
 
+const hasUsableTextThumbnail = (post: PlatformPost) => {
+  const title = (post.title || "").trim();
+  const content = (post.content || "").trim();
+  return !!content || (!!title && title !== "Reddit Post" && title !== "Web Post" && !/^(?:@?[^\s]+|.+) on Threads$/i.test(title));
+};
+
 async function backfillThumbnail(post: PlatformPost) {
   if (!post.media_url || !post.platform) return;
   const platform = post.platform.toLowerCase();
   if (!THUMB_BACKFILL_PLATFORMS.has(platform)) return;
   if (post.thumbnail_url && !isGenericPlaceholderThumbnail(post.thumbnail_url)) return;
+  if (!post.thumbnail_url && hasUsableTextThumbnail(post)) return;
 
   const key = `${post.id}:${platform}`;
   if (inflightBackfills.has(key)) return;
@@ -107,28 +114,6 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
     queryKey: ["platform-posts", userId, platform],
     queryFn: async () => {
       if (!userId || !platform) return [];
-
-      // [DEBUG] Reddit tab diagnostics — log exact platform string passed to RPC
-      // and the distinct platform values actually stored for this user.
-      console.log("[useUserPlatformPosts] RPC platform_name =", JSON.stringify(platform), "userId =", userId);
-      try {
-        const { data: allUserPosts, error: debugErr } = await supabase
-          .from("posts")
-          .select("platform")
-          .eq("user_id", userId);
-        if (debugErr) {
-          console.warn("[useUserPlatformPosts][debug] distinct platforms query failed:", debugErr);
-        } else {
-          const counts = (allUserPosts || []).reduce<Record<string, number>>((acc, row: any) => {
-            const key = row.platform === null ? "<null>" : JSON.stringify(row.platform);
-            acc[key] = (acc[key] || 0) + 1;
-            return acc;
-          }, {});
-          console.log("[useUserPlatformPosts][debug] distinct platforms for user:", counts);
-        }
-      } catch (e) {
-        console.warn("[useUserPlatformPosts][debug] exception:", e);
-      }
 
       const all: PlatformPost[] = [];
       let cursor: string | null = null;
@@ -187,7 +172,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
     const platformLower = (platform || "").toLowerCase();
     if (!THUMB_BACKFILL_PLATFORMS.has(platformLower)) return;
 
-    const missing = items.filter((p) => (!p.thumbnail_url || isGenericPlaceholderThumbnail(p.thumbnail_url)) && !!p.media_url);
+    const missing = items.filter((p) => (!p.thumbnail_url || isGenericPlaceholderThumbnail(p.thumbnail_url)) && !hasUsableTextThumbnail(p) && !!p.media_url);
     const expiring = items.filter((p) => isLikelyExpiringMetaCdnUrl(p.thumbnail_url));
     if (!missing.length && !expiring.length) return;
 
