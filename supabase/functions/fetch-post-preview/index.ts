@@ -118,13 +118,15 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const updatePayload: Record<string, string | null> = { thumbnail_url: thumbnailUrl, preview_text: previewText };
+    const updatePayload: Record<string, string | null> = {
+      thumbnail_url: thumbnailUrl,
+      preview_image_url: thumbnailUrl,
+      preview_text: previewText,
+    };
     if (previewTitle) {
       updatePayload.title = previewTitle;
       updatePayload.preview_title = previewTitle;
     }
-    if (thumbnailUrl) updatePayload.preview_image_url = thumbnailUrl;
-
     const { error: updateError } = await supabase
       .from('posts')
       .update(updatePayload)
@@ -305,15 +307,7 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
   const oembedData = await fetchRedditOembed(canonicalUrl || url);
 
   try {
-    let jsonUrl = (canonicalUrl || url).split('?')[0].replace(/\/$/, '');
-    jsonUrl = jsonUrl.replace('www.reddit.com', 'old.reddit.com');
-    jsonUrl += '.json';
-    const res = await fetch(jsonUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-      },
-    });
+    const res = await fetchRedditJson(canonicalUrl || url);
     
     if (res.ok) {
       const json = await res.json();
@@ -623,8 +617,17 @@ function isThreadsProfilePicture(url: string): boolean {
   // Threads profile pictures live on cdninstagram.com under /v/... with
   // a profile_pic encode tag. Other Threads media (photos/videos) live
   // under different paths or scontent-*.cdninstagram.com/o1/v/t2/.
-  if (lower.includes('cdninstagram.com/v/') && lower.includes('profile_pic')) return true;
+  if ((lower.includes('cdninstagram.com/v/') || lower.includes('fbcdn.net/v/')) && lower.includes('profile_pic')) return true;
+  if (lower.includes('/t51.82787-19/')) return true;
   if (lower.includes('stp=dst-jpg') && lower.includes('profile_pic')) return true;
+  try {
+    const parsed = new URL(url);
+    const efg = parsed.searchParams.get('efg');
+    if (efg) {
+      const decoded = atob(efg.replace(/-/g, '+').replace(/_/g, '/'));
+      if (decoded.toLowerCase().includes('profile_pic')) return true;
+    }
+  } catch { /* ignore */ }
   return false;
 }
 
