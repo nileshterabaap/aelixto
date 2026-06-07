@@ -42,11 +42,8 @@ function normalizeRedditEmbedUrl(rawUrl: string): string | null {
       return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
     }
 
-    // Mobile share URLs (`/r/.../s/...`) are not accepted by embed.reddit.com;
-    // sending them straight to the iframe renders Reddit's own "Page not found".
-    // Force these through expand-url first so we iframe the canonical /comments/ URL.
     if (/^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(u.pathname)) {
-      return null;
+      return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
     }
 
     if (/^\/(?:r|user)\/[^/]+\/comments\/[a-z0-9_]+(?:\/.*)?$/i.test(u.pathname)) {
@@ -112,7 +109,10 @@ function toRedditEmbedSrc(rawUrl: string): string | null {
   try {
     const u = new URL(rawUrl);
     const path = u.pathname.replace(/^\//, "");
-    if (!/^(?:r|user)\/[^/]+\/comments\/[a-z0-9_]+(?:\/.*)?$/i.test(path)) return null;
+    const isEmbeddablePath =
+      /^(?:r|user)\/[^/]+\/comments\/[a-z0-9_]+(?:\/.*)?$/i.test(path) ||
+      /^(?:r|user)\/[^/]+\/s\/[a-z0-9_]+\/?$/i.test(path);
+    if (!isEmbeddablePath) return null;
 
     const params = new URLSearchParams();
     params.set("showmedia", "true");
