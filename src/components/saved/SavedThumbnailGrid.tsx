@@ -72,16 +72,12 @@ function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void
   const platform = (post.platform || "").toLowerCase();
   const icon = PLATFORM_ICONS[platform];
   const gradient = PLATFORM_GRADIENTS[platform] || "bg-muted";
-  // Reddit intentionally does NOT use the Aelixto author's avatar as a
-  // fallback — show the branded Reddit placeholder card instead.
-  const useProfileFallback = ["threads", "x", "twitter"].includes(platform);
-
   if (!src || src === "/placeholder.svg") {
-    // Reddit: show the branded logo + label card (no caption text, no avatar),
-    // matching the in-feed Reddit fallback.
-    const textSource = platform === "reddit"
-      ? ""
-      : (post.content?.trim() || post.title?.trim() || "");
+    // Prefer the post's title/text as the thumbnail content. Only fall back to
+    // the author's profile avatar when there is no usable text at all.
+    const textSource = (post.title?.trim() || post.content?.trim() || "");
+    const useProfileFallback =
+      !textSource && ["threads", "x", "twitter"].includes(platform);
     return (
       <button
         onClick={onClick}
