@@ -531,7 +531,14 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <RedditEmbed url={r.url} />
+                  <RedditEmbed
+                    url={r.url}
+                    title={previewTitle || post.title}
+                    thumbnailUrl={thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform)}
+                    description={previewText}
+                    authorAvatar={post.author?.avatar || null}
+                    postId={post.id}
+                  />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -542,7 +549,14 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <RedditEmbed url={r.url} />
+                <RedditEmbed
+                  url={r.url}
+                  title={previewTitle || post.title}
+                  thumbnailUrl={thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform)}
+                  description={previewText}
+                  authorAvatar={post.author?.avatar || null}
+                  postId={post.id}
+                />
               </LazyEmbed>
             )}
             {r.kind === 'twitter' && post.isRealPost && (
