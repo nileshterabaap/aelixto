@@ -379,10 +379,12 @@ serve(async (req) => {
     }
     
     if (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) {
+      const redditUrl = await resolveRedditCanonicalUrl(targetUrl);
+      const redditOembed = await fetchRedditOembed(redditUrl);
       // Use Reddit's public JSON API - append .json to the post URL.
       // Only handle proper post URLs (reddit.com/r/*/comments/*).
       try {
-        let jsonUrl = targetUrl.split('?')[0].split('#')[0];
+        let jsonUrl = redditUrl.split('?')[0].split('#')[0];
         const isPostUrl = /reddit\.com\/r\/[^/]+\/comments\/[^/]+/i.test(jsonUrl);
         if (!isPostUrl) {
           throw new Error('Not a Reddit post URL, skipping JSON API');
@@ -427,10 +429,10 @@ serve(async (req) => {
             console.log('[fetch-og] Reddit JSON API success:', thumbnail?.substring(0, 60) || 'no image');
             return new Response(
               JSON.stringify({ 
-                title: post.title || 'Reddit Post', 
+                title: post.title || redditOembed?.title || 'Reddit Post', 
                 image: thumbnail, 
-                description: post.author ? `Posted by u/${post.author}` : 'View on Reddit',
-                finalUrl: targetUrl 
+                description: post.author ? `Posted by u/${post.author}` : (redditOembed?.description || 'View on Reddit'),
+                finalUrl: redditUrl 
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
@@ -438,6 +440,18 @@ serve(async (req) => {
         }
       } catch (e) {
         console.log('[fetch-og] Reddit JSON API failed, falling back to HTML:', e);
+      }
+
+      if (redditOembed?.title) {
+        return new Response(
+          JSON.stringify({
+            title: redditOembed.title,
+            image: null,
+            description: redditOembed.description || 'View on Reddit',
+            finalUrl: redditUrl,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     }
     
