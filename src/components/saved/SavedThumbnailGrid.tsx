@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import { SavedPostViewer } from "@/components/saved/SavedPostViewer";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
@@ -61,6 +60,7 @@ interface SavedThumbnailGridProps {
 
 function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void }) {
   const [imgError, setImgError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const rawThumb = getPostThumb({
     platform: post.platform,
     thumbnail_url: post.thumbnail_url,
@@ -101,7 +101,17 @@ function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void
 
   return (
     <button onClick={onClick} className="relative overflow-hidden rounded-2xl aspect-square bg-muted/50 group">
-      <img src={src} alt="" onError={() => setImgError(true)} className="w-full h-full object-cover" loading="lazy" />
+      {!imageLoaded && (
+        <div className="absolute inset-0 bg-muted/70 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-muted before:to-transparent before:animate-shimmer" />
+      )}
+      <img
+        src={src}
+        alt=""
+        onError={() => setImgError(true)}
+        onLoad={() => setImageLoaded(true)}
+        loading="eager"
+        className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
+      />
       {icon && (
         <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
           <img src={icon} alt="" className="w-3.5 h-3.5 invert" />
@@ -126,15 +136,8 @@ export const SavedThumbnailGrid = ({ posts, userId }: SavedThumbnailGridProps) =
   return (
     <>
       <div className="grid grid-cols-3 gap-1.5">
-        {posts.map((post, i) => (
-          <motion.div
-            key={post.id}
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.4), ease: [0.4, 0, 0.2, 1] }}
-          >
-            <ThumbnailCard post={post} onClick={() => setSelectedPostId(post.id)} />
-          </motion.div>
+        {posts.map((post) => (
+          <ThumbnailCard key={post.id} post={post} onClick={() => setSelectedPostId(post.id)} />
         ))}
       </div>
 
