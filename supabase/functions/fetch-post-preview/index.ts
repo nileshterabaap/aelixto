@@ -406,6 +406,31 @@ async function fetchRedditOembed(url: string): Promise<{ title: string | null; d
   }
 }
 
+async function fetchRedditJson(url: string): Promise<Response> {
+  const parsed = new URL(url);
+  const jsonPath = parsed.pathname.replace(/\/$/, '') + '.json';
+  const accessToken = await getRedditInstalledClientToken();
+
+  if (accessToken) {
+    const oauthRes = await fetch(`https://oauth.reddit.com${jsonPath}`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'User-Agent': 'Aelixto/1.0',
+        'Accept': 'application/json',
+      },
+    });
+    if (oauthRes.ok) return oauthRes;
+  }
+
+  const oldRedditUrl = `https://old.reddit.com${jsonPath}`;
+  return fetch(oldRedditUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': 'application/json',
+    },
+  });
+}
+
 // TikTok oEmbed — public endpoint, no auth, returns thumbnail_url + title
 async function fetchTikTokOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null } | null> {
   try {
