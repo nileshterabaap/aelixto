@@ -13,6 +13,7 @@ type RedditEmbedProps = {
 };
 
 const REDDIT_EMBED_HEIGHT = 316;
+const REDDIT_EMBED_MAX_HEIGHT = 1600;
 const REDDIT_IFRAME_TIMEOUT = 8500;
 
 function ensureProtocol(rawUrl: string): string {
@@ -136,6 +137,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const [resolving, setResolving] = useState(needsExpansion && !directUrl);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [iframeHeight, setIframeHeight] = useState<number>(REDDIT_EMBED_HEIGHT);
   const [thumbBroken, setThumbBroken] = useState(false);
   const [fetchedThumb, setFetchedThumb] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -245,6 +247,43 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     };
   }, [embedSrc, resolving, failed, loaded]);
 
+  // embed.reddit.com posts its rendered height back to the parent. Resize
+  // the iframe so tall image/video posts aren't cropped at 316px.
+  useEffect(() => {
+    if (!embedSrc) return;
+    const handler = (event: MessageEvent) => {
+      try {
+        if (!/(^|\.)reddit\.com$/i.test(new URL(event.origin).hostname)) return;
+      } catch {
+        return;
+      }
+      const data: any = event.data;
+      if (!data) return;
+      let h: number | undefined;
+      if (typeof data === "object") {
+        if (typeof data.height === "number") h = data.height;
+        else if (data.data && typeof data.data.height === "number") h = data.data.height;
+        else if (typeof data.message === "string") {
+          try {
+            const parsed = JSON.parse(data.message);
+            if (parsed && typeof parsed.height === "number") h = parsed.height;
+          } catch {}
+        }
+      } else if (typeof data === "string") {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed && typeof parsed.height === "number") h = parsed.height;
+        } catch {}
+      }
+      if (typeof h === "number" && h > 0) {
+        const clamped = Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_HEIGHT, Math.ceil(h)));
+        setIframeHeight((prev) => (Math.abs(prev - clamped) > 2 ? clamped : prev));
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, [embedSrc]);
+
   if (shouldRenderStoredImage) {
     return (
       <div data-embed-status="ready">
@@ -319,7 +358,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     <div
       ref={containerRef}
       className="relative w-full"
-      style={{ minHeight: REDDIT_EMBED_HEIGHT }}
+      style={{ minHeight: REDDIT_EMBED_HEIGHT, height: iframeHeight }}
       data-embed-status={loaded ? "ready" : "loading"}
     >
       <iframe
@@ -327,12 +366,13 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
         src={embedSrc}
         title={title || "Reddit post"}
         width="640"
-        height={REDDIT_EMBED_HEIGHT}
+        height={iframeHeight}
         scrolling="no"
         allowFullScreen
         sandbox="allow-scripts allow-same-origin allow-popups"
         allow="clipboard-read; clipboard-write"
         className="mx-auto block w-full max-w-full rounded-lg border-0"
+        style={{ height: iframeHeight }}
       />
     </div>
   );
