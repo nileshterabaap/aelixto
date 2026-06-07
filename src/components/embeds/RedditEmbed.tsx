@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { OgCardFallback } from "@/components/OgCardFallback";
 import { supabase } from "@/integrations/supabase/client";
-import { loadRedditEmbed } from "@/lib/ScriptLoader";
 import redditIcon from "@/assets/platforms/reddit.svg";
 
 type RedditEmbedProps = {
@@ -109,6 +108,24 @@ function isRedditShareUrl(rawUrl: string): boolean {
   }
 }
 
+function toRedditEmbedSrc(rawUrl: string): string | null {
+  try {
+    const u = new URL(rawUrl);
+    const path = u.pathname.replace(/^\//, "");
+    if (!/^(?:r|user)\/[^/]+\/comments\/[a-z0-9_]+(?:\/.*)?$/i.test(path)) return null;
+
+    const params = new URLSearchParams();
+    params.set("showmedia", "true");
+    params.set("showmore", "false");
+    params.set("depth", "1");
+    params.set("utm_name", "post_embed");
+
+    return `https://embed.reddit.com/${path.endsWith("/") ? path : `${path}/`}?${params.toString()}`;
+  } catch {
+    return null;
+  }
+}
+
 export default function RedditEmbed({ url, title, thumbnailUrl, description, authorAvatar, postId }: RedditEmbedProps) {
   const normalizedUrl = useMemo(() => ensureProtocol(url), [url]);
   const directUrl = useMemo(() => normalizeRedditEmbedUrl(url), [url]);
@@ -120,11 +137,13 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const [thumbBroken, setThumbBroken] = useState(false);
   const [fetchedThumb, setFetchedThumb] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const isDirectMedia = isDirectRedditMediaUrl(normalizedUrl);
   const effectiveThumb = thumbnailUrl || fetchedThumb;
   const validThumb = !!effectiveThumb && !thumbBroken && !sameUrl(effectiveThumb, authorAvatar);
   const fallbackImage = validThumb ? effectiveThumb! : undefined;
   const shouldRenderStoredImage = !isDirectMedia && validThumb && isRedditShareUrl(normalizedUrl);
+  const embedSrc = useMemo(() => (resolvedUrl ? toRedditEmbedSrc(resolvedUrl) : null), [resolvedUrl]);
 
   // Detect broken/blocked Reddit thumbnails (e.g. URLs that 403 or 404) so the
   // fallback card swaps to the author's profile picture instead of rendering a
