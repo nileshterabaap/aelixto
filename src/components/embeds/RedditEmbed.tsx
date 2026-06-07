@@ -146,10 +146,6 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const effectiveThumb = thumbnailUrl || fetchedThumb;
   const validThumb = !!effectiveThumb && !thumbBroken && !sameUrl(effectiveThumb, authorAvatar);
   const fallbackImage = validThumb ? effectiveThumb! : undefined;
-  // Only short-circuit to the stored image for mobile `/s/` share URLs that
-  // Reddit's iframe can't render. For canonical `/comments/` posts we want
-  // the full embed card (subreddit header, title, carousel) — matching how
-  // Reddit's official blog embed looks.
   const shouldRenderStoredImage = !isDirectMedia && validThumb && isRedditShareUrl(normalizedUrl);
   const embedSrc = useMemo(() => (resolvedUrl ? toRedditEmbedSrc(resolvedUrl) : null), [resolvedUrl]);
 
