@@ -9,6 +9,7 @@ type RedditEmbedProps = {
   thumbnailUrl?: string | null;
   description?: string | null;
   authorAvatar?: string | null;
+  postId?: string | null;
 };
 
 const REDDIT_EMBED_HEIGHT = 316;
@@ -118,7 +119,7 @@ function isRedditShareUrl(rawUrl: string): boolean {
   }
 }
 
-export default function RedditEmbed({ url, title, thumbnailUrl, description, authorAvatar }: RedditEmbedProps) {
+export default function RedditEmbed({ url, title, thumbnailUrl, description, authorAvatar, postId }: RedditEmbedProps) {
   const normalizedUrl = useMemo(() => ensureProtocol(url), [url]);
   const directUrl = useMemo(() => normalizeRedditEmbedUrl(url), [url]);
   const needsExpansion = useMemo(() => shouldExpandRedditUrl(url), [url]);
@@ -127,9 +128,11 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [thumbBroken, setThumbBroken] = useState(false);
+  const [fetchedThumb, setFetchedThumb] = useState<string | null>(null);
   const isDirectMedia = isDirectRedditMediaUrl(normalizedUrl);
-  const validThumb = !!thumbnailUrl && !thumbBroken && !sameUrl(thumbnailUrl, authorAvatar);
-  const fallbackImage = validThumb ? thumbnailUrl! : undefined;
+  const effectiveThumb = thumbnailUrl || fetchedThumb;
+  const validThumb = !!effectiveThumb && !thumbBroken && !sameUrl(effectiveThumb, authorAvatar);
+  const fallbackImage = validThumb ? effectiveThumb! : undefined;
   const shouldRenderStoredImage = !isDirectMedia && validThumb && isRedditShareUrl(normalizedUrl);
   const iframeUrl = useMemo(() => resolvedUrl ? toRedditIframeUrl(resolvedUrl) : null, [resolvedUrl]);
 
@@ -138,13 +141,31 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   // broken <img>, matching the X/Threads behavior.
   useEffect(() => {
     setThumbBroken(false);
-    if (!thumbnailUrl || sameUrl(thumbnailUrl, authorAvatar)) return;
+    if (!effectiveThumb || sameUrl(effectiveThumb, authorAvatar)) return;
     let cancelled = false;
     const probe = new Image();
     probe.onerror = () => { if (!cancelled) setThumbBroken(true); };
-    probe.src = thumbnailUrl;
+    probe.src = effectiveThumb;
     return () => { cancelled = true; };
-  }, [thumbnailUrl, authorAvatar]);
+  }, [effectiveThumb, authorAvatar]);
+
+  // Lazily fetch + persist a real Reddit thumbnail when one isn't already
+  // stored. This guarantees image posts have something to render if the
+  // official embed iframe errors out (it frequently does for image/gallery
+  // submissions).
+  useEffect(() => {
+    if (thumbnailUrl || fetchedThumb || !postId) return;
+    let cancelled = false;
+    supabase.functions
+      .invoke("fetch-post-preview", { body: { postId, url: normalizedUrl, platform: "reddit" } })
+      .then(({ data }) => {
+        if (cancelled) return;
+        const t = (data as any)?.thumbnailUrl || (data as any)?.thumbnail_url;
+        if (t) setFetchedThumb(t);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [postId, normalizedUrl, thumbnailUrl, fetchedThumb]);
 
   // Expand mobile `/s/` links and other short shares before rendering Reddit's official iframe.
   useEffect(() => {
