@@ -154,8 +154,22 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
         if (!cursor) break;
       }
 
-      const userIds = [...new Set(all.map((post) => post.user_id).filter(Boolean))];
-      if (userIds.length === 0) return all;
+      const postIds = all.map((post) => post.id).filter(Boolean);
+      const { data: postDetails } = postIds.length
+        ? await supabase
+            .from("posts")
+            .select("id, title, content, thumbnail_url, preview_text, preview_title, preview_image_url")
+            .in("id", postIds)
+        : { data: [] };
+
+      const detailsById = new Map((postDetails || []).map((post) => [post.id, post]));
+      const enrichedPosts = all.map((post) => ({
+        ...post,
+        ...(detailsById.get(post.id) || {}),
+      }));
+
+      const userIds = [...new Set(enrichedPosts.map((post) => post.user_id).filter(Boolean))];
+      if (userIds.length === 0) return enrichedPosts;
 
       const { data: profiles } = await supabase
         .from("profiles")
@@ -166,7 +180,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
         (profiles || []).map((profile) => [profile.user_id, profile])
       );
 
-      return all.map((post) => {
+      return enrichedPosts.map((post) => {
         const profile = profileByUserId.get(post.user_id);
         return {
           ...post,
