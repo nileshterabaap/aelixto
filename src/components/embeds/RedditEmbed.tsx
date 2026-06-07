@@ -42,12 +42,11 @@ function normalizeRedditEmbedUrl(rawUrl: string): string | null {
       return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
     }
 
-    // Mobile share links (`/s/<code>`). Reddit's CDN blocks server-side
-    // expansion from most cloud egress IPs, but the user's own browser is not
-    // blocked, so we pass the short URL straight to embed.reddit.com and let
-    // the official embed script resolve it client-side.
+    // Mobile app share links (`/s/<code>`) are not embeddable by Reddit's
+    // iframe endpoint. They must be expanded to the canonical `/comments/`
+    // URL first.
     if (/^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(u.pathname)) {
-      return `https://www.reddit.com${u.pathname.endsWith("/") ? u.pathname : `${u.pathname}/`}`;
+      return null;
     }
 
     if (/^\/(?:r|user)\/[^/]+\/comments\/[a-z0-9_]+(?:\/.*)?$/i.test(u.pathname)) {
@@ -114,8 +113,7 @@ function toRedditEmbedSrc(rawUrl: string): string | null {
     const u = new URL(rawUrl);
     const path = u.pathname.replace(/^\//, "");
     const isEmbeddablePath =
-      /^(?:r|user)\/[^/]+\/comments\/[a-z0-9_]+(?:\/.*)?$/i.test(path) ||
-      /^(?:r|user)\/[^/]+\/s\/[a-z0-9_]+\/?$/i.test(path);
+      /^(?:r|user)\/[^/]+\/comments\/[a-z0-9_]+(?:\/.*)?$/i.test(path);
     if (!isEmbeddablePath) return null;
 
     const params = new URLSearchParams();
