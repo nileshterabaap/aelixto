@@ -222,42 +222,26 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   }, [directUrl, needsExpansion, url]);
 
   useEffect(() => {
-    if (!resolvedUrl || resolving || failed || loaded) return;
-    if (!containerRef.current) return;
-
-    // Mount Reddit's official blockquote widget. embed.reddit.com/widgets.js
-    // scans the DOM for `blockquote.reddit-embed-bq` and replaces them with
-    // an iframe that correctly renders image, gallery, and video posts.
+    if (!embedSrc || resolving || failed || loaded) return;
+    const iframe = iframeRef.current;
     const container = containerRef.current;
-    container.innerHTML = "";
-    const bq = document.createElement("blockquote");
-    bq.className = "reddit-embed-bq";
-    bq.setAttribute("data-embed-height", String(REDDIT_EMBED_HEIGHT));
-    bq.setAttribute("data-embed-showmedia", "true");
-    const a = document.createElement("a");
-    a.href = resolvedUrl;
-    a.textContent = title || "Reddit post";
-    bq.appendChild(a);
-    container.appendChild(bq);
+    if (!iframe || !container) return;
 
-    // Observe iframe insertion to mark ready
-    const observer = new MutationObserver(() => {
-      if (container.querySelector("iframe")) {
-        setLoaded(true);
-        container.dispatchEvent(new CustomEvent("embedReady", { bubbles: true }));
-        observer.disconnect();
-      }
-    });
-    observer.observe(container, { childList: true, subtree: true });
+    const markReady = () => {
+      setLoaded(true);
+      container.dispatchEvent(new CustomEvent("embedReady", { bubbles: true }));
+    };
 
-    loadRedditEmbed().catch(() => {});
+    iframe.addEventListener("load", markReady, { once: true });
+    iframe.addEventListener("error", markReady, { once: true });
 
-    const fallback = window.setTimeout(() => setLoaded(true), REDDIT_IFRAME_TIMEOUT);
+    const fallback = window.setTimeout(markReady, REDDIT_IFRAME_TIMEOUT);
     return () => {
-      observer.disconnect();
+      iframe.removeEventListener("load", markReady);
+      iframe.removeEventListener("error", markReady);
       window.clearTimeout(fallback);
     };
-  }, [resolvedUrl, resolving, failed, loaded, title]);
+  }, [embedSrc, resolving, failed, loaded]);
 
   if (shouldRenderStoredImage) {
     return (
@@ -278,7 +262,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     return <div data-embed-status="loading" className="w-full" style={{ minHeight: REDDIT_EMBED_HEIGHT }} />;
   }
 
-  if (!resolvedUrl || failed) {
+  if (!resolvedUrl || failed || !embedSrc) {
     return (
       <div data-embed-status="ready">
         {isDirectMedia ? (
@@ -331,11 +315,23 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
 
   return (
     <div
+      ref={containerRef}
       className="relative w-full"
       style={{ minHeight: REDDIT_EMBED_HEIGHT }}
       data-embed-status={loaded ? "ready" : "loading"}
     >
-      <div ref={containerRef} className="w-full" />
+      <iframe
+        ref={iframeRef}
+        src={embedSrc}
+        title={title || "Reddit post"}
+        width="640"
+        height={REDDIT_EMBED_HEIGHT}
+        scrolling="no"
+        allowFullScreen
+        sandbox="allow-scripts allow-same-origin allow-popups"
+        allow="clipboard-read; clipboard-write"
+        className="mx-auto block w-full max-w-full rounded-lg border-0"
+      />
     </div>
   );
 }
