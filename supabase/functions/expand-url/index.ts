@@ -86,10 +86,25 @@ serve(async (req) => {
 
     console.log('[expand-url] Expanding URL:', targetUrl);
 
-    // Fetch with redirect following
-    const response = await fetch(targetUrl, {
-      method: 'HEAD',
+    const parsedTarget = new URL(targetUrl);
+    const redditShareFallback =
+      /^www\.reddit\.com$/i.test(parsedTarget.hostname) &&
+      /^\/r\/[^/]+\/s\/[^/]+\/?$/i.test(parsedTarget.pathname)
+        ? `https://reddit.com${parsedTarget.pathname}${parsedTarget.search}`
+        : targetUrl;
+
+    // Some platforms, especially Reddit mobile /s/ shares, block HEAD or
+    // www-prefixed short links. Use a real browser-like GET and, for Reddit,
+    // prefer reddit.com so the first public redirect exposes the canonical
+    // /comments/ URL before Reddit's bot protection page appears.
+    const response = await fetch(redditShareFallback, {
+      method: 'GET',
       redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
     });
 
     const finalUrl = response.url;
