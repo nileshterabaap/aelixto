@@ -107,7 +107,11 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const updatePayload: Record<string, string | null> = { thumbnail_url: thumbnailUrl, preview_text: previewText };
-    if (previewTitle) updatePayload.title = previewTitle;
+    if (previewTitle) {
+      updatePayload.title = previewTitle;
+      updatePayload.preview_title = previewTitle;
+    }
+    if (thumbnailUrl) updatePayload.preview_image_url = thumbnailUrl;
 
     const { error: updateError } = await supabase
       .from('posts')
@@ -326,19 +330,37 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
 async function resolveRedditCanonicalUrl(url: string): Promise<string | null> {
   try {
     const parsed = new URL(url);
-    if (!/^www\.reddit\.com$/i.test(parsed.hostname) || !/^\/r\/[^/]+\/s\/[^/]+\/?$/i.test(parsed.pathname)) {
+    if (!/(^|\.)reddit\.com$/i.test(parsed.hostname)) {
       return url;
     }
-    const res = await fetch(`https://reddit.com${parsed.pathname}${parsed.search}`, {
+    // Only short-share URLs need to be resolved to their canonical /comments/ form.
+    if (!/^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(parsed.pathname)) {
+      return url;
+    }
+    // Reddit's /s/ links return a 30x to the canonical /comments/ URL only when
+    // the request looks like a real desktop browser. Using `follow` and reading
+    // `res.url` is the most reliable way to grab the resolved location across
+    // multi-hop redirects (m.reddit.com -> www.reddit.com -> /comments/).
+    const res = await fetch(`https://www.reddit.com${parsed.pathname}${parsed.search}`, {
       method: 'GET',
-      redirect: 'manual',
+      redirect: 'follow',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
       },
     });
-    const location = res.headers.get('location');
-    return location && /\/comments\//i.test(location) ? location : null;
+    const finalUrl = res.url || '';
+    if (/\/comments\/[a-z0-9_]+/i.test(finalUrl)) return finalUrl;
+    // Some responses include the canonical URL as a <link rel="canonical">
+    try {
+      const html = await res.text();
+      const canonical = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i)?.[1];
+      if (canonical && /\/comments\/[a-z0-9_]+/i.test(canonical)) return canonical;
+      const ogUrl = html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i)?.[1];
+      if (ogUrl && /\/comments\/[a-z0-9_]+/i.test(ogUrl)) return ogUrl;
+    } catch { /* ignore */ }
+    return null;
   } catch {
     return null;
   }
