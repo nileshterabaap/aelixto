@@ -45,6 +45,8 @@ export function getPostThumb(p: {
   platform?: string | null;
   thumbnail_url?: string | null;   // server field
   thumbnailUrl?: string | null;    // legacy/feed field
+  preview_image_url?: string | null;
+  previewImageUrl?: string | null;
   media_url?: string | null;       // server field
   mediaUrl?: string | null;        // legacy/feed field
   // Aelixto post author's avatar — used to detect misleading OG scrapes
@@ -56,6 +58,7 @@ export function getPostThumb(p: {
 }): string | null {
   const platform = (p.platform || "").toLowerCase();
   const tu = p.thumbnail_url || p.thumbnailUrl;
+  const piu = p.preview_image_url || p.previewImageUrl;
   const mu = p.media_url || p.mediaUrl;
   const authorAvatar = p.author_avatar_url || p.profile_avatar_url || null;
 
@@ -76,6 +79,16 @@ export function getPostThumb(p: {
     if (matchesOwnAvatar || isMisleadingThumbnail(platform, decoded) || isTextOnlySocialAvatar(platform, decoded)) {
       // Fall through to platform/media derivations or placeholder.
     } else {
+      return decoded;
+    }
+  }
+
+  // 1b) article/unfurl preview images are stored separately from thumbnails.
+  // Use them consistently anywhere a grid/share card asks for a post thumb.
+  if (piu) {
+    const decoded = decodeHtmlEntities(piu);
+    const matchesOwnAvatar = !!authorAvatar && sameUrl(decoded, authorAvatar);
+    if (!matchesOwnAvatar && !isMisleadingThumbnail(platform, decoded) && !isTextOnlySocialAvatar(platform, decoded)) {
       return decoded;
     }
   }
