@@ -27,6 +27,14 @@ function isDirectImageUrl(url?: string | null): boolean {
   }
 }
 
+function isTextOnlySocialAvatar(platform: string, url: string): boolean {
+  const lower = url.toLowerCase();
+  if ((platform === "twitter" || platform === "x") && lower.includes("pbs.twimg.com/profile_images/")) {
+    return true;
+  }
+  return false;
+}
+
 export function getPostThumb(p: {
   platform?: string | null;
   thumbnail_url?: string | null;   // server field
@@ -54,7 +62,7 @@ export function getPostThumb(p: {
   if (tu) {
     const decoded = decodeHtmlEntities(tu);
     const matchesOwnAvatar = platform === "reddit" && sameUrl(decoded, authorAvatar);
-    if (matchesOwnAvatar || isMisleadingThumbnail(platform, decoded)) {
+    if (matchesOwnAvatar || isMisleadingThumbnail(platform, decoded) || isTextOnlySocialAvatar(platform, decoded)) {
       // Fall through to platform/media derivations or placeholder.
     } else {
       return decoded;
