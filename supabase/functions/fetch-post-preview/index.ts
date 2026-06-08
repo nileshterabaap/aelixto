@@ -6,6 +6,65 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+type Sizing = { media_kind: string | null; aspect_ratio: number | null; suggested_height: number | null };
+
+function clampAR(ar: number | null | undefined): number | null {
+  if (!ar || !isFinite(ar) || ar <= 0) return null;
+  // Clamp to sane bounds (between ~9:21 and ~21:9)
+  const clamped = Math.min(2.4, Math.max(0.42, ar));
+  return Math.round(clamped * 10000) / 10000;
+}
+
+function suggestedHeightForText(text: string | null | undefined, base = 220): number {
+  const len = (text || '').trim().length;
+  // Approx 36 chars/line on mobile, ~22px per line. Avatar + actions ~base.
+  const lines = Math.min(18, Math.max(1, Math.ceil(len / 36)));
+  return Math.min(640, Math.max(200, base + lines * 22));
+}
+
+function classifyReddit(post: Record<string, unknown> | null, fallbackText: string): Sizing {
+  if (!post) {
+    return { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(fallbackText, 280) };
+  }
+  const hint = typeof post.post_hint === 'string' ? post.post_hint.toLowerCase() : '';
+  const isVideo = post.is_video === true || hint === 'hosted:video' || hint === 'rich:video';
+  const isImage = hint === 'image' || hint === 'link' && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(String(post.url || ''));
+  const isGallery = post.is_gallery === true || hint === 'gallery';
+  const isSelf = post.is_self === true || hint === 'self';
+
+  const srcW = readNum(post, ['preview', 'images', 0, 'source', 'width'])
+    ?? readNum(post, ['media', 'reddit_video', 'width'])
+    ?? null;
+  const srcH = readNum(post, ['preview', 'images', 0, 'source', 'height'])
+    ?? readNum(post, ['media', 'reddit_video', 'height'])
+    ?? null;
+  const ar = clampAR(srcW && srcH ? srcW / srcH : null);
+
+  if (isVideo) return { media_kind: 'video', aspect_ratio: ar ?? 9 / 16, suggested_height: null };
+  if (isGallery) return { media_kind: 'gallery', aspect_ratio: ar ?? 1, suggested_height: null };
+  if (isImage) return { media_kind: 'image', aspect_ratio: ar ?? 4 / 5, suggested_height: null };
+  if (isSelf) {
+    const text = typeof post.selftext === 'string' ? post.selftext : fallbackText;
+    return { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(text, 280) };
+  }
+  // Link/article post → compact card
+  return { media_kind: 'article', aspect_ratio: ar ?? 16 / 9, suggested_height: 360 };
+}
+
+function readNum(obj: unknown, path: Array<string | number>): number | null {
+  let cur: unknown = obj;
+  for (const k of path) {
+    if (typeof k === 'number') {
+      if (!Array.isArray(cur)) return null;
+      cur = cur[k];
+    } else {
+      if (!cur || typeof cur !== 'object') return null;
+      cur = (cur as Record<string, unknown>)[k];
+    }
+  }
+  return typeof cur === 'number' && isFinite(cur) ? cur : null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -26,6 +85,12 @@ serve(async (req) => {
     let thumbnailUrl: string | null = null;
     let previewText: string | null = null;
     let previewTitle: string | null = null;
+    // Smart-sizing intel captured per branch so the card can render at the
+    // right height from the first paint instead of guessing a fixed value.
+    let sizing: Sizing = { media_kind: null, aspect_ratio: null, suggested_height: null };
+    let oembedThumbW: number | null = null;
+    let oembedThumbH: number | null = null;
+    let redditPostData: Record<string, unknown> | null = null;
 
     // YouTube special handling - reliable thumbnails
     if (platform === 'youtube') {
@@ -33,6 +98,7 @@ serve(async (req) => {
       if (videoId) {
         thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
       }
+      sizing = { media_kind: 'video', aspect_ratio: 16 / 9, suggested_height: null };
     }
     // Instagram - use official oEmbed API with Meta token
     else if (platform === 'instagram') {
@@ -44,6 +110,10 @@ serve(async (req) => {
       if (oembedData?.title) {
         previewText = oembedData.title;
       }
+      oembedThumbW = oembedData?.thumbnail_width ?? null;
+      oembedThumbH = oembedData?.thumbnail_height ?? null;
+      const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : 1;
+      sizing = { media_kind: 'image', aspect_ratio: clampAR(ar), suggested_height: null };
     }
     // Facebook - use official oEmbed API with Meta token
     else if (platform === 'facebook') {
@@ -51,13 +121,23 @@ serve(async (req) => {
       if (oembedData?.thumbnail_url) {
         thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
       }
+      // /reel/ → 9:16 vertical, /videos/ → 16:9, else 4:5 portrait photo card
+      const isReel = /\/reel\//i.test(url);
+      const isVideo = /\/videos?\//i.test(url);
+      sizing = {
+        media_kind: 'video',
+        aspect_ratio: isReel ? 9 / 16 : (isVideo ? 16 / 9 : 4 / 5),
+        suggested_height: null,
+      };
     }
     // Reddit special handling
     else if (platform === 'reddit') {
       const redditData = await fetchRedditPreview(url);
+      redditPostData = redditData.post_data ?? null;
       thumbnailUrl = redditData.thumbnail_url;
       previewTitle = redditData.title;
       previewText = redditData.description || redditData.title;
+      sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
     }
     // Article handling — try Medium RSS first (because Medium blocks the
     // normal HTML fetch for some posts), then fall back to the universal
@@ -73,7 +153,10 @@ serve(async (req) => {
         previewTitle = (mediumData?.title) || ogData.title;
         thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
         previewText = (mediumData?.description) || ogData.description || ogData.title;
+        sizing.aspect_ratio = clampAR(ogData.imageWidth && ogData.imageHeight ? ogData.imageWidth / ogData.imageHeight : null);
       }
+      sizing.media_kind = 'article';
+      if (!sizing.aspect_ratio) sizing.aspect_ratio = 16 / 9;
     }
     // TikTok - use official oEmbed (no auth required) and store permanently
     else if (platform === 'tiktok') {
@@ -84,6 +167,10 @@ serve(async (req) => {
       if (tiktokData?.title) {
         previewText = tiktokData.title;
       }
+      const w = tiktokData?.thumbnail_width ?? null;
+      const h = tiktokData?.thumbnail_height ?? null;
+      const ar = w && h ? w / h : 9 / 16;
+      sizing = { media_kind: 'video', aspect_ratio: clampAR(ar), suggested_height: null };
       // Fallback to OG scrape if oEmbed didn't yield a thumbnail
       if (!thumbnailUrl) {
         const ogData = await scrapeOgData(url);
@@ -111,6 +198,25 @@ serve(async (req) => {
       if (isThreads && thumbnailUrl && isThreadsProfilePicture(thumbnailUrl)) {
         thumbnailUrl = null;
       }
+
+      // Classify the generic / Threads / X / etc. branch
+      const hasVideo = ogData.hasVideo;
+      const dims = (ogData.videoWidth && ogData.videoHeight)
+        ? { w: ogData.videoWidth, h: ogData.videoHeight }
+        : (ogData.imageWidth && ogData.imageHeight)
+          ? { w: ogData.imageWidth, h: ogData.imageHeight }
+          : null;
+      const ar = dims ? clampAR(dims.w / dims.h) : null;
+
+      if (isThreads && !thumbnailUrl) {
+        sizing = { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(previewText) };
+      } else if (hasVideo) {
+        sizing = { media_kind: 'video', aspect_ratio: ar ?? 16 / 9, suggested_height: null };
+      } else if (thumbnailUrl) {
+        sizing = { media_kind: 'image', aspect_ratio: ar ?? 4 / 5, suggested_height: null };
+      } else {
+        sizing = { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(previewText) };
+      }
     }
 
     // Update database
@@ -118,10 +224,13 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const updatePayload: Record<string, string | null> = {
+    const updatePayload: Record<string, string | number | null> = {
       thumbnail_url: thumbnailUrl,
       preview_image_url: thumbnailUrl,
       preview_text: previewText,
+      media_kind: sizing.media_kind,
+      aspect_ratio: sizing.aspect_ratio,
+      suggested_height: sizing.suggested_height,
     };
     if (previewTitle) {
       updatePayload.title = previewTitle;
@@ -160,7 +269,7 @@ function extractYouTubeId(url: string): string | null {
 }
 
 // Fetch Instagram thumbnail using official oEmbed API
-async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null } | null> {
+async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null; thumbnail_width: number | null; thumbnail_height: number | null } | null> {
   const metaToken = Deno.env.get('META_APP_TOKEN');
   
   if (!metaToken) {
@@ -189,7 +298,9 @@ async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: strin
 
     return {
       thumbnail_url: data.thumbnail_url || null,
-      title: data.title || data.author_name || null
+      title: data.title || data.author_name || null,
+      thumbnail_width: typeof data.thumbnail_width === 'number' ? data.thumbnail_width : null,
+      thumbnail_height: typeof data.thumbnail_height === 'number' ? data.thumbnail_height : null,
     };
   } catch (error) {
     console.error('[fetch-post-preview] Instagram oEmbed error:', error);
@@ -302,7 +413,7 @@ async function storeThumbnailPermanently(postId: string, imageUrl: string): Prom
   }
 }
 
-async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string | null; title: string | null; description: string | null }> {
+async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string | null; title: string | null; description: string | null; post_data?: Record<string, unknown> | null }> {
   const canonicalUrl = await resolveRedditCanonicalUrl(url);
   const oembedData = await fetchRedditOembed(canonicalUrl || url);
 
@@ -318,6 +429,7 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
           thumbnail_url: thumbnail,
           title: typeof post?.title === 'string' ? post.title : oembedData.title,
           description: typeof post?.selftext === 'string' && post.selftext.trim() ? post.selftext : oembedData.description,
+          post_data: post ?? null,
         };
       }
     }
@@ -330,6 +442,7 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
     thumbnail_url: ogData.image && !isMisleadingRedditThumbnail(ogData.image) ? ogData.image : null,
     title: oembedData.title || ogData.title,
     description: oembedData.description || ogData.description,
+    post_data: null,
   };
 }
 
@@ -432,7 +545,7 @@ async function fetchRedditJson(url: string): Promise<Response> {
 }
 
 // TikTok oEmbed — public endpoint, no auth, returns thumbnail_url + title
-async function fetchTikTokOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null } | null> {
+async function fetchTikTokOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null; thumbnail_width: number | null; thumbnail_height: number | null } | null> {
   try {
     // Normalize: strip query/tracking params, follow short links (vm.tiktok.com / vt.tiktok.com)
     let target = url.trim();
@@ -462,6 +575,8 @@ async function fetchTikTokOembed(url: string): Promise<{ thumbnail_url: string |
     return {
       thumbnail_url: data.thumbnail_url || null,
       title: data.title || data.author_name || null,
+      thumbnail_width: typeof data.thumbnail_width === 'number' ? data.thumbnail_width : null,
+      thumbnail_height: typeof data.thumbnail_height === 'number' ? data.thumbnail_height : null,
     };
   } catch (e) {
     console.error('[fetch-post-preview] TikTok oEmbed error:', e);
@@ -611,7 +726,7 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&nbsp;/g, ' ');
 }
 
-async function scrapeOgData(url: string, userAgent?: string): Promise<{ image: string | null; title: string | null; description: string | null }> {
+async function scrapeOgData(url: string, userAgent?: string): Promise<{ image: string | null; title: string | null; description: string | null; imageWidth: number | null; imageHeight: number | null; videoWidth: number | null; videoHeight: number | null; hasVideo: boolean }> {
   try {
     const response = await fetch(url, {
       headers: {
@@ -625,15 +740,35 @@ async function scrapeOgData(url: string, userAgent?: string): Promise<{ image: s
     });
 
     if (!response.ok) {
-      return { image: null, title: null, description: null };
+      return { image: null, title: null, description: null, imageWidth: null, imageHeight: null, videoWidth: null, videoHeight: null, hasVideo: false };
     }
 
     const html = await response.text();
-    return extractArticleMetadata(html, response.url || url);
+    const meta = extractArticleMetadata(html, response.url || url);
+    const sizing = extractSizingFromHtml(html);
+    return { ...meta, ...sizing };
   } catch (error) {
     console.error('[fetch-post-preview] Scraping error:', error);
-    return { image: null, title: null, description: null };
+    return { image: null, title: null, description: null, imageWidth: null, imageHeight: null, videoWidth: null, videoHeight: null, hasVideo: false };
   }
+}
+
+function extractSizingFromHtml(html: string): { imageWidth: number | null; imageHeight: number | null; videoWidth: number | null; videoHeight: number | null; hasVideo: boolean } {
+  const metaNum = (name: string): number | null => {
+    const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)["']`, 'i'))
+      || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${name}["']`, 'i'));
+    const n = m?.[1] ? parseInt(m[1], 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const hasVideo = !!html.match(/<meta[^>]+(?:property|name)=["']og:video(?::secure_url|:url)?["']/i)
+    || !!html.match(/<meta[^>]+(?:property|name)=["']twitter:card["'][^>]+content=["']player["']/i);
+  return {
+    imageWidth: metaNum('og:image:width'),
+    imageHeight: metaNum('og:image:height'),
+    videoWidth: metaNum('og:video:width'),
+    videoHeight: metaNum('og:video:height'),
+    hasVideo,
+  };
 }
 
 function isThreadsProfilePicture(url: string): boolean {

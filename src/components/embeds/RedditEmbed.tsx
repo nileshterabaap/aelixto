@@ -10,9 +10,14 @@ type RedditEmbedProps = {
   description?: string | null;
   authorAvatar?: string | null;
   postId?: string | null;
+  mediaKind?: string | null;
+  aspectRatio?: number | null;
+  suggestedHeight?: number | null;
 };
 
-const REDDIT_EMBED_HEIGHT = 800;
+const REDDIT_EMBED_MIN_HEIGHT = 240;
+const REDDIT_EMBED_MAX_HEIGHT = 1600;
+const REDDIT_EMBED_INITIAL_HEIGHT = 500;
 const REDDIT_IFRAME_TIMEOUT = 8500;
 
 function ensureProtocol(rawUrl: string): string {
@@ -128,7 +133,7 @@ function toRedditEmbedSrc(rawUrl: string): string | null {
   }
 }
 
-export default function RedditEmbed({ url, title, thumbnailUrl, description, authorAvatar, postId }: RedditEmbedProps) {
+export default function RedditEmbed({ url, title, thumbnailUrl, description, authorAvatar, postId, mediaKind, aspectRatio, suggestedHeight }: RedditEmbedProps) {
   const normalizedUrl = useMemo(() => ensureProtocol(url), [url]);
   const directUrl = useMemo(() => normalizeRedditEmbedUrl(url), [url]);
   const needsExpansion = useMemo(() => shouldExpandRedditUrl(url), [url]);
@@ -140,6 +145,25 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const [fetchedThumb, setFetchedThumb] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  // Smart initial height: text posts get a compact suggested_height,
+  // media posts derive from aspect_ratio + an action-bar allowance,
+  // and anything unclassified falls back to the legacy initial value.
+  const computeInitialHeight = (): number => {
+    const viewportWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth, 640) : 400;
+    if (mediaKind === 'text' && suggestedHeight && suggestedHeight > 0) {
+      return Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, suggestedHeight));
+    }
+    if (aspectRatio && aspectRatio > 0 && (mediaKind === 'video' || mediaKind === 'image' || mediaKind === 'gallery')) {
+      // Reddit's chrome (header + action bar + comments button) takes ~210px.
+      const mediaH = viewportWidth / aspectRatio;
+      return Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, Math.ceil(mediaH + 210)));
+    }
+    if (mediaKind === 'article' && suggestedHeight) {
+      return Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, suggestedHeight));
+    }
+    return REDDIT_EMBED_INITIAL_HEIGHT;
+  };
+  const [iframeHeight, setIframeHeight] = useState<number>(computeInitialHeight);
   const isDirectMedia = isDirectRedditMediaUrl(normalizedUrl);
   const effectiveThumb = thumbnailUrl || fetchedThumb;
   const validThumb = !!effectiveThumb && !thumbBroken && !sameUrl(effectiveThumb, authorAvatar);
@@ -244,8 +268,34 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     };
   }, [embedSrc, resolving, failed, loaded]);
 
+  // Reddit's official embed iframe posts its rendered height via postMessage.
+  // Listen for it so the container hugs the actual content instead of leaving
+  // a fixed-height gap underneath the action bar.
+  useEffect(() => {
+    if (!embedSrc) return;
+    const onMessage = (event: MessageEvent) => {
+      try {
+        const origin = event.origin || "";
+        if (!/\.reddit\.com$/i.test(new URL(origin).hostname)) return;
+      } catch {
+        return;
+      }
+      const data: any = event.data;
+      if (!data || typeof data !== "object") return;
+      const candidate =
+        (data.type === "embed" || data.type === "embed-resize" || data.message === "embed-resize") &&
+        (typeof data.height === "number" ? data.height : typeof data.data?.height === "number" ? data.data.height : null);
+      if (typeof candidate === "number" && candidate > 0) {
+        const clamped = Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, Math.ceil(candidate)));
+        setIframeHeight(clamped);
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [embedSrc]);
+
   if (resolving || (!resolvedUrl && !failed)) {
-    return <div data-embed-status="loading" className="w-full" style={{ minHeight: REDDIT_EMBED_HEIGHT }} />;
+    return <div data-embed-status="loading" className="w-full" style={{ minHeight: iframeHeight }} />;
   }
 
   if (!resolvedUrl || failed || !embedSrc) {
@@ -303,7 +353,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     <div
       ref={containerRef}
       className="relative w-full"
-      style={{ minHeight: REDDIT_EMBED_HEIGHT }}
+      style={{ height: iframeHeight }}
       data-embed-status={loaded ? "ready" : "loading"}
     >
       <iframe
@@ -311,12 +361,12 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
         src={embedSrc}
         title={title || "Reddit post"}
         width="640"
-        height={REDDIT_EMBED_HEIGHT}
+        height={iframeHeight}
         scrolling="no"
         allowFullScreen
         sandbox="allow-scripts allow-same-origin allow-popups"
         allow="clipboard-read; clipboard-write"
-        className="mx-auto block w-full max-w-full rounded-lg border-0"
+        className="mx-auto block w-full h-full max-w-full rounded-lg border-0"
       />
     </div>
   );
