@@ -256,7 +256,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
               btn.classList.add("animate-fab-pop");
               onCreatePost();
             }}
-            className="fab-create pointer-events-auto relative flex h-12 w-12 items-center justify-center rounded-2xl bg-foreground text-background shadow-[0_6px_18px_-4px_hsl(var(--foreground)/0.45)] transition-[transform,box-shadow] duration-200 ease-out will-change-transform active:scale-[0.86] active:shadow-[0_2px_8px_-2px_hsl(var(--foreground)/0.5)]"
+            className="fab-create pointer-events-auto relative flex h-12 w-12 items-center justify-center rounded-2xl bg-foreground text-background transition-transform duration-200 ease-out will-change-transform active:translate-y-[3px] active:scale-[0.82]"
           >
             <span className="pointer-events-none absolute inset-0 rounded-2xl bg-background/0 transition-colors duration-200 active:bg-background/15" />
             <Plus className="relative h-5 w-5 stroke-[3] text-background transition-transform duration-300 ease-out group-active:rotate-90" />
