@@ -269,7 +269,7 @@ function extractYouTubeId(url: string): string | null {
 }
 
 // Fetch Instagram thumbnail using official oEmbed API
-async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null } | null> {
+async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null; thumbnail_width: number | null; thumbnail_height: number | null } | null> {
   const metaToken = Deno.env.get('META_APP_TOKEN');
   
   if (!metaToken) {
@@ -298,7 +298,9 @@ async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: strin
 
     return {
       thumbnail_url: data.thumbnail_url || null,
-      title: data.title || data.author_name || null
+      title: data.title || data.author_name || null,
+      thumbnail_width: typeof data.thumbnail_width === 'number' ? data.thumbnail_width : null,
+      thumbnail_height: typeof data.thumbnail_height === 'number' ? data.thumbnail_height : null,
     };
   } catch (error) {
     console.error('[fetch-post-preview] Instagram oEmbed error:', error);
