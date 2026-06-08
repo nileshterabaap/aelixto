@@ -143,9 +143,9 @@ export default {
           "100%": { transform: "scale(1.9)", opacity: "0" },
         },
         "fab-pop": {
-          "0%": { transform: "scale(0.86)" },
-          "55%": { transform: "scale(1.08)" },
-          "100%": { transform: "scale(1)" },
+          "0%": { transform: "translateY(3px) scale(0.82)" },
+          "55%": { transform: "translateY(-1px) scale(1.06)" },
+          "100%": { transform: "translateY(0) scale(1)" },
         },
       },
       animation: {
