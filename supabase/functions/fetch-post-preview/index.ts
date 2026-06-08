@@ -413,7 +413,7 @@ async function storeThumbnailPermanently(postId: string, imageUrl: string): Prom
   }
 }
 
-async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string | null; title: string | null; description: string | null }> {
+async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string | null; title: string | null; description: string | null; post_data?: Record<string, unknown> | null }> {
   const canonicalUrl = await resolveRedditCanonicalUrl(url);
   const oembedData = await fetchRedditOembed(canonicalUrl || url);
 
@@ -429,6 +429,7 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
           thumbnail_url: thumbnail,
           title: typeof post?.title === 'string' ? post.title : oembedData.title,
           description: typeof post?.selftext === 'string' && post.selftext.trim() ? post.selftext : oembedData.description,
+          post_data: post ?? null,
         };
       }
     }
@@ -441,6 +442,7 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
     thumbnail_url: ogData.image && !isMisleadingRedditThumbnail(ogData.image) ? ogData.image : null,
     title: oembedData.title || ogData.title,
     description: oembedData.description || ogData.description,
+    post_data: null,
   };
 }
 
