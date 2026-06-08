@@ -26,6 +26,12 @@ serve(async (req) => {
     let thumbnailUrl: string | null = null;
     let previewText: string | null = null;
     let previewTitle: string | null = null;
+    // Smart-sizing intel captured per branch so the card can render at the
+    // right height from the first paint instead of guessing a fixed value.
+    let sizing: Sizing = { media_kind: null, aspect_ratio: null, suggested_height: null };
+    let oembedThumbW: number | null = null;
+    let oembedThumbH: number | null = null;
+    let redditPostData: Record<string, unknown> | null = null;
 
     // YouTube special handling - reliable thumbnails
     if (platform === 'youtube') {
@@ -33,6 +39,7 @@ serve(async (req) => {
       if (videoId) {
         thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
       }
+      sizing = { media_kind: 'video', aspect_ratio: 16 / 9, suggested_height: null };
     }
     // Instagram - use official oEmbed API with Meta token
     else if (platform === 'instagram') {
@@ -44,6 +51,10 @@ serve(async (req) => {
       if (oembedData?.title) {
         previewText = oembedData.title;
       }
+      oembedThumbW = oembedData?.thumbnail_width ?? null;
+      oembedThumbH = oembedData?.thumbnail_height ?? null;
+      const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : 1;
+      sizing = { media_kind: 'image', aspect_ratio: clampAR(ar), suggested_height: null };
     }
     // Facebook - use official oEmbed API with Meta token
     else if (platform === 'facebook') {
@@ -51,13 +62,23 @@ serve(async (req) => {
       if (oembedData?.thumbnail_url) {
         thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
       }
+      // /reel/ → 9:16 vertical, /videos/ → 16:9, else 4:5 portrait photo card
+      const isReel = /\/reel\//i.test(url);
+      const isVideo = /\/videos?\//i.test(url);
+      sizing = {
+        media_kind: 'video',
+        aspect_ratio: isReel ? 9 / 16 : (isVideo ? 16 / 9 : 4 / 5),
+        suggested_height: null,
+      };
     }
     // Reddit special handling
     else if (platform === 'reddit') {
       const redditData = await fetchRedditPreview(url);
+      redditPostData = redditData.post_data ?? null;
       thumbnailUrl = redditData.thumbnail_url;
       previewTitle = redditData.title;
       previewText = redditData.description || redditData.title;
+      sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
     }
     // Article handling — try Medium RSS first (because Medium blocks the
     // normal HTML fetch for some posts), then fall back to the universal
@@ -73,7 +94,10 @@ serve(async (req) => {
         previewTitle = (mediumData?.title) || ogData.title;
         thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
         previewText = (mediumData?.description) || ogData.description || ogData.title;
+        sizing.aspect_ratio = clampAR(ogData.imageWidth && ogData.imageHeight ? ogData.imageWidth / ogData.imageHeight : null);
       }
+      sizing.media_kind = 'article';
+      if (!sizing.aspect_ratio) sizing.aspect_ratio = 16 / 9;
     }
     // TikTok - use official oEmbed (no auth required) and store permanently
     else if (platform === 'tiktok') {
@@ -84,6 +108,10 @@ serve(async (req) => {
       if (tiktokData?.title) {
         previewText = tiktokData.title;
       }
+      const w = tiktokData?.thumbnail_width ?? null;
+      const h = tiktokData?.thumbnail_height ?? null;
+      const ar = w && h ? w / h : 9 / 16;
+      sizing = { media_kind: 'video', aspect_ratio: clampAR(ar), suggested_height: null };
       // Fallback to OG scrape if oEmbed didn't yield a thumbnail
       if (!thumbnailUrl) {
         const ogData = await scrapeOgData(url);
@@ -111,6 +139,25 @@ serve(async (req) => {
       if (isThreads && thumbnailUrl && isThreadsProfilePicture(thumbnailUrl)) {
         thumbnailUrl = null;
       }
+
+      // Classify the generic / Threads / X / etc. branch
+      const hasVideo = ogData.hasVideo;
+      const dims = (ogData.videoWidth && ogData.videoHeight)
+        ? { w: ogData.videoWidth, h: ogData.videoHeight }
+        : (ogData.imageWidth && ogData.imageHeight)
+          ? { w: ogData.imageWidth, h: ogData.imageHeight }
+          : null;
+      const ar = dims ? clampAR(dims.w / dims.h) : null;
+
+      if (isThreads && !thumbnailUrl) {
+        sizing = { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(previewText) };
+      } else if (hasVideo) {
+        sizing = { media_kind: 'video', aspect_ratio: ar ?? 16 / 9, suggested_height: null };
+      } else if (thumbnailUrl) {
+        sizing = { media_kind: 'image', aspect_ratio: ar ?? 4 / 5, suggested_height: null };
+      } else {
+        sizing = { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(previewText) };
+      }
     }
 
     // Update database
@@ -118,10 +165,13 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const updatePayload: Record<string, string | null> = {
+    const updatePayload: Record<string, string | number | null> = {
       thumbnail_url: thumbnailUrl,
       preview_image_url: thumbnailUrl,
       preview_text: previewText,
+      media_kind: sizing.media_kind,
+      aspect_ratio: sizing.aspect_ratio,
+      suggested_height: sizing.suggested_height,
     };
     if (previewTitle) {
       updatePayload.title = previewTitle;
