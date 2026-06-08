@@ -12,7 +12,7 @@ type RedditEmbedProps = {
   postId?: string | null;
 };
 
-const REDDIT_EMBED_HEIGHT = 316;
+const REDDIT_EMBED_HEIGHT = 800;
 const REDDIT_IFRAME_TIMEOUT = 8500;
 
 function ensureProtocol(rawUrl: string): string {
