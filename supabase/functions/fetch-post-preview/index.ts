@@ -726,7 +726,7 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&nbsp;/g, ' ');
 }
 
-async function scrapeOgData(url: string, userAgent?: string): Promise<{ image: string | null; title: string | null; description: string | null }> {
+async function scrapeOgData(url: string, userAgent?: string): Promise<{ image: string | null; title: string | null; description: string | null; imageWidth: number | null; imageHeight: number | null; videoWidth: number | null; videoHeight: number | null; hasVideo: boolean }> {
   try {
     const response = await fetch(url, {
       headers: {
@@ -740,15 +740,35 @@ async function scrapeOgData(url: string, userAgent?: string): Promise<{ image: s
     });
 
     if (!response.ok) {
-      return { image: null, title: null, description: null };
+      return { image: null, title: null, description: null, imageWidth: null, imageHeight: null, videoWidth: null, videoHeight: null, hasVideo: false };
     }
 
     const html = await response.text();
-    return extractArticleMetadata(html, response.url || url);
+    const meta = extractArticleMetadata(html, response.url || url);
+    const sizing = extractSizingFromHtml(html);
+    return { ...meta, ...sizing };
   } catch (error) {
     console.error('[fetch-post-preview] Scraping error:', error);
-    return { image: null, title: null, description: null };
+    return { image: null, title: null, description: null, imageWidth: null, imageHeight: null, videoWidth: null, videoHeight: null, hasVideo: false };
   }
+}
+
+function extractSizingFromHtml(html: string): { imageWidth: number | null; imageHeight: number | null; videoWidth: number | null; videoHeight: number | null; hasVideo: boolean } {
+  const metaNum = (name: string): number | null => {
+    const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)["']`, 'i'))
+      || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${name}["']`, 'i'));
+    const n = m?.[1] ? parseInt(m[1], 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const hasVideo = !!html.match(/<meta[^>]+(?:property|name)=["']og:video(?::secure_url|:url)?["']/i)
+    || !!html.match(/<meta[^>]+(?:property|name)=["']twitter:card["'][^>]+content=["']player["']/i);
+  return {
+    imageWidth: metaNum('og:image:width'),
+    imageHeight: metaNum('og:image:height'),
+    videoWidth: metaNum('og:video:width'),
+    videoHeight: metaNum('og:video:height'),
+    hasVideo,
+  };
 }
 
 function isThreadsProfilePicture(url: string): boolean {
