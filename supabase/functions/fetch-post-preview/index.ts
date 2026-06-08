@@ -118,15 +118,13 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const updatePayload: Record<string, string | null> = {
-      thumbnail_url: thumbnailUrl,
-      preview_image_url: thumbnailUrl,
-      preview_text: previewText,
-    };
+    const updatePayload: Record<string, string | null> = { thumbnail_url: thumbnailUrl, preview_text: previewText };
     if (previewTitle) {
       updatePayload.title = previewTitle;
       updatePayload.preview_title = previewTitle;
     }
+    if (thumbnailUrl) updatePayload.preview_image_url = thumbnailUrl;
+
     const { error: updateError } = await supabase
       .from('posts')
       .update(updatePayload)
@@ -307,7 +305,15 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
   const oembedData = await fetchRedditOembed(canonicalUrl || url);
 
   try {
-    const res = await fetchRedditJson(canonicalUrl || url);
+    let jsonUrl = (canonicalUrl || url).split('?')[0].replace(/\/$/, '');
+    jsonUrl = jsonUrl.replace('www.reddit.com', 'old.reddit.com');
+    jsonUrl += '.json';
+    const res = await fetch(jsonUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
+    });
     
     if (res.ok) {
       const json = await res.json();
@@ -404,31 +410,6 @@ async function fetchRedditOembed(url: string): Promise<{ title: string | null; d
   } catch {
     return { title: null, description: null };
   }
-}
-
-async function fetchRedditJson(url: string): Promise<Response> {
-  const parsed = new URL(url);
-  const jsonPath = parsed.pathname.replace(/\/$/, '') + '.json';
-  const accessToken = await getRedditInstalledClientToken();
-
-  if (accessToken) {
-    const oauthRes = await fetch(`https://oauth.reddit.com${jsonPath}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'User-Agent': 'Aelixto/1.0',
-        'Accept': 'application/json',
-      },
-    });
-    if (oauthRes.ok) return oauthRes;
-  }
-
-  const oldRedditUrl = `https://old.reddit.com${jsonPath}`;
-  return fetch(oldRedditUrl, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Accept': 'application/json',
-    },
-  });
 }
 
 // TikTok oEmbed — public endpoint, no auth, returns thumbnail_url + title
@@ -642,17 +623,8 @@ function isThreadsProfilePicture(url: string): boolean {
   // Threads profile pictures live on cdninstagram.com under /v/... with
   // a profile_pic encode tag. Other Threads media (photos/videos) live
   // under different paths or scontent-*.cdninstagram.com/o1/v/t2/.
-  if ((lower.includes('cdninstagram.com/v/') || lower.includes('fbcdn.net/v/')) && lower.includes('profile_pic')) return true;
-  if (lower.includes('/t51.82787-19/')) return true;
+  if (lower.includes('cdninstagram.com/v/') && lower.includes('profile_pic')) return true;
   if (lower.includes('stp=dst-jpg') && lower.includes('profile_pic')) return true;
-  try {
-    const parsed = new URL(url);
-    const efg = parsed.searchParams.get('efg');
-    if (efg) {
-      const decoded = atob(efg.replace(/-/g, '+').replace(/_/g, '/'));
-      if (decoded.toLowerCase().includes('profile_pic')) return true;
-    }
-  } catch { /* ignore */ }
   return false;
 }
 
@@ -666,9 +638,6 @@ export function extractArticleMetadata(
   html: string,
   baseUrl: string
 ): { image: string | null; title: string | null; description: string | null } {
-  type JsonLdValue = string | { url?: string; '@id'?: string } | Array<string | { url?: string; '@id'?: string }> | null | undefined;
-  type JsonLdNode = Record<string, JsonLdValue>;
-
   const meta = (name: string): string | null => {
     const patterns = [
       new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)["']`, 'i'),
@@ -690,14 +659,13 @@ export function extractArticleMetadata(
     const inner = block.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '').trim();
     if (!inner) continue;
     try {
-      const parsed = JSON.parse(inner) as JsonLdNode | JsonLdNode[];
-      const graph = !Array.isArray(parsed) && Array.isArray(parsed['@graph']) ? parsed['@graph'] : null;
-      const nodes: JsonLdNode[] = Array.isArray(parsed) ? parsed : (graph as JsonLdNode[] | null) || [parsed];
+      const parsed = JSON.parse(inner);
+      const nodes: any[] = Array.isArray(parsed) ? parsed : (parsed['@graph'] && Array.isArray(parsed['@graph']) ? parsed['@graph'] : [parsed]);
       for (const node of nodes) {
         if (!node || typeof node !== 'object') continue;
         const t = node.headline || node.name;
         const d = node.description;
-        let img = node.image || node.thumbnailUrl || node.thumbnail;
+        let img: any = node.image || node.thumbnailUrl || node.thumbnail;
         if (Array.isArray(img)) img = img[0];
         if (img && typeof img === 'object') img = img.url || img['@id'] || null;
         if (!jsonLdTitle && typeof t === 'string') jsonLdTitle = t.trim();

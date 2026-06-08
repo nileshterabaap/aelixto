@@ -35,15 +35,9 @@ function isTextOnlySocialAvatar(platform: string, url: string): boolean {
   if ((platform === "twitter" || platform === "x") && lower.includes("abs.twimg.com/")) {
     return true;
   }
-  if (platform === "threads" && isThreadsProfilePictureUrl(lower)) {
+  if (platform === "threads" && (lower.includes("cdninstagram.com/v/") || lower.includes("scontent-") && lower.includes("/profile/"))) {
     return true;
   }
-  return false;
-}
-
-function isThreadsProfilePictureUrl(lowerUrl: string): boolean {
-  if (lowerUrl.includes("profile_pic")) return true;
-  if (lowerUrl.includes("/t51.82787-19/")) return true;
   return false;
 }
 
@@ -67,7 +61,6 @@ export function getPostThumb(p: {
   const piu = p.preview_image_url || p.previewImageUrl;
   const mu = p.media_url || p.mediaUrl;
   const authorAvatar = p.author_avatar_url || p.profile_avatar_url || null;
-  const previewIsThreadsAvatar = platform === "threads" && piu ? isThreadsProfilePictureUrl(decodeHtmlEntities(piu).toLowerCase()) : false;
 
   // 1) server-derived thumbnail wins (decode HTML entities first),
   //    BUT filter out misleading generic OG placeholders (e.g. Unsplash
@@ -83,7 +76,7 @@ export function getPostThumb(p: {
     // typographic TextCardThumbnail can render the actual text instead
     // of a misleading avatar tile.
     const matchesOwnAvatar = !!authorAvatar && sameUrl(decoded, authorAvatar);
-    if (matchesOwnAvatar || previewIsThreadsAvatar || isMisleadingThumbnail(platform, decoded) || isTextOnlySocialAvatar(platform, decoded)) {
+    if (matchesOwnAvatar || isMisleadingThumbnail(platform, decoded) || isTextOnlySocialAvatar(platform, decoded)) {
       // Fall through to platform/media derivations or placeholder.
     } else {
       return decoded;
