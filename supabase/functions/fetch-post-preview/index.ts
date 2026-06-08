@@ -6,6 +6,65 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+type Sizing = { media_kind: string | null; aspect_ratio: number | null; suggested_height: number | null };
+
+function clampAR(ar: number | null | undefined): number | null {
+  if (!ar || !isFinite(ar) || ar <= 0) return null;
+  // Clamp to sane bounds (between ~9:21 and ~21:9)
+  const clamped = Math.min(2.4, Math.max(0.42, ar));
+  return Math.round(clamped * 10000) / 10000;
+}
+
+function suggestedHeightForText(text: string | null | undefined, base = 220): number {
+  const len = (text || '').trim().length;
+  // Approx 36 chars/line on mobile, ~22px per line. Avatar + actions ~base.
+  const lines = Math.min(18, Math.max(1, Math.ceil(len / 36)));
+  return Math.min(640, Math.max(200, base + lines * 22));
+}
+
+function classifyReddit(post: Record<string, unknown> | null, fallbackText: string): Sizing {
+  if (!post) {
+    return { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(fallbackText, 280) };
+  }
+  const hint = typeof post.post_hint === 'string' ? post.post_hint.toLowerCase() : '';
+  const isVideo = post.is_video === true || hint === 'hosted:video' || hint === 'rich:video';
+  const isImage = hint === 'image' || hint === 'link' && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(String(post.url || ''));
+  const isGallery = post.is_gallery === true || hint === 'gallery';
+  const isSelf = post.is_self === true || hint === 'self';
+
+  const srcW = readNum(post, ['preview', 'images', 0, 'source', 'width'])
+    ?? readNum(post, ['media', 'reddit_video', 'width'])
+    ?? null;
+  const srcH = readNum(post, ['preview', 'images', 0, 'source', 'height'])
+    ?? readNum(post, ['media', 'reddit_video', 'height'])
+    ?? null;
+  const ar = clampAR(srcW && srcH ? srcW / srcH : null);
+
+  if (isVideo) return { media_kind: 'video', aspect_ratio: ar ?? 9 / 16, suggested_height: null };
+  if (isGallery) return { media_kind: 'gallery', aspect_ratio: ar ?? 1, suggested_height: null };
+  if (isImage) return { media_kind: 'image', aspect_ratio: ar ?? 4 / 5, suggested_height: null };
+  if (isSelf) {
+    const text = typeof post.selftext === 'string' ? post.selftext : fallbackText;
+    return { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(text, 280) };
+  }
+  // Link/article post → compact card
+  return { media_kind: 'article', aspect_ratio: ar ?? 16 / 9, suggested_height: 360 };
+}
+
+function readNum(obj: unknown, path: Array<string | number>): number | null {
+  let cur: unknown = obj;
+  for (const k of path) {
+    if (typeof k === 'number') {
+      if (!Array.isArray(cur)) return null;
+      cur = cur[k];
+    } else {
+      if (!cur || typeof cur !== 'object') return null;
+      cur = (cur as Record<string, unknown>)[k];
+    }
+  }
+  return typeof cur === 'number' && isFinite(cur) ? cur : null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
