@@ -144,7 +144,6 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const effectiveThumb = thumbnailUrl || fetchedThumb;
   const validThumb = !!effectiveThumb && !thumbBroken && !sameUrl(effectiveThumb, authorAvatar);
   const fallbackImage = validThumb ? effectiveThumb! : undefined;
-  const shouldRenderStoredImage = !isDirectMedia && validThumb && isRedditShareUrl(normalizedUrl);
   const embedSrc = useMemo(() => (resolvedUrl ? toRedditEmbedSrc(resolvedUrl) : null), [resolvedUrl]);
 
   // Detect broken/blocked Reddit thumbnails (e.g. URLs that 403 or 404) so the
@@ -244,21 +243,6 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
       window.clearTimeout(fallback);
     };
   }, [embedSrc, resolving, failed, loaded]);
-
-  if (shouldRenderStoredImage) {
-    return (
-      <div data-embed-status="ready">
-        <a
-          href={normalizedUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block w-full bg-card"
-        >
-          <img src={fallbackImage} alt={title || "Reddit post"} className="w-full h-auto object-cover" loading="eager" />
-        </a>
-      </div>
-    );
-  }
 
   if (resolving || (!resolvedUrl && !failed)) {
     return <div data-embed-status="loading" className="w-full" style={{ minHeight: REDDIT_EMBED_HEIGHT }} />;
