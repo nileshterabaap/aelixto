@@ -249,6 +249,11 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
                 "pointer-events-none absolute inset-0 rounded-2xl bg-foreground/40 animate-fab-pulse";
               btn.appendChild(ring);
               window.setTimeout(() => ring.remove(), 520);
+              // springy pop on release
+              btn.classList.remove("animate-fab-pop");
+              // force reflow so animation can restart
+              void btn.offsetWidth;
+              btn.classList.add("animate-fab-pop");
               onCreatePost();
             }}
             className="fab-create pointer-events-auto relative flex h-12 w-12 items-center justify-center rounded-2xl bg-foreground text-background shadow-[0_6px_18px_-4px_hsl(var(--foreground)/0.45)] transition-[transform,box-shadow] duration-200 ease-out will-change-transform active:scale-[0.86] active:shadow-[0_2px_8px_-2px_hsl(var(--foreground)/0.5)]"
