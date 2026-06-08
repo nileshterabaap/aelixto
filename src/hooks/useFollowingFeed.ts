@@ -18,6 +18,9 @@ interface FeedPost {
   embed_html: string | null;
   thumbnail_url: string | null;
   title: string | null;
+  preview_text?: string | null;
+  preview_title?: string | null;
+  preview_image_url?: string | null;
   is_public: boolean;
   feed_cursor?: string | null;
   is_repost?: boolean;
@@ -79,6 +82,9 @@ const fetchFeedPage = async (cursor?: string) => {
     embed_html: item.embed_html,
     thumbnail_url: item.thumbnail_url,
     title: item.title,
+    preview_text: item.preview_text,
+    preview_title: item.preview_title,
+    preview_image_url: item.preview_image_url,
     is_public: item.is_public,
     feed_cursor: item.feed_cursor,
     is_repost: item.is_repost,
