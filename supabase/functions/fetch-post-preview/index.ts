@@ -543,7 +543,7 @@ async function fetchRedditJson(url: string): Promise<Response> {
 }
 
 // TikTok oEmbed — public endpoint, no auth, returns thumbnail_url + title
-async function fetchTikTokOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null } | null> {
+async function fetchTikTokOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null; thumbnail_width: number | null; thumbnail_height: number | null } | null> {
   try {
     // Normalize: strip query/tracking params, follow short links (vm.tiktok.com / vt.tiktok.com)
     let target = url.trim();
@@ -573,6 +573,8 @@ async function fetchTikTokOembed(url: string): Promise<{ thumbnail_url: string |
     return {
       thumbnail_url: data.thumbnail_url || null,
       title: data.title || data.author_name || null,
+      thumbnail_width: typeof data.thumbnail_width === 'number' ? data.thumbnail_width : null,
+      thumbnail_height: typeof data.thumbnail_height === 'number' ? data.thumbnail_height : null,
     };
   } catch (e) {
     console.error('[fetch-post-preview] TikTok oEmbed error:', e);
