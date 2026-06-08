@@ -692,7 +692,6 @@ export type Database = {
       }
       posts: {
         Row: {
-          aspect_ratio: number | null
           broken_check_count: number
           broken_first_seen_at: string | null
           comments_count: number | null
@@ -703,7 +702,6 @@ export type Database = {
           is_public: boolean
           last_validated_at: string | null
           likes_count: number | null
-          media_kind: string | null
           media_type: string | null
           media_url: string | null
           platform: string | null
@@ -713,13 +711,11 @@ export type Database = {
           raw_json_data: Json | null
           reposts_count: number | null
           saves_count: number | null
-          suggested_height: number | null
           thumbnail_url: string | null
           title: string | null
           user_id: string
         }
         Insert: {
-          aspect_ratio?: number | null
           broken_check_count?: number
           broken_first_seen_at?: string | null
           comments_count?: number | null
@@ -730,7 +726,6 @@ export type Database = {
           is_public?: boolean
           last_validated_at?: string | null
           likes_count?: number | null
-          media_kind?: string | null
           media_type?: string | null
           media_url?: string | null
           platform?: string | null
@@ -740,13 +735,11 @@ export type Database = {
           raw_json_data?: Json | null
           reposts_count?: number | null
           saves_count?: number | null
-          suggested_height?: number | null
           thumbnail_url?: string | null
           title?: string | null
           user_id: string
         }
         Update: {
-          aspect_ratio?: number | null
           broken_check_count?: number
           broken_first_seen_at?: string | null
           comments_count?: number | null
@@ -757,7 +750,6 @@ export type Database = {
           is_public?: boolean
           last_validated_at?: string | null
           likes_count?: number | null
-          media_kind?: string | null
           media_type?: string | null
           media_url?: string | null
           platform?: string | null
@@ -767,7 +759,6 @@ export type Database = {
           raw_json_data?: Json | null
           reposts_count?: number | null
           saves_count?: number | null
-          suggested_height?: number | null
           thumbnail_url?: string | null
           title?: string | null
           user_id?: string
@@ -1081,7 +1072,6 @@ export type Database = {
       get_following_feed_v2: {
         Args: { cursor_key?: string; limit_count: number }
         Returns: {
-          aspect_ratio: number
           comments_count: number
           content: string
           created_at: string
@@ -1091,7 +1081,6 @@ export type Database = {
           is_public: boolean
           is_repost: boolean
           likes_count: number
-          media_kind: string
           media_type: string
           media_url: string
           platform: string
@@ -1107,7 +1096,6 @@ export type Database = {
           reposted_by_username: string
           reposts_count: number
           saves_count: number
-          suggested_height: number
           thumbnail_url: string
           title: string
           user_id: string

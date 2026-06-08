@@ -296,9 +296,6 @@ export const HydratedEmbed = memo(({
               description={(post as any).preview_text || (post as any).previewText || undefined}
               authorAvatar={(post as any).author?.avatar || (post as any).profiles?.avatar_url || null}
               postId={post.id}
-              mediaKind={(post as any).media_kind ?? null}
-              aspectRatio={(post as any).aspect_ratio ?? null}
-              suggestedHeight={(post as any).suggested_height ?? null}
             />
           </ImageViewTracker>
         )}
