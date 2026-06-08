@@ -155,6 +155,9 @@ const Index = () => {
       isRealPost: true,
       isRepost: post.is_repost,
       repostedByUsername: post.reposted_by_username,
+      media_kind: post.media_kind,
+      aspect_ratio: post.aspect_ratio,
+      suggested_height: post.suggested_height,
     }));
   }, [followingPosts, showDemoFeed]);
 
