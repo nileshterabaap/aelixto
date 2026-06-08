@@ -295,7 +295,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   }, [embedSrc]);
 
   if (resolving || (!resolvedUrl && !failed)) {
-    return <div data-embed-status="loading" className="w-full" style={{ minHeight: REDDIT_EMBED_INITIAL_HEIGHT }} />;
+    return <div data-embed-status="loading" className="w-full" style={{ minHeight: iframeHeight }} />;
   }
 
   if (!resolvedUrl || failed || !embedSrc) {
