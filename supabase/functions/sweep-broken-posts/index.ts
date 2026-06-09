@@ -34,6 +34,89 @@ async function resolveRedirect(url: string): Promise<string> {
   }
 }
 
+// Patterns that indicate a removed/deleted/unavailable piece of content.
+// Kept conservative — must be specific enough not to match normal pages.
+const REMOVED_PATTERNS = [
+  /this (post|tweet|video|page|content|pin|story|reel) (is|has been|was)?\s*(no longer )?(available|unavailable|removed|deleted)/i,
+  /sorry,?\s+(this|that)\s+(page|post|content|tweet|video|pin)\s+(doesn'?t exist|isn'?t available|cannot be found|is unavailable)/i,
+  /page (not found|doesn'?t exist|can'?t be found|unavailable)/i,
+  /post (not found|unavailable|has been removed|may have been removed|isn'?t available)/i,
+  /content (isn'?t available|is unavailable|has been removed)/i,
+  /(404|410)\s*[-–:]?\s*(not found|gone)/i,
+  /\bdeleted by (author|user|moderator)\b/i,
+  /\[removed by moderator\]/i,
+  /this (account|user) (doesn'?t exist|has been suspended|has been deactivated)/i,
+  /the link to this (photo|video|post) may be broken/i,
+  /hmm\.\.\.this page doesn'?t exist/i,
+];
+
+function looksRemoved(html: string): boolean {
+  // Trim to a manageable slice — relevant markers live in <head> + first visible chunks.
+  const slice = html.length > 200_000 ? html.slice(0, 200_000) : html;
+  return REMOVED_PATTERNS.some((re) => re.test(slice));
+}
+
+function metaContent(html: string, name: string): string | null {
+  const re = new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]*content=["']([^"']+)["']`, "i");
+  const m = html.match(re);
+  if (m?.[1]) return m[1].trim();
+  const re2 = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${name}["']`, "i");
+  return html.match(re2)?.[1]?.trim() ?? null;
+}
+
+function extractAuthor(html: string): string | null {
+  // Try common signals in order of reliability.
+  const candidates = [
+    metaContent(html, "twitter:creator"),
+    metaContent(html, "article:author"),
+    metaContent(html, "author"),
+    metaContent(html, "og:site_name"),
+  ];
+  for (const c of candidates) {
+    if (c && c.length > 0 && c.length < 80) return c.replace(/^@/, "").trim();
+  }
+  // JSON-LD author.name
+  const ld = html.match(/"author"\s*:\s*\{[^}]*"name"\s*:\s*"([^"]+)"/i);
+  if (ld?.[1]) return ld[1].trim();
+  return null;
+}
+
+async function tryOembedDiscovery(url: string): Promise<string | null> {
+  try {
+    const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } });
+    if (!r.ok) return null;
+    const html = await r.text();
+    const m = html.match(/<link[^>]+type=["']application\/json\+oembed["'][^>]+href=["']([^"']+)["']/i);
+    if (!m?.[1]) return null;
+    const oe = await fetchWithTimeout(m[1].replace(/&amp;/g, "&"), { headers: { "User-Agent": UA } });
+    if (!oe.ok) return null;
+    const j = await oe.json();
+    return j?.author_name ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function checkViaHtml(url: string): Promise<CheckResult> {
+  try {
+    // Cheap HEAD probe first.
+    let head: Response | null = null;
+    try {
+      head = await fetchWithTimeout(url, { method: "HEAD", headers: { "User-Agent": UA } });
+    } catch { /* some hosts reject HEAD */ }
+    if (head && (head.status === 404 || head.status === 410)) return { verdict: "removed" };
+
+    const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } });
+    if (r.status === 404 || r.status === 410) return { verdict: "removed" };
+    if (!r.ok) return { verdict: "unknown" };
+    const html = await r.text();
+    if (looksRemoved(html)) return { verdict: "removed", author: extractAuthor(html) };
+    return { verdict: "ok", author: extractAuthor(html) };
+  } catch {
+    return { verdict: "unknown" };
+  }
+}
+
 async function validate(platform: string | null, url: string | null): Promise<CheckResult> {
   if (!url) return { verdict: "unknown" };
   const p = (platform || "").toLowerCase();
@@ -123,14 +206,15 @@ async function validate(platform: string | null, url: string | null): Promise<Ch
       p === "pinterest" || p === "quora" || p === "medium" || p === "article" || p === "external" ||
       /threads\.(net|com)|x\.com|twitter\.com|linkedin\.com|pinterest\.com|pin\.it|quora\.com|medium\.com/i.test(url)
     ) {
-      let r = await fetchWithTimeout(url, { method: "HEAD", headers: { "User-Agent": UA } });
-      if (r.status === 405 || r.status === 403) {
-        r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } });
+      const res = await checkViaHtml(url);
+      if (res.verdict !== "ok" && !res.author) {
+        const a = await tryOembedDiscovery(url);
+        if (a) return { ...res, author: a };
       }
-      if (r.status === 404 || r.status === 410) return { verdict: "removed" };
-      return { verdict: "unknown" };
+      return res;
     }
-    return { verdict: "unknown" };
+    // Generic catch-all for any other URL — best-effort HTML inspection.
+    return await checkViaHtml(url);
   } catch {
     return { verdict: "unknown" };
   }
