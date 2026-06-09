@@ -61,6 +61,10 @@ const NotificationItem = ({
   const isAccountWarning = reportKind === 'account_warning';
   const isSourceRemoved = reportKind === 'source_removed';
   const sourcePlatform = (notification.metadata?.platform as string | undefined) || '';
+  const originalAuthor =
+    (notification.metadata?.original_author as string | undefined) ||
+    (notification.metadata?.post_snapshot as { original_author?: string } | undefined)?.original_author ||
+    '';
   const snapshot = notification.metadata?.post_snapshot as
     | { title?: string; content?: string; thumbnail_url?: string }
     | undefined;
@@ -108,6 +112,17 @@ const NotificationItem = ({
                   : "— thanks for the report. We didn't find a violation this time."}
               </span>
             </p>
+          ) : null}
+          {isSourceRemoved && (originalAuthor || snapshot?.title) && (
+            <p className="text-xs text-muted-foreground mt-1 truncate">
+              {originalAuthor ? <>by <span className="font-medium text-foreground">@{originalAuthor}</span></> : null}
+              {originalAuthor && snapshot?.title ? ' · ' : ''}
+              {snapshot?.title ? <span className="italic">"{snapshot.title.slice(0, 60)}{snapshot.title.length > 60 ? '…' : ''}"</span> : null}
+            </p>
+          )}
+          {!isReportOutcome ? null : null}
+          {!isReportOutcome && (
+            <></>
           ) : (
             <p className="text-sm">
               <span className="font-semibold">{actorName}</span>{' '}
