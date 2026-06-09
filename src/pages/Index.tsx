@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { BottomNav } from "@/components/BottomNav";
+import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
 import { PostSkeleton } from "@/components/PostSkeleton";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
@@ -22,6 +22,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
+  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
@@ -264,7 +265,6 @@ const Index = () => {
               ))}
             </div>
           </main>
-          <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
         </div>
       </SwipeableView>
     );
@@ -348,8 +348,6 @@ const Index = () => {
           )}
         </main>
       </PullToRefresh>
-
-      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
         <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
       </div>

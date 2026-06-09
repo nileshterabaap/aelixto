@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { BottomNav } from "@/components/BottomNav";
+import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,6 +31,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const navigate = useNavigate();
   const { user } = useSession();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
   const [followListOpen, setFollowListOpen] = useState(false);
 
@@ -407,11 +408,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
       </div>
       ) : null}
 
-      {user ? (
-        <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
-      ) : (
-        <AuthCTABar />
-      )}
+      {user ? null : <AuthCTABar />}
 
       <CreatePostDialog 
         open={isCreateDialogOpen} 

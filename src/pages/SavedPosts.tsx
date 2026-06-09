@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { Header } from "@/components/Header";
-import { BottomNav } from "@/components/BottomNav";
+import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
@@ -25,6 +25,7 @@ export default function SavedPosts() {
   const { session, loading } = useSession();
   const navigate = useNavigate();
   const [createPostOpen, setCreatePostOpen] = useState(false);
+  useCreatePostTrigger(useCallback(() => setCreatePostOpen(true), []));
   const [activeTab, setActiveTab] = useState<"all" | "collections" | "drafts">("all");
   const queryClient = useQueryClient();
 
@@ -142,7 +143,6 @@ export default function SavedPosts() {
         <div className="min-h-screen pb-20">
           <Header onCreatePost={() => setCreatePostOpen(true)} />
           <SavedSkeleton />
-          <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
         </div>
       </SwipeableView>
     );
@@ -192,7 +192,6 @@ export default function SavedPosts() {
         </main>
       </PullToRefresh>
 
-      <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
       <CreatePostDialog open={createPostOpen} onOpenChange={setCreatePostOpen} />
     </div>
     </SwipeableView>
