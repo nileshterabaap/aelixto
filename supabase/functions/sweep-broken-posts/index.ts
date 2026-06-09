@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 type Verdict = "ok" | "removed" | "unknown";
+type CheckResult = { verdict: Verdict; author?: string | null };
 const UA = "Mozilla/5.0 (compatible; AelixtoBot/1.0; +https://aelixto.com)";
 
 async function fetchWithTimeout(url: string, init: RequestInit = {}, ms = 8000) {
@@ -24,59 +25,97 @@ function ytId(u: string): string | null {
   return m?.[1] ?? null;
 }
 
-async function validate(platform: string | null, url: string | null): Promise<Verdict> {
-  if (!url) return "unknown";
+async function resolveRedirect(url: string): Promise<string> {
+  try {
+    const r = await fetchWithTimeout(url, { method: "GET", headers: { "User-Agent": UA } });
+    return r.url || url;
+  } catch {
+    return url;
+  }
+}
+
+async function validate(platform: string | null, url: string | null): Promise<CheckResult> {
+  if (!url) return { verdict: "unknown" };
   const p = (platform || "").toLowerCase();
   const meta = Deno.env.get("META_APP_TOKEN");
   try {
     if (p === "instagram" || /instagram\.com\//i.test(url)) {
-      if (!meta) return "unknown";
-      const r = await fetchWithTimeout(`https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${meta}`);
-      if (r.ok) return "ok";
-      if (r.status === 404 || r.status === 400) {
-        const text = await r.text();
-        if (/not found|unsupported|invalid|removed|unavailable|object/i.test(text)) return "removed";
+      if (meta) {
+        const r = await fetchWithTimeout(`https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${meta}`);
+        if (r.ok) {
+          try {
+            const j = await r.json();
+            return { verdict: "ok", author: j?.author_name ?? null };
+          } catch { return { verdict: "ok" }; }
+        }
+        if (r.status === 404 || r.status === 400) {
+          const text = await r.text();
+          if (/not found|unsupported|invalid|removed|unavailable|object/i.test(text)) return { verdict: "removed" };
+        }
       }
-      return "unknown";
+      // Fallback: IG /embed/ endpoint. Removed/private posts render "Sorry, this content isn't available right now".
+      const embedUrl = url.replace(/\/?(\?.*)?$/, "/embed/$1");
+      const r2 = await fetchWithTimeout(embedUrl, { headers: { "User-Agent": UA } });
+      if (r2.ok) {
+        const html = await r2.text();
+        if (/content isn'?t available|Sorry, this page|Page Not Found|may be broken/i.test(html)) return { verdict: "removed" };
+        const m = html.match(/"username":"([^"]+)"/);
+        return { verdict: "ok", author: m?.[1] ?? null };
+      }
+      if (r2.status === 404 || r2.status === 410) return { verdict: "removed" };
+      return { verdict: "unknown" };
     }
     if (p === "facebook" || /facebook\.com\/|fb\.watch\//i.test(url)) {
-      if (!meta) return "unknown";
+      if (!meta) return { verdict: "unknown" };
       const ep = /\/videos?\/|\/reel\/|fb\.watch\//i.test(url) ? "oembed_video" : "oembed_post";
       const r = await fetchWithTimeout(`https://graph.facebook.com/v18.0/${ep}?url=${encodeURIComponent(url)}&access_token=${meta}`);
-      if (r.ok) return "ok";
+      if (r.ok) {
+        try { const j = await r.json(); return { verdict: "ok", author: j?.author_name ?? null }; } catch { return { verdict: "ok" }; }
+      }
       if (r.status === 404 || r.status === 400) {
         const text = await r.text();
-        if (/not found|unsupported|invalid|removed|unavailable|object/i.test(text)) return "removed";
+        if (/not found|unsupported|invalid|removed|unavailable|object/i.test(text)) return { verdict: "removed" };
       }
-      return "unknown";
+      return { verdict: "unknown" };
     }
     if (p === "youtube" || /youtube\.com\/|youtu\.be\//i.test(url)) {
       const id = ytId(url);
-      if (!id) return "unknown";
+      if (!id) return { verdict: "unknown" };
       const r = await fetchWithTimeout(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`);
-      if (r.ok) return "ok";
-      if (r.status === 401 || r.status === 404 || r.status === 403) return "removed";
-      return "unknown";
+      if (r.ok) {
+        try { const j = await r.json(); return { verdict: "ok", author: j?.author_name ?? null }; } catch { return { verdict: "ok" }; }
+      }
+      if (r.status === 401 || r.status === 404 || r.status === 403) return { verdict: "removed" };
+      return { verdict: "unknown" };
     }
     if (p === "tiktok" || /tiktok\.com\//i.test(url)) {
       const r = await fetchWithTimeout(`https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`);
-      if (r.ok) return "ok";
-      if (r.status === 404) return "removed";
-      return "unknown";
+      if (r.ok) {
+        try { const j = await r.json(); return { verdict: "ok", author: j?.author_name ?? null }; } catch { return { verdict: "ok" }; }
+      }
+      if (r.status === 404) return { verdict: "removed" };
+      return { verdict: "unknown" };
     }
     if (p === "reddit" || /reddit\.com\//i.test(url)) {
-      const jsonUrl = url.replace(/\/?$/, "") + ".json";
+      // Resolve share short links like /r/<sub>/s/<id> to their canonical /comments/... URL.
+      let resolved = url;
+      if (/reddit\.com\/r\/[^/]+\/s\//i.test(url)) resolved = await resolveRedirect(url);
+      const cleanUrl = resolved.split("?")[0].replace(/\/$/, "");
+      const jsonUrl = cleanUrl + ".json";
       const r = await fetchWithTimeout(jsonUrl, { headers: { "User-Agent": UA } });
-      if (r.status === 404) return "removed";
-      if (!r.ok) return "unknown";
+      if (r.status === 404) return { verdict: "removed" };
+      if (!r.ok) return { verdict: "unknown" };
       try {
         const j = await r.json();
         const post = j?.[0]?.data?.children?.[0]?.data;
-        if (!post) return "removed";
-        if (post.removed_by_category || post.removed || post.selftext === "[removed]" || post.selftext === "[deleted]") return "removed";
-        return "ok";
+        if (!post) return { verdict: "removed" };
+        const author = post.author && post.author !== "[deleted]" ? post.author : null;
+        if (post.removed_by_category || post.removed || post.selftext === "[removed]" || post.selftext === "[deleted]" || post.author === "[deleted]") {
+          return { verdict: "removed", author };
+        }
+        return { verdict: "ok", author };
       } catch {
-        return "unknown";
+        return { verdict: "unknown" };
       }
     }
     if (
@@ -88,12 +127,12 @@ async function validate(platform: string | null, url: string | null): Promise<Ve
       if (r.status === 405 || r.status === 403) {
         r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } });
       }
-      if (r.status === 404 || r.status === 410) return "removed";
-      return "unknown";
+      if (r.status === 404 || r.status === 410) return { verdict: "removed" };
+      return { verdict: "unknown" };
     }
-    return "unknown";
+    return { verdict: "unknown" };
   } catch {
-    return "unknown";
+    return { verdict: "unknown" };
   }
 }
 
@@ -123,7 +162,8 @@ serve(async (req) => {
   let ok = 0, removed = 0, unknown = 0, deleted = 0;
 
   for (const post of posts ?? []) {
-    const verdict = await validate(post.platform, post.media_url);
+    const result = await validate(post.platform, post.media_url);
+    const verdict = result.verdict;
     const now = new Date().toISOString();
 
     if (verdict === "ok") {
@@ -164,10 +204,12 @@ serve(async (req) => {
         kind: "source_removed",
         platform: post.platform,
         original_url: post.media_url,
+        original_author: result.author ?? null,
         post_snapshot: {
           title: post.title,
           content: post.content,
           thumbnail_url: post.thumbnail_url,
+          original_author: result.author ?? null,
         },
       },
     });
