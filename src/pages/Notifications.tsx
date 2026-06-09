@@ -8,6 +8,8 @@ import { useNotifications, type Notification } from "@/hooks/useNotifications";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const getNotificationIcon = (type: string) => {
   switch (type) {
@@ -46,6 +48,8 @@ const NotificationItem = ({
   notification: Notification; 
   onClick: () => void;
 }) => {
+  const [busy, setBusy] = useState<"delete" | "keep" | null>(null);
+  const [resolved, setResolved] = useState<"deleted" | "kept" | null>(null);
   const { icon: Icon, bgColor, iconColor } = getNotificationIcon(notification.type);
   const message = getNotificationMessage(notification.type);
   const actorName = notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
@@ -70,7 +74,29 @@ const NotificationItem = ({
     | undefined;
   
   const handleClick = () => {
+    if (busy) return;
     onClick();
+  };
+
+  const handleDeletePost = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (busy || !notification.post_id) return;
+    setBusy("delete");
+    const { error } = await supabase.from("posts").delete().eq("id", notification.post_id);
+    if (error) {
+      toast.error("Couldn't delete the post");
+      setBusy(null);
+      return;
+    }
+    toast.success("Post deleted from your profile");
+    setResolved("deleted");
+    setBusy(null);
+  };
+
+  const handleKeepPost = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (busy) return;
+    setResolved("kept");
   };
 
   return (
@@ -119,6 +145,32 @@ const NotificationItem = ({
               {originalAuthor && snapshot?.title ? ' · ' : ''}
               {snapshot?.title ? <span className="italic">"{snapshot.title.slice(0, 60)}{snapshot.title.length > 60 ? '…' : ''}"</span> : null}
             </p>
+          )}
+          {isSourceRemoved && notification.post_id && (
+            <div className="flex gap-2 mt-3">
+              {resolved === "deleted" ? (
+                <span className="text-xs text-muted-foreground">Removed from your profile.</span>
+              ) : resolved === "kept" ? (
+                <span className="text-xs text-muted-foreground">Kept on your profile.</span>
+              ) : (
+                <>
+                  <button
+                    onClick={handleDeletePost}
+                    disabled={busy !== null}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full bg-destructive text-destructive-foreground hover:opacity-90 transition disabled:opacity-50"
+                  >
+                    {busy === "delete" ? "Deleting…" : "Delete post"}
+                  </button>
+                  <button
+                    onClick={handleKeepPost}
+                    disabled={busy !== null}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full bg-muted hover:bg-muted/70 transition disabled:opacity-50"
+                  >
+                    Keep
+                  </button>
+                </>
+              )}
+            </div>
           )}
           {!isReportOutcome && (
             <p className="text-sm">
