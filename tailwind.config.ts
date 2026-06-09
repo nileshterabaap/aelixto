@@ -140,8 +140,7 @@ export default {
         },
         "fab-press": {
           "0%":   { transform: "scale(1)",    filter: "brightness(1)" },
-          "35%":  { transform: "scale(0.86)", filter: "brightness(1.35)" },
-          "65%":  { transform: "scale(1.06)", filter: "brightness(1.1)" },
+          "45%":  { transform: "scale(0.9)",  filter: "brightness(1.3)" },
           "100%": { transform: "scale(1)",    filter: "brightness(1)" },
         },
         "fab-blink": {
