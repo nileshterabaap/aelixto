@@ -254,28 +254,27 @@ const FabCreateButton = ({ onCreatePost }: { onCreatePost: () => void }) => {
       onClick={onCreatePost}
       onPointerDown={triggerPress}
       style={{ transform: "translateX(-50%)", WebkitTapHighlightColor: "transparent" }}
-      className="absolute left-1/2 -top-4 h-12 w-12 rounded-2xl bg-foreground text-background select-none touch-manipulation will-change-transform shadow-[0_6px_18px_-6px_rgba(0,0,0,0.45)] focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40"
+      className="absolute left-1/2 -top-4 h-12 w-12 select-none touch-manipulation focus:outline-none"
     >
-      {/* Press scale + brightness pulse — preserves translateX(-50%) */}
+      {/* Inner pressable shape — animates without affecting the outer translateX */}
       <span
         key={`press-${pressKey}`}
-        className={`absolute inset-0 rounded-2xl bg-foreground ${pressKey ? "animate-fab-press" : ""}`}
-        style={{ transform: "translateX(0)" }}
-        aria-hidden
-      />
-      {/* Inner white flash */}
-      <span
-        key={`flash-${pressKey}`}
-        className={`pointer-events-none absolute inset-0 rounded-2xl bg-background/40 opacity-0 ${pressKey ? "animate-fab-flash" : ""}`}
-        aria-hidden
-      />
-      {/* Expanding ring blink */}
-      <span
-        key={`ring-${pressKey}`}
-        className={`pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-foreground/60 opacity-0 ${pressKey ? "animate-fab-blink" : ""}`}
-        aria-hidden
-      />
-      <Plus className="relative mx-auto h-5 w-5 stroke-[3] text-background" />
+        className={`relative flex h-full w-full items-center justify-center rounded-2xl bg-foreground shadow-[0_6px_18px_-6px_rgba(0,0,0,0.45)] will-change-transform ${pressKey ? "animate-fab-press" : ""}`}
+      >
+        {/* Inner white flash */}
+        <span
+          key={`flash-${pressKey}`}
+          className={`pointer-events-none absolute inset-0 rounded-2xl bg-background/45 opacity-0 ${pressKey ? "animate-fab-flash" : ""}`}
+          aria-hidden
+        />
+        {/* Expanding ring blink */}
+        <span
+          key={`ring-${pressKey}`}
+          className={`pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-foreground/70 opacity-0 ${pressKey ? "animate-fab-blink" : ""}`}
+          aria-hidden
+        />
+        <Plus className="relative h-5 w-5 stroke-[3] text-background" />
+      </span>
     </button>
   );
 };
