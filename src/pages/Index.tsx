@@ -22,6 +22,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
+  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
@@ -264,7 +265,6 @@ const Index = () => {
               ))}
             </div>
           </main>
-          <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
         </div>
       </SwipeableView>
     );
@@ -348,8 +348,6 @@ const Index = () => {
           )}
         </main>
       </PullToRefresh>
-
-      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
         <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
       </div>
