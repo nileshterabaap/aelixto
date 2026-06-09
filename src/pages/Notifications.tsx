@@ -1,5 +1,5 @@
 import { Header } from "@/components/Header";
-import { BottomNav } from "@/components/BottomNav";
+import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Heart, MessageCircle, Repeat2, Bell, Shield } from "lucide-react";
@@ -149,6 +149,7 @@ const NotificationSkeleton = () => (
 
 const Notifications = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const { notifications, isLoading, markAllRead, refetch } = useNotifications();
   const navigate = useNavigate();
 
@@ -211,7 +212,6 @@ const Notifications = () => {
         </main>
       </PullToRefresh>
 
-      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
       <CreatePostDialog 
         open={isCreateDialogOpen} 
