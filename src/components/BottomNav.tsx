@@ -253,13 +253,14 @@ const FabCreateButton = ({ onCreatePost }: { onCreatePost: () => void }) => {
       aria-label="Create post"
       onClick={onCreatePost}
       onPointerDown={triggerPress}
-      style={{ transform: "translateX(-50%)", WebkitTapHighlightColor: "transparent" }}
+      style={{ transform: "translate3d(-50%,0,0)", WebkitTapHighlightColor: "transparent" }}
       className="absolute left-1/2 -top-4 h-12 w-12 select-none touch-manipulation focus:outline-none"
     >
       {/* Inner pressable shape — animates without affecting the outer translateX */}
       <span
         key={`press-${pressKey}`}
-        className={`relative flex h-full w-full items-center justify-center rounded-2xl bg-foreground shadow-[0_6px_18px_-6px_rgba(0,0,0,0.45)] will-change-transform ${pressKey ? "animate-fab-press" : ""}`}
+        style={{ transformOrigin: "50% 50%" }}
+        className={`relative flex h-full w-full items-center justify-center rounded-2xl bg-foreground will-change-transform ${pressKey ? "animate-fab-press" : ""}`}
       >
         {/* Inner white flash */}
         <span
