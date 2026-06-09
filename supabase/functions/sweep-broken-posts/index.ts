@@ -234,7 +234,7 @@ serve(async (req) => {
     .select("id,user_id,platform,media_url,thumbnail_url,title,content,broken_check_count,broken_first_seen_at,last_validated_at")
     .not("media_url", "is", null)
     .order("last_validated_at", { ascending: true, nullsFirst: true })
-    .limit(60);
+    .limit(200);
 
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), {
