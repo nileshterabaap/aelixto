@@ -139,10 +139,10 @@ export default {
           "100%": { transform: "scale(1)" },
         },
         "fab-press": {
-          "0%":   { transform: "translateX(-50%) scale(1)",    filter: "brightness(1)" },
-          "35%":  { transform: "translateX(-50%) scale(0.86)", filter: "brightness(1.35)" },
-          "65%":  { transform: "translateX(-50%) scale(1.06)", filter: "brightness(1.1)" },
-          "100%": { transform: "translateX(-50%) scale(1)",    filter: "brightness(1)" },
+          "0%":   { transform: "scale(1)",    filter: "brightness(1)" },
+          "35%":  { transform: "scale(0.86)", filter: "brightness(1.35)" },
+          "65%":  { transform: "scale(1.06)", filter: "brightness(1.1)" },
+          "100%": { transform: "scale(1)",    filter: "brightness(1)" },
         },
         "fab-blink": {
           "0%":   { opacity: "0.9", transform: "scale(0.6)" },
