@@ -237,15 +237,44 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
         </div>
 
         {/* Floating center + button (rounded square) */}
-        <button
-          aria-label="Create post"
-          onClick={onCreatePost}
-          className="absolute left-1/2 -top-4 h-12 w-12 -translate-x-1/2 rounded-2xl bg-foreground text-background transition-transform duration-300 ease-out active:scale-90"
-        >
-          <span className="absolute inset-0 rounded-2xl bg-background/10 opacity-0 transition-opacity duration-300 active:opacity-100" />
-          <Plus className="relative mx-auto h-5 w-5 stroke-[3] text-background" />
-        </button>
+        <FabCreateButton onCreatePost={onCreatePost} />
       </div>
     </nav>
+  );
+};
+
+const FabCreateButton = ({ onCreatePost }: { onCreatePost: () => void }) => {
+  const [pressKey, setPressKey] = useState(0);
+  const triggerPress = useCallback(() => {
+    setPressKey((k) => k + 1);
+  }, []);
+  return (
+    <button
+      aria-label="Create post"
+      onClick={onCreatePost}
+      onPointerDown={triggerPress}
+      style={{ transform: "translateX(-50%)", WebkitTapHighlightColor: "transparent" }}
+      className="absolute left-1/2 -top-4 h-12 w-12 select-none touch-manipulation focus:outline-none"
+    >
+      {/* Inner pressable shape — animates without affecting the outer translateX */}
+      <span
+        key={`press-${pressKey}`}
+        className={`relative flex h-full w-full items-center justify-center rounded-2xl bg-foreground shadow-[0_6px_18px_-6px_rgba(0,0,0,0.45)] will-change-transform ${pressKey ? "animate-fab-press" : ""}`}
+      >
+        {/* Inner white flash */}
+        <span
+          key={`flash-${pressKey}`}
+          className={`pointer-events-none absolute inset-0 rounded-2xl bg-background/45 opacity-0 ${pressKey ? "animate-fab-flash" : ""}`}
+          aria-hidden
+        />
+        {/* Expanding ring blink */}
+        <span
+          key={`ring-${pressKey}`}
+          className={`pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-foreground/70 opacity-0 ${pressKey ? "animate-fab-blink" : ""}`}
+          aria-hidden
+        />
+        <Plus className="relative h-5 w-5 stroke-[3] text-background" />
+      </span>
+    </button>
   );
 };
