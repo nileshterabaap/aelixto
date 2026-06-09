@@ -408,10 +408,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
       </div>
       ) : null}
 
-      {user ? (
-      ) : (
-        <AuthCTABar />
-      )}
+      {user ? null : <AuthCTABar />}
 
       <CreatePostDialog 
         open={isCreateDialogOpen} 
