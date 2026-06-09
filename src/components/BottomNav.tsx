@@ -12,12 +12,6 @@ interface BottomNavProps {
   onCreatePost: () => void;
 }
 
-interface Ripple {
-  x: number;
-  y: number;
-  id: number;
-}
-
 export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -54,34 +48,14 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     if (path === "/messages") return location.pathname === "/messages";
     return location.pathname === path;
   };
-  const [ripples, setRipples] = useState<Record<string, Ripple[]>>({});
-  
+
   // Track last home tap time to detect double-tap for refresh
   const lastHomeTapRef = useRef<number>(0);
 
-  const baseIcon = "text-foreground transition-all duration-200";
+  // Icon classes — only opacity transitions; size/color stay rock-stable to prevent layout flicker on tap
+  const baseIcon = "text-foreground transition-opacity duration-200 will-change-[opacity]";
   const activeIcon = "h-[3.375rem] w-[3.375rem] opacity-100";
-  const inactiveIcon = "h-[2.625rem] w-[2.625rem] opacity-50 hover:opacity-80";
-
-  const createRipple = useCallback((e: MouseEvent<HTMLButtonElement>, key: string) => {
-    const button = e.currentTarget;
-    const rect = button.getBoundingClientRect();
-    const x = e.clientX - rect.left - 12;
-    const y = e.clientY - rect.top - 12;
-    const id = Date.now();
-
-    setRipples(prev => ({
-      ...prev,
-      [key]: [...(prev[key] || []), { x, y, id }]
-    }));
-
-    setTimeout(() => {
-      setRipples(prev => ({
-        ...prev,
-        [key]: (prev[key] || []).filter(r => r.id !== id)
-      }));
-    }, 600);
-  }, []);
+  const inactiveIcon = "h-[2.625rem] w-[2.625rem] opacity-50";
 
   // Prefetch on hover (desktop) or touch start (mobile)
   const handlePrefetch = useCallback((path: string) => {
@@ -89,8 +63,6 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   }, [queryClient]);
 
   const handleHomeClick = (e: MouseEvent<HTMLButtonElement>) => {
-    createRipple(e, "home");
-    
     const now = Date.now();
     const isAlreadyOnHome = location.pathname === "/";
     const isAtTop = window.scrollY < 50;
@@ -113,7 +85,6 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   };
 
   const handleClick = (e: MouseEvent<HTMLButtonElement>, path: string, key: string) => {
-    createRipple(e, key);
     // Snapshot scroll position for the current route BEFORE navigation.
     // (React Router may reset scroll to top during route change, which can
     // otherwise overwrite our saved value.)
@@ -127,7 +98,10 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-t border-border pb-[env(safe-area-inset-bottom)]">
+    <nav
+      className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-sm border-t border-border pb-[env(safe-area-inset-bottom)]"
+      style={{ contain: "layout paint", transform: "translate3d(0,0,0)", WebkitTapHighlightColor: "transparent" }}
+    >
       {/* max width like your feed */}
       <div className="relative mx-auto max-w-md">
         {/* 5 columns: 1=home, 2=discover, 3=empty (for FAB), 4=notifications, 5=profile */}
@@ -137,18 +111,12 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Home"
             variant="ghost"
             size="icon"
-            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
+            className="h-14 w-14 flex flex-col items-center justify-center gap-1 relative focus-visible:ring-0 hover:bg-transparent"
+            style={{ WebkitTapHighlightColor: "transparent" }}
             onClick={handleHomeClick}
             onMouseEnter={() => handlePrefetch("/")}
             onTouchStart={() => handleTouchStart("/")}
           >
-            {ripples.home?.map(ripple => (
-              <span
-                key={ripple.id}
-                className="absolute w-6 h-6 bg-foreground/20 rounded-full animate-ripple pointer-events-none"
-                style={{ left: ripple.x, top: ripple.y }}
-              />
-            ))}
             <Home
               fill="currentColor"
               className={`${baseIcon} ${isActive("/") ? activeIcon : inactiveIcon}`}
@@ -161,18 +129,12 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Search"
             variant="ghost"
             size="icon"
-            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
+            className="h-14 w-14 flex flex-col items-center justify-center gap-1 relative focus-visible:ring-0 hover:bg-transparent"
+            style={{ WebkitTapHighlightColor: "transparent" }}
             onClick={(e) => handleClick(e, "/discover", "discover")}
             onMouseEnter={() => handlePrefetch("/discover")}
             onTouchStart={() => handleTouchStart("/discover")}
           >
-            {ripples.discover?.map(ripple => (
-              <span
-                key={ripple.id}
-                className="absolute w-6 h-6 bg-foreground/20 rounded-full animate-ripple pointer-events-none"
-                style={{ left: ripple.x, top: ripple.y }}
-              />
-            ))}
             <Search
               strokeWidth={2.5}
               className={`${baseIcon} ${isActive("/discover") ? activeIcon : inactiveIcon}`}
@@ -188,16 +150,10 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Notifications"
             variant="ghost"
             size="icon"
-            className="relative h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden"
+            className="relative h-14 w-14 flex flex-col items-center justify-center gap-1 focus-visible:ring-0 hover:bg-transparent"
+            style={{ WebkitTapHighlightColor: "transparent" }}
             onClick={(e) => handleClick(e, "/notifications", "notifications")}
           >
-            {ripples.notifications?.map(ripple => (
-              <span
-                key={ripple.id}
-                className="absolute w-6 h-6 bg-foreground/20 rounded-full animate-ripple pointer-events-none"
-                style={{ left: ripple.x, top: ripple.y }}
-              />
-            ))}
             <Bell
               fill="currentColor"
               className={`${baseIcon} ${isActive("/notifications") ? activeIcon : inactiveIcon}`}
@@ -215,18 +171,12 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             aria-label="Profile"
             variant="ghost"
             size="icon"
-            className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
+            className="h-14 w-14 flex flex-col items-center justify-center gap-1 relative focus-visible:ring-0 hover:bg-transparent"
+            style={{ WebkitTapHighlightColor: "transparent" }}
             onClick={(e) => handleClick(e, "/profile", "profile")}
             onMouseEnter={() => handlePrefetch("/profile")}
             onTouchStart={() => handleTouchStart("/profile")}
           >
-            {ripples.profile?.map(ripple => (
-              <span
-                key={ripple.id}
-                className="absolute w-6 h-6 bg-foreground/20 rounded-full animate-ripple pointer-events-none"
-                style={{ left: ripple.x, top: ripple.y }}
-              />
-            ))}
             <User
               strokeWidth={2.5}
               fill={isActive("/profile") ? "currentColor" : "none"}
