@@ -120,10 +120,7 @@ const NotificationItem = ({
               {snapshot?.title ? <span className="italic">"{snapshot.title.slice(0, 60)}{snapshot.title.length > 60 ? '…' : ''}"</span> : null}
             </p>
           )}
-          {!isReportOutcome ? null : null}
           {!isReportOutcome && (
-            <></>
-          ) : (
             <p className="text-sm">
               <span className="font-semibold">{actorName}</span>{' '}
               <span className="text-muted-foreground">{message}</span>
