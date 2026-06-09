@@ -11,6 +11,7 @@ import { prefetchCoreData } from "@/lib/prefetch";
 import { useGlobalMediaPauseOnNavigate } from "@/hooks/useMediaPauseOnScroll";
 import { PageTransition } from "@/components/PageTransition";
 import { KeepAliveRoutes } from "@/components/KeepAliveRoutes";
+import { PersistentBottomNav } from "@/components/PersistentBottomNav";
 import { persistOptions } from "@/lib/queryPersister";
 import Index from "./pages/Index";
 import Discover from "./pages/Discover";
@@ -116,6 +117,9 @@ const AnimatedRoutes = () => {
           </Routes>
         </AnimatePresence>
       </KeepAliveRoutes>
+      {/* Persistent navigation — lives OUTSIDE PageTransition so it
+          stays mounted across route changes and never flickers. */}
+      <PersistentBottomNav />
     </>
   );
 };
