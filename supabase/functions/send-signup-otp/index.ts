@@ -27,10 +27,14 @@ Deno.serve(async (req) => {
 
   let email = ''
   let username = ''
+  let password = ''
+  let mode: 'signup' | 'resend' = 'signup'
   try {
     const body = await req.json()
     email = (body.email || '').toString().trim().toLowerCase()
     username = (body.username || '').toString().trim()
+    password = (body.password || '').toString()
+    mode = body.mode === 'resend' ? 'resend' : 'signup'
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -41,6 +45,55 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: 'Valid email is required' }), {
       status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
+  }
+
+  // Signup mode: create the auth user up front (email_confirm = false).
+  // If the user already exists AND is unconfirmed, we treat this as a resend.
+  if (mode === 'signup') {
+    if (!password || password.length < 6) {
+      return new Response(JSON.stringify({ error: 'Password must be at least 6 characters' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    if (!username || username.length < 3) {
+      return new Response(JSON.stringify({ error: 'Username is required' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const { error: createErr } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: false,
+      user_metadata: { username },
+    })
+
+    if (createErr) {
+      const msg = (createErr.message || '').toLowerCase()
+      // If user already exists, allow resend ONLY if they're still unconfirmed.
+      if (msg.includes('already') || msg.includes('registered') || msg.includes('exists')) {
+        const { data: list } = await supabase.auth.admin.listUsers()
+        const existing = list?.users?.find((u) => (u.email || '').toLowerCase() === email)
+        if (existing?.email_confirmed_at) {
+          return new Response(
+            JSON.stringify({ error: 'An account with this email already exists. Please sign in.' }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        // Unconfirmed — update password and continue to send a new OTP
+        if (existing) {
+          await supabase.auth.admin.updateUserById(existing.id, { password })
+        }
+      } else {
+        console.error('createUser failed', createErr)
+        return new Response(JSON.stringify({ error: createErr.message }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+    }
+
+    // Ensure profile flag is false
+    await supabase.from('profiles').update({ email_verified: false }).eq('username', username)
   }
 
   // Rate limit: one send per 30s per email
@@ -78,9 +131,6 @@ Deno.serve(async (req) => {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
-
-  // Mark profile as unverified (if exists)
-  await supabase.from('profiles').update({ email_verified: false }).eq('username', username)
 
   // Send email via existing transactional pipeline
   const sendRes = await supabase.functions.invoke('send-transactional-email', {

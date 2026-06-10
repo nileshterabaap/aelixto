@@ -80,11 +80,12 @@ Deno.serve(async (req) => {
   }
 
   // Success: mark profile verified, delete OTP
-  // Find the auth user by email to update their profile reliably
   const { data: usersList } = await supabase.auth.admin.listUsers()
   const authUser = usersList?.users?.find((u) => (u.email || '').toLowerCase() === email)
 
   if (authUser) {
+    // Confirm email in auth.users so the user can sign in
+    await supabase.auth.admin.updateUserById(authUser.id, { email_confirm: true })
     await supabase
       .from('profiles')
       .update({ email_verified: true })
