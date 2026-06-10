@@ -521,6 +521,7 @@ const Auth = () => {
             </form>
           </TabsContent>
         </Tabs>
+        )}
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground px-4 leading-relaxed">
