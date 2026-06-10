@@ -32,6 +32,16 @@ const Auth = () => {
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const [usernameValue, setUsernameValue] = useState("");
   const [signinIdentifier, setSigninIdentifier] = useState("");
+  // OTP verification state
+  const [otpStep, setOtpStep] = useState<null | { email: string; password: string; username: string }>(null);
+  const [otpValue, setOtpValue] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendCooldown]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -130,22 +140,80 @@ const Auth = () => {
     const password = formData.get("signup-password") as string;
     const username = usernameValue || email.split("@")[0];
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: { username },
-      },
+    const { data, error } = await supabase.functions.invoke("send-signup-otp", {
+      body: { email: email.trim().toLowerCase(), password, username, mode: "signup" },
     });
 
     setLoading(false);
 
-    if (error) {
-      toast({ title: "Sign up failed", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Welcome!", description: "Your account has been created successfully." });
+    if (error || (data && (data as { error?: string }).error)) {
+      const msg =
+        (data as { error?: string } | null)?.error ||
+        (error as { message?: string } | null)?.message ||
+        "Could not send verification code.";
+      toast({ title: "Sign up failed", description: msg, variant: "destructive" });
+      return;
     }
+
+    setOtpStep({ email: email.trim().toLowerCase(), password, username });
+    setOtpValue("");
+    setResendCooldown(30);
+    toast({ title: "Check your email", description: "We sent a 4-digit code to " + email });
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!otpStep) return;
+    if (!/^\d{4}$/.test(otpValue)) {
+      toast({ title: "Enter the 4-digit code", description: "Check your email and try again.", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke("verify-signup-otp", {
+      body: { email: otpStep.email, code: otpValue },
+    });
+
+    if (error || (data && (data as { error?: string }).error)) {
+      setLoading(false);
+      const msg =
+        (data as { error?: string } | null)?.error ||
+        (error as { message?: string } | null)?.message ||
+        "Incorrect code.";
+      toast({ title: "Verification failed", description: msg, variant: "destructive" });
+      return;
+    }
+
+    // Code verified — sign the user in
+    const { error: signInErr } = await supabase.auth.signInWithPassword({
+      email: otpStep.email,
+      password: otpStep.password,
+    });
+    setLoading(false);
+    if (signInErr) {
+      toast({ title: "Could not sign in", description: signInErr.message, variant: "destructive" });
+      return;
+    }
+    toast({ title: "Welcome to Aelixto!", description: "Your account is verified." });
+    setOtpStep(null);
+  };
+
+  const handleResendOtp = async () => {
+    if (!otpStep || resendCooldown > 0) return;
+    setLoading(true);
+    const { data, error } = await supabase.functions.invoke("send-signup-otp", {
+      body: { email: otpStep.email, username: otpStep.username, password: otpStep.password, mode: "resend" },
+    });
+    setLoading(false);
+    if (error || (data && (data as { error?: string }).error)) {
+      toast({
+        title: "Couldn't resend",
+        description: (data as { error?: string } | null)?.error || "Try again in a moment.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setResendCooldown(30);
+    toast({ title: "New code sent", description: "Check your inbox." });
   };
 
   const handleForgotPassword = async (identifier: string) => {
@@ -262,6 +330,56 @@ const Auth = () => {
         </div>
 
         <div className="rounded-3xl border border-border/10 bg-card/80 backdrop-blur-xl shadow-[0_20px_60px_-20px_hsl(var(--brand-blue)/0.25)] p-6">
+        {otpStep ? (
+          <form onSubmit={handleVerifyOtp} className="space-y-4">
+            <div className="text-center space-y-2">
+              <h2 className="text-xl font-bold">Verify your email</h2>
+              <p className="text-sm text-muted-foreground">
+                We sent a 4-digit code to <span className="font-medium text-foreground">{otpStep.email}</span>
+              </p>
+            </div>
+            <Input
+              id="otp"
+              name="otp"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={4}
+              pattern="\d{4}"
+              placeholder="••••"
+              value={otpValue}
+              onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              className="text-center text-3xl tracking-[0.6em] h-16 font-bold"
+              required
+              autoFocus
+            />
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-full text-base font-semibold shadow-lg"
+              disabled={loading || otpValue.length !== 4}
+            >
+              {loading ? "Verifying..." : "Verify & continue"}
+            </Button>
+            <div className="flex items-center justify-between text-sm">
+              <button
+                type="button"
+                className="text-muted-foreground underline underline-offset-2 disabled:opacity-50"
+                onClick={handleResendOtp}
+                disabled={loading || resendCooldown > 0}
+              >
+                {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
+              </button>
+              <button
+                type="button"
+                className="text-muted-foreground underline underline-offset-2"
+                onClick={() => { setOtpStep(null); setOtpValue(""); }}
+                disabled={loading}
+              >
+                Use different email
+              </button>
+            </div>
+          </form>
+        ) : (
         <Tabs
           defaultValue={
             typeof window !== "undefined" &&
