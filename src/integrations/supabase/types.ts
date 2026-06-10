@@ -790,6 +790,7 @@ export type Database = {
           cover_url: string | null
           created_at: string
           display_name: string | null
+          email_verified: boolean
           id: string
           search_tsv: unknown
           settings: Json
@@ -804,6 +805,7 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           display_name?: string | null
+          email_verified?: boolean
           id?: string
           search_tsv?: unknown
           settings?: Json
@@ -818,6 +820,7 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           display_name?: string | null
+          email_verified?: boolean
           id?: string
           search_tsv?: unknown
           settings?: Json
@@ -983,6 +986,33 @@ export type Database = {
           code?: string
           created_at?: string
           target_path?: string
+        }
+        Relationships: []
+      }
+      signup_otps: {
+        Row: {
+          attempts: number
+          code_hash: string
+          created_at: string
+          email: string
+          expires_at: string
+          last_sent_at: string
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          created_at?: string
+          email: string
+          expires_at: string
+          last_sent_at?: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          last_sent_at?: string
         }
         Relationships: []
       }
