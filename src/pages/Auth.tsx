@@ -115,6 +115,22 @@ const Auth = () => {
     if (error) {
       const msg = error.message.toLowerCase();
       const isNoUser = msg.includes("invalid login credentials") || msg.includes("invalid_credentials");
+      const isUnconfirmed = msg.includes("email not confirmed") || msg.includes("not confirmed");
+      if (isUnconfirmed) {
+        // Trigger OTP resend and switch to verification screen
+        const username = email.split("@")[0];
+        await supabase.functions.invoke("send-signup-otp", {
+          body: { email, username, password, mode: "resend" },
+        });
+        setOtpStep({ email, password, username });
+        setOtpValue("");
+        setResendCooldown(30);
+        toast({
+          title: "Verify your email",
+          description: "We sent a 4-digit code to " + email,
+        });
+        return;
+      }
       toast({
         title: "Sign in failed",
         description: isNoUser
