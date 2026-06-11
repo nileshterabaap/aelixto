@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trackArticleOpen, trackExternalVisit } from "@/hooks/useViewTracking";
 
 // --- Helpers: safe DOM parsing on reader HTML (r.jina.ai result) ---
 // Safe entity decoding using DOMParser instead of innerHTML assignment
