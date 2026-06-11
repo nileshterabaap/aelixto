@@ -8,6 +8,8 @@ import { LinkPreviewCard } from "./LinkPreviewCard";
 interface ArticleEmbedProps {
   url: string;
   onFaviconLoaded?: (favicon: string) => void;
+  postId?: string;
+  platform?: string | null;
 }
 
 interface UnfurlResult {
@@ -63,7 +65,7 @@ const resolveRenderer = (url: string): 'reddit' | 'quora' | 'article' => {
   return 'article';
 };
 
-export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
+export const ArticleEmbed = ({ url, onFaviconLoaded, postId, platform }: ArticleEmbedProps) => {
   const [data, setData] = useState<UnfurlResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -232,7 +234,7 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
   // Everything else - rich article card
   return (
     <div data-embed-status="ready">
-      <ArticleContentEmbed data={data} />
+      <ArticleContentEmbed data={data} postId={postId} platform={platform} />
     </div>
   );
 };
