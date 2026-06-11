@@ -530,22 +530,24 @@ serve(async (req) => {
     let faviconHref: string | null = null;
     
     // Try multiple favicon patterns in order of preference
-    const faviconPatterns = [
-      // Standard icon with href attribute first
-      /<link[^>]*rel=["'](?:icon|shortcut icon)["'][^>]*href=["']([^"']+)["']/i,
-      // Reverse order (href before rel)
-      /<link[^>]*href=["']([^"']+)["'][^>]*rel=["'](?:icon|shortcut icon)["']/i,
-      // Apple touch icon as fallback
-      /<link[^>]*rel=["']apple-touch-icon["'][^>]*href=["']([^"']+)["']/i,
-      /<link[^>]*href=["']([^"']+)["'][^>]*rel=["']apple-touch-icon["']/i,
-    ];
-    
-    for (const pattern of faviconPatterns) {
-      const match = html.match(pattern);
-      if (match && match[1]) {
-        faviconHref = match[1];
-        break;
+    const wantedRels = ['icon', 'shortcut icon', 'apple-touch-icon', 'apple-touch-icon-precomposed'];
+    const linkRegex = /<link\b[^>]*>/gi;
+    let lm: RegExpExecArray | null;
+    const iconCandidates: { rel: string; href: string }[] = [];
+    while ((lm = linkRegex.exec(html)) !== null) {
+      const tag = lm[0];
+      const relMatch = tag.match(/\srel\s*=\s*["']([^"']+)["']/i);
+      const hrefMatch = tag.match(/\shref\s*=\s*["']([^"']+)["']/i);
+      if (!relMatch || !hrefMatch) continue;
+      const rel = relMatch[1].toLowerCase().trim();
+      if (wantedRels.some((r) => rel.split(/\s+/).includes(r) || rel === r)) {
+        iconCandidates.push({ rel, href: hrefMatch[1] });
       }
+    }
+    // Prefer "icon" over apple-touch-icon
+    const preferred = iconCandidates.find((c) => c.rel.includes('icon') && !c.rel.includes('apple')) || iconCandidates[0];
+    if (preferred) faviconHref = preferred.href;
+
     }
     
     // Fallback to /favicon.ico if nothing found
