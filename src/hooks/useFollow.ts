@@ -18,6 +18,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
   const [isFollowing, setIsFollowing] = useState<boolean | null>(
     initialIsFollowing ?? null
   );
+  const [isRequested, setIsRequested] = useState<boolean>(false);
   const [counts, setCounts] = useState<{ followers: number; following: number }>({ 
     followers: 0, 
     following: 0 
@@ -43,6 +44,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
 
       // Check if current user follows this profile
       let myFollow = null;
+      let myRequest = null;
       if (user) {
         const { data } = await supabase
           .from("follows")
@@ -51,6 +53,13 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
           .eq("following_id", targetUserId)
           .maybeSingle();
         myFollow = data;
+        const { data: reqRow } = await supabase
+          .from("follow_requests")
+          .select("id")
+          .eq("requester_id", user.id)
+          .eq("target_id", targetUserId)
+          .maybeSingle();
+        myRequest = reqRow;
       }
 
       setCounts({
@@ -58,6 +67,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
         following: followingCount ?? 0,
       });
       setIsFollowing(!!myFollow);
+      setIsRequested(!!myRequest && !myFollow);
     } catch (error) {
       console.error("Error refreshing follow data:", error);
     }
@@ -69,7 +79,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
   }, [refresh, skipInitialRefresh]);
 
   const follow = useCallback(async () => {
-    if (!targetUserId || isFollowing) return;
+    if (!targetUserId || isFollowing || isRequested) return;
     setLoading(true);
     
     try {
@@ -79,28 +89,25 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
         return;
       }
 
-      // Optimistic update
-      setIsFollowing(true);
-      setCounts(prev => ({ ...prev, followers: prev.followers + 1 }));
-
-      const { error } = await supabase
-        .from("follows")
-        .insert({ follower_id: user.id, following_id: targetUserId });
-      
+      const { data, error } = await supabase.rpc("request_or_follow", { _target: targetUserId });
       if (error) throw error;
+      const result = (data as string) || "";
+      if (result === "requested") {
+        setIsRequested(true);
+      } else if (result === "following") {
+        setIsFollowing(true);
+        setCounts(prev => ({ ...prev, followers: prev.followers + 1 }));
+      }
       await refresh();
     } catch (error) {
       console.error("Error following:", error);
-      // Revert optimistic update
-      setIsFollowing(false);
-      setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
     } finally {
       setLoading(false);
     }
-  }, [targetUserId, isFollowing, refresh]);
+  }, [targetUserId, isFollowing, isRequested, refresh]);
 
   const unfollow = useCallback(async () => {
-    if (!targetUserId || !isFollowing) return;
+    if (!targetUserId || (!isFollowing && !isRequested)) return;
     setLoading(true);
     
     try {
@@ -110,27 +117,22 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
         return;
       }
 
-      // Optimistic update
+      const wasFollowing = isFollowing;
       setIsFollowing(false);
-      setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
+      setIsRequested(false);
+      if (wasFollowing) {
+        setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
+      }
 
-      const { error } = await supabase
-        .from("follows")
-        .delete()
-        .eq("follower_id", user.id)
-        .eq("following_id", targetUserId);
-      
+      const { error } = await supabase.rpc("cancel_follow_or_request", { _target: targetUserId });
       if (error) throw error;
       await refresh();
     } catch (error) {
       console.error("Error unfollowing:", error);
-      // Revert optimistic update
-      setIsFollowing(true);
-      setCounts(prev => ({ ...prev, followers: prev.followers + 1 }));
     } finally {
       setLoading(false);
     }
-  }, [targetUserId, isFollowing, refresh]);
+  }, [targetUserId, isFollowing, isRequested, refresh]);
 
-  return { isFollowing, follow, unfollow, loading, counts, refresh };
+  return { isFollowing, isRequested, follow, unfollow, loading, counts, refresh };
 }
