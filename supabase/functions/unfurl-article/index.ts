@@ -93,10 +93,25 @@ const decodeHtmlEntities = (text: string): string => {
 
 // Extract meta tag content
 const extractMetaContent = (html: string, property: string, attr = 'property'): string | null => {
-  const regex = new RegExp(`<meta\\s+${attr}=["']${property}["']\\s+content=["']([^"']+)["']`, 'i');
-  const reverseRegex = new RegExp(`<meta\\s+content=["']([^"']+)["']\\s+${attr}=["']${property}["']`, 'i');
-  const match = html.match(regex) || html.match(reverseRegex);
-  return match ? decodeHtmlEntities(match[1]) : null;
+  // Tolerant parser: iterate every <meta ...> tag and match attributes in any order,
+  // with any extra attributes in between (data-*, id, class, charset, etc.).
+  const want = property.toLowerCase();
+  const wantAttrs = attr === 'name' ? ['name'] : ['property', 'name', 'itemprop'];
+  const tagRegex = /<meta\b[^>]*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = tagRegex.exec(html)) !== null) {
+    const tag = m[0];
+    const propMatch = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
+    if (!propMatch) continue;
+    if (!wantAttrs.includes(propMatch[1].toLowerCase())) continue;
+    if (propMatch[2].toLowerCase() !== want) continue;
+    const contentMatch =
+      tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
+      tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
+      tag.match(/\scontent\s*=\s*([^\s>]+)/i);
+    if (contentMatch?.[1]) return decodeHtmlEntities(contentMatch[1]).trim();
+  }
+  return null;
 };
 
 // Extract title - prioritize actual article H1
