@@ -137,10 +137,42 @@ const extractTitle = (html: string): string => {
   return titleMatch ? titleMatch[1] : '';
 };
 
-// Extract first image from content
+// Heuristic: skip icons, logos, trackers, tiny sprites
+const isLikelyRealContentImage = (url: string): boolean => {
+  if (!url) return false;
+  const u = url.trim();
+  if (!u || u.startsWith('data:')) return false;
+  if (/\.svg(\?|#|$)/i.test(u)) return false;
+  const lower = u.toLowerCase();
+  const blocked = ['sprite','icon','favicon','logo','avatar','profile-photo','blank.gif','spacer.gif','pixel.gif','1x1','tracking','analytics','badge','emoji'];
+  if (blocked.some((h) => lower.includes(h))) return false;
+  if (/[?&=_/-](?:w|width)=(?:8|16|24|32|48|64)\b/i.test(u)) return false;
+  return true;
+};
+
+// Extract first real content image from HTML (article/main first, then any img)
 const extractFirstContentImage = (html: string): string | null => {
-  const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-  return imgMatch ? imgMatch[1] : null;
+  const scopes: string[] = [];
+  const articleMatch = html.match(/<article[\s\S]*?<\/article>/i);
+  if (articleMatch) scopes.push(articleMatch[0]);
+  const mainMatch = html.match(/<main[\s\S]*?<\/main>/i);
+  if (mainMatch) scopes.push(mainMatch[0]);
+  scopes.push(html);
+  for (const scope of scopes) {
+    const imgRegex = /<img\b[^>]+>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = imgRegex.exec(scope)) !== null) {
+      const tag = m[0];
+      const src =
+        tag.match(/\s(?:data-src|data-original|data-lazy-src)\s*=\s*["']([^"']+)["']/i)?.[1] ||
+        tag.match(/\s(?:srcset|data-srcset)\s*=\s*["']([^"']+)["']/i)?.[1] ||
+        tag.match(/\ssrc\s*=\s*["']([^"']+)["']/i)?.[1];
+      if (!src) continue;
+      const candidate = decodeHtmlEntities(src.split(',')[0].trim().split(/\s+/)[0]);
+      if (isLikelyRealContentImage(candidate)) return candidate;
+    }
+  }
+  return null;
 };
 
 // Extract first few sentences from content
