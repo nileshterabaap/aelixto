@@ -754,14 +754,31 @@ async function scrapeOgData(url: string, userAgent?: string): Promise<{ image: s
 }
 
 function extractSizingFromHtml(html: string): { imageWidth: number | null; imageHeight: number | null; videoWidth: number | null; videoHeight: number | null; hasVideo: boolean } {
+  const tolerantMeta = (want: string): string | null => {
+    const w = want.toLowerCase();
+    const tagRegex = /<meta\b[^>]*>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = tagRegex.exec(html)) !== null) {
+      const tag = m[0];
+      const p = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
+      if (!p || p[2].toLowerCase() !== w) continue;
+      const c =
+        tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
+        tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
+        tag.match(/\scontent\s*=\s*([^\s>]+)/i);
+      if (c?.[1]) return decodeHtmlEntities(c[1]).trim();
+    }
+    return null;
+  };
   const metaNum = (name: string): number | null => {
-    const m = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)["']`, 'i'))
-      || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${name}["']`, 'i'));
-    const n = m?.[1] ? parseInt(m[1], 10) : NaN;
+    const v = tolerantMeta(name);
+    const n = v ? parseInt(v, 10) : NaN;
     return Number.isFinite(n) && n > 0 ? n : null;
   };
-  const hasVideo = !!html.match(/<meta[^>]+(?:property|name)=["']og:video(?::secure_url|:url)?["']/i)
-    || !!html.match(/<meta[^>]+(?:property|name)=["']twitter:card["'][^>]+content=["']player["']/i);
+  const hasVideo = !!tolerantMeta('og:video')
+    || !!tolerantMeta('og:video:secure_url')
+    || !!tolerantMeta('og:video:url')
+    || (tolerantMeta('twitter:card')?.toLowerCase() === 'player');
   return {
     imageWidth: metaNum('og:image:width'),
     imageHeight: metaNum('og:image:height'),
@@ -805,13 +822,18 @@ export function extractArticleMetadata(
   type JsonLdNode = Record<string, JsonLdValue>;
 
   const meta = (name: string): string | null => {
-    const patterns = [
-      new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)["']`, 'i'),
-      new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${name}["']`, 'i'),
-    ];
-    for (const p of patterns) {
-      const m = html.match(p);
-      if (m?.[1]) return decodeHtmlEntities(m[1]).trim();
+    const want = name.toLowerCase();
+    const tagRegex = /<meta\b[^>]*>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = tagRegex.exec(html)) !== null) {
+      const tag = m[0];
+      const propMatch = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
+      if (!propMatch || propMatch[2].toLowerCase() !== want) continue;
+      const contentMatch =
+        tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
+        tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
+        tag.match(/\scontent\s*=\s*([^\s>]+)/i);
+      if (contentMatch?.[1]) return decodeHtmlEntities(contentMatch[1]).trim();
     }
     return null;
   };

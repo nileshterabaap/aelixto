@@ -93,10 +93,25 @@ const decodeHtmlEntities = (text: string): string => {
 
 // Extract meta tag content
 const extractMetaContent = (html: string, property: string, attr = 'property'): string | null => {
-  const regex = new RegExp(`<meta\\s+${attr}=["']${property}["']\\s+content=["']([^"']+)["']`, 'i');
-  const reverseRegex = new RegExp(`<meta\\s+content=["']([^"']+)["']\\s+${attr}=["']${property}["']`, 'i');
-  const match = html.match(regex) || html.match(reverseRegex);
-  return match ? decodeHtmlEntities(match[1]) : null;
+  // Tolerant parser: iterate every <meta ...> tag and match attributes in any order,
+  // with any extra attributes in between (data-*, id, class, charset, etc.).
+  const want = property.toLowerCase();
+  const wantAttrs = attr === 'name' ? ['name'] : ['property', 'name', 'itemprop'];
+  const tagRegex = /<meta\b[^>]*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = tagRegex.exec(html)) !== null) {
+    const tag = m[0];
+    const propMatch = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
+    if (!propMatch) continue;
+    if (!wantAttrs.includes(propMatch[1].toLowerCase())) continue;
+    if (propMatch[2].toLowerCase() !== want) continue;
+    const contentMatch =
+      tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
+      tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
+      tag.match(/\scontent\s*=\s*([^\s>]+)/i);
+    if (contentMatch?.[1]) return decodeHtmlEntities(contentMatch[1]).trim();
+  }
+  return null;
 };
 
 // Extract title - prioritize actual article H1
@@ -122,10 +137,42 @@ const extractTitle = (html: string): string => {
   return titleMatch ? titleMatch[1] : '';
 };
 
-// Extract first image from content
+// Heuristic: skip icons, logos, trackers, tiny sprites
+const isLikelyRealContentImage = (url: string): boolean => {
+  if (!url) return false;
+  const u = url.trim();
+  if (!u || u.startsWith('data:')) return false;
+  if (/\.svg(\?|#|$)/i.test(u)) return false;
+  const lower = u.toLowerCase();
+  const blocked = ['sprite','icon','favicon','logo','avatar','profile-photo','blank.gif','spacer.gif','pixel.gif','1x1','tracking','analytics','badge','emoji'];
+  if (blocked.some((h) => lower.includes(h))) return false;
+  if (/[?&=_/-](?:w|width)=(?:8|16|24|32|48|64)\b/i.test(u)) return false;
+  return true;
+};
+
+// Extract first real content image from HTML (article/main first, then any img)
 const extractFirstContentImage = (html: string): string | null => {
-  const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-  return imgMatch ? imgMatch[1] : null;
+  const scopes: string[] = [];
+  const articleMatch = html.match(/<article[\s\S]*?<\/article>/i);
+  if (articleMatch) scopes.push(articleMatch[0]);
+  const mainMatch = html.match(/<main[\s\S]*?<\/main>/i);
+  if (mainMatch) scopes.push(mainMatch[0]);
+  scopes.push(html);
+  for (const scope of scopes) {
+    const imgRegex = /<img\b[^>]+>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = imgRegex.exec(scope)) !== null) {
+      const tag = m[0];
+      const src =
+        tag.match(/\s(?:data-src|data-original|data-lazy-src)\s*=\s*["']([^"']+)["']/i)?.[1] ||
+        tag.match(/\s(?:srcset|data-srcset)\s*=\s*["']([^"']+)["']/i)?.[1] ||
+        tag.match(/\ssrc\s*=\s*["']([^"']+)["']/i)?.[1];
+      if (!src) continue;
+      const candidate = decodeHtmlEntities(src.split(',')[0].trim().split(/\s+/)[0]);
+      if (isLikelyRealContentImage(candidate)) return candidate;
+    }
+  }
+  return null;
 };
 
 // Extract first few sentences from content
@@ -515,24 +562,24 @@ serve(async (req) => {
     let faviconHref: string | null = null;
     
     // Try multiple favicon patterns in order of preference
-    const faviconPatterns = [
-      // Standard icon with href attribute first
-      /<link[^>]*rel=["'](?:icon|shortcut icon)["'][^>]*href=["']([^"']+)["']/i,
-      // Reverse order (href before rel)
-      /<link[^>]*href=["']([^"']+)["'][^>]*rel=["'](?:icon|shortcut icon)["']/i,
-      // Apple touch icon as fallback
-      /<link[^>]*rel=["']apple-touch-icon["'][^>]*href=["']([^"']+)["']/i,
-      /<link[^>]*href=["']([^"']+)["'][^>]*rel=["']apple-touch-icon["']/i,
-    ];
-    
-    for (const pattern of faviconPatterns) {
-      const match = html.match(pattern);
-      if (match && match[1]) {
-        faviconHref = match[1];
-        break;
+    const wantedRels = ['icon', 'shortcut icon', 'apple-touch-icon', 'apple-touch-icon-precomposed'];
+    const linkRegex = /<link\b[^>]*>/gi;
+    let lm: RegExpExecArray | null;
+    const iconCandidates: { rel: string; href: string }[] = [];
+    while ((lm = linkRegex.exec(html)) !== null) {
+      const tag = lm[0];
+      const relMatch = tag.match(/\srel\s*=\s*["']([^"']+)["']/i);
+      const hrefMatch = tag.match(/\shref\s*=\s*["']([^"']+)["']/i);
+      if (!relMatch || !hrefMatch) continue;
+      const rel = relMatch[1].toLowerCase().trim();
+      if (wantedRels.some((r) => rel.split(/\s+/).includes(r) || rel === r)) {
+        iconCandidates.push({ rel, href: hrefMatch[1] });
       }
     }
-    
+    // Prefer "icon" over apple-touch-icon
+    const preferred = iconCandidates.find((c) => c.rel.includes('icon') && !c.rel.includes('apple')) || iconCandidates[0];
+    if (preferred) faviconHref = preferred.href;
+
     // Fallback to /favicon.ico if nothing found
     if (!faviconHref) faviconHref = '/favicon.ico';
     
