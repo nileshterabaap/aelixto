@@ -248,9 +248,10 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
               href={data.resolvedUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={handleCtaClick}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
-              Continue Reading
+              {ctaLabel}
             </a>
           </Button>
         </div>
