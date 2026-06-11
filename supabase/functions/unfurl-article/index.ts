@@ -476,9 +476,9 @@ serve(async (req) => {
         }
       }
     } else {
-      // For non-Quora sites, use standard fetch
-      const standardHeaders = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      // For non-Quora sites, try a UA fallback chain to bypass anti-bot protections (Cloudflare, etc.)
+      const buildHeaders = (ua: string) => ({
+        'User-Agent': ua,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
@@ -488,20 +488,46 @@ serve(async (req) => {
         'Sec-Fetch-Mode': 'navigate',
         'Sec-Fetch-Site': 'none',
         'Cache-Control': 'max-age=0',
-      };
-      
-      const response = await fetch(targetUrl, {
-        headers: standardHeaders,
-        redirect: 'follow',
       });
 
-      if (!response.ok) {
-        console.log('[unfurl-article] HTTP error:', response.status);
-        throw new Error(`HTTP error! status: ${response.status}`);
+      const uaChain = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
+        'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+        'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+      ];
+
+      let okResp: Response | null = null;
+      for (const ua of uaChain) {
+        try {
+          const r = await fetch(targetUrl, { headers: buildHeaders(ua), redirect: 'follow' });
+          console.log('[unfurl-article] UA', ua, '->', r.status);
+          if (r.ok) { okResp = r; break; }
+        } catch (e) {
+          console.log('[unfurl-article] UA error:', ua, e instanceof Error ? e.message : String(e));
+        }
       }
 
-      html = await response.text();
-      resolvedUrl = response.url;
+      if (!okResp) {
+        // Last-resort proxy fallback
+        try {
+          const jina = await fetch(`https://r.jina.ai/${targetUrl}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,*/*' },
+            redirect: 'follow',
+          });
+          if (jina.ok) { okResp = jina; resolvedUrl = targetUrl; console.log('[unfurl-article] Jina proxy succeeded'); }
+        } catch (e) {
+          console.log('[unfurl-article] Jina proxy failed:', e instanceof Error ? e.message : String(e));
+        }
+      }
+
+      if (!okResp) {
+        console.log('[unfurl-article] All fetch strategies failed');
+        throw new Error('HTTP error! All fetch strategies failed');
+      }
+
+      html = await okResp.text();
+      resolvedUrl = okResp.url || resolvedUrl;
     }
 
     // Extract metadata
