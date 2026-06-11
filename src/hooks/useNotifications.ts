@@ -7,7 +7,7 @@ export interface Notification {
   id: string;
   recipient_id: string;
   actor_id: string;
-  type: 'like' | 'comment' | 'repost' | 'follow' | 'report_outcome';
+  type: 'like' | 'comment' | 'repost' | 'follow' | 'follow_request' | 'report_outcome';
   post_id: string | null;
   comment_id: string | null;
   is_read: boolean;
