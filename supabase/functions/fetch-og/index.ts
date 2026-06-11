@@ -115,13 +115,18 @@ function extractArticleMetadata(
   baseUrl: string
 ): { image: string | null; title: string | null; description: string | null } {
   const meta = (name: string): string | null => {
-    const patterns = [
-      new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)["']`, 'i'),
-      new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${name}["']`, 'i'),
-    ];
-    for (const p of patterns) {
-      const m = html.match(p);
-      if (m?.[1]) return decodeHtmlEntities(m[1]).trim();
+    const want = name.toLowerCase();
+    const tagRegex = /<meta\b[^>]*>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = tagRegex.exec(html)) !== null) {
+      const tag = m[0];
+      const propMatch = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
+      if (!propMatch || propMatch[2].toLowerCase() !== want) continue;
+      const contentMatch =
+        tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
+        tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
+        tag.match(/\scontent\s*=\s*([^\s>]+)/i);
+      if (contentMatch?.[1]) return decodeHtmlEntities(contentMatch[1]).trim();
     }
     return null;
   };
@@ -557,13 +562,18 @@ serve(async (req) => {
     const finalUrl = response.url;
 
     const extractMeta = (propName: string): string | null => {
-      const patterns = [
-        new RegExp(`<meta[^>]+(?:property|name)=["']${propName}["'][^>]+content=["']([^"']+)["']`, 'i'),
-        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${propName}["']`, 'i'),
-      ];
-      for (const pattern of patterns) {
-        const match = html.match(pattern);
-        if (match) return decodeHtmlEntities(match[1]);
+      const want = propName.toLowerCase();
+      const tagRegex = /<meta\b[^>]*>/gi;
+      let m: RegExpExecArray | null;
+      while ((m = tagRegex.exec(html)) !== null) {
+        const tag = m[0];
+        const propMatch = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
+        if (!propMatch || propMatch[2].toLowerCase() !== want) continue;
+        const contentMatch =
+          tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
+          tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
+          tag.match(/\scontent\s*=\s*([^\s>]+)/i);
+        if (contentMatch?.[1]) return decodeHtmlEntities(contentMatch[1]).trim();
       }
       return null;
     };
