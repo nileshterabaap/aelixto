@@ -214,25 +214,29 @@ export const HydratedEmbed = memo(({
 
         {/* YouTube video */}
         {r.kind === 'video' && post.platform === 'youtube' && r.url && (
-          <div className={`w-full bg-black ${aspectClass}`}>
-            <iframe
-              className="w-full h-full"
-              src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=0&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
-              title="YouTube video player"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          </div>
+          <ImageViewTracker postId={post.id}>
+            <div className={`w-full bg-black ${aspectClass}`}>
+              <iframe
+                className="w-full h-full"
+                src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=0&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
+                title="YouTube video player"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+          </ImageViewTracker>
         )}
         
         {/* Non-YouTube video */}
         {r.kind === 'video' && post.platform !== 'youtube' && r.url && (
-          <video 
-            src={r.url} 
-            className="w-full h-auto" 
-            controls 
-            playsInline
-          />
+          <ImageViewTracker postId={post.id}>
+            <video 
+              src={r.url} 
+              className="w-full h-auto" 
+              controls 
+              playsInline
+            />
+          </ImageViewTracker>
         )}
         
         {/* Image content */}
