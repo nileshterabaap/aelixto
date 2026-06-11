@@ -105,9 +105,22 @@ interface ArticleContentEmbedProps {
       html: string;
     };
   };
+  postId?: string;
+  platform?: string | null;
 }
 
-export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
+export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEmbedProps) => {
+  const isExternal = platform === 'external';
+  const ctaLabel = isExternal ? 'Visit' : 'Continue Reading';
+
+  const handleCtaClick = () => {
+    if (!postId) return;
+    if (isExternal) {
+      void trackExternalVisit(postId);
+    } else {
+      void trackArticleOpen(postId);
+    }
+  };
   const formatDate = (dateString: string | null) => {
     if (!dateString) return null;
     try {
