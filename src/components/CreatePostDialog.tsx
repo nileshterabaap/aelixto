@@ -9,6 +9,12 @@ import { ArrowLeft, Link2, Loader2, Sparkles, X, Check } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
+import {
+  extractRootDomain,
+  getDomainOverride,
+  recordDomainClassification,
+} from "@/lib/domainClassification";
+import { supabase } from "@/integrations/supabase/client";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 
@@ -233,7 +239,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
   };
 
-  const handlePost = () => {
+  const handlePost = async () => {
     if (!linkUrl.trim()) return;
 
     if (limitReached) {
@@ -242,7 +248,15 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
 
     // Use centralised classification
-    const platform = classifyUrl(linkUrl, ogType);
+    let platform = classifyUrl(linkUrl, ogType);
+
+    // Apply user-learned override for unknown sites (article vs external).
+    if (platform === "article" || platform === "external") {
+      const domain = extractRootDomain(linkUrl);
+      const override = await getDomainOverride(domain);
+      if (override) platform = override;
+    }
+
     const mediaType = deriveMediaType(linkUrl, platform);
 
     // Final safety net — never publish a card with nothing to show.
@@ -288,8 +302,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
     }, {
-      onSuccess: () => {
+      onSuccess: (created: any) => {
         incrementDailyCount();
+        if (platform === "article" || platform === "external") {
+          promptSectionFeedback(created?.id, linkUrl, platform);
+        }
       },
     });
 
