@@ -536,7 +536,7 @@ serve(async (req) => {
               body: JSON.stringify({
                 url: targetUrl,
                 formats: ['html'],
-                onlyMainContent: true,
+                onlyMainContent: false,
               }),
             });
             if (fc.ok) {
@@ -547,14 +547,20 @@ serve(async (req) => {
               const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
               const title = md.ogTitle || md.title || '';
               const desc = md.ogDescription || md.description || '';
-              const image = md.ogImage || md['og:image'] || '';
+              const image = md.ogImage || md['og:image'] || md.image || '';
+              const author = md.author || md.ogAuthor || '';
+              const site = md.ogSiteName || md['og:site_name'] || '';
               const synth = `<html><head>
                 ${title ? `<title>${esc(title)}</title>` : ''}
                 ${title ? `<meta property="og:title" content="${esc(title)}">` : ''}
                 ${desc ? `<meta property="og:description" content="${esc(desc)}">` : ''}
                 ${desc ? `<meta name="description" content="${esc(desc)}">` : ''}
                 ${image ? `<meta property="og:image" content="${esc(image)}">` : ''}
+                ${image ? `<meta name="twitter:image" content="${esc(image)}">` : ''}
+                ${site ? `<meta property="og:site_name" content="${esc(site)}">` : ''}
+                ${author ? `<meta name="author" content="${esc(author)}">` : ''}
                 <meta property="og:url" content="${esc(md.sourceURL || targetUrl)}">
+                <base href="${esc(md.sourceURL || targetUrl)}">
               </head><body>${fcHtml}</body></html>`;
               if (title || image || fcHtml) {
                 okResp = new Response(synth, { status: 200, headers: { 'Content-Type': 'text/html' } });
