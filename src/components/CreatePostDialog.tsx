@@ -238,6 +238,52 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
   };
 
+  const promptSectionFeedback = (
+    postId: string | undefined,
+    url: string,
+    currentType: "article" | "external"
+  ) => {
+    if (!postId) return;
+    const domain = extractRootDomain(url);
+    if (!domain) return;
+    const otherType: "article" | "external" =
+      currentType === "article" ? "external" : "article";
+    const otherLabel = otherType === "article" ? "Articles" : "External";
+    const currentLabel = currentType === "article" ? "Articles" : "External";
+
+    const id = toast(
+      `Posted to ${currentLabel}. Wrong section?`,
+      {
+        description: `Move it to ${otherLabel} — Aelixto will remember ${domain} for next time.`,
+        duration: 12000,
+        action: {
+          label: `Move to ${otherLabel}`,
+          onClick: async () => {
+            try {
+              const { error } = await supabase
+                .from("posts")
+                .update({ platform: otherType })
+                .eq("id", postId);
+              if (error) throw error;
+              await recordDomainClassification(domain, otherType);
+              toast.success(`Moved to ${otherLabel}. Aelixto will remember.`);
+            } catch (e: any) {
+              toast.error(e?.message || "Couldn't move the post.");
+            }
+          },
+        },
+        cancel: {
+          label: "Keep here",
+          onClick: async () => {
+            // Confirming the current placement also teaches the system.
+            try { await recordDomainClassification(domain, currentType); } catch {}
+          },
+        },
+      }
+    );
+    return id;
+  };
+
   const handlePost = async () => {
     if (!linkUrl.trim()) return;
 
