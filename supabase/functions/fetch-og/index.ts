@@ -568,29 +568,24 @@ serve(async (req) => {
             body: JSON.stringify({
               url: targetUrl,
               formats: ['html'],
-              onlyMainContent: true,
+              onlyMainContent: false,
             }),
           });
           if (fc.ok) {
             const data = await fc.json();
             const payload = data?.data || data || {};
             const md = payload.metadata || {};
-            const fcHtml: string = payload.html || '';
-            const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             const title = md.ogTitle || md.title || '';
             const desc = md.ogDescription || md.description || '';
-            const image = md.ogImage || md['og:image'] || '';
-            const synthHead = `<html><head>
-              ${title ? `<title>${esc(title)}</title>` : ''}
-              ${title ? `<meta property="og:title" content="${esc(title)}">` : ''}
-              ${desc ? `<meta property="og:description" content="${esc(desc)}">` : ''}
-              ${desc ? `<meta name="description" content="${esc(desc)}">` : ''}
-              ${image ? `<meta property="og:image" content="${esc(image)}">` : ''}
-              <meta property="og:url" content="${esc(md.sourceURL || targetUrl)}">
-            </head><body>${fcHtml}</body></html>`;
-            if (title || image || fcHtml) {
-              response = new Response(synthHead, { status: 200, headers: { 'Content-Type': 'text/html' } });
-              console.log('[fetch-og] Success with Firecrawl. title:', title?.slice(0,80), 'image:', !!image);
+            const image = md.ogImage || md['og:image'] || md.image || '';
+            const ogType = md.ogType || md['og:type'] || null;
+            const finalUrl = md.sourceURL || md.url || targetUrl;
+            if (title || image) {
+              console.log('[fetch-og] Firecrawl direct return. title:', title?.slice(0,80), 'image:', image?.slice(0,120));
+              return new Response(
+                JSON.stringify({ title: title || null, image: image || null, description: desc || null, finalUrl, og_type: ogType }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
             }
           } else {
             console.log('[fetch-og] Firecrawl failed:', fc.status);
