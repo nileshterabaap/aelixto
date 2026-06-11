@@ -2,7 +2,7 @@ import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { Heart, MessageCircle, Repeat2, Bell, Shield } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Bell, Shield, UserPlus } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -19,6 +19,8 @@ const getNotificationIcon = (type: string) => {
       return { icon: MessageCircle, bgColor: 'bg-blue-100', iconColor: 'text-blue-500' };
     case 'repost':
       return { icon: Repeat2, bgColor: 'bg-green-100', iconColor: 'text-green-500' };
+    case 'follow_request':
+      return { icon: UserPlus, bgColor: 'bg-violet-100', iconColor: 'text-violet-500' };
     case 'report_outcome':
       return { icon: Shield, bgColor: 'bg-amber-100', iconColor: 'text-amber-600' };
     default:
@@ -36,6 +38,8 @@ const getNotificationMessage = (type: string) => {
       return 'reposted your post';
     case 'follow':
       return 'started following you';
+    case 'follow_request':
+      return 'requested to follow you';
     default:
       return 'interacted with you';
   }
@@ -50,10 +54,13 @@ const NotificationItem = ({
 }) => {
   const [busy, setBusy] = useState<"delete" | "keep" | null>(null);
   const [resolved, setResolved] = useState<"deleted" | "kept" | null>(null);
+  const [reqBusy, setReqBusy] = useState<"approve" | "decline" | null>(null);
+  const [reqResolved, setReqResolved] = useState<"approved" | "declined" | null>(null);
   const { icon: Icon, bgColor, iconColor } = getNotificationIcon(notification.type);
   const message = getNotificationMessage(notification.type);
   const actorName = notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
   const isReportOutcome = notification.type === 'report_outcome';
+  const isFollowRequest = notification.type === 'follow_request';
   const outcome = notification.metadata?.action as 'removed' | 'kept' | undefined;
   const reportKind = notification.metadata?.kind as
     | 'report_outcome'
@@ -76,6 +83,40 @@ const NotificationItem = ({
   const handleClick = () => {
     if (busy) return;
     onClick();
+  };
+
+  const handleApproveFollow = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (reqBusy || !notification.actor_id) return;
+    setReqBusy("approve");
+    const { error } = await supabase.rpc("respond_to_follow_request", {
+      _requester: notification.actor_id,
+      _approve: true,
+    });
+    if (error) {
+      toast.error("Couldn't approve");
+      setReqBusy(null);
+      return;
+    }
+    setReqResolved("approved");
+    setReqBusy(null);
+  };
+
+  const handleDeclineFollow = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (reqBusy || !notification.actor_id) return;
+    setReqBusy("decline");
+    const { error } = await supabase.rpc("respond_to_follow_request", {
+      _requester: notification.actor_id,
+      _approve: false,
+    });
+    if (error) {
+      toast.error("Couldn't decline");
+      setReqBusy(null);
+      return;
+    }
+    setReqResolved("declined");
+    setReqBusy(null);
   };
 
   const handleDeletePost = async (e: React.MouseEvent) => {
@@ -177,6 +218,32 @@ const NotificationItem = ({
               <span className="font-semibold">{actorName}</span>{' '}
               <span className="text-muted-foreground">{message}</span>
             </p>
+          )}
+          {isFollowRequest && (
+            <div className="flex gap-2 mt-3">
+              {reqResolved === "approved" ? (
+                <span className="text-xs text-muted-foreground">Approved.</span>
+              ) : reqResolved === "declined" ? (
+                <span className="text-xs text-muted-foreground">Declined.</span>
+              ) : (
+                <>
+                  <button
+                    onClick={handleApproveFollow}
+                    disabled={reqBusy !== null}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition disabled:opacity-50"
+                  >
+                    {reqBusy === "approve" ? "Approving…" : "Approve"}
+                  </button>
+                  <button
+                    onClick={handleDeclineFollow}
+                    disabled={reqBusy !== null}
+                    className="text-xs font-medium px-3 py-1.5 rounded-full bg-muted hover:bg-muted/70 transition disabled:opacity-50"
+                  >
+                    {reqBusy === "decline" ? "Declining…" : "Decline"}
+                  </button>
+                </>
+              )}
+            </div>
           )}
           <p className="text-xs text-muted-foreground mt-2">
             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
