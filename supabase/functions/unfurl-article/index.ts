@@ -548,8 +548,6 @@ serve(async (req) => {
     const preferred = iconCandidates.find((c) => c.rel.includes('icon') && !c.rel.includes('apple')) || iconCandidates[0];
     if (preferred) faviconHref = preferred.href;
 
-    }
-    
     // Fallback to /favicon.ico if nothing found
     if (!faviconHref) faviconHref = '/favicon.ico';
     
