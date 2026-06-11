@@ -521,6 +521,41 @@ serve(async (req) => {
         }
       }
 
+      // Final fallback: Firecrawl (bypasses Cloudflare / anti-bot challenges)
+      if (!okResp) {
+        const fcKey = Deno.env.get('FIRECRAWL_API_KEY');
+        if (fcKey) {
+          try {
+            console.log('[unfurl-article] Trying Firecrawl fallback');
+            const fc = await fetch('https://api.firecrawl.dev/v2/scrape', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${fcKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                url: targetUrl,
+                formats: ['html'],
+                onlyMainContent: false,
+              }),
+            });
+            if (fc.ok) {
+              const data = await fc.json();
+              const fcHtml = data?.data?.html || data?.html || '';
+              if (fcHtml && fcHtml.length > 200) {
+                okResp = new Response(fcHtml, { status: 200, headers: { 'Content-Type': 'text/html' } });
+                resolvedUrl = targetUrl;
+                console.log('[unfurl-article] Success with Firecrawl, html len:', fcHtml.length);
+              }
+            } else {
+              console.log('[unfurl-article] Firecrawl failed:', fc.status);
+            }
+          } catch (e) {
+            console.log('[unfurl-article] Firecrawl error:', e instanceof Error ? e.message : String(e));
+          }
+        }
+      }
+
       if (!okResp) {
         console.log('[unfurl-article] All fetch strategies failed');
         throw new Error('HTTP error! All fetch strategies failed');
