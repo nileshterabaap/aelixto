@@ -521,6 +521,61 @@ serve(async (req) => {
         }
       }
 
+      // Final fallback: Firecrawl (bypasses Cloudflare / anti-bot challenges)
+      if (!okResp) {
+        const fcKey = Deno.env.get('FIRECRAWL_API_KEY');
+        if (fcKey) {
+          try {
+            console.log('[unfurl-article] Trying Firecrawl fallback');
+            const fc = await fetch('https://api.firecrawl.dev/v2/scrape', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${fcKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                url: targetUrl,
+                formats: ['html'],
+                onlyMainContent: false,
+              }),
+            });
+            if (fc.ok) {
+              const data = await fc.json();
+              const payload = data?.data || data || {};
+              const md = payload.metadata || {};
+              const fcHtml: string = payload.html || '';
+              const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+              const title = md.ogTitle || md.title || '';
+              const desc = md.ogDescription || md.description || '';
+              const image = md.ogImage || md['og:image'] || md.image || '';
+              const author = md.author || md.ogAuthor || '';
+              const site = md.ogSiteName || md['og:site_name'] || '';
+              const synth = `<html><head>
+                ${title ? `<title>${esc(title)}</title>` : ''}
+                ${title ? `<meta property="og:title" content="${esc(title)}">` : ''}
+                ${desc ? `<meta property="og:description" content="${esc(desc)}">` : ''}
+                ${desc ? `<meta name="description" content="${esc(desc)}">` : ''}
+                ${image ? `<meta property="og:image" content="${esc(image)}">` : ''}
+                ${image ? `<meta name="twitter:image" content="${esc(image)}">` : ''}
+                ${site ? `<meta property="og:site_name" content="${esc(site)}">` : ''}
+                ${author ? `<meta name="author" content="${esc(author)}">` : ''}
+                <meta property="og:url" content="${esc(md.sourceURL || targetUrl)}">
+                <base href="${esc(md.sourceURL || targetUrl)}">
+              </head><body>${fcHtml}</body></html>`;
+              if (title || image || fcHtml) {
+                okResp = new Response(synth, { status: 200, headers: { 'Content-Type': 'text/html' } });
+                resolvedUrl = md.sourceURL || targetUrl;
+                console.log('[unfurl-article] Success with Firecrawl. title:', title?.slice(0,80), 'image:', !!image);
+              }
+            } else {
+              console.log('[unfurl-article] Firecrawl failed:', fc.status);
+            }
+          } catch (e) {
+            console.log('[unfurl-article] Firecrawl error:', e instanceof Error ? e.message : String(e));
+          }
+        }
+      }
+
       if (!okResp) {
         console.log('[unfurl-article] All fetch strategies failed');
         throw new Error('HTTP error! All fetch strategies failed');

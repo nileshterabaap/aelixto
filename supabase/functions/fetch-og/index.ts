@@ -553,6 +553,49 @@ serve(async (req) => {
       }
     }
 
+    // Final fallback: Firecrawl (bypasses Cloudflare / anti-bot challenges)
+    if (!response || !response.ok) {
+      const fcKey = Deno.env.get('FIRECRAWL_API_KEY');
+      if (fcKey) {
+        try {
+          console.log('[fetch-og] Trying Firecrawl fallback');
+          const fc = await fetch('https://api.firecrawl.dev/v2/scrape', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${fcKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              url: targetUrl,
+              formats: ['html'],
+              onlyMainContent: false,
+            }),
+          });
+          if (fc.ok) {
+            const data = await fc.json();
+            const payload = data?.data || data || {};
+            const md = payload.metadata || {};
+            const title = md.ogTitle || md.title || '';
+            const desc = md.ogDescription || md.description || '';
+            const image = md.ogImage || md['og:image'] || md.image || '';
+            const ogType = md.ogType || md['og:type'] || null;
+            const finalUrl = md.sourceURL || md.url || targetUrl;
+            if (title || image) {
+              console.log('[fetch-og] Firecrawl direct return. title:', title?.slice(0,80), 'image:', image?.slice(0,120));
+              return new Response(
+                JSON.stringify({ title: title || null, image: image || null, description: desc || null, finalUrl, og_type: ogType }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+              );
+            }
+          } else {
+            console.log('[fetch-og] Firecrawl failed:', fc.status);
+          }
+        } catch (e) {
+          console.log('[fetch-og] Firecrawl error:', e instanceof Error ? e.message : String(e));
+        }
+      }
+    }
+
     if (!response) {
       response = await fetch(targetUrl, {
       headers: {
