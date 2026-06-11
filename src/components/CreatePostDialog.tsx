@@ -168,12 +168,14 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       
       // Fetch oEmbed HTML in parallel for instant embed rendering
       console.log('[CreatePostDialog] Fetching oEmbed HTML...');
+      let fetchedEmbedHtml = "";
       try {
         const { data: oembedData, error: oembedError } = await supabase.functions.invoke('fetch-oembed', {
           body: { url: linkUrl }
         });
         if (!oembedError && oembedData?.embed_html) {
           setEmbedHtml(oembedData.embed_html);
+          fetchedEmbedHtml = oembedData.embed_html;
           console.log('[CreatePostDialog] Got oEmbed HTML, length:', oembedData.embed_html.length);
         }
       } catch (error) {
@@ -184,24 +186,45 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       setTitle(videoTitle);
 
       // Smart privacy check — verify the source is publicly accessible.
-      // If the platform explicitly says the post is missing/private, stop here
-      // so users can't share content they don't have permission to share.
+      const platform = classifyUrl(linkUrl, detectedOgType);
+      const platformLabel = platform && platform !== "external"
+        ? platform.charAt(0).toUpperCase() + platform.slice(1)
+        : "this site";
+      let verdict: string | undefined;
       try {
-        const platform = classifyUrl(linkUrl, detectedOgType);
         const { data: validation } = await supabase.functions.invoke(
           "validate-post-source",
           { body: { url: linkUrl, platform } }
         );
-        if (validation?.verdict === "removed") {
-          toast.error(
-            "This post is private or unavailable and can't be shared publicly.",
-            { duration: 5000 }
-          );
-          return;
-        }
+        verdict = validation?.verdict;
       } catch (err) {
         console.error("[CreatePostDialog] Privacy check failed:", err);
-        // Network issue — don't block, fall through.
+      }
+
+      if (verdict === "removed") {
+        toast.error(
+          `We couldn't load this ${platformLabel} post. It looks private, deleted, or region-restricted — try a different link.`,
+          { duration: 6000 }
+        );
+        return;
+      }
+
+      // Content-availability check — if we got nothing usable to render,
+      // tell the user the likely reason instead of letting them publish a broken card.
+      const hasAnyContent = Boolean(thumbnail) || Boolean(fetchedEmbedHtml) || Boolean(videoTitle);
+      if (!hasAnyContent) {
+        if (platform === "external") {
+          toast.error(
+            "We couldn't read this link. It may not be a supported platform, the page may block previews, or the URL might be wrong.",
+            { duration: 6000 }
+          );
+        } else {
+          toast.error(
+            `We couldn't fetch this ${platformLabel} post. It may be private, deleted, age- or region-restricted, or ${platformLabel} is blocking the preview right now. Double-check the link or try another post.`,
+            { duration: 6000 }
+          );
+        }
+        return;
       }
 
       setStep(2);
@@ -221,6 +244,18 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     // Use centralised classification
     const platform = classifyUrl(linkUrl, ogType);
     const mediaType = deriveMediaType(linkUrl, platform);
+
+    // Final safety net — never publish a card with nothing to show.
+    if (!thumbnailUrl && !embedHtml && !title.trim()) {
+      const label = platform && platform !== "external"
+        ? platform.charAt(0).toUpperCase() + platform.slice(1)
+        : "this link";
+      toast.error(
+        `We couldn't find any content for this ${label} post. It may be private, deleted, or unsupported — try a different link.`,
+        { duration: 6000 }
+      );
+      return;
+    }
 
     // Validate Facebook embed HTML before saving
     if (platform === 'facebook' && embedHtml) {
