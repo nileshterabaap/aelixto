@@ -536,16 +536,30 @@ serve(async (req) => {
               body: JSON.stringify({
                 url: targetUrl,
                 formats: ['html'],
-                onlyMainContent: false,
+                onlyMainContent: true,
               }),
             });
             if (fc.ok) {
               const data = await fc.json();
-              const fcHtml = data?.data?.html || data?.html || '';
-              if (fcHtml && fcHtml.length > 200) {
-                okResp = new Response(fcHtml, { status: 200, headers: { 'Content-Type': 'text/html' } });
-                resolvedUrl = targetUrl;
-                console.log('[unfurl-article] Success with Firecrawl, html len:', fcHtml.length);
+              const payload = data?.data || data || {};
+              const md = payload.metadata || {};
+              const fcHtml: string = payload.html || '';
+              const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+              const title = md.ogTitle || md.title || '';
+              const desc = md.ogDescription || md.description || '';
+              const image = md.ogImage || md['og:image'] || '';
+              const synth = `<html><head>
+                ${title ? `<title>${esc(title)}</title>` : ''}
+                ${title ? `<meta property="og:title" content="${esc(title)}">` : ''}
+                ${desc ? `<meta property="og:description" content="${esc(desc)}">` : ''}
+                ${desc ? `<meta name="description" content="${esc(desc)}">` : ''}
+                ${image ? `<meta property="og:image" content="${esc(image)}">` : ''}
+                <meta property="og:url" content="${esc(md.sourceURL || targetUrl)}">
+              </head><body>${fcHtml}</body></html>`;
+              if (title || image || fcHtml) {
+                okResp = new Response(synth, { status: 200, headers: { 'Content-Type': 'text/html' } });
+                resolvedUrl = md.sourceURL || targetUrl;
+                console.log('[unfurl-article] Success with Firecrawl. title:', title?.slice(0,80), 'image:', !!image);
               }
             } else {
               console.log('[unfurl-article] Firecrawl failed:', fc.status);
