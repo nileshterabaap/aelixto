@@ -9,6 +9,11 @@ import { ArrowLeft, Link2, Loader2, Sparkles, X, Check } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
+import {
+  extractRootDomain,
+  getDomainOverride,
+  recordDomainClassification,
+} from "@/lib/domainClassification";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 
@@ -233,7 +238,53 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
   };
 
-  const handlePost = () => {
+  const promptSectionFeedback = (
+    postId: string | undefined,
+    url: string,
+    currentType: "article" | "external"
+  ) => {
+    if (!postId) return;
+    const domain = extractRootDomain(url);
+    if (!domain) return;
+    const otherType: "article" | "external" =
+      currentType === "article" ? "external" : "article";
+    const otherLabel = otherType === "article" ? "Articles" : "External";
+    const currentLabel = currentType === "article" ? "Articles" : "External";
+
+    const id = toast(
+      `Posted to ${currentLabel}. Wrong section?`,
+      {
+        description: `Move it to ${otherLabel} — Aelixto will remember ${domain} for next time.`,
+        duration: 12000,
+        action: {
+          label: `Move to ${otherLabel}`,
+          onClick: async () => {
+            try {
+              const { error } = await supabase
+                .from("posts")
+                .update({ platform: otherType })
+                .eq("id", postId);
+              if (error) throw error;
+              await recordDomainClassification(domain, otherType);
+              toast.success(`Moved to ${otherLabel}. Aelixto will remember.`);
+            } catch (e: any) {
+              toast.error(e?.message || "Couldn't move the post.");
+            }
+          },
+        },
+        cancel: {
+          label: "Keep here",
+          onClick: async () => {
+            // Confirming the current placement also teaches the system.
+            try { await recordDomainClassification(domain, currentType); } catch {}
+          },
+        },
+      }
+    );
+    return id;
+  };
+
+  const handlePost = async () => {
     if (!linkUrl.trim()) return;
 
     if (limitReached) {
@@ -242,7 +293,15 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
 
     // Use centralised classification
-    const platform = classifyUrl(linkUrl, ogType);
+    let platform = classifyUrl(linkUrl, ogType);
+
+    // Apply user-learned override for unknown sites (article vs external).
+    if (platform === "article" || platform === "external") {
+      const domain = extractRootDomain(linkUrl);
+      const override = await getDomainOverride(domain);
+      if (override) platform = override;
+    }
+
     const mediaType = deriveMediaType(linkUrl, platform);
 
     // Final safety net — never publish a card with nothing to show.
@@ -288,8 +347,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
     }, {
-      onSuccess: () => {
+      onSuccess: (created: any) => {
         incrementDailyCount();
+        if (platform === "article" || platform === "external") {
+          promptSectionFeedback(created?.id, linkUrl, platform);
+        }
       },
     });
 

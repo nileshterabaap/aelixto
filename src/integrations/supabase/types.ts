@@ -280,6 +280,30 @@ export type Database = {
         }
         Relationships: []
       }
+      domain_classifications: {
+        Row: {
+          content_type: string
+          domain: string
+          updated_at: string
+          updated_by: string | null
+          vote_count: number
+        }
+        Insert: {
+          content_type: string
+          domain: string
+          updated_at?: string
+          updated_by?: string | null
+          vote_count?: number
+        }
+        Update: {
+          content_type?: string
+          domain?: string
+          updated_at?: string
+          updated_by?: string | null
+          vote_count?: number
+        }
+        Relationships: []
+      }
       email_send_log: {
         Row: {
           created_at: string
@@ -1247,6 +1271,10 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
+      }
+      record_domain_classification: {
+        Args: { _content_type: string; _domain: string }
+        Returns: undefined
       }
       search_profiles: {
         Args: { cursor?: string; limit_count: number; q: string }
