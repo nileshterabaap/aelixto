@@ -14,7 +14,6 @@ import {
   getDomainOverride,
   recordDomainClassification,
 } from "@/lib/domainClassification";
-import { supabase } from "@/integrations/supabase/client";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 
