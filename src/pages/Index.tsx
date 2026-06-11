@@ -337,13 +337,19 @@ const Index = () => {
                   the user reaches the end. */}
               {/* All caught up message */}
               {!hasMore && !showDemoFeed && allPosts.length > 0 && (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
+                <motion.div
+                  className="flex flex-col items-center justify-center pt-24 pb-10 text-center"
+                  initial={{ opacity: 0, y: 32 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.6 }}
+                  transition={{ type: 'spring', stiffness: 180, damping: 22 }}
+                >
                   <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                   <h3 className="text-lg font-semibold">You're all caught up</h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     You've seen all recent posts from people you follow.
                   </p>
-                </div>
+                </motion.div>
               )}
             </div>
           )}
