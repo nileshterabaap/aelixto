@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
