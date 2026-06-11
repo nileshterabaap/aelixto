@@ -317,7 +317,7 @@ export const HydratedEmbed = memo(({
         {/* Article embed */}
         {r.kind === 'article' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <ArticleEmbed url={r.url} />
+            <ArticleEmbed url={r.url} postId={post.id} platform={post.platform} />
           </ImageViewTracker>
         )}
         

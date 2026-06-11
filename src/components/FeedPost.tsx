@@ -615,7 +615,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 autoLoad={false}
               >
                 <ImageViewTracker postId={post.id}>
-                  <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
+                  <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} postId={post.id} platform={post.platform} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -628,7 +628,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
                 autoLoad={false}
               >
-                <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
+                <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} postId={post.id} platform={post.platform} />
               </LazyEmbed>
             )}
             {r.kind === 'universal' && !isFacebookUnavailable && post.isRealPost && (

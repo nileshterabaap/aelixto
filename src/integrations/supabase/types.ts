@@ -391,6 +391,27 @@ export type Database = {
         }
         Relationships: []
       }
+      follow_requests: {
+        Row: {
+          created_at: string
+          id: string
+          requester_id: string
+          target_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          requester_id: string
+          target_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          requester_id?: string
+          target_id?: string
+        }
+        Relationships: []
+      }
       follows: {
         Row: {
           created_at: string
@@ -1120,6 +1141,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_follow_or_request: {
+        Args: { _target: string }
+        Returns: undefined
+      }
       create_short_link: { Args: { p_target_path: string }; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
@@ -1275,6 +1300,11 @@ export type Database = {
       record_domain_classification: {
         Args: { _content_type: string; _domain: string }
         Returns: undefined
+      }
+      request_or_follow: { Args: { _target: string }; Returns: string }
+      respond_to_follow_request: {
+        Args: { _approve: boolean; _requester: string }
+        Returns: string
       }
       search_profiles: {
         Args: { cursor?: string; limit_count: number; q: string }
