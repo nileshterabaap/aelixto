@@ -78,6 +78,7 @@ const Index = () => {
     loading: followingLoading,
     loadMore,
     hasMore,
+    reachedEnd,
   } = useFollowingFeed(user?.id);
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -293,7 +294,7 @@ const Index = () => {
                   Discover people to follow
                 </Link>
               </div>
-            ) : followingHasAnyPosts ? (
+            ) : followingHasAnyPosts && reachedEnd ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                 <h3 className="text-lg font-semibold">You're all caught up</h3>
@@ -301,6 +302,8 @@ const Index = () => {
                   You've seen all recent posts from people you follow.
                 </p>
               </div>
+            ) : followingHasAnyPosts ? (
+              <div className="py-16" />
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
@@ -336,7 +339,7 @@ const Index = () => {
               {/* No visible loader — pagination happens silently far before
                   the user reaches the end. */}
               {/* All caught up message */}
-              {!hasMore && !showDemoFeed && allPosts.length > 0 && (
+              {reachedEnd && !hasMore && !showDemoFeed && allPosts.length > 0 && (
                 <motion.div
                   className="flex flex-col items-center justify-center pt-24 pb-10 text-center"
                   initial={{ opacity: 0, y: 32 }}
