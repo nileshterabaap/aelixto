@@ -139,6 +139,9 @@ function isMisleadingThumbnail(platform: string, url: string): boolean {
   // These render as the giant orange "reddit" wordmark in grid tiles.
   if (platform === "reddit") {
     if (lower.includes("redditstatic.com")) return true;
+    // share.redd.it /preview/post/<id> serves the generic orange Reddit
+    // logo when no real preview exists — never use it as a thumbnail.
+    if (lower.includes("share.redd.it/preview/post")) return true;
     // Snoo / brand icon assets served from reddit's CDNs
     if (/\b(reddit[-_ ]?logo|snoo|brand|icon|favicon|default[-_ ]?avatar)\b/.test(lower)) return true;
     // Reddit's generic share fallback image
