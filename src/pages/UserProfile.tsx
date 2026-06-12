@@ -201,7 +201,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
       <PullToRefresh onRefresh={handleRefresh}>
       <main className="mx-auto max-w-2xl">
         {/* Cover Image with Header Overlay */}
-        <div className="relative h-[400px] bg-gradient-to-r from-purple-500 to-pink-500">
+        <div className="relative h-[400px] bg-muted">
           {profile.cover_url && (
             <img
               src={profile.cover_url}
