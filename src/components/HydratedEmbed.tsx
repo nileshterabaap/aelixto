@@ -1,5 +1,6 @@
 import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
+import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
 import type { Post } from '@/data/demoData';
 import { supabase } from '@/integrations/supabase/client';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
@@ -130,6 +131,10 @@ export const HydratedEmbed = memo(({
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
     { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: true }
   );
+
+  // Track click-throughs to the original platform (iframe focus or anchor clicks).
+  // Awards +1 engagement score to the author on top of the impression score.
+  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate);
 
   const forceTwitterRenderer =
     r.kind === 'raw' &&
