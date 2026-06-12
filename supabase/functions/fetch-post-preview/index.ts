@@ -71,12 +71,14 @@ serve(async (req) => {
   }
 
   try {
-    const { postId, url, platform } = await req.json();
+    const { postId, url, platform, persist } = await req.json();
+    const normalizedPostId = typeof postId === 'string' && postId.trim() ? postId.trim() : null;
+    const shouldPersist = persist !== false && !!normalizedPostId;
     
     console.log(`[fetch-post-preview] Processing postId=${postId}, platform=${platform}, url=${url}`);
 
-    if (!postId || !url) {
-      return new Response(JSON.stringify({ error: 'Missing postId or url' }), {
+    if (!url) {
+      return new Response(JSON.stringify({ error: 'Missing url' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -104,8 +106,7 @@ serve(async (req) => {
     else if (platform === 'instagram') {
       const oembedData = await fetchInstagramOembed(url);
       if (oembedData?.thumbnail_url) {
-        // Store thumbnail permanently
-        thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
+        thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, oembedData.thumbnail_url);
       }
       if (oembedData?.title) {
         previewText = oembedData.title;
@@ -119,7 +120,7 @@ serve(async (req) => {
     else if (platform === 'facebook') {
       const oembedData = await fetchFacebookOembed(url);
       if (oembedData?.thumbnail_url) {
-        thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
+        thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, oembedData.thumbnail_url);
       }
       // /reel/ → 9:16 vertical, /videos/ → 16:9, else 4:5 portrait photo card
       const isReel = /\/reel\//i.test(url);
@@ -162,7 +163,7 @@ serve(async (req) => {
     else if (platform === 'tiktok') {
       const tiktokData = await fetchTikTokOembed(url);
       if (tiktokData?.thumbnail_url) {
-        thumbnailUrl = await storeThumbnailPermanently(postId, tiktokData.thumbnail_url);
+        thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, tiktokData.thumbnail_url);
       }
       if (tiktokData?.title) {
         previewText = tiktokData.title;
@@ -175,7 +176,7 @@ serve(async (req) => {
       if (!thumbnailUrl) {
         const ogData = await scrapeOgData(url);
         if (ogData.image) {
-          thumbnailUrl = await storeThumbnailPermanently(postId, ogData.image);
+          thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, ogData.image);
         }
         if (!previewText) previewText = ogData.description || ogData.title;
       }

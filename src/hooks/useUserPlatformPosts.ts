@@ -43,10 +43,18 @@ const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
   );
 };
 
-const isGenericPlaceholderThumbnail = (url?: string | null) => {
+const isUnusableThumbnail = (url?: string | null, platform?: string | null) => {
   if (!url) return false;
   const lower = url.toLowerCase();
-  return lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com");
+  if (lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com")) return true;
+  if ((platform || "").toLowerCase() === "reddit") {
+    return (
+      lower.includes("redditstatic.com") ||
+      lower.includes("share.redd.it/preview/post") ||
+      /\b(reddit[-_ ]?logo|snoo|brand|icon|favicon|default[-_ ]?avatar)\b/.test(lower)
+    );
+  }
+  return false;
 };
 
 const hasUsableTextThumbnail = (post: PlatformPost) => {
@@ -63,7 +71,7 @@ async function backfillThumbnail(post: PlatformPost) {
   if (!post.media_url || !post.platform) return;
   const platform = post.platform.toLowerCase();
   if (!THUMB_BACKFILL_PLATFORMS.has(platform)) return;
-  if (post.thumbnail_url && !isGenericPlaceholderThumbnail(post.thumbnail_url)) return;
+  if (post.thumbnail_url && !isUnusableThumbnail(post.thumbnail_url, platform)) return;
   // For Reddit/Instagram/Facebook/TikTok, ALWAYS try to recover the real
   // media thumbnail even when we have usable text — an image post should
   // show the image, not its title. For pure text platforms (Threads, X,
@@ -210,7 +218,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       platformLower === "facebook" || platformLower === "tiktok" || platformLower === "pinterest";
     const missing = items.filter((p) => {
       if (!p.media_url) return false;
-      const noThumb = !p.thumbnail_url || isGenericPlaceholderThumbnail(p.thumbnail_url);
+      const noThumb = !p.thumbnail_url || isUnusableThumbnail(p.thumbnail_url, platformLower);
       if (!noThumb) return false;
       if (imageFirstPlatform) return true;
       return !hasUsableTextThumbnail(p);

@@ -23,6 +23,16 @@ interface CreatePostDialogProps {
   initialDraft?: PostDraft | null;
 }
 
+const isBlockedRedditThumbnail = (url?: string | null) => {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return (
+    lower.includes("redditstatic.com") ||
+    lower.includes("share.redd.it/preview/post") ||
+    /\b(reddit[-_ ]?logo|snoo|brand|icon|favicon|default[-_ ]?avatar)\b/.test(lower)
+  );
+};
+
 export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePostDialogProps) => {
   const [step, setStep] = useState<1 | 2>(1);
   const [linkUrl, setLinkUrl] = useState("");
@@ -85,15 +95,23 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           }
         }
       } else if (linkUrl.includes("reddit.com") || linkUrl.includes("redd.it")) {
-        console.log('[CreatePostDialog] Fetching Reddit thumbnail via edge function');
+        console.log('[CreatePostDialog] Fetching Reddit preview via edge function');
         try {
-          const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
-            body: { url: linkUrl }
+          const { data: redditData, error } = await supabase.functions.invoke('fetch-post-preview', {
+            body: { url: linkUrl, platform: 'reddit', persist: false }
           });
-          if (!error && ogData) {
-            videoTitle = ogData.title || "";
-            thumbnail = ogData.image || "";
-            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
+          if (!error && redditData) {
+            videoTitle = redditData.title || redditData.preview_title || "";
+            thumbnail = redditData.thumbnail_url || redditData.preview_image_url || "";
+          } else {
+            const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
+              body: { url: linkUrl }
+            });
+            if (!ogError && ogData) {
+              videoTitle = ogData.title || "";
+              thumbnail = ogData.image || "";
+              if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
+            }
           }
         } catch (error) {
           console.error('[CreatePostDialog] Reddit fetch failed:', error);
@@ -169,6 +187,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
         } catch (error) {
           console.error('[CreatePostDialog] Failed to fetch OG data:', error);
         }
+      }
+      if ((linkUrl.includes("reddit.com") || linkUrl.includes("redd.it")) && isBlockedRedditThumbnail(thumbnail)) {
+        thumbnail = "";
       }
       
       // Fetch oEmbed HTML in parallel for instant embed rendering
