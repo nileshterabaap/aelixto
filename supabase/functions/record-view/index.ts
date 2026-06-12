@@ -52,7 +52,7 @@ Deno.serve(async (req) => {
     const { post_id, event_type, duration_ms, device_hash, viewer_id } = await req.json();
 
     // Validate event_type
-    if (!['video_play', 'image_view', 'article_open', 'external_visit'].includes(event_type)) {
+    if (!['video_play', 'image_view', 'article_open', 'external_visit', 'original_visit'].includes(event_type)) {
       return new Response(
         JSON.stringify({ ok: false, reason: 'Invalid event_type' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
