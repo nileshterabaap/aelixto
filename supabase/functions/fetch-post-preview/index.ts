@@ -220,11 +220,6 @@ serve(async (req) => {
       }
     }
 
-    // Update database
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
-
     const updatePayload: Record<string, string | number | null> = {
       thumbnail_url: thumbnailUrl,
       preview_image_url: thumbnailUrl,
@@ -237,19 +232,25 @@ serve(async (req) => {
       updatePayload.title = previewTitle;
       updatePayload.preview_title = previewTitle;
     }
-    const { error: updateError } = await supabase
-      .from('posts')
-      .update(updatePayload)
-      .eq('id', postId);
 
-    if (updateError) {
-      console.error('[fetch-post-preview] DB update error:', updateError);
-    } else {
-      console.log(`[fetch-post-preview] Updated post ${postId} with thumbnail: ${thumbnailUrl}`);
+    if (shouldPersist && normalizedPostId) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const { error: updateError } = await supabase
+        .from('posts')
+        .update(updatePayload)
+        .eq('id', normalizedPostId);
+
+      if (updateError) {
+        console.error('[fetch-post-preview] DB update error:', updateError);
+      } else {
+        console.log(`[fetch-post-preview] Updated post ${normalizedPostId} with thumbnail: ${thumbnailUrl}`);
+      }
     }
 
     return new Response(
-      JSON.stringify({ thumbnail_url: thumbnailUrl, title: previewTitle, preview_text: previewText }),
+      JSON.stringify({ ...updatePayload, title: previewTitle }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
@@ -412,6 +413,11 @@ async function storeThumbnailPermanently(postId: string, imageUrl: string): Prom
     console.error('[fetch-post-preview] Store thumbnail error:', error);
     return imageUrl; // Return original as fallback
   }
+}
+
+async function maybeStoreThumbnail(postId: string | null, shouldPersist: boolean, imageUrl: string): Promise<string | null> {
+  if (!shouldPersist || !postId) return imageUrl;
+  return await storeThumbnailPermanently(postId, imageUrl);
 }
 
 async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string | null; title: string | null; description: string | null; post_data?: Record<string, unknown> | null }> {
