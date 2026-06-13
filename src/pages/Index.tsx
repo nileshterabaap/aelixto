@@ -14,7 +14,7 @@ import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
@@ -26,6 +26,7 @@ const Index = () => {
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
+  const isRestoring = useIsRestoring();
   useIframeScrollFreeze();
   const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
 
@@ -275,7 +276,7 @@ const Index = () => {
   const shouldShowSkeleton =
     !hasRenderedOnce.current &&
     allPosts.length === 0 &&
-    (sessionLoading || loading || classifiersPending || authTokenPending);
+    (isRestoring || sessionLoading || loading || classifiersPending || authTokenPending);
 
   if (shouldShowSkeleton) {
     return (
