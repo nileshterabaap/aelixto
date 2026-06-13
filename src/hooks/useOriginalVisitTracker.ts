@@ -106,3 +106,8 @@ export function useOriginalVisitTracker(
     };
   }, [containerRef, postId, enabled]);
 }
+
+export function markOriginalVisit(postId: string) {
+  if (!postId) return;
+  trackOriginalVisit(postId).catch(() => {});
+}
