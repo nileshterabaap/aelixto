@@ -15,8 +15,10 @@ interface TrackViewParams {
  */
 export async function trackView({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
   try {
-    // Get current user (may be null for anonymous)
-    const { data: { user } } = await supabase.auth.getUser();
+    // Get current session/user (may be null for anonymous). getSession is local
+    // and avoids a network round-trip right before outbound navigation.
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
     
     // Get device fingerprint and hash it
     const deviceId = getDeviceId();
@@ -31,9 +33,36 @@ export async function trackView({ postId, eventType, durationMs = 0 }: TrackView
       viewer_id: user?.id || null,
     };
 
-    const { data, error } = await supabase.functions.invoke('record-view', {
-      body: payload,
-    });
+    const shouldKeepAlive =
+      eventType === 'article_open' ||
+      eventType === 'external_visit' ||
+      eventType === 'original_visit';
+
+    let data: any = null;
+    let error: any = null;
+
+    if (shouldKeepAlive) {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      const response = await fetch(`${supabaseUrl}/functions/v1/record-view`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: anonKey,
+          Authorization: `Bearer ${session?.access_token || anonKey}`,
+        },
+        body: JSON.stringify(payload),
+        keepalive: true,
+      });
+      data = await response.json().catch(() => null);
+      if (!response.ok) error = data || new Error(`record-view failed: ${response.status}`);
+    } else {
+      const result = await supabase.functions.invoke('record-view', {
+        body: payload,
+      });
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       console.error('[useViewTracking] Error:', error);
