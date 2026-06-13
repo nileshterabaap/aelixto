@@ -251,9 +251,18 @@ const Index = () => {
     return () => observer.disconnect();
   }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
-  // Only show skeleton on truly empty first load - prevent flicker
+  // Only show skeleton on truly empty first load - prevent flicker.
+  // Also keep the skeleton up while the empty-state classifier queries are
+  // still resolving for a signed-in user; otherwise the page can briefly
+  // render a blank spacer between the skeleton disappearing and the feed
+  // (or "caught up" state) appearing.
   const loading = showDemoFeed ? demoLoading : followingLoading;
-  const shouldShowSkeleton = !hasRenderedOnce.current && (sessionLoading || loading) && allPosts.length === 0;
+  const classifiersPending =
+    !showDemoFeed && Boolean(user) && (followingCount === undefined || followingHasAnyPosts === undefined);
+  const shouldShowSkeleton =
+    !hasRenderedOnce.current &&
+    allPosts.length === 0 &&
+    (sessionLoading || loading || classifiersPending);
 
   if (shouldShowSkeleton) {
     return (
