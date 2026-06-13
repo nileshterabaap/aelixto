@@ -16,6 +16,8 @@ import {
 } from "@/lib/domainClassification";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
+import { TextCardThumbnail } from "@/components/TextCardThumbnail";
+import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -49,6 +51,8 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
   const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
+  const { profile: currentProfile } = useCurrentProfile();
+  const previewPlatform = linkUrl ? classifyUrl(linkUrl, ogType) : "external";
 
   // Hydrate from existing draft when opening
   useEffect(() => {
@@ -612,6 +616,22 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                                 alt="Preview"
                                 className="h-48 w-full object-cover"
                                 onError={() => setThumbnailUrl("")}
+                              />
+                            </motion.div>
+                          )}
+                          {!thumbnailUrl && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.96 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ duration: 0.3 }}
+                              className="overflow-hidden rounded-2xl border border-border/60 h-48"
+                            >
+                              <TextCardThumbnail
+                                platform={previewPlatform}
+                                text={title || caption}
+                                username={currentProfile?.username}
+                                displayName={currentProfile?.display_name}
+                                aspect=""
                               />
                             </motion.div>
                           )}
