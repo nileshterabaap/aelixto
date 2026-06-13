@@ -135,7 +135,9 @@ serve(async (req) => {
     else if (platform === 'reddit') {
       const redditData = await fetchRedditPreview(url);
       redditPostData = redditData.post_data ?? null;
-      thumbnailUrl = redditData.thumbnail_url;
+      thumbnailUrl = redditData.thumbnail_url
+        ? await maybeStoreThumbnail(normalizedPostId, shouldPersist, redditData.thumbnail_url)
+        : null;
       previewTitle = redditData.title;
       previewText = redditData.description || redditData.title;
       sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
@@ -188,7 +190,10 @@ serve(async (req) => {
       const ogData = isThreads
         ? await scrapeOgData(url, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)')
         : await scrapeOgData(url);
-      thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
+      const candidate = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
+      thumbnailUrl = candidate
+        ? await maybeStoreThumbnail(normalizedPostId, shouldPersist, candidate)
+        : null;
       previewText = ogData.description || ogData.title;
       if (ogData.title) previewTitle = ogData.title;
 
