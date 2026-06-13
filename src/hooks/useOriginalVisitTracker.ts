@@ -104,7 +104,11 @@ export function useOriginalVisitTracker(
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
       iframe.addEventListener('focus', fire);
       iframe.addEventListener('load', () => {
-        iframe.contentWindow?.addEventListener?.('focus', fire);
+        try {
+          iframe.contentWindow?.addEventListener?.('focus', fire);
+        } catch {
+          // Cross-origin iframes may reject direct listener attachment.
+        }
       }, { once: true });
     };
 
