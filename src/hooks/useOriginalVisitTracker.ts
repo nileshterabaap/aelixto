@@ -2,13 +2,17 @@ import { useEffect, useRef } from 'react';
 import { trackOriginalVisit } from '@/hooks/useViewTracking';
 
 /**
- * Detects when the user clicks/taps into an embedded iframe (cross-origin embeds
- * steal focus from the parent window). Fires `original_visit` once per post.
+ * Detects when the user taps/clicks into an embedded iframe or an outbound
+ * anchor inside the embed, and fires `original_visit` once per post.
  *
- * This is the standard "iframe click detector" pattern: when an iframe is
- * clicked, the parent window's active element becomes the iframe and a `blur`
- * event fires on the window. We treat that as the user engaging with the
- * original platform (tap-through to view/play/visit the source).
+ * Strategy (covers mobile + desktop reliably):
+ *  1. `pointerdown` (capture) on the container — if the event target is an
+ *     IFRAME (or sits inside one of our embed iframes), we treat that as a
+ *     tap-through to the original platform (play video, open Spotify, etc.).
+ *  2. Anchor click anywhere in the embed (article CTAs, fallback link cards).
+ *  3. `window.blur` + active-element === IFRAME fallback (desktop click).
+ *  4. `document.visibilitychange` → hidden shortly after a pointerdown on the
+ *     embed (catches deep-links that hand the user to a native app).
  */
 export function useOriginalVisitTracker(
   containerRef: React.RefObject<HTMLElement>,
@@ -16,9 +20,11 @@ export function useOriginalVisitTracker(
   enabled: boolean = true,
 ) {
   const firedRef = useRef(false);
+  const recentPointerRef = useRef(0);
 
   useEffect(() => {
     firedRef.current = false;
+    recentPointerRef.current = 0;
   }, [postId]);
 
   useEffect(() => {
@@ -33,6 +39,21 @@ export function useOriginalVisitTracker(
         // Allow a retry on next interaction
         firedRef.current = false;
       });
+    };
+
+    const isInsideIframe = (node: EventTarget | null): boolean => {
+      if (!(node instanceof Element)) return false;
+      if (node.tagName === 'IFRAME') return true;
+      return !!node.closest('iframe');
+    };
+
+    const onPointerDown = (e: Event) => {
+      recentPointerRef.current = Date.now();
+      if (isInsideIframe(e.target)) {
+        // Tap landed on an embedded iframe (YouTube/Spotify/Insta/etc.) —
+        // treat as tap-through to the original platform.
+        fire();
+      }
     };
 
     const onWindowBlur = () => {
@@ -50,6 +71,15 @@ export function useOriginalVisitTracker(
       }, 0);
     };
 
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'hidden') return;
+      // If the page hid within ~3s of a pointerdown on this embed, the user
+      // likely tapped through to a native app / new tab.
+      if (Date.now() - recentPointerRef.current < 3000) {
+        fire();
+      }
+    };
+
     // Fallback: explicit anchor/button clicks inside the embed (article CTAs,
     // fallback link cards) — anything that opens the original.
     const onClick = (e: Event) => {
@@ -61,11 +91,17 @@ export function useOriginalVisitTracker(
       }
     };
 
+    el.addEventListener('pointerdown', onPointerDown, true);
+    el.addEventListener('touchstart', onPointerDown, { capture: true, passive: true });
     window.addEventListener('blur', onWindowBlur);
+    document.addEventListener('visibilitychange', onVisibilityChange);
     el.addEventListener('click', onClick, true);
 
     return () => {
+      el.removeEventListener('pointerdown', onPointerDown, true);
+      el.removeEventListener('touchstart', onPointerDown, true);
       window.removeEventListener('blur', onWindowBlur);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       el.removeEventListener('click', onClick, true);
     };
   }, [containerRef, postId, enabled]);
