@@ -23,11 +23,13 @@ export function useOriginalVisitTracker(
   const firedRef = useRef(false);
   const playFiredRef = useRef(false);
   const recentPointerRef = useRef(0);
+  const lastIframeInteractionRef = useRef(0);
 
   useEffect(() => {
     firedRef.current = false;
     playFiredRef.current = false;
     recentPointerRef.current = 0;
+    lastIframeInteractionRef.current = 0;
   }, [postId]);
 
   useEffect(() => {
@@ -35,14 +37,16 @@ export function useOriginalVisitTracker(
     const el = containerRef.current;
     if (!el) return;
 
-    const fire = () => {
+    const firePlay = () => {
       if (trackPlayableInteraction && !playFiredRef.current) {
         playFiredRef.current = true;
         trackView({ postId, eventType: 'video_play' }).catch(() => {
           playFiredRef.current = false;
         });
       }
+    };
 
+    const fireOriginal = () => {
       if (firedRef.current) return;
       firedRef.current = true;
       trackOriginalVisit(postId).catch(() => {
@@ -58,11 +62,18 @@ export function useOriginalVisitTracker(
     };
 
     const onPointerDown = (e: Event) => {
-      recentPointerRef.current = Date.now();
+      const now = Date.now();
+      recentPointerRef.current = now;
       if (isInsideIframe(e.target)) {
-        // Tap landed on an embedded iframe (YouTube/Spotify/Insta/etc.) —
-        // treat as tap-through to the original platform.
-        fire();
+        if (trackPlayableInteraction) {
+          firePlay();
+          if (playFiredRef.current && lastIframeInteractionRef.current > 0 && now - lastIframeInteractionRef.current > 1200) {
+            fireOriginal();
+          }
+          lastIframeInteractionRef.current = now;
+        } else {
+          fireOriginal();
+        }
       }
     };
 
@@ -76,7 +87,11 @@ export function useOriginalVisitTracker(
           active.tagName === 'IFRAME' &&
           el.contains(active)
         ) {
-          fire();
+          if (trackPlayableInteraction) {
+            firePlay();
+          } else {
+            fireOriginal();
+          }
         }
       }, 0);
     };
@@ -86,7 +101,7 @@ export function useOriginalVisitTracker(
       // If the page hid within ~3s of a pointerdown on this embed, the user
       // likely tapped through to a native app / new tab.
       if (Date.now() - recentPointerRef.current < 3000) {
-        fire();
+        fireOriginal();
       }
     };
 
@@ -97,15 +112,15 @@ export function useOriginalVisitTracker(
       if (!target) return;
       const anchor = target.closest('a[href]') as HTMLAnchorElement | null;
       if (anchor && anchor.href && !anchor.href.startsWith('javascript:')) {
-        fire();
+        fireOriginal();
       }
     };
 
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
-      iframe.addEventListener('focus', fire);
+      iframe.addEventListener('focus', trackPlayableInteraction ? firePlay : fireOriginal);
       iframe.addEventListener('load', () => {
         try {
-          iframe.contentWindow?.addEventListener?.('focus', fire);
+          iframe.contentWindow?.addEventListener?.('focus', trackPlayableInteraction ? firePlay : fireOriginal);
         } catch {
           // Cross-origin iframes may reject direct listener attachment.
         }
