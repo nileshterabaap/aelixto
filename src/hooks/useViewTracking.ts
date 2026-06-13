@@ -31,9 +31,7 @@ export async function trackView({ postId, eventType, durationMs = 0 }: TrackView
       viewer_id: user?.id || null,
     };
 
-    const { data, error } = await supabase.functions.invoke('record-view', {
-      body: payload,
-    });
+    const { data, error } = await supabase.functions.invoke('record-view', { body: payload });
 
     if (error) {
       console.error('[useViewTracking] Error:', error);
@@ -44,6 +42,38 @@ export async function trackView({ postId, eventType, durationMs = 0 }: TrackView
     return success;
   } catch (error) {
     console.error('[useViewTracking] Exception:', error);
+    return false;
+  }
+}
+
+async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const deviceHash = await sha256(getDeviceId());
+    const payload = JSON.stringify({
+      post_id: postId,
+      event_type: eventType,
+      duration_ms: durationMs,
+      device_hash: deviceHash,
+      viewer_id: session?.user?.id || null,
+    });
+
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    const url = `https://${projectId}.functions.supabase.co/record-view`;
+    // No custom headers/content-type here: outbound clicks can navigate away
+    // immediately, so this must avoid CORS preflight and use keepalive/beacon.
+    if (navigator.sendBeacon && navigator.sendBeacon(url, payload)) {
+      return true;
+    }
+
+    await fetch(url, {
+      method: 'POST',
+      body: payload,
+      keepalive: true,
+    });
+    return true;
+  } catch (error) {
+    console.error('[useViewTracking] Navigation-safe exception:', error);
     return false;
   }
 }
@@ -78,14 +108,14 @@ export function useImageViewTracking() {
  * Track article open (Continue Reading click) for +1 engagement score.
  */
 export async function trackArticleOpen(postId: string): Promise<boolean> {
-  return await trackView({ postId, eventType: 'article_open' });
+  return await trackViewBeforeNavigation({ postId, eventType: 'article_open' });
 }
 
 /**
  * Track external link visit (Visit click) for +1 engagement score.
  */
 export async function trackExternalVisit(postId: string): Promise<boolean> {
-  return await trackView({ postId, eventType: 'external_visit' });
+  return await trackViewBeforeNavigation({ postId, eventType: 'external_visit' });
 }
 
 /**
@@ -93,5 +123,5 @@ export async function trackExternalVisit(postId: string): Promise<boolean> {
  * Fires once per post per cooldown window — backend dedups.
  */
 export async function trackOriginalVisit(postId: string): Promise<boolean> {
-  return await trackView({ postId, eventType: 'original_visit' });
+  return await trackViewBeforeNavigation({ postId, eventType: 'original_visit' });
 }
