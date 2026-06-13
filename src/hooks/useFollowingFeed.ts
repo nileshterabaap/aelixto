@@ -122,6 +122,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   const {
     data,
     isLoading: feedLoading,
+    isFetching,
     error: feedError,
     fetchNextPage,
     hasNextPage,
@@ -135,7 +136,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: true, // refetch if stale on mount/page reload
+    refetchOnMount: 'always', // refresh on mount/page reload so an empty first paint cannot stick
     refetchOnReconnect: true,
     structuralSharing: true,
   });
@@ -185,10 +186,13 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     }
   };
 
+  const hasReceivedPage = data !== undefined;
+  const initialFeedPending = Boolean(userId) && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
+
   return {
     items,
-    empty: Boolean(userId) && !feedLoading && items.length === 0,
-    loading: Boolean(userId) && feedLoading,
+    empty: Boolean(userId) && hasReceivedPage && !initialFeedPending && items.length === 0,
+    loading: initialFeedPending,
     error: feedError?.message ?? null,
     loadMore,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
