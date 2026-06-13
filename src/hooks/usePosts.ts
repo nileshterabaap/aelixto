@@ -87,26 +87,6 @@ export const useCreatePost = () => {
         .single();
 
       if (error) throw error;
-
-      // Eagerly populate the canonical preview (thumbnail/title/sizing) via
-      // the server-side scraper BEFORE the feed refetches. Without this the
-      // first render uses whatever the create dialog scraped (which can be
-      // a generic platform placeholder), and the real thumbnail only appears
-      // after a later background invocation updates the row.
-      if (data?.id && (newPost.media_url || newPost.platform)) {
-        try {
-          await supabase.functions.invoke('fetch-post-preview', {
-            body: {
-              postId: data.id,
-              url: newPost.media_url || '',
-              platform: newPost.platform || null,
-            },
-          });
-        } catch (err) {
-          console.warn('[useCreatePost] fetch-post-preview failed (non-fatal):', err);
-        }
-      }
-
       return data;
     },
     onSuccess: async () => {
