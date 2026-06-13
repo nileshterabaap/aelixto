@@ -55,14 +55,6 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
     },
   });
 
-  useEffect(() => {
-    const refreshScore = () => {
-      void refetchProfile();
-    };
-    window.addEventListener('aelixto:engagement-tracked', refreshScore);
-    return () => window.removeEventListener('aelixto:engagement-tracked', refreshScore);
-  }, [refetchProfile]);
-
   const { isFollowing, isRequested, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);

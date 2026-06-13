@@ -14,7 +14,7 @@ import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
 
-import { useIsRestoring, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
@@ -26,7 +26,6 @@ const Index = () => {
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
-  const isRestoring = useIsRestoring();
   useIframeScrollFreeze();
   const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
 
@@ -85,18 +84,6 @@ const Index = () => {
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
   const isSignedOut = !user;
   const showDemoFeed = isSignedOut && isDemoMode;
-  const hasStoredAuthToken = useMemo(() => {
-    if (typeof window === 'undefined' || user) return false;
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) return true;
-      }
-    } catch {
-      // ignore storage access errors
-    }
-    return false;
-  }, [user]);
 
   // Map demo posts to feed format - stable memoization
   const mappedDemoPosts = useMemo(() => {
@@ -272,11 +259,10 @@ const Index = () => {
   const loading = showDemoFeed ? demoLoading : followingLoading;
   const classifiersPending =
     !showDemoFeed && Boolean(user) && (followingCount === undefined || followingHasAnyPosts === undefined);
-  const authTokenPending = !showDemoFeed && !user && hasStoredAuthToken;
   const shouldShowSkeleton =
     !hasRenderedOnce.current &&
     allPosts.length === 0 &&
-    (isRestoring || sessionLoading || loading || classifiersPending || authTokenPending);
+    (sessionLoading || loading || classifiersPending);
 
   if (shouldShowSkeleton) {
     return (
