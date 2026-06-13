@@ -101,6 +101,24 @@ export function useOriginalVisitTracker(
       }
     };
 
+    const attachIframeListeners = (iframe: HTMLIFrameElement) => {
+      iframe.addEventListener('focus', fire);
+      iframe.addEventListener('load', () => {
+        iframe.contentWindow?.addEventListener?.('focus', fire);
+      }, { once: true });
+    };
+
+    el.querySelectorAll('iframe').forEach(attachIframeListeners);
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node instanceof HTMLIFrameElement) attachIframeListeners(node);
+          if (node instanceof HTMLElement) node.querySelectorAll('iframe').forEach(attachIframeListeners);
+        });
+      });
+    });
+    observer.observe(el, { childList: true, subtree: true });
+
     el.addEventListener('pointerdown', onPointerDown, true);
     el.addEventListener('touchstart', onPointerDown, { capture: true, passive: true });
     window.addEventListener('blur', onWindowBlur);
@@ -113,6 +131,7 @@ export function useOriginalVisitTracker(
       window.removeEventListener('blur', onWindowBlur);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       el.removeEventListener('click', onClick, true);
+      observer.disconnect();
     };
   }, [containerRef, postId, enabled, trackPlayableInteraction]);
 }
