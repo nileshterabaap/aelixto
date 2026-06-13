@@ -114,7 +114,22 @@ serve(async (req) => {
       oembedThumbW = oembedData?.thumbnail_width ?? null;
       oembedThumbH = oembedData?.thumbnail_height ?? null;
       const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : 1;
-      sizing = { media_kind: 'image', aspect_ratio: clampAR(ar), suggested_height: null };
+      // Reels render as 9:16 video; other Instagram posts as 4:5 image card.
+      const isReel = /\/reel(s)?\//i.test(url);
+      sizing = {
+        media_kind: isReel ? 'video' : 'image',
+        aspect_ratio: clampAR(ar) ?? (isReel ? 9 / 16 : 1),
+        suggested_height: null,
+      };
+      // Fallback: when oEmbed fails (rate-limit / missing token / private post)
+      // try the universal OG scraper so we still ship a real thumbnail.
+      if (!thumbnailUrl) {
+        const ogData = await scrapeOgData(url);
+        if (ogData.image && !isGenericPlaceholderImage(ogData.image)) {
+          thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, ogData.image);
+        }
+        if (!previewText) previewText = ogData.description || ogData.title;
+      }
     }
     // Facebook - use official oEmbed API with Meta token
     else if (platform === 'facebook') {
