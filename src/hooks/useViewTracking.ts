@@ -60,15 +60,14 @@ async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: 
 
     const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
     const url = `https://${projectId}.functions.supabase.co/record-view`;
-    const headers = {
-      'Content-Type': 'application/json',
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-    };
+    // No custom headers/content-type here: outbound clicks can navigate away
+    // immediately, so this must avoid CORS preflight and use keepalive/beacon.
+    if (navigator.sendBeacon && navigator.sendBeacon(url, payload)) {
+      return true;
+    }
 
     await fetch(url, {
       method: 'POST',
-      headers,
       body: payload,
       keepalive: true,
     });
