@@ -84,6 +84,18 @@ const Index = () => {
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
   const isSignedOut = !user;
   const showDemoFeed = isSignedOut && isDemoMode;
+  const hasStoredAuthToken = useMemo(() => {
+    if (typeof window === 'undefined' || user) return false;
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) return true;
+      }
+    } catch {
+      // ignore storage access errors
+    }
+    return false;
+  }, [user]);
 
   // Map demo posts to feed format - stable memoization
   const mappedDemoPosts = useMemo(() => {
@@ -259,10 +271,11 @@ const Index = () => {
   const loading = showDemoFeed ? demoLoading : followingLoading;
   const classifiersPending =
     !showDemoFeed && Boolean(user) && (followingCount === undefined || followingHasAnyPosts === undefined);
+  const authTokenPending = !showDemoFeed && !user && hasStoredAuthToken;
   const shouldShowSkeleton =
     !hasRenderedOnce.current &&
     allPosts.length === 0 &&
-    (sessionLoading || loading || classifiersPending);
+    (sessionLoading || loading || classifiersPending || authTokenPending);
 
   if (shouldShowSkeleton) {
     return (
