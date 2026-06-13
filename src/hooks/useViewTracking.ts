@@ -66,11 +66,6 @@ async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: 
       ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
     };
 
-    if (navigator.sendBeacon) {
-      const blob = new Blob([payload], { type: 'application/json' });
-      if (navigator.sendBeacon(url, blob)) return true;
-    }
-
     await fetch(url, {
       method: 'POST',
       headers,
