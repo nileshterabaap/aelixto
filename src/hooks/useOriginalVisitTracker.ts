@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { trackOriginalVisit } from '@/hooks/useViewTracking';
+import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
 
 /**
  * Detects when the user taps/clicks into an embedded iframe or an outbound
@@ -18,12 +18,15 @@ export function useOriginalVisitTracker(
   containerRef: React.RefObject<HTMLElement>,
   postId: string,
   enabled: boolean = true,
+  trackPlayableInteraction: boolean = false,
 ) {
   const firedRef = useRef(false);
+  const playFiredRef = useRef(false);
   const recentPointerRef = useRef(0);
 
   useEffect(() => {
     firedRef.current = false;
+    playFiredRef.current = false;
     recentPointerRef.current = 0;
   }, [postId]);
 
@@ -33,6 +36,13 @@ export function useOriginalVisitTracker(
     if (!el) return;
 
     const fire = () => {
+      if (trackPlayableInteraction && !playFiredRef.current) {
+        playFiredRef.current = true;
+        trackView({ postId, eventType: 'video_play' }).catch(() => {
+          playFiredRef.current = false;
+        });
+      }
+
       if (firedRef.current) return;
       firedRef.current = true;
       trackOriginalVisit(postId).catch(() => {
@@ -104,7 +114,7 @@ export function useOriginalVisitTracker(
       document.removeEventListener('visibilitychange', onVisibilityChange);
       el.removeEventListener('click', onClick, true);
     };
-  }, [containerRef, postId, enabled]);
+  }, [containerRef, postId, enabled, trackPlayableInteraction]);
 }
 
 export function markOriginalVisit(postId: string) {
