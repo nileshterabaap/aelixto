@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getDeviceId, sha256 } from '@/lib/deviceId';
+import { useCallback } from 'react';
 
 type EventType = 'video_play' | 'image_view' | 'article_open' | 'external_visit' | 'original_visit';
 
@@ -82,26 +83,26 @@ async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: 
  * Hook for tracking video play events
  */
 export function useVideoPlayTracking() {
-  return async (postId: string) => {
+  return useCallback(async (postId: string) => {
     return await trackView({
       postId,
       eventType: 'video_play',
       durationMs: 0,
     });
-  };
+  }, []);
 }
 
 /**
  * Hook for tracking image view events (2+ seconds)
  */
 export function useImageViewTracking() {
-  return async (postId: string) => {
+  return useCallback(async (postId: string) => {
     return await trackView({
       postId,
       eventType: 'image_view',
       durationMs: 2000,
     });
-  };
+  }, []);
 }
 
 /**
