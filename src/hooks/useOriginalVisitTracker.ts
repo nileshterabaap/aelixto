@@ -81,6 +81,7 @@ export function useOriginalVisitTracker(
       // The iframe steals focus when tapped — check that the now-active element
       // belongs to this post's embed container.
       setTimeout(() => {
+        const now = Date.now();
         const active = document.activeElement;
         if (
           active &&
@@ -88,7 +89,12 @@ export function useOriginalVisitTracker(
           el.contains(active)
         ) {
           if (trackPlayableInteraction) {
-            firePlay();
+            if (playFiredRef.current && lastIframeInteractionRef.current > 0 && now - lastIframeInteractionRef.current > 1200) {
+              fireOriginal();
+            } else {
+              firePlay();
+            }
+            lastIframeInteractionRef.current = now;
           } else {
             fireOriginal();
           }
