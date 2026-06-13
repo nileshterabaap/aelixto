@@ -484,9 +484,8 @@ async function resolveRedditCanonicalUrl(url: string): Promise<string | null> {
       return url;
     }
     const accessToken = await getRedditInstalledClientToken();
-    if (!accessToken) return null;
-
-    const res = await fetch(`https://oauth.reddit.com${parsed.pathname}${parsed.search}`, {
+    if (accessToken) {
+      const res = await fetch(`https://oauth.reddit.com${parsed.pathname}${parsed.search}`, {
       method: 'GET',
       redirect: 'manual',
       headers: {
@@ -502,6 +501,26 @@ async function resolveRedditCanonicalUrl(url: string): Promise<string | null> {
     if (bodyRedirect) return bodyRedirect.replace(/&amp;/g, '&');
     const finalUrl = res.url || '';
     if (/\/comments\/[a-z0-9_]+/i.test(finalUrl)) return finalUrl;
+    }
+
+    // Plain redirect-follow fallback (no auth) for when the OAuth token path
+    // is unavailable. Reddit serves a 30x to the canonical /comments/ URL for
+    // the public /s/ short links.
+    try {
+      const plain = await fetch(url, {
+        method: 'GET',
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; AelixtoBot/1.0; +https://aelixto.com)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
+      });
+      const finalUrl = plain.url || '';
+      if (/\/comments\/[a-z0-9_]+/i.test(finalUrl)) return finalUrl;
+      const body = await plain.text();
+      const m = body.match(/https?:\/\/(?:www\.)?reddit\.com\/(?:r|user)\/[^"'<>\s]+\/comments\/[a-z0-9_]+[^"'<>\s]*/i);
+      if (m) return m[0].replace(/&amp;/g, '&');
+    } catch { /* ignore */ }
     return null;
   } catch {
     return null;
