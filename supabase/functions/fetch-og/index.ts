@@ -87,6 +87,18 @@ function isLikelyRealContentImage(url: string): boolean {
   return true;
 }
 
+// Reddit's branded chrome/logo OG fallbacks (giant orange wordmark) never
+// represent the actual post — strip them so callers fall back to a typographic
+// text card instead of saving the misleading image.
+function isMisleadingRedditImage(url: string): boolean {
+  const lower = url.toLowerCase();
+  return (
+    lower.includes('redditstatic.com') ||
+    lower.includes('share.redd.it/preview/post') ||
+    /\b(reddit[-_ ]?logo|snoo|default[-_ ]?avatar)\b/.test(lower)
+  );
+}
+
 function findFirstContentImage(html: string): string | null {
   const scopes: string[] = [];
   const articleMatch = html.match(/<article[\s\S]*?<\/article>/i);
