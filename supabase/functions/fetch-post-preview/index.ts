@@ -71,14 +71,12 @@ serve(async (req) => {
   }
 
   try {
-    const { postId, url, platform, persist } = await req.json();
-    const normalizedPostId = typeof postId === 'string' && postId.trim() ? postId.trim() : null;
-    const shouldPersist = persist !== false && !!normalizedPostId;
+    const { postId, url, platform } = await req.json();
     
     console.log(`[fetch-post-preview] Processing postId=${postId}, platform=${platform}, url=${url}`);
 
-    if (!url) {
-      return new Response(JSON.stringify({ error: 'Missing url' }), {
+    if (!postId || !url) {
+      return new Response(JSON.stringify({ error: 'Missing postId or url' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -106,7 +104,8 @@ serve(async (req) => {
     else if (platform === 'instagram') {
       const oembedData = await fetchInstagramOembed(url);
       if (oembedData?.thumbnail_url) {
-        thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, oembedData.thumbnail_url);
+        // Store thumbnail permanently
+        thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
       }
       if (oembedData?.title) {
         previewText = oembedData.title;
@@ -120,7 +119,7 @@ serve(async (req) => {
     else if (platform === 'facebook') {
       const oembedData = await fetchFacebookOembed(url);
       if (oembedData?.thumbnail_url) {
-        thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, oembedData.thumbnail_url);
+        thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
       }
       // /reel/ → 9:16 vertical, /videos/ → 16:9, else 4:5 portrait photo card
       const isReel = /\/reel\//i.test(url);
@@ -163,7 +162,7 @@ serve(async (req) => {
     else if (platform === 'tiktok') {
       const tiktokData = await fetchTikTokOembed(url);
       if (tiktokData?.thumbnail_url) {
-        thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, tiktokData.thumbnail_url);
+        thumbnailUrl = await storeThumbnailPermanently(postId, tiktokData.thumbnail_url);
       }
       if (tiktokData?.title) {
         previewText = tiktokData.title;
@@ -176,7 +175,7 @@ serve(async (req) => {
       if (!thumbnailUrl) {
         const ogData = await scrapeOgData(url);
         if (ogData.image) {
-          thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, ogData.image);
+          thumbnailUrl = await storeThumbnailPermanently(postId, ogData.image);
         }
         if (!previewText) previewText = ogData.description || ogData.title;
       }
@@ -220,6 +219,11 @@ serve(async (req) => {
       }
     }
 
+    // Update database
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     const updatePayload: Record<string, string | number | null> = {
       thumbnail_url: thumbnailUrl,
       preview_image_url: thumbnailUrl,
@@ -232,25 +236,19 @@ serve(async (req) => {
       updatePayload.title = previewTitle;
       updatePayload.preview_title = previewTitle;
     }
+    const { error: updateError } = await supabase
+      .from('posts')
+      .update(updatePayload)
+      .eq('id', postId);
 
-    if (shouldPersist && normalizedPostId) {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
-      const { error: updateError } = await supabase
-        .from('posts')
-        .update(updatePayload)
-        .eq('id', normalizedPostId);
-
-      if (updateError) {
-        console.error('[fetch-post-preview] DB update error:', updateError);
-      } else {
-        console.log(`[fetch-post-preview] Updated post ${normalizedPostId} with thumbnail: ${thumbnailUrl}`);
-      }
+    if (updateError) {
+      console.error('[fetch-post-preview] DB update error:', updateError);
+    } else {
+      console.log(`[fetch-post-preview] Updated post ${postId} with thumbnail: ${thumbnailUrl}`);
     }
 
     return new Response(
-      JSON.stringify({ ...updatePayload, title: previewTitle }),
+      JSON.stringify({ thumbnail_url: thumbnailUrl, title: previewTitle, preview_text: previewText }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
@@ -413,11 +411,6 @@ async function storeThumbnailPermanently(postId: string, imageUrl: string): Prom
     console.error('[fetch-post-preview] Store thumbnail error:', error);
     return imageUrl; // Return original as fallback
   }
-}
-
-async function maybeStoreThumbnail(postId: string | null, shouldPersist: boolean, imageUrl: string): Promise<string | null> {
-  if (!shouldPersist || !postId) return imageUrl;
-  return await storeThumbnailPermanently(postId, imageUrl);
 }
 
 async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string | null; title: string | null; description: string | null; post_data?: Record<string, unknown> | null }> {
