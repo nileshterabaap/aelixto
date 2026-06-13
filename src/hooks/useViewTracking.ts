@@ -70,6 +70,9 @@ export async function trackView({ postId, eventType, durationMs = 0 }: TrackView
     }
 
     const success = data?.ok === true;
+    if (success && typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('aelixto:engagement-tracked', { detail: { postId, eventType } }));
+    }
     return success;
   } catch (error) {
     console.error('[useViewTracking] Exception:', error);
