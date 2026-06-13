@@ -71,14 +71,12 @@ serve(async (req) => {
   }
 
   try {
-    const { postId, url, platform, persist } = await req.json();
-    const normalizedPostId = typeof postId === 'string' && postId.trim() ? postId.trim() : null;
-    const shouldPersist = persist !== false && !!normalizedPostId;
+    const { postId, url, platform } = await req.json();
     
     console.log(`[fetch-post-preview] Processing postId=${postId}, platform=${platform}, url=${url}`);
 
-    if (!url) {
-      return new Response(JSON.stringify({ error: 'Missing url' }), {
+    if (!postId || !url) {
+      return new Response(JSON.stringify({ error: 'Missing postId or url' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -106,7 +104,8 @@ serve(async (req) => {
     else if (platform === 'instagram') {
       const oembedData = await fetchInstagramOembed(url);
       if (oembedData?.thumbnail_url) {
-        thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, oembedData.thumbnail_url);
+        // Store thumbnail permanently
+        thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
       }
       if (oembedData?.title) {
         previewText = oembedData.title;
@@ -114,28 +113,13 @@ serve(async (req) => {
       oembedThumbW = oembedData?.thumbnail_width ?? null;
       oembedThumbH = oembedData?.thumbnail_height ?? null;
       const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : 1;
-      // Reels render as 9:16 video; other Instagram posts as 4:5 image card.
-      const isReel = /\/reel(s)?\//i.test(url);
-      sizing = {
-        media_kind: isReel ? 'video' : 'image',
-        aspect_ratio: clampAR(ar) ?? (isReel ? 9 / 16 : 1),
-        suggested_height: null,
-      };
-      // Fallback: when oEmbed fails (rate-limit / missing token / private post)
-      // try the universal OG scraper so we still ship a real thumbnail.
-      if (!thumbnailUrl) {
-        const ogData = await scrapeOgData(url);
-        if (ogData.image && !isGenericPlaceholderImage(ogData.image)) {
-          thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, ogData.image);
-        }
-        if (!previewText) previewText = ogData.description || ogData.title;
-      }
+      sizing = { media_kind: 'image', aspect_ratio: clampAR(ar), suggested_height: null };
     }
     // Facebook - use official oEmbed API with Meta token
     else if (platform === 'facebook') {
       const oembedData = await fetchFacebookOembed(url);
       if (oembedData?.thumbnail_url) {
-        thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, oembedData.thumbnail_url);
+        thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
       }
       // /reel/ → 9:16 vertical, /videos/ → 16:9, else 4:5 portrait photo card
       const isReel = /\/reel\//i.test(url);
@@ -150,9 +134,7 @@ serve(async (req) => {
     else if (platform === 'reddit') {
       const redditData = await fetchRedditPreview(url);
       redditPostData = redditData.post_data ?? null;
-      thumbnailUrl = redditData.thumbnail_url
-        ? await maybeStoreThumbnail(normalizedPostId, shouldPersist, redditData.thumbnail_url)
-        : null;
+      thumbnailUrl = redditData.thumbnail_url;
       previewTitle = redditData.title;
       previewText = redditData.description || redditData.title;
       sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
@@ -180,7 +162,7 @@ serve(async (req) => {
     else if (platform === 'tiktok') {
       const tiktokData = await fetchTikTokOembed(url);
       if (tiktokData?.thumbnail_url) {
-        thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, tiktokData.thumbnail_url);
+        thumbnailUrl = await storeThumbnailPermanently(postId, tiktokData.thumbnail_url);
       }
       if (tiktokData?.title) {
         previewText = tiktokData.title;
@@ -193,7 +175,7 @@ serve(async (req) => {
       if (!thumbnailUrl) {
         const ogData = await scrapeOgData(url);
         if (ogData.image) {
-          thumbnailUrl = await maybeStoreThumbnail(normalizedPostId, shouldPersist, ogData.image);
+          thumbnailUrl = await storeThumbnailPermanently(postId, ogData.image);
         }
         if (!previewText) previewText = ogData.description || ogData.title;
       }
@@ -205,10 +187,7 @@ serve(async (req) => {
       const ogData = isThreads
         ? await scrapeOgData(url, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)')
         : await scrapeOgData(url);
-      const candidate = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
-      thumbnailUrl = candidate
-        ? await maybeStoreThumbnail(normalizedPostId, shouldPersist, candidate)
-        : null;
+      thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
       previewText = ogData.description || ogData.title;
       if (ogData.title) previewTitle = ogData.title;
 
@@ -240,6 +219,11 @@ serve(async (req) => {
       }
     }
 
+    // Update database
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
     const updatePayload: Record<string, string | number | null> = {
       thumbnail_url: thumbnailUrl,
       preview_image_url: thumbnailUrl,
@@ -252,25 +236,19 @@ serve(async (req) => {
       updatePayload.title = previewTitle;
       updatePayload.preview_title = previewTitle;
     }
+    const { error: updateError } = await supabase
+      .from('posts')
+      .update(updatePayload)
+      .eq('id', postId);
 
-    if (shouldPersist && normalizedPostId) {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
-      const { error: updateError } = await supabase
-        .from('posts')
-        .update(updatePayload)
-        .eq('id', normalizedPostId);
-
-      if (updateError) {
-        console.error('[fetch-post-preview] DB update error:', updateError);
-      } else {
-        console.log(`[fetch-post-preview] Updated post ${normalizedPostId} with thumbnail: ${thumbnailUrl}`);
-      }
+    if (updateError) {
+      console.error('[fetch-post-preview] DB update error:', updateError);
+    } else {
+      console.log(`[fetch-post-preview] Updated post ${postId} with thumbnail: ${thumbnailUrl}`);
     }
 
     return new Response(
-      JSON.stringify({ ...updatePayload, title: previewTitle }),
+      JSON.stringify({ thumbnail_url: thumbnailUrl, title: previewTitle, preview_text: previewText }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
@@ -435,11 +413,6 @@ async function storeThumbnailPermanently(postId: string, imageUrl: string): Prom
   }
 }
 
-async function maybeStoreThumbnail(postId: string | null, shouldPersist: boolean, imageUrl: string): Promise<string | null> {
-  if (!shouldPersist || !postId) return imageUrl;
-  return await storeThumbnailPermanently(postId, imageUrl);
-}
-
 async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string | null; title: string | null; description: string | null; post_data?: Record<string, unknown> | null }> {
   const canonicalUrl = await resolveRedditCanonicalUrl(url);
   const oembedData = await fetchRedditOembed(canonicalUrl || url);
@@ -484,8 +457,9 @@ async function resolveRedditCanonicalUrl(url: string): Promise<string | null> {
       return url;
     }
     const accessToken = await getRedditInstalledClientToken();
-    if (accessToken) {
-      const res = await fetch(`https://oauth.reddit.com${parsed.pathname}${parsed.search}`, {
+    if (!accessToken) return null;
+
+    const res = await fetch(`https://oauth.reddit.com${parsed.pathname}${parsed.search}`, {
       method: 'GET',
       redirect: 'manual',
       headers: {
@@ -501,26 +475,6 @@ async function resolveRedditCanonicalUrl(url: string): Promise<string | null> {
     if (bodyRedirect) return bodyRedirect.replace(/&amp;/g, '&');
     const finalUrl = res.url || '';
     if (/\/comments\/[a-z0-9_]+/i.test(finalUrl)) return finalUrl;
-    }
-
-    // Plain redirect-follow fallback (no auth) for when the OAuth token path
-    // is unavailable. Reddit serves a 30x to the canonical /comments/ URL for
-    // the public /s/ short links.
-    try {
-      const plain = await fetch(url, {
-        method: 'GET',
-        redirect: 'follow',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; AelixtoBot/1.0; +https://aelixto.com)',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        },
-      });
-      const finalUrl = plain.url || '';
-      if (/\/comments\/[a-z0-9_]+/i.test(finalUrl)) return finalUrl;
-      const body = await plain.text();
-      const m = body.match(/https?:\/\/(?:www\.)?reddit\.com\/(?:r|user)\/[^"'<>\s]+\/comments\/[a-z0-9_]+[^"'<>\s]*/i);
-      if (m) return m[0].replace(/&amp;/g, '&');
-    } catch { /* ignore */ }
     return null;
   } catch {
     return null;

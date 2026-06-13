@@ -1,7 +1,6 @@
 import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
-import { Play } from 'lucide-react';
 import type { Post } from '@/data/demoData';
 import { supabase } from '@/integrations/supabase/client';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
@@ -86,15 +85,7 @@ export const HydratedEmbed = memo(({
   const mediaUrl = post.mediaUrl || (post as any).media_url || r.url;
   const platformHint = (post.platform || '').toLowerCase();
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
-  const mediaKindHint = String((post as any).media_kind || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
-
-  // Reddit video posts auto-play inside Reddit's iframe and we cannot
-  // mute/pause via URL parameters. Gate the iframe behind a thumbnail
-  // + play button so videos never start without the user's tap.
-  const isRedditVideo = r.kind === 'reddit' && (mediaKindHint === 'video' || lowerUrl.includes('/v.redd.it') || lowerUrl.includes('v.redd.it'));
-  const [redditPlayTapped, setRedditPlayTapped] = useState(false);
-  useEffect(() => { setRedditPlayTapped(false); }, [post.id]);
 
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
@@ -199,16 +190,9 @@ export const HydratedEmbed = memo(({
   }
   
   // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
-  if (!shouldHydrate || (isRedditVideo && !redditPlayTapped)) {
-    const onTap = isRedditVideo && shouldHydrate
-      ? () => setRedditPlayTapped(true)
-      : undefined;
+  if (!shouldHydrate) {
     return (
-      <div
-        ref={embedContainerRef}
-        className={`relative w-full bg-muted ${aspectClass} ${onTap ? 'cursor-pointer' : ''}`}
-        onClick={onTap}
-      >
+      <div ref={embedContainerRef} className={`relative w-full bg-muted ${aspectClass}`}>
         {effectiveThumbnail && !imageError ? (
           <img
             src={effectiveThumbnail}
@@ -223,13 +207,6 @@ export const HydratedEmbed = memo(({
           />
         ) : (
           <div className="w-full h-full animate-pulse bg-muted" />
-        )}
-        {isRedditVideo && shouldHydrate && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-            <div className="w-16 h-16 rounded-full bg-black/60 flex items-center justify-center">
-              <Play className="w-8 h-8 text-white fill-white ml-1" />
-            </div>
-          </div>
         )}
       </div>
     );

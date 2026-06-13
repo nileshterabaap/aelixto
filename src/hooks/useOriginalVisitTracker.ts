@@ -61,32 +61,12 @@ export function useOriginalVisitTracker(
       }
     };
 
-    // Mobile iframes frequently absorb the tap without triggering window blur,
-    // and YouTube/Reddit/Spotify treat the first pointerdown as a "play/visit"
-    // intent. Treat any pointerdown inside an iframe-bearing embed as the
-    // original-visit signal so engagement scoring stays accurate.
-    const onPointerDown = (e: Event) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
-      // Only count taps that land on (or inside) an iframe — i.e. the actual
-      // embedded player surface, not the action bar / caption area.
-      const path = (e as PointerEvent).composedPath?.() || [];
-      const tappedIframe =
-        target.tagName === 'IFRAME' ||
-        path.some((n) => (n as HTMLElement)?.tagName === 'IFRAME') ||
-        !!el.querySelector('iframe');
-      if (!tappedIframe) return;
-      fire();
-    };
-
     window.addEventListener('blur', onWindowBlur);
     el.addEventListener('click', onClick, true);
-    el.addEventListener('pointerdown', onPointerDown, true);
 
     return () => {
       window.removeEventListener('blur', onWindowBlur);
       el.removeEventListener('click', onClick, true);
-      el.removeEventListener('pointerdown', onPointerDown, true);
     };
   }, [containerRef, postId, enabled]);
 }

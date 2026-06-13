@@ -58,10 +58,6 @@ export const useCreatePost = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const shouldResolvePreviewBeforePublish = (platform?: string | null) => {
-    return ["reddit", "instagram", "facebook", "tiktok", "pinterest"].includes((platform || "").toLowerCase());
-  };
-
   return useMutation({
     mutationFn: async (newPost: {
       title?: string;
@@ -91,30 +87,6 @@ export const useCreatePost = () => {
         .single();
 
       if (error) throw error;
-      if (data?.id && newPost.media_url && shouldResolvePreviewBeforePublish(newPost.platform)) {
-        try {
-          const { data: preview } = await supabase.functions.invoke("fetch-post-preview", {
-            body: {
-              postId: data.id,
-              url: newPost.media_url,
-              platform: newPost.platform,
-            },
-          });
-
-          if (preview && typeof preview === "object") {
-            return {
-              ...data,
-              thumbnail_url: preview.thumbnail_url ?? data.thumbnail_url,
-              preview_image_url: preview.preview_image_url ?? data.preview_image_url,
-              preview_text: preview.preview_text ?? data.preview_text,
-              preview_title: preview.preview_title ?? data.preview_title,
-              title: preview.title ?? data.title,
-            };
-          }
-        } catch {
-          // Keep publishing even if the preview refresh is temporarily blocked.
-        }
-      }
       return data;
     },
     onSuccess: async () => {

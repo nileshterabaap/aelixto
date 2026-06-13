@@ -16,24 +16,12 @@ import {
 } from "@/lib/domainClassification";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
-import { TextCardThumbnail } from "@/components/TextCardThumbnail";
-import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialDraft?: PostDraft | null;
 }
-
-const isBlockedRedditThumbnail = (url?: string | null) => {
-  if (!url) return false;
-  const lower = url.toLowerCase();
-  return (
-    lower.includes("redditstatic.com") ||
-    lower.includes("share.redd.it/preview/post") ||
-    /\b(reddit[-_ ]?logo|snoo|brand|icon|favicon|default[-_ ]?avatar)\b/.test(lower)
-  );
-};
 
 export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePostDialogProps) => {
   const [step, setStep] = useState<1 | 2>(1);
@@ -51,8 +39,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
   const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
-  const { profile: currentProfile } = useCurrentProfile();
-  const previewPlatform = linkUrl ? classifyUrl(linkUrl, ogType) : "external";
 
   // Hydrate from existing draft when opening
   useEffect(() => {
@@ -99,23 +85,15 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           }
         }
       } else if (linkUrl.includes("reddit.com") || linkUrl.includes("redd.it")) {
-        console.log('[CreatePostDialog] Fetching Reddit preview via edge function');
+        console.log('[CreatePostDialog] Fetching Reddit thumbnail via edge function');
         try {
-          const { data: redditData, error } = await supabase.functions.invoke('fetch-post-preview', {
-            body: { url: linkUrl, platform: 'reddit', persist: false }
+          const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
+            body: { url: linkUrl }
           });
-          if (!error && redditData) {
-            videoTitle = redditData.title || redditData.preview_title || "";
-            thumbnail = redditData.thumbnail_url || redditData.preview_image_url || "";
-          } else {
-            const { data: ogData, error: ogError } = await supabase.functions.invoke('fetch-og', {
-              body: { url: linkUrl }
-            });
-            if (!ogError && ogData) {
-              videoTitle = ogData.title || "";
-              thumbnail = ogData.image || "";
-              if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
-            }
+          if (!error && ogData) {
+            videoTitle = ogData.title || "";
+            thumbnail = ogData.image || "";
+            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
           }
         } catch (error) {
           console.error('[CreatePostDialog] Reddit fetch failed:', error);
@@ -191,9 +169,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
         } catch (error) {
           console.error('[CreatePostDialog] Failed to fetch OG data:', error);
         }
-      }
-      if ((linkUrl.includes("reddit.com") || linkUrl.includes("redd.it")) && isBlockedRedditThumbnail(thumbnail)) {
-        thumbnail = "";
       }
       
       // Fetch oEmbed HTML in parallel for instant embed rendering
@@ -616,22 +591,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                                 alt="Preview"
                                 className="h-48 w-full object-cover"
                                 onError={() => setThumbnailUrl("")}
-                              />
-                            </motion.div>
-                          )}
-                          {!thumbnailUrl && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.96 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ duration: 0.3 }}
-                              className="overflow-hidden rounded-2xl border border-border/60 h-48"
-                            >
-                              <TextCardThumbnail
-                                platform={previewPlatform}
-                                text={title || caption}
-                                username={currentProfile?.username}
-                                displayName={currentProfile?.display_name}
-                                aspect=""
                               />
                             </motion.div>
                           )}
