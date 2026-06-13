@@ -209,25 +209,15 @@ const Index = () => {
       // best-effort — proceed with reload regardless
     }
 
+    // Graceful refresh: invalidate + refetch in the background. React Query
+    // keeps the existing posts visible while the new page is fetched, so the
+    // user never sees a blank screen. Newly unseen posts will jump to the top
+    // once the refetch resolves (the RPC excludes already-seen ones).
     await Promise.all([
-      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
-    ]);
-
-    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
-
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.refetchQueries({ queryKey: ['following-feed', user?.id], type: 'active' }),
       queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
       queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
     ]);
-
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    window.location.reload();
-    await new Promise(() => {});
   }, [flushNow, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
