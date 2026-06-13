@@ -51,7 +51,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
   const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
-  const { data: currentProfile } = useCurrentProfile();
+  const { profile: currentProfile } = useCurrentProfile();
   const previewPlatform = linkUrl ? classifyUrl(linkUrl, ogType) : "external";
 
   // Hydrate from existing draft when opening
