@@ -683,9 +683,15 @@ serve(async (req) => {
     // real <img> inside <article>/<main>).
     const meta = extractArticleMetadata(html, finalUrl);
     const title = meta.title;
-    const image = meta.image;
+    let image = meta.image;
     const description = meta.description;
     const ogType = extractMeta('og:type');
+
+    // For Reddit, never return the platform's branded chrome / generic share
+    // preview as a thumbnail — those render as a giant orange wordmark.
+    if (image && (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) && isMisleadingRedditImage(image)) {
+      image = null;
+    }
 
     console.log('[fetch-og] Extracted OG data:', { title, image, description, ogType, finalUrl });
 
