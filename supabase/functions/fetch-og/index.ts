@@ -442,7 +442,14 @@ serve(async (req) => {
             } else if (post.secure_media?.oembed?.thumbnail_url || post.media?.oembed?.thumbnail_url) {
               thumbnail = post.secure_media?.oembed?.thumbnail_url || post.media?.oembed?.thumbnail_url;
             }
-            
+
+            // Drop Reddit's branded chrome / generic share-preview placeholder
+            // so the client renders a typographic Reddit text card instead of
+            // the giant orange "reddit" wordmark.
+            if (thumbnail && isMisleadingRedditImage(thumbnail)) {
+              thumbnail = null;
+            }
+
             console.log('[fetch-og] Reddit JSON API success:', thumbnail?.substring(0, 60) || 'no image');
             return new Response(
               JSON.stringify({ 
