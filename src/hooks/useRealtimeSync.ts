@@ -91,6 +91,7 @@ export const useRealtimeSync = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'comments' }, () => queue('comments', 'feed'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'saves' }, () => queue('saved', 'actions'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'follows' }, () => queue('feed', 'profile'))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_requests' }, () => queue('notifications', 'profile'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => queue('notifications'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, () => queue('messages'))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => queue('messages'))

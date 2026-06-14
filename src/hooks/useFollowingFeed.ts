@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
 import { useRef, useEffect, useMemo, useCallback } from 'react';
@@ -118,6 +118,7 @@ const fetchFeedPage = async (cursor?: string) => {
 
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
+  const queryClient = useQueryClient();
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -189,7 +190,11 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     }
   };
 
-  const refresh = useCallback(() => refetch(), [refetch]);
+  const refresh = useCallback(async () => {
+    preloadedRef.current = false;
+    queryClient.setQueryData(['following-feed', userId], undefined);
+    return await refetch();
+  }, [queryClient, refetch, userId]);
 
   const hasReceivedPage = data !== undefined;
   const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
