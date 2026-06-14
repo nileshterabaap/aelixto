@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, RefreshCw } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
@@ -80,6 +80,7 @@ const Index = () => {
     refresh: refreshFollowingFeed,
     hasMore,
     reachedEnd,
+    error: followingError,
   } = useFollowingFeed(user?.id);
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -286,7 +287,21 @@ const Index = () => {
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
-            {!showDemoFeed && followingEmpty ? (
+            {!showDemoFeed && followingError && allPosts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <h3 className="text-lg font-semibold">Feed couldn’t load</h3>
+                <p className="text-sm text-muted-foreground mt-1 mb-4">
+                  Pull to refresh or tap retry.
+                </p>
+                <button
+                  onClick={() => void refreshFollowingFeed()}
+                  className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold active:scale-95 transition-transform"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Retry
+                </button>
+              </div>
+            ) : !showDemoFeed && followingEmpty ? (
             followingCount === undefined || followingHasAnyPosts === undefined ? (
               <div className="space-y-4">
                 {[...Array(2)].map((_, i) => (
