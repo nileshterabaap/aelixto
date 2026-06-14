@@ -77,6 +77,7 @@ const Index = () => {
     empty: followingEmpty,
     loading: followingLoading,
     loadMore,
+    refresh: refreshFollowingFeed,
     hasMore,
     reachedEnd,
   } = useFollowingFeed(user?.id);
@@ -210,25 +211,20 @@ const Index = () => {
     }
 
     await Promise.all([
-      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
-    ]);
-
-    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
-
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
+      refreshFollowingFeed(),
       queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
       queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
     ]);
+  }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
 
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    window.location.reload();
-    await new Promise(() => {});
-  }, [flushNow, queryClient, user?.id]);
+  useEffect(() => {
+    if (!user?.id || showDemoFeed) return;
+    const refreshHomeFeed = () => {
+      void handleRefresh();
+    };
+    window.addEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
+    return () => window.removeEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
+  }, [handleRefresh, showDemoFeed, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
@@ -252,17 +248,11 @@ const Index = () => {
   }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
   // Only show skeleton on truly empty first load - prevent flicker.
-  // Also keep the skeleton up while the empty-state classifier queries are
-  // still resolving for a signed-in user; otherwise the page can briefly
-  // render a blank spacer between the skeleton disappearing and the feed
-  // (or "caught up" state) appearing.
   const loading = showDemoFeed ? demoLoading : followingLoading;
-  const classifiersPending =
-    !showDemoFeed && Boolean(user) && (followingCount === undefined || followingHasAnyPosts === undefined);
   const shouldShowSkeleton =
     !hasRenderedOnce.current &&
     allPosts.length === 0 &&
-    (sessionLoading || loading || classifiersPending);
+    (sessionLoading || loading);
 
   if (shouldShowSkeleton) {
     return (
