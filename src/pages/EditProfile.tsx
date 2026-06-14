@@ -15,7 +15,7 @@ import { useImageUpload } from "@/hooks/useImageUpload";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -39,6 +39,8 @@ const EditProfile = () => {
     cover_url: '',
   });
   const [aelixScoreEnabled, setAelixScoreEnabled] = useState(true);
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false);
+  const infoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'self'>('idle');
 
   // Check ownership and redirect if not owner
