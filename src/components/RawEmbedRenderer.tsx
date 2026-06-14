@@ -136,7 +136,7 @@ const stripInstagramCaption = (html: string): string => {
 
 const sanitizeEmbedHtml = (html: string): string => {
   // First strip Instagram caption attribute
-  let processedHtml = stripInstagramCaption(html);
+  const processedHtml = stripInstagramCaption(html);
   
   return DOMPurify.sanitize(processedHtml, {
     ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img', 'svg', 'path', 'title', 'section'],
