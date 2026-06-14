@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -24,6 +24,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
   );
   const [isRequested, setIsRequested] = useState<boolean>(false);
   const [followsMe, setFollowsMe] = useState<boolean>(initialFollowsMe ?? false);
+  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [counts, setCounts] = useState<{ followers: number; following: number }>({ 
     followers: 0, 
     following: 0 
@@ -114,14 +115,14 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
         .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_requests', filter: `target_id=eq.${currentUserId}` }, refresh)
         .subscribe();
 
-      (window as any).__aelixtoFollowChannel = channel;
+      realtimeChannelRef.current = channel;
     });
 
     return () => {
-      const channel = (window as any).__aelixtoFollowChannel;
+      const channel = realtimeChannelRef.current;
       if (channel) {
         supabase.removeChannel(channel);
-        delete (window as any).__aelixtoFollowChannel;
+        realtimeChannelRef.current = null;
       }
     };
   }, [refresh, targetUserId]);
