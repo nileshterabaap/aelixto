@@ -106,7 +106,12 @@ export function useOriginalVisitTracker(
       if (document.visibilityState !== 'hidden') return;
       // If the page hid within ~3s of a pointerdown on this embed, the user
       // likely tapped through to a native app / new tab.
-      if (Date.now() - recentPointerRef.current < 3000) {
+      const now = Date.now();
+      if (
+        now - recentPointerRef.current < 3000 ||
+        now - lastIframeInteractionRef.current < 10000 ||
+        (trackPlayableInteraction && playFiredRef.current)
+      ) {
         fireOriginal();
       }
     };
@@ -122,11 +127,25 @@ export function useOriginalVisitTracker(
       }
     };
 
+    const handleIframeFocus = () => {
+      const now = Date.now();
+      if (trackPlayableInteraction) {
+        if (playFiredRef.current && lastIframeInteractionRef.current > 0 && now - lastIframeInteractionRef.current > 1200) {
+          fireOriginal();
+        } else {
+          firePlay();
+        }
+        lastIframeInteractionRef.current = now;
+      } else {
+        fireOriginal();
+      }
+    };
+
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
-      iframe.addEventListener('focus', trackPlayableInteraction ? firePlay : fireOriginal);
+      iframe.addEventListener('focus', handleIframeFocus);
       iframe.addEventListener('load', () => {
         try {
-          iframe.contentWindow?.addEventListener?.('focus', trackPlayableInteraction ? firePlay : fireOriginal);
+          iframe.contentWindow?.addEventListener?.('focus', handleIframeFocus);
         } catch {
           // Cross-origin iframes may reject direct listener attachment.
         }
