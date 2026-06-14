@@ -258,10 +258,7 @@ const Index = () => {
 
   // Only show skeleton on truly empty first load - prevent flicker.
   const loading = showDemoFeed ? demoLoading : followingLoading;
-  const shouldShowSkeleton =
-    !hasRenderedOnce.current &&
-    allPosts.length === 0 &&
-    (sessionLoading || loading);
+  const shouldShowSkeleton = allPosts.length === 0 && (sessionLoading || loading);
 
   if (shouldShowSkeleton) {
     return (
