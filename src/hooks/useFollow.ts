@@ -7,6 +7,8 @@ interface UseFollowOptions {
    *  network round-trip resolves. Pass the value from a list query
    *  (e.g. search_profiles.is_following). */
   initialIsFollowing?: boolean;
+  initialIsRequested?: boolean;
+  initialFollowsMe?: boolean;
   /** Skip the initial network refresh entirely. Use when the caller
    *  already has authoritative data and only needs follow/unfollow
    *  mutations + counts on demand. */
@@ -14,13 +16,14 @@ interface UseFollowOptions {
 }
 
 export function useFollow(targetUserId?: string, options: UseFollowOptions = {}) {
-  const { initialIsFollowing, skipInitialRefresh } = options;
+  const { initialIsFollowing, initialIsRequested, initialFollowsMe, skipInitialRefresh } = options;
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [isFollowing, setIsFollowing] = useState<boolean | null>(
     initialIsFollowing ?? null
   );
   const [isRequested, setIsRequested] = useState<boolean>(false);
+  const [followsMe, setFollowsMe] = useState<boolean>(initialFollowsMe ?? false);
   const [counts, setCounts] = useState<{ followers: number; following: number }>({ 
     followers: 0, 
     following: 0 
@@ -47,6 +50,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
       // Check if current user follows this profile
       let myFollow = null;
       let myRequest = null;
+      let theirFollow = null;
       if (user) {
         const { data } = await supabase
           .from("follows")
@@ -62,6 +66,13 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
           .eq("target_id", targetUserId)
           .maybeSingle();
         myRequest = reqRow;
+        const { data: backRow } = await supabase
+          .from("follows")
+          .select("id")
+          .eq("follower_id", targetUserId)
+          .eq("following_id", user.id)
+          .maybeSingle();
+        theirFollow = backRow;
       }
 
       setCounts({
@@ -70,6 +81,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
       });
       setIsFollowing(!!myFollow);
       setIsRequested(!!myRequest && !myFollow);
+      setFollowsMe(!!theirFollow);
     } catch (error) {
       console.error("Error refreshing follow data:", error);
     }
@@ -79,6 +91,40 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
     if (skipInitialRefresh) return;
     refresh();
   }, [refresh, skipInitialRefresh]);
+
+  useEffect(() => {
+    setIsFollowing(initialIsFollowing ?? null);
+    setIsRequested(initialIsRequested ?? false);
+    setFollowsMe(initialFollowsMe ?? false);
+  }, [initialIsFollowing, initialIsRequested, initialFollowsMe, targetUserId]);
+
+  useEffect(() => {
+    if (!targetUserId) return;
+    let currentUserId: string | undefined;
+
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      currentUserId = user?.id;
+      if (!currentUserId) return;
+
+      const channel = supabase
+        .channel(`follow-state-${currentUserId}-${targetUserId}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'follows', filter: `follower_id=eq.${currentUserId}` }, refresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'follows', filter: `following_id=eq.${currentUserId}` }, refresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_requests', filter: `requester_id=eq.${currentUserId}` }, refresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_requests', filter: `target_id=eq.${currentUserId}` }, refresh)
+        .subscribe();
+
+      (window as any).__aelixtoFollowChannel = channel;
+    });
+
+    return () => {
+      const channel = (window as any).__aelixtoFollowChannel;
+      if (channel) {
+        supabase.removeChannel(channel);
+        delete (window as any).__aelixtoFollowChannel;
+      }
+    };
+  }, [refresh, targetUserId]);
 
   const follow = useCallback(async () => {
     if (!targetUserId || isFollowing || isRequested) return;
@@ -96,8 +142,10 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
       const result = (data as string) || "";
       if (result === "requested") {
         setIsRequested(true);
+        setIsFollowing(false);
       } else if (result === "following") {
         setIsFollowing(true);
+        setIsRequested(false);
         setCounts(prev => ({ ...prev, followers: prev.followers + 1 }));
       }
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
@@ -146,5 +194,5 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
     }
   }, [targetUserId, isFollowing, isRequested, refresh, queryClient]);
 
-  return { isFollowing, isRequested, follow, unfollow, loading, counts, refresh };
+  return { isFollowing, isRequested, followsMe, follow, unfollow, loading, counts, refresh };
 }
