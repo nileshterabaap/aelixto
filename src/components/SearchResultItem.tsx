@@ -18,6 +18,8 @@ export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) =>
   // Follow/Following label is correct on first paint — no 3-4s flicker.
   const { isFollowing, isRequested, follow, unfollow, loading } = useFollow(result.user_id, {
     initialIsFollowing: result.is_following,
+    initialIsRequested: result.is_requested,
+    initialFollowsMe: result.follows_me,
     skipInitialRefresh: true,
   });
   
@@ -66,7 +68,7 @@ export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) =>
           onClick={handleFollowClick}
           className="text-xs"
         >
-          {loading ? "..." : isFollowing ? "Following" : isRequested ? "Asked" : "Follow"}
+          {loading ? "..." : isFollowing ? "Following" : isRequested ? "Asked" : result.follows_me ? "Follow Back" : "Follow"}
         </Button>
       )}
     </div>

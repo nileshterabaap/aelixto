@@ -90,9 +90,9 @@ const fetchFeedPage = async (cursor?: string) => {
     preview_text: item.preview_text,
     preview_title: item.preview_title,
     preview_image_url: item.preview_image_url,
-    media_kind: (item as any).media_kind ?? null,
-    aspect_ratio: (item as any).aspect_ratio ?? null,
-    suggested_height: (item as any).suggested_height ?? null,
+    media_kind: item.media_kind ?? null,
+    aspect_ratio: item.aspect_ratio ?? null,
+    suggested_height: item.suggested_height ?? null,
     is_public: item.is_public,
     feed_cursor: item.feed_cursor,
     is_repost: item.is_repost,
@@ -192,7 +192,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   const refresh = useCallback(async () => {
     preloadedRef.current = false;
-    queryClient.setQueryData(['following-feed', userId], undefined);
+    await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
     return await refetch();
   }, [queryClient, refetch, userId]);
 
