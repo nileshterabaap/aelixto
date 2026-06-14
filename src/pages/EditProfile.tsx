@@ -304,27 +304,31 @@ const EditProfile = () => {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
+              <div className="space-y-0.5 relative">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="aelix-score">Aelix Score</Label>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button type="button" className="text-muted-foreground hover:text-foreground transition-colors">
-                          <Info className="h-4 w-4" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" className="max-w-xs text-left space-y-1">
-                        <p>Aelix Score represents the total engagement earned by your shared posts.</p>
-                        <ul className="list-disc pl-4 space-y-0.5">
-                          <li>View a shared post (+1)</li>
-                          <li>Play shared content (+1)</li>
-                          <li>Visit the original source (+1)</li>
-                        </ul>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => {
+                      if (infoTimeoutRef.current) clearTimeout(infoTimeoutRef.current);
+                      setShowInfoTooltip(true);
+                      infoTimeoutRef.current = setTimeout(() => setShowInfoTooltip(false), 5000);
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </button>
                 </div>
+                {showInfoTooltip && (
+                  <div className="absolute left-0 top-full mt-2 z-50 max-w-xs rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95">
+                    <p>Aelix Score represents the total engagement earned by your shared posts.</p>
+                    <ul className="list-disc pl-4 space-y-0.5 mt-1">
+                      <li>View a shared post (+1)</li>
+                      <li>Play shared content (+1)</li>
+                      <li>Visit the original source (+1)</li>
+                    </ul>
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground">
                   Display your Aelix Score on your profile
                 </p>
