@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
 
 interface FeedPost {
   id: string;
@@ -189,6 +189,8 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     }
   };
 
+  const refresh = useCallback(() => refetch(), [refetch]);
+
   const hasReceivedPage = data !== undefined;
   const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
 
@@ -198,7 +200,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     loading: initialFeedPending,
     error: feedError?.message ?? null,
     loadMore,
-    refresh: () => refetch(),
+    refresh,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
     reachedEnd: Boolean(userId) && reachedEnd,
   };
