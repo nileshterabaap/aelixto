@@ -303,7 +303,26 @@ const EditProfile = () => {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="aelix-score">Aelix Score</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="aelix-score">Aelix Score</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button type="button" className="text-muted-foreground hover:text-foreground transition-colors">
+                          <Info className="h-4 w-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-xs text-left space-y-1">
+                        <p>Aelix Score represents the total engagement earned by your shared posts.</p>
+                        <ul className="list-disc pl-4 space-y-0.5">
+                          <li>View a shared post (+1)</li>
+                          <li>Play shared content (+1)</li>
+                          <li>Visit the original source (+1)</li>
+                        </ul>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Display your Aelix Score on your profile
                 </p>
