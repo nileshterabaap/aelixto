@@ -110,6 +110,9 @@ export const useMarkPostSeen = (userId: string | undefined) => {
   // Periodic flush
   useEffect(() => {
     if (!userId) return;
+    const observers = observersRef.current;
+    const timers = timersRef.current;
+    const visible = visibleRef.current;
     const interval = setInterval(flush, BATCH_INTERVAL);
     // Flush on page hide (tab switch, navigate away)
     const onVisibilityChange = () => {
@@ -119,11 +122,11 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      observersRef.current.forEach((observer) => observer.disconnect());
-      observersRef.current.clear();
-      timersRef.current.forEach((timer) => clearTimeout(timer));
-      timersRef.current.clear();
-      visibleRef.current.clear();
+      observers.forEach((observer) => observer.disconnect());
+      observers.clear();
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
+      visible.clear();
       flush(); // flush remaining on unmount
     };
   }, [userId, flush]);

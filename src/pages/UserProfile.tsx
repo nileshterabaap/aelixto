@@ -293,7 +293,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           {!isMe && user && mutualsData && mutualsData.length > 0 && (
             <p className="text-center text-sm text-muted-foreground mb-4 px-4">
               {(() => {
-                const followersVis = getFollowVisibility((profile?.settings as Record<string, any>) || null, "followers");
+                const followersVis = getFollowVisibility((profile?.settings as Record<string, unknown>) || null, "followers");
                 const total = mutualsData[0]?.total_count ?? mutualsData.length;
                 if (followersVis === "no_one") {
                   return `Followed by ${total} mutual${total !== 1 ? "s" : ""}`;
