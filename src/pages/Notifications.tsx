@@ -60,11 +60,11 @@ const NotificationItem = ({
   const queryClient = useQueryClient();
   const { icon: Icon, bgColor, iconColor } = getNotificationIcon(notification.type);
   const message = getNotificationMessage(notification.type);
+  const isReportOutcome = notification.type === 'report_outcome';
+  const isFollowRequest = notification.type === 'follow_request';
   const actorName = isFollowRequest && notification.actor?.username
     ? `@${notification.actor.username}`
     : notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
-  const isReportOutcome = notification.type === 'report_outcome';
-  const isFollowRequest = notification.type === 'follow_request';
   const outcome = notification.metadata?.action as 'removed' | 'kept' | undefined;
   const reportKind = notification.metadata?.kind as
     | 'report_outcome'
