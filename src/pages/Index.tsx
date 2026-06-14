@@ -226,6 +226,14 @@ const Index = () => {
     return () => window.removeEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
   }, [handleRefresh, showDemoFeed, user?.id]);
 
+  useEffect(() => {
+    if (!user?.id || !followingLoading || allPosts.length > 0) return;
+    const retry = window.setTimeout(() => {
+      void refreshFollowingFeed();
+    }, 7000);
+    return () => window.clearTimeout(retry);
+  }, [allPosts.length, followingLoading, refreshFollowingFeed, user?.id]);
+
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
   // attached to that specific post so nothing fetches until it's actually
