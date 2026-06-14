@@ -140,6 +140,26 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     };
   }, [isAtTop, onRefresh, pullY, refreshing]);
 
+  // Allow other parts of the app (e.g. Home tab tap-to-refresh) to trigger
+  // the same animated pull-to-refresh spinner programmatically.
+  useEffect(() => {
+    const trigger = () => {
+      if (refreshing) return;
+      animate(pullY, LOADING_REST, { type: "spring", stiffness: 200, damping: 25 });
+      setRefreshing(true);
+      void (async () => {
+        try {
+          await onRefresh();
+        } finally {
+          setRefreshing(false);
+          animate(pullY, 0, { type: "spring", stiffness: 250, damping: 28 });
+        }
+      })();
+    };
+    window.addEventListener("aelixto:trigger-pull-refresh", trigger);
+    return () => window.removeEventListener("aelixto:trigger-pull-refresh", trigger);
+  }, [onRefresh, pullY, refreshing]);
+
   return (
     <div
       ref={containerRef}
@@ -148,21 +168,21 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     >
       {/* Pull indicator — overlays on top, content does NOT move */}
       <motion.div
-        className="absolute left-0 right-0 flex justify-center pointer-events-none z-50"
-        style={{ top: 12, y: pullY, x: 0 }}
+        className="fixed left-0 right-0 flex justify-center pointer-events-none z-[60]"
+        style={{ top: "calc(env(safe-area-inset-top) + 72px)", y: pullY, x: 0 }}
       >
         <motion.div
-          className="h-9 w-9 rounded-full bg-background border border-border shadow-md flex items-center justify-center"
+          className="h-10 w-10 rounded-full bg-background border border-border shadow-lg flex items-center justify-center"
           style={{
             opacity: spinnerOpacity,
             scale: spinnerScale,
           }}
         >
           {refreshing ? (
-            <Loader2 className="h-4.5 w-4.5 text-primary animate-spin" />
+            <Loader2 className="h-5 w-5 text-primary animate-spin" />
           ) : (
             <motion.div style={{ rotate: spinnerRotate }}>
-              <Loader2 className="h-4.5 w-4.5 text-muted-foreground" />
+              <Loader2 className="h-5 w-5 text-muted-foreground" />
             </motion.div>
           )}
         </motion.div>
