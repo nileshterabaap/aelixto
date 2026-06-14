@@ -67,15 +67,17 @@ export const useRealtimeSync = () => {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    const pendingGroups = pendingGroupsRef.current;
+
     const flush = () => {
       timerRef.current = null;
-      const groups = Array.from(pendingGroupsRef.current);
-      pendingGroupsRef.current.clear();
+      const groups = Array.from(pendingGroups);
+      pendingGroups.clear();
       groups.forEach((group) => invalidateGroup(queryClient, group, user?.id));
     };
 
     const queue = (...groups: CacheGroup[]) => {
-      groups.forEach((group) => pendingGroupsRef.current.add(group));
+      groups.forEach((group) => pendingGroups.add(group));
       if (timerRef.current) return;
       timerRef.current = setTimeout(flush, 300);
     };
@@ -98,7 +100,7 @@ export const useRealtimeSync = () => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = null;
-      pendingGroupsRef.current.clear();
+      pendingGroups.clear();
       supabase.removeChannel(channel);
     };
   }, [queryClient, user?.id]);
