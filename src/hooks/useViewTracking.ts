@@ -59,8 +59,11 @@ async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: 
       viewer_id: session?.user?.id || null,
     });
 
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-    const url = `https://${projectId}.functions.supabase.co/record-view`;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID as string | undefined;
+    const url = supabaseUrl
+      ? `${supabaseUrl.replace(/\/$/, '')}/functions/v1/record-view`
+      : `https://${projectId}.functions.supabase.co/record-view`;
     // No custom headers/content-type here: outbound clicks can navigate away
     // immediately, so this must avoid CORS preflight and use keepalive/beacon.
     if (navigator.sendBeacon && navigator.sendBeacon(url, payload)) {
