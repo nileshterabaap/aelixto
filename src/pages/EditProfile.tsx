@@ -43,6 +43,13 @@ const EditProfile = () => {
   const infoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'self'>('idle');
 
+  // Cleanup info tooltip timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (infoTimeoutRef.current) clearTimeout(infoTimeoutRef.current);
+    };
+  }, []);
+
   // Check ownership and redirect if not owner
   useEffect(() => {
     if (!loading && profile && user && user.id !== profile.user_id) {
