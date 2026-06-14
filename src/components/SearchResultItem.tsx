@@ -16,7 +16,7 @@ export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) =>
   const { user } = useSession();
   // Seed with the value already returned by search_profiles so the
   // Follow/Following label is correct on first paint — no 3-4s flicker.
-  const { isFollowing, follow, unfollow, loading } = useFollow(result.user_id, {
+  const { isFollowing, isRequested, follow, unfollow, loading } = useFollow(result.user_id, {
     initialIsFollowing: result.is_following,
     skipInitialRefresh: true,
   });
@@ -30,7 +30,7 @@ export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) =>
 
   const handleFollowClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isFollowing) {
+    if (isFollowing || isRequested) {
       unfollow();
     } else {
       follow();
@@ -61,12 +61,12 @@ export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) =>
       {!isMe && user && (
         <Button
           size="sm"
-          variant={isFollowing ? "secondary" : "default"}
+          variant={(isFollowing || isRequested) ? "secondary" : "default"}
           disabled={loading}
           onClick={handleFollowClick}
           className="text-xs"
         >
-          {loading ? "..." : isFollowing ? "Following" : "Follow"}
+          {loading ? "..." : isFollowing ? "Following" : isRequested ? "Asked" : "Follow"}
         </Button>
       )}
     </div>

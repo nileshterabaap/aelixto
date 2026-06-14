@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 const getNotificationIcon = (type: string) => {
   switch (type) {
@@ -39,7 +40,7 @@ const getNotificationMessage = (type: string) => {
     case 'follow':
       return 'started following you';
     case 'follow_request':
-      return 'requested to follow you';
+      return 'asked to Follow';
     default:
       return 'interacted with you';
   }
@@ -56,9 +57,12 @@ const NotificationItem = ({
   const [resolved, setResolved] = useState<"deleted" | "kept" | null>(null);
   const [reqBusy, setReqBusy] = useState<"approve" | "decline" | null>(null);
   const [reqResolved, setReqResolved] = useState<"approved" | "declined" | null>(null);
+  const queryClient = useQueryClient();
   const { icon: Icon, bgColor, iconColor } = getNotificationIcon(notification.type);
   const message = getNotificationMessage(notification.type);
-  const actorName = notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
+  const actorName = isFollowRequest && notification.actor?.username
+    ? `@${notification.actor.username}`
+    : notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
   const isReportOutcome = notification.type === 'report_outcome';
   const isFollowRequest = notification.type === 'follow_request';
   const outcome = notification.metadata?.action as 'removed' | 'kept' | undefined;
@@ -99,6 +103,10 @@ const NotificationItem = ({
       return;
     }
     setReqResolved("approved");
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["notification-count"] });
+    queryClient.invalidateQueries({ queryKey: ["profile"] });
+    queryClient.invalidateQueries({ queryKey: ["user-profile"] });
     setReqBusy(null);
   };
 
@@ -116,6 +124,10 @@ const NotificationItem = ({
       return;
     }
     setReqResolved("declined");
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["notification-count"] });
+    queryClient.invalidateQueries({ queryKey: ["profile"] });
+    queryClient.invalidateQueries({ queryKey: ["user-profile"] });
     setReqBusy(null);
   };
 
@@ -232,14 +244,14 @@ const NotificationItem = ({
                     disabled={reqBusy !== null}
                     className="text-xs font-medium px-3 py-1.5 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition disabled:opacity-50"
                   >
-                    {reqBusy === "approve" ? "Approving…" : "Approve"}
+                    {reqBusy === "approve" ? "Alright…" : "Alright"}
                   </button>
                   <button
                     onClick={handleDeclineFollow}
                     disabled={reqBusy !== null}
                     className="text-xs font-medium px-3 py-1.5 rounded-full bg-muted hover:bg-muted/70 transition disabled:opacity-50"
                   >
-                    {reqBusy === "decline" ? "Declining…" : "Decline"}
+                    {reqBusy === "decline" ? "Sorry…" : "Sorry"}
                   </button>
                 </>
               )}

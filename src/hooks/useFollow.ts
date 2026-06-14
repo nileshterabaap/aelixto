@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface UseFollowOptions {
   /** Seed the initial follow state so the UI doesn't flicker while the
@@ -14,6 +15,7 @@ interface UseFollowOptions {
 
 export function useFollow(targetUserId?: string, options: UseFollowOptions = {}) {
   const { initialIsFollowing, skipInitialRefresh } = options;
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [isFollowing, setIsFollowing] = useState<boolean | null>(
     initialIsFollowing ?? null
@@ -98,13 +100,18 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
         setIsFollowing(true);
         setCounts(prev => ({ ...prev, followers: prev.followers + 1 }));
       }
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notification-count"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["user-search"] });
       await refresh();
     } catch (error) {
       console.error("Error following:", error);
     } finally {
       setLoading(false);
     }
-  }, [targetUserId, isFollowing, isRequested, refresh]);
+  }, [targetUserId, isFollowing, isRequested, refresh, queryClient]);
 
   const unfollow = useCallback(async () => {
     if (!targetUserId || (!isFollowing && !isRequested)) return;
@@ -126,13 +133,18 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
 
       const { error } = await supabase.rpc("cancel_follow_or_request", { _target: targetUserId });
       if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["notification-count"] });
+      queryClient.invalidateQueries({ queryKey: ["profile"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+      queryClient.invalidateQueries({ queryKey: ["user-search"] });
       await refresh();
     } catch (error) {
       console.error("Error unfollowing:", error);
     } finally {
       setLoading(false);
     }
-  }, [targetUserId, isFollowing, isRequested, refresh]);
+  }, [targetUserId, isFollowing, isRequested, refresh, queryClient]);
 
   return { isFollowing, isRequested, follow, unfollow, loading, counts, refresh };
 }
