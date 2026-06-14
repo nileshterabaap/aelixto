@@ -80,7 +80,6 @@ const Index = () => {
     refresh: refreshFollowingFeed,
     hasMore,
     reachedEnd,
-    error: followingError,
   } = useFollowingFeed(user?.id);
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
