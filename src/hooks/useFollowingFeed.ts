@@ -192,7 +192,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   const refresh = useCallback(async () => {
     preloadedRef.current = false;
-    queryClient.setQueryData(['following-feed', userId], undefined);
+    await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
     return await refetch();
   }, [queryClient, refetch, userId]);
 
