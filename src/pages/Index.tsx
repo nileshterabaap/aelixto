@@ -286,11 +286,13 @@ const Index = () => {
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
-          {!showDemoFeed && followingEmpty ? (
+            {!showDemoFeed && followingEmpty ? (
             followingCount === undefined || followingHasAnyPosts === undefined ? (
-              // Empty-state classifier queries haven't resolved yet —
-              // render nothing to avoid a flash of the wrong message.
-              <div className="py-16" />
+              <div className="space-y-4">
+                {[...Array(2)].map((_, i) => (
+                  <PostSkeleton key={i} />
+                ))}
+              </div>
             ) : followingCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <h3 className="text-lg font-semibold">Nothing here yet 👀</h3>
@@ -301,7 +303,7 @@ const Index = () => {
                   Discover people to follow
                 </Link>
               </div>
-            ) : followingHasAnyPosts && reachedEnd ? (
+            ) : followingHasAnyPosts ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                 <h3 className="text-lg font-semibold">You're all caught up</h3>
@@ -309,8 +311,6 @@ const Index = () => {
                   You've seen all recent posts from people you follow.
                 </p>
               </div>
-            ) : followingHasAnyPosts ? (
-              <div className="py-16" />
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />

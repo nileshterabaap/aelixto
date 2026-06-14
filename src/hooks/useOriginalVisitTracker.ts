@@ -24,12 +24,17 @@ export function useOriginalVisitTracker(
   const playFiredRef = useRef(false);
   const recentPointerRef = useRef(0);
   const lastIframeInteractionRef = useRef(0);
+  const originalDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     firedRef.current = false;
     playFiredRef.current = false;
     recentPointerRef.current = 0;
     lastIframeInteractionRef.current = 0;
+    if (originalDwellTimerRef.current) {
+      clearTimeout(originalDwellTimerRef.current);
+      originalDwellTimerRef.current = null;
+    }
   }, [postId]);
 
   useEffect(() => {
@@ -55,6 +60,20 @@ export function useOriginalVisitTracker(
       });
     };
 
+    const scheduleOriginalFromPlayableDwell = () => {
+      if (!trackPlayableInteraction || firedRef.current || originalDwellTimerRef.current) return;
+      originalDwellTimerRef.current = setTimeout(() => {
+        originalDwellTimerRef.current = null;
+        // Cross-origin Instagram/TikTok/etc. controls do not reliably bubble
+        // their "open original" tap to the parent page. If a playable embed has
+        // focus long enough to be watched, record the original-platform
+        // engagement so reels don't get stuck at impression/play only.
+        if (playFiredRef.current && document.visibilityState === 'visible') {
+          fireOriginal();
+        }
+      }, 3500);
+    };
+
     const isInsideIframe = (node: EventTarget | null): boolean => {
       if (!(node instanceof Element)) return false;
       if (node.tagName === 'IFRAME') return true;
@@ -67,6 +86,7 @@ export function useOriginalVisitTracker(
       if (isInsideIframe(e.target)) {
         if (trackPlayableInteraction) {
           firePlay();
+          scheduleOriginalFromPlayableDwell();
           if (playFiredRef.current && lastIframeInteractionRef.current > 0 && now - lastIframeInteractionRef.current > 1200) {
             fireOriginal();
           }
@@ -93,6 +113,7 @@ export function useOriginalVisitTracker(
               fireOriginal();
             } else {
               firePlay();
+              scheduleOriginalFromPlayableDwell();
             }
             lastIframeInteractionRef.current = now;
           } else {
@@ -134,6 +155,7 @@ export function useOriginalVisitTracker(
           fireOriginal();
         } else {
           firePlay();
+          scheduleOriginalFromPlayableDwell();
         }
         lastIframeInteractionRef.current = now;
       } else {
@@ -176,6 +198,10 @@ export function useOriginalVisitTracker(
       document.removeEventListener('visibilitychange', onVisibilityChange);
       el.removeEventListener('click', onClick, true);
       observer.disconnect();
+      if (originalDwellTimerRef.current) {
+        clearTimeout(originalDwellTimerRef.current);
+        originalDwellTimerRef.current = null;
+      }
     };
   }, [containerRef, postId, enabled, trackPlayableInteraction]);
 }

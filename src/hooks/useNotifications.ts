@@ -47,7 +47,8 @@ export const useNotificationCount = () => {
       return count || 0;
     },
     enabled: !!user?.id,
-    staleTime: 30000, // 30 seconds
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // Subscribe to realtime notifications
@@ -65,9 +66,8 @@ export const useNotificationCount = () => {
           filter: `recipient_id=eq.${user.id}`,
         },
         () => {
-          // Invalidate the count query when notifications change
-          queryClient.invalidateQueries({ queryKey: ["notification-count", user.id] });
-          queryClient.invalidateQueries({ queryKey: ["notifications", user.id] });
+          queryClient.refetchQueries({ queryKey: ["notification-count", user.id] });
+          queryClient.refetchQueries({ queryKey: ["notifications", user.id] });
         }
       )
       .subscribe();
@@ -163,7 +163,34 @@ export const useNotifications = () => {
       return result;
     },
     enabled: !!user?.id,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`notifications-list-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        () => {
+          queryClient.refetchQueries({ queryKey: ["notifications", user.id] });
+          queryClient.refetchQueries({ queryKey: ["notification-count", user.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, user?.id]);
 
   // Mark all as read mutation
   const markAllReadMutation = useMutation({

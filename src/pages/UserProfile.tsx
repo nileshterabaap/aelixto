@@ -346,7 +346,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                     : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
               >
-                {isFollowing ? 'Following' : isRequested ? 'Requested' : 'Follow'}
+                {isFollowing ? 'Following' : isRequested ? 'Asked' : isFollowedByTarget ? 'Follow Back' : 'Follow'}
               </Button>
               <Button
                 disabled={conversationLoading}
