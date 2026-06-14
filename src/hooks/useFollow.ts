@@ -13,10 +13,11 @@ interface UseFollowOptions {
    *  already has authoritative data and only needs follow/unfollow
    *  mutations + counts on demand. */
   skipInitialRefresh?: boolean;
+  enableRealtime?: boolean;
 }
 
 export function useFollow(targetUserId?: string, options: UseFollowOptions = {}) {
-  const { initialIsFollowing, initialIsRequested, initialFollowsMe, skipInitialRefresh } = options;
+  const { initialIsFollowing, initialIsRequested, initialFollowsMe, skipInitialRefresh, enableRealtime = !skipInitialRefresh } = options;
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [isFollowing, setIsFollowing] = useState<boolean | null>(
@@ -100,11 +101,12 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
   }, [initialIsFollowing, initialIsRequested, initialFollowsMe, targetUserId]);
 
   useEffect(() => {
-    if (!targetUserId) return;
-    let currentUserId: string | undefined;
+    if (!targetUserId || !enableRealtime) return;
+    let cancelled = false;
 
     supabase.auth.getUser().then(({ data: { user } }) => {
-      currentUserId = user?.id;
+      if (cancelled) return;
+      const currentUserId = user?.id;
       if (!currentUserId) return;
 
       const channel = supabase
@@ -119,13 +121,14 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
     });
 
     return () => {
+      cancelled = true;
       const channel = realtimeChannelRef.current;
       if (channel) {
         supabase.removeChannel(channel);
         realtimeChannelRef.current = null;
       }
     };
-  }, [refresh, targetUserId]);
+  }, [enableRealtime, refresh, targetUserId]);
 
   const follow = useCallback(async () => {
     if (!targetUserId || isFollowing || isRequested) return;
