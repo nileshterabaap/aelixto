@@ -42,6 +42,7 @@ interface UseFollowingFeedResult {
   loading: boolean;
   error: string | null;
   loadMore: () => void;
+  refresh: () => Promise<unknown>;
   hasMore: boolean;
   reachedEnd: boolean;
 }
@@ -125,6 +126,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     isFetching,
     error: feedError,
     fetchNextPage,
+    refetch,
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
@@ -138,6 +140,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     refetchOnWindowFocus: false,
     refetchOnMount: 'always', // refresh on mount/page reload so an empty first paint cannot stick
     refetchOnReconnect: true,
+    retry: 2,
     structuralSharing: true,
   });
 
@@ -187,7 +190,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   };
 
   const hasReceivedPage = data !== undefined;
-  const initialFeedPending = Boolean(userId) && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
+  const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
 
   return {
     items,
@@ -195,6 +198,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     loading: initialFeedPending,
     error: feedError?.message ?? null,
     loadMore,
+    refresh: () => refetch(),
     hasMore: Boolean(userId) && (hasNextPage ?? false),
     reachedEnd: Boolean(userId) && reachedEnd,
   };
