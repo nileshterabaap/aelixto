@@ -5,6 +5,22 @@ const BATCH_INTERVAL = 3000; // flush every 3s
 const VISIBILITY_THRESHOLD = 0.5;
 const SEEN_DWELL_MS = 1500;
 
+const collectCurrentlyVisibleFeedPostIds = () => {
+  if (typeof document === 'undefined' || typeof window === 'undefined') return [];
+
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+  return Array.from(document.querySelectorAll<HTMLElement>('[data-feed-item-id]'))
+    .filter((el) => {
+      const rect = el.getBoundingClientRect();
+      if (rect.height <= 0 || rect.bottom <= 0 || rect.top >= viewportHeight) return false;
+
+      const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+      return visibleHeight / rect.height >= VISIBILITY_THRESHOLD;
+    })
+    .map((el) => el.dataset.feedItemId)
+    .filter((id): id is string => Boolean(id));
+};
+
 /**
  * Mark a single post as seen immediately (fire-and-forget).
  * Use this when viewing a post on detail/profile/saved pages.
@@ -89,6 +105,7 @@ export const useMarkPostSeen = (userId: string | undefined) => {
   const flushNow = useCallback(async () => {
     if (!userId) return;
     visibleRef.current.forEach((id) => pendingRef.current.add(id));
+    collectCurrentlyVisibleFeedPostIds().forEach((id) => pendingRef.current.add(id));
     if (pendingRef.current.size === 0) return;
     // Wait for any in-flight flush to finish
     while (flushing.current) {
