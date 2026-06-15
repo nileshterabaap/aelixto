@@ -2,24 +2,9 @@ import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 const BATCH_INTERVAL = 3000; // flush every 3s
-const VISIBILITY_THRESHOLD = 0.5;
-const SEEN_DWELL_MS = 1500;
-
-const collectCurrentlyVisibleFeedPostIds = () => {
-  if (typeof document === 'undefined' || typeof window === 'undefined') return [];
-
-  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-  return Array.from(document.querySelectorAll<HTMLElement>('[data-feed-item-id]'))
-    .filter((el) => {
-      const rect = el.getBoundingClientRect();
-      if (rect.height <= 0 || rect.bottom <= 0 || rect.top >= viewportHeight) return false;
-
-      const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
-      return visibleHeight / rect.height >= VISIBILITY_THRESHOLD;
-    })
-    .map((el) => el.dataset.feedItemId)
-    .filter((id): id is string => Boolean(id));
-};
+// Any visibility — the moment a post enters the viewport it counts as seen
+// so it never reappears in the feed, regardless of how briefly it scrolled past.
+const VISIBILITY_THRESHOLD = 0;
 
 /**
  * Mark a single post as seen immediately (fire-and-forget).
@@ -57,7 +42,6 @@ export const markPostsSeenImmediate = async (userId: string, postIds: string[]) 
 export const useMarkPostSeen = (userId: string | undefined) => {
   const pendingRef = useRef<Set<string>>(new Set());
   const observersRef = useRef<Map<string, IntersectionObserver>>(new Map());
-  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // Posts currently intersecting the viewport (any visibility), so on
   // refresh we can also count posts the user is looking at right now
   // even if the periodic batch flush hasn't fired yet.
@@ -69,12 +53,6 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     if (observer) {
       observer.disconnect();
       observersRef.current.delete(postId);
-    }
-
-    const timer = timersRef.current.get(postId);
-    if (timer) {
-      clearTimeout(timer);
-      timersRef.current.delete(postId);
     }
 
     visibleRef.current.delete(postId);
@@ -105,7 +83,6 @@ export const useMarkPostSeen = (userId: string | undefined) => {
   const flushNow = useCallback(async () => {
     if (!userId) return;
     visibleRef.current.forEach((id) => pendingRef.current.add(id));
-    collectCurrentlyVisibleFeedPostIds().forEach((id) => pendingRef.current.add(id));
     if (pendingRef.current.size === 0) return;
     // Wait for any in-flight flush to finish
     while (flushing.current) {
@@ -127,9 +104,6 @@ export const useMarkPostSeen = (userId: string | undefined) => {
   // Periodic flush
   useEffect(() => {
     if (!userId) return;
-    const observers = observersRef.current;
-    const timers = timersRef.current;
-    const visible = visibleRef.current;
     const interval = setInterval(flush, BATCH_INTERVAL);
     // Flush on page hide (tab switch, navigate away)
     const onVisibilityChange = () => {
@@ -139,11 +113,9 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      observers.forEach((observer) => observer.disconnect());
-      observers.clear();
-      timers.forEach((timer) => clearTimeout(timer));
-      timers.clear();
-      visible.clear();
+      observersRef.current.forEach((observer) => observer.disconnect());
+      observersRef.current.clear();
+      visibleRef.current.clear();
       flush(); // flush remaining on unmount
     };
   }, [userId, flush]);
@@ -156,32 +128,21 @@ export const useMarkPostSeen = (userId: string | undefined) => {
 
       const observer = new IntersectionObserver(
         ([entry]) => {
-          if (entry.isIntersecting && entry.intersectionRatio >= VISIBILITY_THRESHOLD) {
+          if (entry.isIntersecting) {
+            // Mark as seen the moment any part of the post enters the
+            // viewport — no dwell timer. Once recorded, stop observing.
             visibleRef.current.add(postId);
-
-            if (!timersRef.current.has(postId)) {
-              const timer = setTimeout(() => {
-                if (!visibleRef.current.has(postId)) return;
-                pendingRef.current.add(postId);
-                timersRef.current.delete(postId);
-                const obs = observersRef.current.get(postId);
-                if (obs) {
-                  obs.disconnect();
-                  observersRef.current.delete(postId);
-                }
-              }, SEEN_DWELL_MS);
-              timersRef.current.set(postId, timer);
+            pendingRef.current.add(postId);
+            const obs = observersRef.current.get(postId);
+            if (obs) {
+              obs.disconnect();
+              observersRef.current.delete(postId);
             }
           } else {
             visibleRef.current.delete(postId);
-            const timer = timersRef.current.get(postId);
-            if (timer) {
-              clearTimeout(timer);
-              timersRef.current.delete(postId);
-            }
           }
         },
-        { threshold: [0, VISIBILITY_THRESHOLD] }
+        { threshold: [VISIBILITY_THRESHOLD] }
       );
 
       observersRef.current.set(postId, observer);
