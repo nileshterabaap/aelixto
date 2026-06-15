@@ -4,25 +4,18 @@ import { supabase } from '@/integrations/supabase/client';
 const BATCH_INTERVAL = 3000; // flush every 3s
 const VISIBILITY_THRESHOLD = 0.5;
 const SEEN_DWELL_MS = 1500;
-const OBSERVER_THRESHOLDS = Array.from({ length: 21 }, (_, index) => index / 20);
-
-const getViewportHeight = () => window.innerHeight || document.documentElement.clientHeight;
-
-const getVisibleRatio = (rect: Pick<DOMRectReadOnly, 'top' | 'bottom' | 'height'>) => {
-  const viewportHeight = getViewportHeight();
-  if (rect.height <= 0 || rect.bottom <= 0 || rect.top >= viewportHeight) return 0;
-
-  const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
-  return visibleHeight / Math.min(rect.height, viewportHeight);
-};
 
 const collectCurrentlyVisibleFeedPostIds = () => {
   if (typeof document === 'undefined' || typeof window === 'undefined') return [];
 
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
   return Array.from(document.querySelectorAll<HTMLElement>('[data-feed-item-id]'))
     .filter((el) => {
       const rect = el.getBoundingClientRect();
-      return getVisibleRatio(rect) >= VISIBILITY_THRESHOLD;
+      if (rect.height <= 0 || rect.bottom <= 0 || rect.top >= viewportHeight) return false;
+
+      const visibleHeight = Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+      return visibleHeight / rect.height >= VISIBILITY_THRESHOLD;
     })
     .map((el) => el.dataset.feedItemId)
     .filter((id): id is string => Boolean(id));
@@ -163,7 +156,7 @@ export const useMarkPostSeen = (userId: string | undefined) => {
 
       const observer = new IntersectionObserver(
         ([entry]) => {
-          if (entry.isIntersecting && getVisibleRatio(entry.boundingClientRect) >= VISIBILITY_THRESHOLD) {
+          if (entry.isIntersecting && entry.intersectionRatio >= VISIBILITY_THRESHOLD) {
             visibleRef.current.add(postId);
 
             if (!timersRef.current.has(postId)) {
@@ -188,7 +181,7 @@ export const useMarkPostSeen = (userId: string | undefined) => {
             }
           }
         },
-        { threshold: OBSERVER_THRESHOLDS }
+        { threshold: [0, VISIBILITY_THRESHOLD] }
       );
 
       observersRef.current.set(postId, observer);
