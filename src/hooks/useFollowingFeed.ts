@@ -122,7 +122,6 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     isFetching,
     error: feedError,
     fetchNextPage,
-    refetch,
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
