@@ -76,6 +76,7 @@ const Index = () => {
     items: followingPosts,
     empty: followingEmpty,
     loading: followingLoading,
+    error: followingError,
     loadMore,
     refresh: refreshFollowingFeed,
     hasMore,
@@ -274,8 +275,8 @@ const Index = () => {
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
-            {!showDemoFeed && followingEmpty ? (
-            followingCount === undefined || followingHasAnyPosts === undefined ? (
+          {!showDemoFeed && followingEmpty ? (
+            followingCount === undefined ? (
               <div className="space-y-4">
                 {[...Array(2)].map((_, i) => (
                   <PostSkeleton key={i} />
@@ -291,20 +292,12 @@ const Index = () => {
                   Discover people to follow
                 </Link>
               </div>
-            ) : followingHasAnyPosts ? (
+            ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                 <h3 className="text-lg font-semibold">You're all caught up</h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   You've seen all recent posts from people you follow.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
-                <h3 className="text-lg font-semibold">No posts yet</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  People you follow haven't posted anything yet. Check back soon.
                 </p>
               </div>
             )
