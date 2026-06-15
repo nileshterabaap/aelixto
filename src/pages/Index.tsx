@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { CheckCircle2, RefreshCw } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
@@ -80,7 +80,6 @@ const Index = () => {
     refresh: refreshFollowingFeed,
     hasMore,
     reachedEnd,
-    error: followingError,
   } = useFollowingFeed(user?.id);
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -203,50 +202,20 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // 1) Flush any pending "mark as seen" records first so the next fetch
-    //    excludes posts the user actually viewed.
+    // Mark only posts the user actually saw, then clear any persisted/stale
+    // feed cache so refresh always asks the backend for the latest eligible feed.
     try {
       await flushNow();
     } catch {
       // best-effort — proceed with reload regardless
     }
 
-    // 2) Aggressively cancel + remove + invalidate every feed-related cache
-    //    so the post-reload fetch is guaranteed fresh.
-    const feedKeys = [
-      ['following-feed'],
-      ['following-count', user?.id],
-      ['following-has-posts', user?.id],
-    ] as const;
-
-    await Promise.all(
-      feedKeys.map((key) =>
-        queryClient.cancelQueries({ queryKey: key as unknown as readonly unknown[] }),
-      ),
-    );
-    feedKeys.forEach((key) =>
-      queryClient.removeQueries({ queryKey: key as unknown as readonly unknown[] }),
-    );
-    await Promise.all(
-      feedKeys.map((key) =>
-        queryClient.invalidateQueries({ queryKey: key as unknown as readonly unknown[] }),
-      ),
-    );
-
-    // 3) Small settle delay, then hard reload so embed scripts, observers,
-    //    and feed state are fully reset.
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    window.location.reload();
-  }, [flushNow, queryClient, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id || showDemoFeed) return;
-    const refreshHomeFeed = () => {
-      void handleRefresh();
-    };
-    window.addEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
-    return () => window.removeEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
-  }, [handleRefresh, showDemoFeed, user?.id]);
+    await Promise.all([
+      refreshFollowingFeed(),
+      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
+    ]);
+  }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !followingLoading || allPosts.length > 0) return;
@@ -305,21 +274,7 @@ const Index = () => {
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
-            {!showDemoFeed && followingError && allPosts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <h3 className="text-lg font-semibold">Feed couldn’t load</h3>
-                <p className="text-sm text-muted-foreground mt-1 mb-4">
-                  Pull to refresh or tap retry.
-                </p>
-                <button
-                  onClick={() => void refreshFollowingFeed()}
-                  className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold active:scale-95 transition-transform"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Retry
-                </button>
-              </div>
-            ) : !showDemoFeed && followingEmpty ? (
+            {!showDemoFeed && followingEmpty ? (
             followingCount === undefined || followingHasAnyPosts === undefined ? (
               <div className="space-y-4">
                 {[...Array(2)].map((_, i) => (
