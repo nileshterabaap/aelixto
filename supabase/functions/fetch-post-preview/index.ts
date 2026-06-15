@@ -632,12 +632,7 @@ function extractRedditMediaThumbnail(post: Record<string, unknown> | null | unde
 
 function isMisleadingRedditThumbnail(url: string): boolean {
   const lower = url.toLowerCase();
-  return (
-    lower.includes('images.unsplash.com') ||
-    lower.includes('source.unsplash.com') ||
-    lower.includes('redditstatic.com') ||
-    lower.includes('share.redd.it/preview/post')
-  );
+  return lower.includes('images.unsplash.com') || lower.includes('source.unsplash.com');
 }
 
 function isGenericPlaceholderImage(url: string): boolean {

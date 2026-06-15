@@ -77,7 +77,7 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
       
       return {
         posts: mappedPosts,
-        nextCursor: mappedPosts.length === 0 ? undefined : mappedPosts[mappedPosts.length - 1]?.feed_cursor,
+        nextCursor: mappedPosts.length === 20 ? mappedPosts[mappedPosts.length - 1].feed_cursor : undefined,
       };
     },
     initialPageParam: undefined,
