@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { CheckCircle2, RefreshCw } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
@@ -290,20 +290,12 @@ const Index = () => {
                   Discover people to follow
                 </Link>
               </div>
-            ) : !followingHasUnseenPosts ? (
+            ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                 <h3 className="text-lg font-semibold">You're all caught up</h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   You've seen all recent posts from people you follow.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <RefreshCw className="h-10 w-10 text-primary mb-3 animate-spin" />
-                <h3 className="text-lg font-semibold">Refreshing feed</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Pull down if this takes too long.
                 </p>
               </div>
             )
