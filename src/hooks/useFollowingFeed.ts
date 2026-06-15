@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQueryClient, keepPreviousData, type InfiniteData } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
 import { useRef, useEffect, useMemo, useCallback } from 'react';
@@ -54,7 +54,6 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
 }
 
 const PAGE_SIZE = 20;
-const EMPTY_FEED_PAGE = { posts: [], nextCursor: undefined };
 
 const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
@@ -123,8 +122,6 @@ type FeedPage = Awaited<ReturnType<typeof fetchFeedPage>>;
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
   const queryClient = useQueryClient();
-  const lastVisiblePostsRef = useRef<FeedPost[]>([]);
-  const refreshTokenRef = useRef(0);
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -148,20 +145,12 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     refetchOnReconnect: true,
     retry: 2,
     structuralSharing: true,
-    placeholderData: keepPreviousData,
   });
-
-  useEffect(() => {
-    if (data?.pages) {
-      const latestPosts = data.pages.flatMap((page) => page.posts);
-      lastVisiblePostsRef.current = latestPosts;
-    }
-  }, [data]);
 
   // Flatten all pages into single array - stable reference
   const items = useMemo(
-    () => data?.pages.flatMap((page) => page.posts) ?? lastVisiblePostsRef.current,
-    [data]
+    () => data?.pages.flatMap((page) => page.posts) ?? [],
+    [data?.pages]
   );
 
   const reachedEnd = useMemo(
@@ -207,29 +196,15 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     if (!userId) return undefined;
     preloadedRef.current = false;
 
-    const currentPosts = queryClient
-      .getQueryData<InfiniteData<FeedPage>>(['following-feed', userId])
-      ?.pages.flatMap((page) => page.posts);
-    if (currentPosts) lastVisiblePostsRef.current = currentPosts;
-
     await queryClient.cancelQueries({ queryKey: ['following-feed', userId], exact: true });
-
-    const refreshToken = ++refreshTokenRef.current;
-    const result = await queryClient.fetchQuery({
-      queryKey: ['following-feed-refresh', userId, refreshToken],
-      queryFn: () => fetchFeedPage(),
-      staleTime: 0,
-      gcTime: 0,
-      retry: 1,
-    });
+    const result = await fetchFeedPage();
 
     const nextData = {
-      pages: [result.posts.length === 0 ? EMPTY_FEED_PAGE : result],
+      pages: [result],
       pageParams: [undefined],
     } satisfies InfiniteData<FeedPage>;
 
     queryClient.setQueryData(['following-feed', userId], nextData);
-    lastVisiblePostsRef.current = result.posts;
     return nextData;
   }, [queryClient, userId]);
 
