@@ -44,7 +44,6 @@ interface UseFollowingFeedResult {
   loadMore: () => void;
   refresh: () => Promise<unknown>;
   hasMore: boolean;
-  reachedEnd: boolean;
 }
 
 interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
@@ -105,13 +104,9 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  // Only end pagination when the server returns zero rows. Returning fewer
-  // than PAGE_SIZE can still mean more posts exist beyond this cursor band
-  // (mark-as-seen filtering, tier transitions, etc.), so we always keep
-  // a cursor as long as we got at least one row. The next call may return
-  // 0 rows — that's the true end-of-feed signal.
+  // End pagination as soon as the server returns fewer rows than PAGE_SIZE.
   const lastCursor = mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
-  const nextCursor = mappedPosts.length === 0 ? undefined : lastCursor;
+  const nextCursor = mappedPosts.length < PAGE_SIZE ? undefined : lastCursor;
 
   return { posts: mappedPosts, nextCursor };
 };
@@ -148,11 +143,6 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   // Flatten all pages into single array - stable reference
   const items = useMemo(
     () => data?.pages.flatMap((page) => page.posts) ?? [],
-    [data?.pages]
-  );
-
-  const reachedEnd = useMemo(
-    () => data?.pages.some((page) => page.posts.length === 0) ?? false,
     [data?.pages]
   );
 
@@ -207,7 +197,6 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     loadMore,
     refresh,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
-    reachedEnd: Boolean(userId) && reachedEnd,
   };
 };
 
