@@ -55,7 +55,6 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
 
 const PAGE_SIZE = 20;
 const EMPTY_FEED_PAGE = { posts: [], nextCursor: undefined };
-type FeedPage = Awaited<ReturnType<typeof fetchFeedPage>>;
 
 const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
@@ -118,6 +117,8 @@ const fetchFeedPage = async (cursor?: string) => {
 
   return { posts: mappedPosts, nextCursor };
 };
+
+type FeedPage = Awaited<ReturnType<typeof fetchFeedPage>>;
 
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
