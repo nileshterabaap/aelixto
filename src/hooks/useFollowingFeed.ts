@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient, keepPreviousData, type InfiniteData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
 import { useRef, useEffect, useMemo, useCallback } from 'react';
@@ -55,6 +55,7 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
 
 const PAGE_SIZE = 20;
 const EMPTY_FEED_PAGE = { posts: [], nextCursor: undefined };
+type FeedPage = Awaited<ReturnType<typeof fetchFeedPage>>;
 
 const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
@@ -121,7 +122,8 @@ const fetchFeedPage = async (cursor?: string) => {
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
   const queryClient = useQueryClient();
-  const lastGoodDataRef = useRef<{ pages: { posts: FeedPost[]; nextCursor: string | undefined }[]; pageParams: unknown[] } | undefined>();
+  const lastVisiblePostsRef = useRef<FeedPost[]>([]);
+  const refreshTokenRef = useRef(0);
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -149,14 +151,15 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   });
 
   useEffect(() => {
-    if (data) {
-      lastGoodDataRef.current = data;
+    if (data?.pages) {
+      const latestPosts = data.pages.flatMap((page) => page.posts);
+      lastVisiblePostsRef.current = latestPosts;
     }
   }, [data]);
 
   // Flatten all pages into single array - stable reference
   const items = useMemo(
-    () => (data ?? lastGoodDataRef.current)?.pages.flatMap((page) => page.posts) ?? [],
+    () => data?.pages.flatMap((page) => page.posts) ?? lastVisiblePostsRef.current,
     [data]
   );
 
@@ -200,27 +203,36 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   };
 
   const refresh = useCallback(async () => {
+    if (!userId) return undefined;
     preloadedRef.current = false;
-    // Remove persisted/stale pages so refresh always starts at page 1 and
-    // actually asks the backend for unseen posts. Keep the last good data in
-    // memory so the UI never flashes blank during the request.
-    queryClient.removeQueries({ queryKey: ['following-feed', userId], exact: true });
-    const result = await queryClient.fetchInfiniteQuery({
-      queryKey: ['following-feed', userId],
-      queryFn: ({ pageParam }) => fetchFeedPage(pageParam as string | undefined),
-      initialPageParam: undefined as string | undefined,
-      getNextPageParam: (lastPage) => lastPage.nextCursor,
+
+    const currentPosts = queryClient
+      .getQueryData<InfiniteData<FeedPage>>(['following-feed', userId])
+      ?.pages.flatMap((page) => page.posts);
+    if (currentPosts) lastVisiblePostsRef.current = currentPosts;
+
+    await queryClient.cancelQueries({ queryKey: ['following-feed', userId], exact: true });
+
+    const refreshToken = ++refreshTokenRef.current;
+    const result = await queryClient.fetchQuery({
+      queryKey: ['following-feed-refresh', userId, refreshToken],
+      queryFn: () => fetchFeedPage(),
+      staleTime: 0,
+      gcTime: 0,
+      retry: 1,
     });
-    if (result.pages.length === 0) {
-      queryClient.setQueryData(['following-feed', userId], {
-        pages: [EMPTY_FEED_PAGE],
-        pageParams: [undefined],
-      });
-    }
-    return result;
+
+    const nextData = {
+      pages: [result.posts.length === 0 ? EMPTY_FEED_PAGE : result],
+      pageParams: [undefined],
+    } satisfies InfiniteData<FeedPage>;
+
+    queryClient.setQueryData(['following-feed', userId], nextData);
+    lastVisiblePostsRef.current = result.posts;
+    return nextData;
   }, [queryClient, userId]);
 
-  const hasReceivedPage = Boolean(data ?? lastGoodDataRef.current);
+  const hasReceivedPage = Boolean(data);
   const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
 
   return {
