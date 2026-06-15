@@ -203,20 +203,41 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark only posts the user actually saw, then clear any persisted/stale
-    // feed cache so refresh always asks the backend for the latest eligible feed.
+    // 1) Flush any pending "mark as seen" records first so the next fetch
+    //    excludes posts the user actually viewed.
     try {
       await flushNow();
     } catch {
       // best-effort — proceed with reload regardless
     }
 
-    await Promise.all([
-      refreshFollowingFeed(),
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
-    ]);
-  }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
+    // 2) Aggressively cancel + remove + invalidate every feed-related cache
+    //    so the post-reload fetch is guaranteed fresh.
+    const feedKeys = [
+      ['following-feed'],
+      ['following-count', user?.id],
+      ['following-has-posts', user?.id],
+    ] as const;
+
+    await Promise.all(
+      feedKeys.map((key) =>
+        queryClient.cancelQueries({ queryKey: key as unknown as readonly unknown[] }),
+      ),
+    );
+    feedKeys.forEach((key) =>
+      queryClient.removeQueries({ queryKey: key as unknown as readonly unknown[] }),
+    );
+    await Promise.all(
+      feedKeys.map((key) =>
+        queryClient.invalidateQueries({ queryKey: key as unknown as readonly unknown[] }),
+      ),
+    );
+
+    // 3) Small settle delay, then hard reload so embed scripts, observers,
+    //    and feed state are fully reset.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    window.location.reload();
+  }, [flushNow, queryClient, user?.id]);
 
   useEffect(() => {
     if (!user?.id || showDemoFeed) return;
