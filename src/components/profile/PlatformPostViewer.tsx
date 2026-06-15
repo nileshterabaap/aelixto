@@ -249,12 +249,9 @@ export const PlatformPostViewer = ({
     };
   }, [portalReady, contentReady, targetPostId, posts, initialIdx, activeTab, profileData]);
 
-  // Mark all visible posts as seen when viewing profile posts
-  useEffect(() => {
-    if (user?.id && posts.length > 0) {
-      markPostsSeenImmediate(user.id, posts.map(p => p.id));
-    }
-  }, [user?.id, posts]);
+  // NOTE: Bulk marking posts as seen in profile viewer is intentionally
+  // disabled. Posts should only be marked seen via the Home feed's
+  // scroll-based 50% visibility + 1.5s dwell logic.
 
   // Get adjacent tabs for swipe navigation
   const currentTabIndex = tabs.findIndex(t => t.key === activeTab);
