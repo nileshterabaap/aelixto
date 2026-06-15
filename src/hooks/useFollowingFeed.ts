@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
 import { useRef, useEffect, useMemo, useCallback } from 'react';
@@ -143,6 +143,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     refetchOnReconnect: true,
     retry: 2,
     structuralSharing: true,
+    placeholderData: keepPreviousData,
   });
 
   // Flatten all pages into single array - stable reference
@@ -192,8 +193,15 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   const refresh = useCallback(async () => {
     preloadedRef.current = false;
-    await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
-    return await refetch();
+    // Reset to first page on every refresh so the cursor restarts and
+    // freshly-eligible posts surface even if the persisted cache had stale
+    // pages. cancelRefetch ensures any in-flight fetch is aborted and
+    // replaced rather than silently no-op'd.
+    queryClient.setQueryData(['following-feed', userId], (old: { pages: unknown[]; pageParams: unknown[] } | undefined) => {
+      if (!old) return old;
+      return { pages: old.pages.slice(0, 1), pageParams: old.pageParams.slice(0, 1) };
+    });
+    return await refetch({ cancelRefetch: true });
   }, [queryClient, refetch, userId]);
 
   const hasReceivedPage = data !== undefined;
