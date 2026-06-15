@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 const BATCH_INTERVAL = 3000; // flush every 3s
 const VISIBILITY_THRESHOLD = 0.5;
 const SEEN_DWELL_MS = 1500;
+const OBSERVER_THRESHOLDS = Array.from({ length: 21 }, (_, index) => index / 20);
 
 const getViewportHeight = () => window.innerHeight || document.documentElement.clientHeight;
 
@@ -187,7 +188,7 @@ export const useMarkPostSeen = (userId: string | undefined) => {
             }
           }
         },
-        { threshold: [0, VISIBILITY_THRESHOLD] }
+        { threshold: OBSERVER_THRESHOLDS }
       );
 
       observersRef.current.set(postId, observer);
