@@ -1276,6 +1276,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_unseen_following_feed_posts: { Args: never; Returns: boolean }
       is_conversation_participant: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean

@@ -44,27 +44,18 @@ const Index = () => {
     staleTime: 60_000,
   });
 
-  // Check if followings have any public posts at all (ignoring seen state).
-  // If yes but feed is empty → user has caught up on everything.
-  const { data: followingHasAnyPosts } = useQuery({
-    queryKey: ['following-has-posts', user?.id],
+  // Check if the feed has any eligible unseen posts. Empty + no unseen posts
+  // means the user is caught up.
+  const { data: followingHasUnseenPosts } = useQuery({
+    queryKey: ['following-has-unseen-posts', user?.id],
     queryFn: async () => {
       if (!user?.id) return false;
-      const { data: follows } = await supabase
-        .from('follows')
-        .select('following_id')
-        .eq('follower_id', user.id);
-      const ids = (follows ?? []).map((f) => f.following_id);
-      ids.push(user.id);
-      const { count } = await supabase
-        .from('posts')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_public', true)
-        .in('user_id', ids);
-      return (count ?? 0) > 0;
+      const { data, error } = await supabase.rpc('has_unseen_following_feed_posts');
+      if (error) throw error;
+      return Boolean(data);
     },
     enabled: Boolean(user?.id),
-    staleTime: 60_000,
+    staleTime: 15_000,
   });
   
   
@@ -79,7 +70,6 @@ const Index = () => {
     loadMore,
     refresh: refreshFollowingFeed,
     hasMore,
-    error: followingError,
   } = useFollowingFeed(user?.id);
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -213,7 +203,7 @@ const Index = () => {
     await Promise.all([
       refreshFollowingFeed(),
       queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['following-has-unseen-posts', user?.id] }),
     ]);
   }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
 
@@ -283,22 +273,8 @@ const Index = () => {
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
-            {!showDemoFeed && followingError && allPosts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <h3 className="text-lg font-semibold">Feed couldn’t load</h3>
-                <p className="text-sm text-muted-foreground mt-1 mb-4">
-                  Pull to refresh or tap retry.
-                </p>
-                <button
-                  onClick={() => void refreshFollowingFeed()}
-                  className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold active:scale-95 transition-transform"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Retry
-                </button>
-              </div>
-            ) : !showDemoFeed && followingEmpty ? (
-            followingCount === undefined || followingHasAnyPosts === undefined ? (
+            {!showDemoFeed && followingEmpty ? (
+            followingCount === undefined || followingHasUnseenPosts === undefined ? (
               <div className="space-y-4">
                 {[...Array(2)].map((_, i) => (
                   <PostSkeleton key={i} />
@@ -314,7 +290,7 @@ const Index = () => {
                   Discover people to follow
                 </Link>
               </div>
-            ) : followingHasAnyPosts ? (
+            ) : !followingHasUnseenPosts ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                 <h3 className="text-lg font-semibold">You're all caught up</h3>
@@ -324,10 +300,10 @@ const Index = () => {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
-                <h3 className="text-lg font-semibold">No posts yet</h3>
+                <RefreshCw className="h-10 w-10 text-primary mb-3 animate-spin" />
+                <h3 className="text-lg font-semibold">Refreshing feed</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  People you follow haven't posted anything yet. Check back soon.
+                  Pull down if this takes too long.
                 </p>
               </div>
             )

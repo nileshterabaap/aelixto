@@ -191,7 +191,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   return {
     items,
-    empty: Boolean(userId) && hasReceivedPage && !initialFeedPending && items.length === 0,
+    empty: Boolean(userId) && !initialFeedPending && items.length === 0 && (hasReceivedPage || Boolean(feedError)),
     loading: initialFeedPending,
     error: feedError?.message ?? null,
     loadMore,
