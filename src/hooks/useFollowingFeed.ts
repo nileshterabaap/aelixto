@@ -1,7 +1,7 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
 
 interface FeedPost {
   id: string;
@@ -42,6 +42,7 @@ interface UseFollowingFeedResult {
   loading: boolean;
   error: string | null;
   loadMore: () => void;
+  refresh: () => Promise<unknown>;
   hasMore: boolean;
   reachedEnd: boolean;
 }
@@ -89,9 +90,9 @@ const fetchFeedPage = async (cursor?: string) => {
     preview_text: item.preview_text,
     preview_title: item.preview_title,
     preview_image_url: item.preview_image_url,
-    media_kind: (item as any).media_kind ?? null,
-    aspect_ratio: (item as any).aspect_ratio ?? null,
-    suggested_height: (item as any).suggested_height ?? null,
+    media_kind: item.media_kind ?? null,
+    aspect_ratio: item.aspect_ratio ?? null,
+    suggested_height: item.suggested_height ?? null,
     is_public: item.is_public,
     feed_cursor: item.feed_cursor,
     is_repost: item.is_repost,
@@ -117,13 +118,16 @@ const fetchFeedPage = async (cursor?: string) => {
 
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
+  const queryClient = useQueryClient();
 
   // Fetch feed directly — no count gate, single RPC call
   const {
     data,
     isLoading: feedLoading,
+    isFetching,
     error: feedError,
     fetchNextPage,
+    refetch,
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
@@ -135,8 +139,9 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: true, // refetch if stale on mount/page reload
+    refetchOnMount: 'always', // refresh on mount/page reload so an empty first paint cannot stick
     refetchOnReconnect: true,
+    retry: 2,
     structuralSharing: true,
   });
 
@@ -185,12 +190,22 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     }
   };
 
+  const refresh = useCallback(async () => {
+    preloadedRef.current = false;
+    await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
+    return await refetch();
+  }, [queryClient, refetch, userId]);
+
+  const hasReceivedPage = data !== undefined;
+  const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
+
   return {
     items,
-    empty: Boolean(userId) && !feedLoading && items.length === 0,
-    loading: Boolean(userId) && feedLoading,
+    empty: Boolean(userId) && hasReceivedPage && !initialFeedPending && items.length === 0,
+    loading: initialFeedPending,
     error: feedError?.message ?? null,
     loadMore,
+    refresh,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
     reachedEnd: Boolean(userId) && reachedEnd,
   };
