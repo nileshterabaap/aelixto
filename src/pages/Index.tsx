@@ -76,7 +76,6 @@ const Index = () => {
     items: followingPosts,
     empty: followingEmpty,
     loading: followingLoading,
-    error: followingError,
     loadMore,
     refresh: refreshFollowingFeed,
     hasMore,
