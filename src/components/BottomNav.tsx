@@ -96,12 +96,14 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     const isAtTop = window.scrollY < 50;
     
     if (isAlreadyOnHome) {
-      // Always scroll to top first, then trigger the visible pull-to-refresh
-      // spinner so the user gets clear feedback that the feed is refreshing.
-      if (!isAtTop) {
+      if (isAtTop) {
+        // Already at top - force refresh the feed (refetchQueries actually refetches, invalidate just marks stale)
+        queryClient.refetchQueries({ queryKey: ["following-feed"] });
+        queryClient.refetchQueries({ queryKey: ["posts"] });
+      } else {
+        // Not at top - scroll to top smoothly
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
-      window.dispatchEvent(new CustomEvent('aelixto:trigger-pull-refresh'));
       lastHomeTapRef.current = now;
     } else {
       // Navigate to home
