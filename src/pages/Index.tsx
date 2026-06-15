@@ -44,30 +44,6 @@ const Index = () => {
     staleTime: 60_000,
   });
 
-  // Check if followings have any public posts at all (ignoring seen state).
-  // If yes but feed is empty → user has caught up on everything.
-  const { data: followingHasAnyPosts } = useQuery({
-    queryKey: ['following-has-posts', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return false;
-      const { data: follows } = await supabase
-        .from('follows')
-        .select('following_id')
-        .eq('follower_id', user.id);
-      const ids = (follows ?? []).map((f) => f.following_id);
-      ids.push(user.id);
-      const { count } = await supabase
-        .from('posts')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_public', true)
-        .in('user_id', ids);
-      return (count ?? 0) > 0;
-    },
-    enabled: Boolean(user?.id),
-    staleTime: 60_000,
-  });
-  
-  
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
 
@@ -213,7 +189,6 @@ const Index = () => {
     await Promise.all([
       refreshFollowingFeed(),
       queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
     ]);
   }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
 
@@ -275,13 +250,7 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
-            followingCount === undefined ? (
-              <div className="space-y-4">
-                {[...Array(2)].map((_, i) => (
-                  <PostSkeleton key={i} />
-                ))}
-              </div>
-            ) : followingCount === 0 ? (
+            followingCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <h3 className="text-lg font-semibold">Nothing here yet 👀</h3>
                 <p className="text-sm text-muted-foreground mt-1 mb-4">
