@@ -122,7 +122,6 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     isFetching,
     error: feedError,
     fetchNextPage,
-    refetch,
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
@@ -182,16 +181,19 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   const refresh = useCallback(async () => {
     preloadedRef.current = false;
+    if (!userId) return undefined;
+
     await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
-    // Reset cached pages so refresh always re-fetches page 1 from scratch.
-    // Without this, refetch() re-runs each existing page with its old cursor,
-    // which can hide brand-new posts from followings behind stale page boundaries.
-    queryClient.setQueryData(['following-feed', userId], (old: unknown) => {
-      if (!old || typeof old !== 'object') return old;
-      return { pages: [], pageParams: [undefined] };
+    // Fetch page 1 directly and replace cached pages. Infinite-query refetch
+    // can replay old page cursors, which is wrong for pull-to-refresh because
+    // brand-new unseen posts must be evaluated from the top of the feed.
+    const firstPage = await fetchFeedPage(undefined);
+    queryClient.setQueryData(['following-feed', userId], {
+      pages: [firstPage],
+      pageParams: [undefined],
     });
-    return await refetch();
-  }, [queryClient, refetch, userId]);
+    return firstPage;
+  }, [queryClient, userId]);
 
   const hasReceivedPage = data !== undefined;
   const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
