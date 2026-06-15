@@ -183,6 +183,13 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   const refresh = useCallback(async () => {
     preloadedRef.current = false;
     await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
+    // Reset cached pages so refresh always re-fetches page 1 from scratch.
+    // Without this, refetch() re-runs each existing page with its old cursor,
+    // which can hide brand-new posts from followings behind stale page boundaries.
+    queryClient.setQueryData(['following-feed', userId], (old: unknown) => {
+      if (!old || typeof old !== 'object') return old;
+      return { pages: [], pageParams: [undefined] };
+    });
     return await refetch();
   }, [queryClient, refetch, userId]);
 
