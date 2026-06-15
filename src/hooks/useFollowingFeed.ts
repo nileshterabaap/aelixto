@@ -54,6 +54,8 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
 }
 
 const PAGE_SIZE = 20;
+const EMPTY_FEED_PAGE = { posts: [], nextCursor: undefined };
+
 const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
     fn: 'get_following_feed_v2',
@@ -119,6 +121,7 @@ const fetchFeedPage = async (cursor?: string) => {
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
   const queryClient = useQueryClient();
+  const lastGoodDataRef = useRef<{ pages: { posts: FeedPost[]; nextCursor: string | undefined }[]; pageParams: unknown[] } | undefined>();
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -146,10 +149,16 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     placeholderData: keepPreviousData,
   });
 
+  useEffect(() => {
+    if (data) {
+      lastGoodDataRef.current = data;
+    }
+  }, [data]);
+
   // Flatten all pages into single array - stable reference
   const items = useMemo(
-    () => data?.pages.flatMap((page) => page.posts) ?? [],
-    [data?.pages]
+    () => (data ?? lastGoodDataRef.current)?.pages.flatMap((page) => page.posts) ?? [],
+    [data]
   );
 
   const reachedEnd = useMemo(
@@ -193,18 +202,26 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   const refresh = useCallback(async () => {
     preloadedRef.current = false;
-    // Reset to first page on every refresh so the cursor restarts and
-    // freshly-eligible posts surface even if the persisted cache had stale
-    // pages. cancelRefetch ensures any in-flight fetch is aborted and
-    // replaced rather than silently no-op'd.
-    queryClient.setQueryData(['following-feed', userId], (old: { pages: unknown[]; pageParams: unknown[] } | undefined) => {
-      if (!old) return old;
-      return { pages: old.pages.slice(0, 1), pageParams: old.pageParams.slice(0, 1) };
+    // Remove persisted/stale pages so refresh always starts at page 1 and
+    // actually asks the backend for unseen posts. Keep the last good data in
+    // memory so the UI never flashes blank during the request.
+    queryClient.removeQueries({ queryKey: ['following-feed', userId], exact: true });
+    const result = await queryClient.fetchInfiniteQuery({
+      queryKey: ['following-feed', userId],
+      queryFn: ({ pageParam }) => fetchFeedPage(pageParam as string | undefined),
+      initialPageParam: undefined as string | undefined,
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
     });
-    return await refetch({ cancelRefetch: true });
+    if (result.pages.length === 0) {
+      queryClient.setQueryData(['following-feed', userId], {
+        pages: [EMPTY_FEED_PAGE],
+        pageParams: [undefined],
+      });
+    }
+    return result;
   }, [queryClient, refetch, userId]);
 
-  const hasReceivedPage = data !== undefined;
+  const hasReceivedPage = Boolean(data ?? lastGoodDataRef.current);
   const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
 
   return {
