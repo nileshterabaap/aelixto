@@ -84,16 +84,15 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     }
   }, [userId]);
 
-  // Force-flush: include currently-visible posts and await DB write.
-  // Used by pull-to-refresh so anything the user actually saw disappears next load.
+  // Force-flush only posts that already satisfied the dwell rule and await DB write.
+  // Pull-to-refresh must not mark a just-arrived visible post as seen before it renders.
   const flushNow = useCallback(async () => {
     if (!userId) return;
-    visibleRef.current.forEach((id) => pendingRef.current.add(id));
-    if (pendingRef.current.size === 0) return;
     // Wait for any in-flight flush to finish
     while (flushing.current) {
       await new Promise((r) => setTimeout(r, 30));
     }
+    if (pendingRef.current.size === 0) return;
     flushing.current = true;
     const postIds = Array.from(pendingRef.current);
     pendingRef.current.clear();

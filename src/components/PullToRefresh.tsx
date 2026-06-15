@@ -10,6 +10,7 @@ interface PullToRefreshProps {
 const THRESHOLD = 60;
 const MAX_PULL = 180;
 const LOADING_REST = 55;
+const MIN_REFRESH_MS = 550;
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -87,6 +88,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       const diff = diffY;
 
       if (diff > 0 && isAtTop()) {
+        if (event.cancelable) event.preventDefault();
         // 1:1 tracking up to threshold, then gentle resistance for elastic over-pull
         let dampened: number;
         if (diff <= THRESHOLD) {
@@ -113,9 +115,14 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
         setRefreshing(true);
 
         void (async () => {
+          const startedAt = Date.now();
           try {
             await onRefresh();
           } finally {
+            const remaining = MIN_REFRESH_MS - (Date.now() - startedAt);
+            if (remaining > 0) {
+              await new Promise((resolve) => window.setTimeout(resolve, remaining));
+            }
             setRefreshing(false);
             animate(pullY, 0, { type: "spring", stiffness: 250, damping: 28 });
           }
@@ -128,7 +135,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     };
 
     el.addEventListener("touchstart", handleTouchStart, { passive: true });
-    el.addEventListener("touchmove", handleTouchMove, { passive: true });
+    el.addEventListener("touchmove", handleTouchMove, { passive: false });
     el.addEventListener("touchend", handleTouchEnd, { passive: true });
     el.addEventListener("touchcancel", handleTouchEnd, { passive: true });
 
@@ -159,10 +166,10 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
           }}
         >
           {refreshing ? (
-            <Loader2 className="h-4.5 w-4.5 text-primary animate-spin" />
+            <Loader2 className="h-[18px] w-[18px] text-primary animate-spin" />
           ) : (
             <motion.div style={{ rotate: spinnerRotate }}>
-              <Loader2 className="h-4.5 w-4.5 text-muted-foreground" />
+              <Loader2 className="h-[18px] w-[18px] text-muted-foreground" />
             </motion.div>
           )}
         </motion.div>
