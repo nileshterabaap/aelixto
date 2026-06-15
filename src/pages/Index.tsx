@@ -52,6 +52,7 @@ const Index = () => {
     items: followingPosts,
     empty: followingEmpty,
     loading: followingLoading,
+    error: followingError,
     loadMore,
     refresh: refreshFollowingFeed,
     hasMore,
@@ -223,7 +224,7 @@ const Index = () => {
 
   // Only show skeleton on truly empty first load - prevent flicker.
   const loading = showDemoFeed ? demoLoading : followingLoading;
-  const shouldShowSkeleton = allPosts.length === 0 && (sessionLoading || loading);
+  const shouldShowSkeleton = allPosts.length === 0 && !followingError && (sessionLoading || loading);
 
   if (shouldShowSkeleton) {
     return (
@@ -249,7 +250,14 @@ const Index = () => {
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
-          {!showDemoFeed && followingEmpty ? (
+          {!showDemoFeed && followingError && allPosts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <h3 className="text-lg font-semibold">Feed couldn't load</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Pull down to refresh again.
+              </p>
+            </div>
+          ) : !showDemoFeed && (followingEmpty || (!followingLoading && allPosts.length === 0)) ? (
             followingCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <h3 className="text-lg font-semibold">Nothing here yet 👀</h3>
