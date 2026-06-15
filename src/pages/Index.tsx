@@ -79,7 +79,6 @@ const Index = () => {
     loadMore,
     refresh: refreshFollowingFeed,
     hasMore,
-    reachedEnd,
     error: followingError,
   } = useFollowingFeed(user?.id);
 
@@ -358,7 +357,7 @@ const Index = () => {
               {/* No visible loader — pagination happens silently far before
                   the user reaches the end. */}
               {/* All caught up message */}
-              {reachedEnd && !hasMore && !showDemoFeed && allPosts.length > 0 && (
+              {!hasMore && !showDemoFeed && allPosts.length > 0 && (
                 <motion.div
                   className="flex flex-col items-center justify-center pt-24 pb-10 text-center"
                   initial={{ opacity: 0, y: 32 }}
