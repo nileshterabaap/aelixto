@@ -9,7 +9,8 @@ export function formatCompactCount(value: number | null | undefined): string {
   const n = Number(value ?? 0);
   if (!Number.isFinite(n)) return '0';
   const abs = Math.abs(n);
-  if (abs < 1000) return String(Math.trunc(n));
+  // Show full number up to 9999; switch to compact "k" at 10,000+.
+  if (abs < 10_000) return String(Math.trunc(n));
 
   const fmt = (num: number, suffix: string) => {
     // Show one decimal only when below 10 in the unit (e.g. 1.2k, but 12k).
