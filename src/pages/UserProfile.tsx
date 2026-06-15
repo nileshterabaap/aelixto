@@ -153,7 +153,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
         style={{ opacity: showSkeleton ? 1 : 0 }}
       >
         <div className="mx-auto max-w-2xl">
-          <div className="relative h-[400px] profile-cover-fallback animate-shimmer" />
+          <div className="relative h-[400px] bg-gradient-to-r from-purple-500/20 to-pink-500/20 animate-shimmer" />
           <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
             <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
               <div className="text-center flex-shrink-0 w-20 -ml-2">
@@ -201,7 +201,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
       <PullToRefresh onRefresh={handleRefresh}>
       <main className="mx-auto max-w-2xl">
         {/* Cover Image with Header Overlay */}
-        <div className="relative h-[400px] profile-cover-fallback">
+        <div className="relative h-[400px] bg-gradient-to-r from-purple-500 to-pink-500">
           {profile.cover_url && (
             <img
               src={profile.cover_url}
