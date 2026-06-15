@@ -44,21 +44,6 @@ const Index = () => {
     staleTime: 60_000,
   });
 
-  // Check if the feed has any eligible unseen posts. Empty + no unseen posts
-  // means the user is caught up.
-  const { data: followingHasUnseenPosts } = useQuery({
-    queryKey: ['following-has-unseen-posts', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return false;
-      const { data, error } = await supabase.rpc('has_unseen_following_feed_posts');
-      if (error) throw error;
-      return Boolean(data);
-    },
-    enabled: Boolean(user?.id),
-    staleTime: 15_000,
-  });
-  
-  
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
 
@@ -203,7 +188,6 @@ const Index = () => {
     await Promise.all([
       refreshFollowingFeed(),
       queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-unseen-posts', user?.id] }),
     ]);
   }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
 
@@ -274,7 +258,7 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
             {!showDemoFeed && followingEmpty ? (
-            followingCount === undefined || followingHasUnseenPosts === undefined ? (
+            followingCount === undefined ? (
               <div className="space-y-4">
                 {[...Array(2)].map((_, i) => (
                   <PostSkeleton key={i} />
