@@ -130,7 +130,6 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     isFetching,
     error: feedError,
     fetchNextPage,
-    refetch,
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
@@ -219,7 +218,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
       });
     }
     return result;
-  }, [queryClient, refetch, userId]);
+  }, [queryClient, userId]);
 
   const hasReceivedPage = Boolean(data ?? lastGoodDataRef.current);
   const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
