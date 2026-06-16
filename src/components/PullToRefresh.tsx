@@ -49,6 +49,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
 
   const runRefresh = useCallback(() => {
     if (refreshingRef.current) return;
+    console.info('[feed-refresh] gesture:trigger', { pullY: pullY.get() });
     refreshingRef.current = true;
     gestureRef.current = "idle";
     setRefreshing(true);
@@ -58,6 +59,11 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       const startedAt = Date.now();
       try {
         await onRefresh();
+        console.info('[feed-refresh] gesture:refresh-complete');
+      } catch (error) {
+        console.error('[feed-refresh] gesture:refresh-error', {
+          message: error instanceof Error ? error.message : String(error),
+        });
       } finally {
         const remaining = MIN_REFRESH_MS - (Date.now() - startedAt);
         if (remaining > 0) {

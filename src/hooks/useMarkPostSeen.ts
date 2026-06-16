@@ -92,11 +92,21 @@ export const useMarkPostSeen = (userId: string | undefined) => {
       ...inFlightSeenRef.current,
       ...pendingRef.current,
     ]));
+    console.info('[feed-refresh] seen:take', {
+      pendingCount: pendingRef.current.size,
+      inFlightCount: inFlightSeenRef.current.size,
+      takenCount: postIds.length,
+      postIds,
+    });
     pendingRef.current.clear();
     return postIds;
   }, []);
 
   const restorePendingSeenPostIds = useCallback((postIds: string[]) => {
+    console.info('[feed-refresh] seen:restore', {
+      restoredCount: postIds.length,
+      postIds,
+    });
     postIds.forEach((id) => pendingRef.current.add(id));
   }, []);
 

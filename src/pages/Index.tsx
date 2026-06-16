@@ -182,17 +182,32 @@ const Index = () => {
 
   const handleRefresh = useCallback(async () => {
     const seenPostIds = takePendingSeenPostIds();
+    console.info('[feed-refresh] ui:start', {
+      seenCount: seenPostIds.length,
+      seenPostIds,
+      visibleBefore: allPosts.length,
+      hasMore,
+    });
 
     try {
-      await Promise.all([
+      const [result] = await Promise.all([
         refreshFollowingFeed(seenPostIds),
         queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
       ]);
+      console.info('[feed-refresh] ui:done', {
+        returnedCount: result?.posts.length ?? null,
+        returnedIds: result?.posts.map((post) => post.id) ?? [],
+        nextCursor: result?.nextCursor ?? null,
+      });
     } catch (error) {
       restorePendingSeenPostIds(seenPostIds);
+      console.error('[feed-refresh] ui:error', {
+        message: error instanceof Error ? error.message : String(error),
+        restoredSeenCount: seenPostIds.length,
+      });
       throw error;
     }
-  }, [queryClient, refreshFollowingFeed, restorePendingSeenPostIds, takePendingSeenPostIds, user?.id]);
+  }, [allPosts.length, hasMore, queryClient, refreshFollowingFeed, restorePendingSeenPostIds, takePendingSeenPostIds, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !followingLoading || allPosts.length > 0) return;
