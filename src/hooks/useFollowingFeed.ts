@@ -188,7 +188,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   }, [effectivePages]);
 
   const loadMore = () => {
-    if (hasNextPage && !isFetchingNextPage) {
+    if (!manualFirstPage && hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
     }
   };
@@ -207,6 +207,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
       pageParams: [undefined],
     });
     setManualFirstPage(firstPage);
+    await queryClient.invalidateQueries({ queryKey: ['following-feed', userId], refetchType: 'inactive' });
     return firstPage;
   }, [queryClient, userId]);
 
