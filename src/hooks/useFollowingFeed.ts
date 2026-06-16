@@ -114,10 +114,10 @@ const fetchFeedPage = async (cursor?: string) => {
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
   const queryClient = useQueryClient();
-  const [manualFirstPage, setManualFirstPage] = useState<{
+  const [manualPages, setManualPages] = useState<Array<{
     posts: FeedPost[];
     nextCursor: string | undefined;
-  } | null>(null);
+  }> | null>(null);
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -144,14 +144,13 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   });
 
   useEffect(() => {
-    setManualFirstPage(null);
+    setManualPages(null);
   }, [userId]);
 
   const effectivePages = useMemo(() => {
-    if (!manualFirstPage) return data?.pages;
-    const remainingPages = data?.pages?.slice(1) ?? [];
-    return [manualFirstPage, ...remainingPages];
-  }, [data?.pages, manualFirstPage]);
+    if (manualPages) return manualPages;
+    return data?.pages;
+  }, [data?.pages, manualPages]);
 
   // Flatten all pages into single array - stable reference
   const items = useMemo(
@@ -188,7 +187,20 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   }, [effectivePages]);
 
   const loadMore = () => {
-    if (!manualFirstPage && hasNextPage && !isFetchingNextPage) {
+    if (manualPages) {
+      const nextCursor = manualPages[manualPages.length - 1]?.nextCursor;
+      if (!nextCursor || isFetchingNextPage) return;
+      void fetchFeedPage(nextCursor).then((nextPage) => {
+        setManualPages((current) => current ? [...current, nextPage] : current);
+        queryClient.setQueryData(['following-feed', userId], {
+          pages: [...manualPages, nextPage],
+          pageParams: [undefined, ...manualPages.map((page) => page.nextCursor).filter(Boolean)],
+        });
+      });
+      return;
+    }
+
+    if (hasNextPage && !isFetchingNextPage) {
       fetchNextPage();
     }
   };
@@ -206,12 +218,12 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
       pages: [firstPage],
       pageParams: [undefined],
     });
-    setManualFirstPage(firstPage);
+    setManualPages([firstPage]);
     await queryClient.invalidateQueries({ queryKey: ['following-feed', userId], refetchType: 'inactive' });
     return firstPage;
   }, [queryClient, userId]);
 
-  const hasReceivedPage = data !== undefined || manualFirstPage !== null;
+  const hasReceivedPage = data !== undefined || manualPages !== null;
   const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
 
   return {
@@ -221,7 +233,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     error: feedError?.message ?? null,
     loadMore,
     refresh,
-    hasMore: Boolean(userId) && (manualFirstPage ? Boolean(manualFirstPage.nextCursor) : (hasNextPage ?? false)),
+    hasMore: Boolean(userId) && (manualPages ? Boolean(manualPages[manualPages.length - 1]?.nextCursor) : (hasNextPage ?? false)),
   };
 };
 
