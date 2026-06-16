@@ -1,4 +1,3 @@
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
 import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
@@ -113,49 +112,53 @@ const fetchFeedPage = async (cursor?: string) => {
 
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
-  const queryClient = useQueryClient();
-  const [manualPages, setManualPages] = useState<Array<{
+  const requestIdRef = useRef(0);
+  const [pages, setPages] = useState<Array<{
     posts: FeedPost[];
     nextCursor: string | undefined;
   }> | null>(null);
-
-  // Fetch feed directly — no count gate, single RPC call
-  const {
-    data,
-    isLoading: feedLoading,
-    isFetching,
-    error: feedError,
-    fetchNextPage,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['following-feed', userId],
-    queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-    enabled: Boolean(userId),
-    staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
-    gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: 'always', // refresh on mount/page reload so an empty first paint cannot stick
-    refetchOnReconnect: true,
-    retry: 2,
-    structuralSharing: true,
-  });
+  const [loading, setLoading] = useState(false);
+  const [fetchingMore, setFetchingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setManualPages(null);
-  }, [userId]);
+    preloadedRef.current = false;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
 
-  const effectivePages = useMemo(() => {
-    if (manualPages) return manualPages;
-    return data?.pages;
-  }, [data?.pages, manualPages]);
+    if (!userId) {
+      setPages(null);
+      setLoading(false);
+      setFetchingMore(false);
+      setError(null);
+      return;
+    }
+
+    setPages(null);
+    setLoading(true);
+    setFetchingMore(false);
+    setError(null);
+
+    void fetchFeedPage(undefined)
+      .then((firstPage) => {
+        if (requestIdRef.current !== requestId) return;
+        setPages([firstPage]);
+      })
+      .catch((err) => {
+        if (requestIdRef.current !== requestId) return;
+        setPages([]);
+        setError(err instanceof Error ? err.message : 'Failed to load feed');
+      })
+      .finally(() => {
+        if (requestIdRef.current !== requestId) return;
+        setLoading(false);
+      });
+  }, [userId]);
 
   // Flatten all pages into single array - stable reference
   const items = useMemo(
-    () => effectivePages?.flatMap((page) => page.posts) ?? [],
-    [effectivePages]
+    () => pages?.flatMap((page) => page.posts) ?? [],
+    [pages]
   );
 
   // Aggressively preload ALL thumbnails once on data arrival
@@ -173,7 +176,6 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   // Preload new pages as they arrive
   useEffect(() => {
-    const pages = effectivePages;
     if (pages && pages.length > 1) {
       const latestPage = pages[pages.length - 1];
       if (latestPage.posts.length > 0) {
@@ -184,56 +186,61 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
         })));
       }
     }
-  }, [effectivePages]);
+  }, [pages]);
 
   const loadMore = () => {
-    if (manualPages) {
-      const nextCursor = manualPages[manualPages.length - 1]?.nextCursor;
-      if (!nextCursor || isFetchingNextPage) return;
-      void fetchFeedPage(nextCursor).then((nextPage) => {
-        setManualPages((current) => current ? [...current, nextPage] : current);
-        queryClient.setQueryData(['following-feed', userId], {
-          pages: [...manualPages, nextPage],
-          pageParams: [undefined, ...manualPages.map((page) => page.nextCursor).filter(Boolean)],
-        });
-      });
-      return;
-    }
+    const nextCursor = pages?.[pages.length - 1]?.nextCursor;
+    if (!userId || !nextCursor || fetchingMore) return;
 
-    if (hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
-    }
+    setFetchingMore(true);
+    void fetchFeedPage(nextCursor)
+      .then((nextPage) => {
+        setPages((current) => (current ? [...current, nextPage] : [nextPage]));
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Failed to load more posts');
+      })
+      .finally(() => setFetchingMore(false));
   };
 
   const refresh = useCallback(async () => {
     preloadedRef.current = false;
     if (!userId) return undefined;
 
-    await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
-    // Fetch page 1 directly and replace cached pages. Infinite-query refetch
-    // can replay old page cursors, which is wrong for pull-to-refresh because
-    // brand-new unseen posts must be evaluated from the top of the feed.
-    const firstPage = await fetchFeedPage(undefined);
-    queryClient.setQueryData(['following-feed', userId], {
-      pages: [firstPage],
-      pageParams: [undefined],
-    });
-    setManualPages([firstPage]);
-    await queryClient.invalidateQueries({ queryKey: ['following-feed', userId], refetchType: 'inactive' });
-    return firstPage;
-  }, [queryClient, userId]);
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    setLoading(true);
+    setFetchingMore(false);
+    setError(null);
 
-  const hasReceivedPage = data !== undefined || manualPages !== null;
-  const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
+    try {
+      const firstPage = await fetchFeedPage(undefined);
+      if (requestIdRef.current !== requestId) return firstPage;
+      setPages([firstPage]);
+      return firstPage;
+    } catch (err) {
+      if (requestIdRef.current === requestId) {
+        setError(err instanceof Error ? err.message : 'Failed to refresh feed');
+      }
+      throw err;
+    } finally {
+      if (requestIdRef.current === requestId) {
+        setLoading(false);
+      }
+    }
+  }, [userId]);
+
+  const hasReceivedPage = pages !== null;
+  const initialFeedPending = Boolean(userId) && !error && items.length === 0 && (!hasReceivedPage || loading);
 
   return {
     items,
-    empty: Boolean(userId) && !initialFeedPending && items.length === 0 && (hasReceivedPage || Boolean(feedError)),
+    empty: Boolean(userId) && !initialFeedPending && items.length === 0 && (hasReceivedPage || Boolean(error)),
     loading: initialFeedPending,
-    error: feedError?.message ?? null,
+    error,
     loadMore,
     refresh,
-    hasMore: Boolean(userId) && (manualPages ? Boolean(manualPages[manualPages.length - 1]?.nextCursor) : (hasNextPage ?? false)),
+    hasMore: Boolean(userId) && Boolean(pages?.[pages.length - 1]?.nextCursor),
   };
 };
 
