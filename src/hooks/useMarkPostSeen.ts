@@ -84,27 +84,15 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     }
   }, [userId]);
 
-  // Force-flush only posts that already satisfied the dwell rule and await DB write.
-  // Pull-to-refresh must not mark a just-arrived visible post as seen before it renders.
-  const flushNow = useCallback(async () => {
-    if (!userId) return;
-    // Wait for any in-flight flush to finish
-    while (flushing.current) {
-      await new Promise((r) => setTimeout(r, 30));
-    }
-    if (pendingRef.current.size === 0) return;
-    flushing.current = true;
+  const takePendingSeenPostIds = useCallback(() => {
     const postIds = Array.from(pendingRef.current);
     pendingRef.current.clear();
-    try {
-      const rows = postIds.map((post_id) => ({ user_id: userId, post_id }));
-      await supabase.from('post_seen').upsert(rows, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
-    } catch {
-      postIds.forEach((id) => pendingRef.current.add(id));
-    } finally {
-      flushing.current = false;
-    }
-  }, [userId]);
+    return postIds;
+  }, []);
+
+  const restorePendingSeenPostIds = useCallback((postIds: string[]) => {
+    postIds.forEach((id) => pendingRef.current.add(id));
+  }, []);
 
   // Periodic flush
   useEffect(() => {
@@ -172,5 +160,5 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     [clearPostTracking, userId]
   );
 
-  return { setObservedPostElement, flushNow };
+  return { setObservedPostElement, takePendingSeenPostIds, restorePendingSeenPostIds };
 };
