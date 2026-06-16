@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo, useCallback } from 'react';
+import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 
 interface FeedPost {
   id: string;
@@ -42,7 +42,7 @@ interface UseFollowingFeedResult {
   loading: boolean;
   error: string | null;
   loadMore: () => void;
-  refresh: () => Promise<unknown>;
+  refresh: () => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
   hasMore: boolean;
 }
 
@@ -114,6 +114,10 @@ const fetchFeedPage = async (cursor?: string) => {
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
   const queryClient = useQueryClient();
+  const [manualFirstPage, setManualFirstPage] = useState<{
+    posts: FeedPost[];
+    nextCursor: string | undefined;
+  } | null>(null);
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -139,10 +143,20 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     structuralSharing: true,
   });
 
+  useEffect(() => {
+    setManualFirstPage(null);
+  }, [userId]);
+
+  const effectivePages = useMemo(() => {
+    if (!manualFirstPage) return data?.pages;
+    const remainingPages = data?.pages?.slice(1) ?? [];
+    return [manualFirstPage, ...remainingPages];
+  }, [data?.pages, manualFirstPage]);
+
   // Flatten all pages into single array - stable reference
   const items = useMemo(
-    () => data?.pages.flatMap((page) => page.posts) ?? [],
-    [data?.pages]
+    () => effectivePages?.flatMap((page) => page.posts) ?? [],
+    [effectivePages]
   );
 
   // Aggressively preload ALL thumbnails once on data arrival
@@ -160,7 +174,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   // Preload new pages as they arrive
   useEffect(() => {
-    const pages = data?.pages;
+    const pages = effectivePages;
     if (pages && pages.length > 1) {
       const latestPage = pages[pages.length - 1];
       if (latestPage.posts.length > 0) {
@@ -171,7 +185,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
         })));
       }
     }
-  }, [data?.pages]);
+  }, [effectivePages]);
 
   const loadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -192,10 +206,11 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
       pages: [firstPage],
       pageParams: [undefined],
     });
+    setManualFirstPage(firstPage);
     return firstPage;
   }, [queryClient, userId]);
 
-  const hasReceivedPage = data !== undefined;
+  const hasReceivedPage = data !== undefined || manualFirstPage !== null;
   const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
 
   return {
@@ -205,7 +220,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     error: feedError?.message ?? null,
     loadMore,
     refresh,
-    hasMore: Boolean(userId) && (hasNextPage ?? false),
+    hasMore: Boolean(userId) && (manualFirstPage ? Boolean(manualFirstPage.nextCursor) : (hasNextPage ?? false)),
   };
 };
 
