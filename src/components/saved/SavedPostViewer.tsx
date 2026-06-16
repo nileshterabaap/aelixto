@@ -163,9 +163,12 @@ export const SavedPostViewer = ({
     };
   }, [initialPostId, hasTarget, range.start]);
 
-  // NOTE: Bulk marking posts as seen in saved viewer is intentionally
-  // disabled. Posts should only be marked seen via the Home feed's
-  // scroll-based 50% visibility + 1.5s dwell logic.
+  // Mark all viewed saved posts as seen
+  useEffect(() => {
+    if (userId && posts.length > 0) {
+      markPostsSeenImmediate(userId, posts.map(p => p.id));
+    }
+  }, [userId, posts]);
 
   // Prevent body scroll
   useEffect(() => {
