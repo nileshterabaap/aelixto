@@ -27,7 +27,11 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
+  const {
+    setObservedPostElement,
+    takePendingSeenPostIds,
+    restorePendingSeenPostIds,
+  } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -177,28 +181,18 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark only posts the user actually saw, then clear any persisted/stale
-    // feed cache so refresh always asks the backend for the latest eligible feed.
+    const seenPostIds = takePendingSeenPostIds();
+
     try {
-      await flushNow();
-    } catch {
-      // best-effort — proceed with reload regardless
+      await Promise.all([
+        refreshFollowingFeed(seenPostIds),
+        queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
+      ]);
+    } catch (error) {
+      restorePendingSeenPostIds(seenPostIds);
+      throw error;
     }
-
-    await Promise.all([
-      refreshFollowingFeed(),
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-    ]);
-  }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id || showDemoFeed) return;
-    const refreshHomeFeed = () => {
-      void handleRefresh();
-    };
-    window.addEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
-    return () => window.removeEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
-  }, [handleRefresh, showDemoFeed, user?.id]);
+  }, [queryClient, refreshFollowingFeed, restorePendingSeenPostIds, takePendingSeenPostIds, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !followingLoading || allPosts.length > 0) return;

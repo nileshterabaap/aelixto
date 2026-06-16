@@ -41,7 +41,7 @@ interface UseFollowingFeedResult {
   loading: boolean;
   error: string | null;
   loadMore: () => void;
-  refresh: () => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
+  refresh: (seenPostIds?: string[]) => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
   hasMore: boolean;
 }
 
@@ -52,6 +52,51 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
 }
 
 const PAGE_SIZE = 20;
+const mapFeedRows = (data: FeedRpcRow[]): FeedPost[] => data.map((item) => ({
+  id: item.id,
+  user_id: item.user_id,
+  content: item.content,
+  created_at: item.created_at,
+  likes_count: item.likes_count,
+  saves_count: item.saves_count,
+  comments_count: item.comments_count,
+  reposts_count: item.reposts_count,
+  media_type: item.media_type,
+  media_url: item.media_url,
+  platform: item.platform,
+  embed_html: item.embed_html,
+  thumbnail_url: item.thumbnail_url,
+  title: item.title,
+  preview_text: item.preview_text,
+  preview_title: item.preview_title,
+  preview_image_url: item.preview_image_url,
+  media_kind: item.media_kind ?? null,
+  aspect_ratio: item.aspect_ratio ?? null,
+  suggested_height: item.suggested_height ?? null,
+  is_public: item.is_public,
+  feed_cursor: item.feed_cursor,
+  is_repost: item.is_repost,
+  reposted_by_user_id: item.reposted_by_user_id,
+  reposted_by_username: item.reposted_by_username,
+  profiles: {
+    username: item.profile_username,
+    display_name: item.profile_display_name,
+    avatar_url: item.profile_avatar_url,
+  },
+}));
+
+const toPage = (data: FeedRpcRow[] | null) => {
+  if (!data || data.length === 0) {
+    return { posts: [], nextCursor: undefined };
+  }
+
+  const mappedPosts = mapFeedRows(data);
+  const lastCursor = mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
+  const nextCursor = mappedPosts.length < PAGE_SIZE ? undefined : lastCursor;
+
+  return { posts: mappedPosts, nextCursor };
+};
+
 const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
     fn: 'get_following_feed_v2',
@@ -65,49 +110,23 @@ const fetchFeedPage = async (cursor?: string) => {
 
   if (error) throw error;
 
-  if (!data || data.length === 0) {
-    return { posts: [], nextCursor: undefined };
-  }
+  return toPage(data);
+};
 
-  // Map RPC response to FeedPost format
-  const mappedPosts: FeedPost[] = data.map((item) => ({
-    id: item.id,
-    user_id: item.user_id,
-    content: item.content,
-    created_at: item.created_at,
-    likes_count: item.likes_count,
-    saves_count: item.saves_count,
-    comments_count: item.comments_count,
-    reposts_count: item.reposts_count,
-    media_type: item.media_type,
-    media_url: item.media_url,
-    platform: item.platform,
-    embed_html: item.embed_html,
-    thumbnail_url: item.thumbnail_url,
-    title: item.title,
-    preview_text: item.preview_text,
-    preview_title: item.preview_title,
-    preview_image_url: item.preview_image_url,
-    media_kind: item.media_kind ?? null,
-    aspect_ratio: item.aspect_ratio ?? null,
-    suggested_height: item.suggested_height ?? null,
-    is_public: item.is_public,
-    feed_cursor: item.feed_cursor,
-    is_repost: item.is_repost,
-    reposted_by_user_id: item.reposted_by_user_id,
-    reposted_by_username: item.reposted_by_username,
-    profiles: {
-      username: item.profile_username,
-      display_name: item.profile_display_name,
-      avatar_url: item.profile_avatar_url,
-    },
-  }));
+const refreshFeedPage = async (seenPostIds: string[]) => {
+  const rpc = supabase.rpc as unknown as (
+    fn: 'refresh_following_feed_v1',
+    args: { limit_count: number; seen_post_ids: string[] }
+  ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
 
-  // End pagination as soon as the server returns fewer rows than PAGE_SIZE.
-  const lastCursor = mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
-  const nextCursor = mappedPosts.length < PAGE_SIZE ? undefined : lastCursor;
+  const { data, error } = await rpc('refresh_following_feed_v1', {
+    limit_count: PAGE_SIZE,
+    seen_post_ids: seenPostIds,
+  });
 
-  return { posts: mappedPosts, nextCursor };
+  if (error) throw error;
+
+  return toPage(data);
 };
 
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
@@ -203,7 +222,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
       .finally(() => setFetchingMore(false));
   };
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (seenPostIds: string[] = []) => {
     preloadedRef.current = false;
     if (!userId) return undefined;
 
@@ -214,7 +233,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     setError(null);
 
     try {
-      const firstPage = await fetchFeedPage(undefined);
+      const firstPage = await refreshFeedPage(seenPostIds);
       if (requestIdRef.current !== requestId) return firstPage;
       setPages([firstPage]);
       return firstPage;
