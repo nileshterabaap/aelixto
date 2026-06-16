@@ -41,7 +41,7 @@ interface UseFollowingFeedResult {
   loading: boolean;
   error: string | null;
   loadMore: () => void;
-  refresh: () => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
+  refresh: (seenPostIds?: string[]) => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
   hasMore: boolean;
 }
 
@@ -222,7 +222,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
       .finally(() => setFetchingMore(false));
   };
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (seenPostIds: string[] = []) => {
     preloadedRef.current = false;
     if (!userId) return undefined;
 
@@ -233,7 +233,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     setError(null);
 
     try {
-      const firstPage = await fetchFeedPage(undefined);
+      const firstPage = await refreshFeedPage(seenPostIds);
       if (requestIdRef.current !== requestId) return firstPage;
       setPages([firstPage]);
       return firstPage;
