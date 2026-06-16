@@ -195,15 +195,6 @@ const Index = () => {
   }, [queryClient, refreshFollowingFeed, restorePendingSeenPostIds, takePendingSeenPostIds, user?.id]);
 
   useEffect(() => {
-    if (!user?.id || showDemoFeed) return;
-    const refreshHomeFeed = () => {
-      void handleRefresh();
-    };
-    window.addEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
-    return () => window.removeEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
-  }, [handleRefresh, showDemoFeed, user?.id]);
-
-  useEffect(() => {
     if (!user?.id || !followingLoading || allPosts.length > 0) return;
     const retry = window.setTimeout(() => {
       void refreshFollowingFeed();
