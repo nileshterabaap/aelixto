@@ -1,7 +1,7 @@
-import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo, useCallback } from 'react';
+import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 
 interface FeedPost {
   id: string;
@@ -53,17 +53,8 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
   profile_avatar_url: string | null;
 }
 
-interface FeedPage {
-  posts: FeedPost[];
-  nextCursor: string | undefined;
-}
-
 const PAGE_SIZE = 20;
-const REFRESH_SCAN_DELAYS_MS = [0, 450, 900, 1400];
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const fetchFeedPage = async (cursor?: string): Promise<FeedPage> => {
+const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
     fn: 'get_following_feed_v2',
     args: { limit_count: number; cursor_key: string | null }
@@ -123,10 +114,13 @@ const fetchFeedPage = async (cursor?: string): Promise<FeedPage> => {
   return { posts: mappedPosts, nextCursor };
 };
 
+type FeedPage = Awaited<ReturnType<typeof fetchFeedPage>>;
+
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
+  const [refreshEpoch, setRefreshEpoch] = useState(0);
   const queryClient = useQueryClient();
-  const queryKey = useMemo(() => ['following-feed', userId] as const, [userId]);
+  const queryKey = useMemo(() => ['following-feed', userId, refreshEpoch] as const, [userId, refreshEpoch]);
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -148,7 +142,6 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     refetchOnMount: true, // refetch if stale on mount/page reload
     refetchOnReconnect: true,
     structuralSharing: true,
-    placeholderData: (previousData) => previousData,
   });
 
   // Flatten all pages into single array - stable reference
@@ -200,44 +193,18 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     if (!userId) return;
 
     preloadedRef.current = false;
-    await queryClient.cancelQueries({ queryKey, exact: true });
+    const nextEpoch = refreshEpoch + 1;
+    const nextQueryKey = ['following-feed', userId, nextEpoch] as const;
 
-    const previousData = queryClient.getQueryData<InfiniteData<FeedPage>>(queryKey);
-    const knownPostIds = new Set(
-      previousData?.pages.flatMap((page) => page.posts.map((post) => post.id)) ?? []
-    );
-
-    // Pull-to-refresh should behave like a real scan, not a cache flip: keep
-    // the current feed visible while we poll the fresh first page briefly.
-    // This catches posts that were just created/expanded and avoids replacing
-    // the feed with an empty result before the backend has settled.
-    let firstPage: FeedPage = { posts: [], nextCursor: undefined };
-    for (let attempt = 0; attempt < REFRESH_SCAN_DELAYS_MS.length; attempt += 1) {
-      const delay = REFRESH_SCAN_DELAYS_MS[attempt];
-      if (delay > 0) await wait(delay);
-
-      firstPage = await fetchFeedPage(undefined);
-      const hasNewTopPost = firstPage.posts.some((post) => !knownPostIds.has(post.id));
-      const isLastAttempt = attempt === REFRESH_SCAN_DELAYS_MS.length - 1;
-
-      if (hasNewTopPost || isLastAttempt) break;
-    }
-
-    queryClient.setQueryData(queryKey, {
-      pages: [firstPage],
-      pageParams: [undefined],
+    await queryClient.cancelQueries({ queryKey: ['following-feed', userId], exact: false });
+    await queryClient.prefetchInfiniteQuery({
+      queryKey: nextQueryKey,
+      queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
+      initialPageParam: undefined as string | undefined,
+      getNextPageParam: (lastPage: FeedPage) => lastPage.nextCursor,
     });
-
-    // Clean up inactive epoch-based feed caches left by the previous refresh
-    // strategy so they cannot be restored later by navigation.
-    queryClient.removeQueries({
-      predicate: (query) =>
-        Array.isArray(query.queryKey) &&
-        query.queryKey[0] === 'following-feed' &&
-        query.queryKey[1] === userId &&
-        query.queryKey.length > 2,
-    });
-  }, [queryClient, queryKey, userId]);
+    setRefreshEpoch(nextEpoch);
+  }, [queryClient, refreshEpoch, userId]);
 
   return {
     items,

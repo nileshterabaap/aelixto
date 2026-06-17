@@ -10,7 +10,6 @@ interface PullToRefreshProps {
 const THRESHOLD = 60;
 const MAX_PULL = 180;
 const LOADING_REST = 55;
-const MIN_REFRESH_VISIBLE_MS = 750;
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -110,22 +109,13 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       const currentPull = pullY.get();
 
       if (currentPull >= THRESHOLD && !refreshing) {
-        // Pin the spinner at the loading rest position and keep it visible
-        // until the refresh actually finishes (with a small min duration so
-        // very fast responses still feel like a real refresh).
         animate(pullY, LOADING_REST, { type: "spring", stiffness: 200, damping: 25 });
         setRefreshing(true);
 
         void (async () => {
-          const startedAt = Date.now();
           try {
             await onRefresh();
           } finally {
-            const elapsed = Date.now() - startedAt;
-            const remaining = MIN_REFRESH_VISIBLE_MS - elapsed;
-            if (remaining > 0) {
-              await new Promise((r) => setTimeout(r, remaining));
-            }
             setRefreshing(false);
             animate(pullY, 0, { type: "spring", stiffness: 250, damping: 28 });
           }

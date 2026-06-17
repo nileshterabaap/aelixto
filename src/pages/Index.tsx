@@ -76,7 +76,6 @@ const Index = () => {
     items: followingPosts,
     empty: followingEmpty,
     loading: followingLoading,
-    error: followingError,
     loadMore,
     hasMore,
     reachedEnd,
@@ -208,15 +207,15 @@ const Index = () => {
     try {
       await flushNow();
     } catch {
-      // best-effort — still refresh the feed
+      // best-effort — proceed with reload regardless
     }
 
-    await refreshFollowingFeed();
-
-    void Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id], exact: true }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id], exact: true }),
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['following-count', user?.id], exact: true, type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['following-has-posts', user?.id], exact: true, type: 'active' }),
     ]);
+
+    await refreshFollowingFeed();
   }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
@@ -285,7 +284,7 @@ const Index = () => {
                   Discover people to follow
                 </Link>
               </div>
-            ) : followingHasAnyPosts ? (
+            ) : followingHasAnyPosts && reachedEnd ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                 <h3 className="text-lg font-semibold">You're all caught up</h3>
@@ -293,13 +292,8 @@ const Index = () => {
                   You've seen all recent posts from people you follow.
                 </p>
               </div>
-            ) : followingError ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <h3 className="text-lg font-semibold">You're all caught up</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Pull down to check again.
-                </p>
-              </div>
+            ) : followingHasAnyPosts ? (
+              <div className="py-16" />
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
