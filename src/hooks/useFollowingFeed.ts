@@ -52,11 +52,6 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
 }
 
 const PAGE_SIZE = 20;
-const debugRefresh = (label: string, details?: Record<string, unknown>) => {
-  if (typeof window === 'undefined') return;
-  console.info(`[feed-refresh] ${label}`, details ?? {});
-};
-
 const mapFeedRows = (data: FeedRpcRow[]): FeedPost[] => data.map((item) => ({
   id: item.id,
   user_id: item.user_id,
@@ -124,27 +119,12 @@ const refreshFeedPage = async (seenPostIds: string[]) => {
     args: { limit_count: number; seen_post_ids: string[] }
   ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
 
-  debugRefresh('rpc:start', {
-    rpc: 'refresh_following_feed_v1',
-    seenCount: seenPostIds.length,
-    seenPostIds,
-  });
-
   const { data, error } = await rpc('refresh_following_feed_v1', {
     limit_count: PAGE_SIZE,
     seen_post_ids: seenPostIds,
   });
 
-  if (error) {
-    debugRefresh('rpc:error', { message: error.message });
-    throw error;
-  }
-
-  debugRefresh('rpc:success', {
-    rowCount: data?.length ?? 0,
-    ids: data?.map((row) => row.id) ?? [],
-    cursors: data?.map((row) => row.feed_cursor).filter(Boolean) ?? [],
-  });
+  if (error) throw error;
 
   return toPage(data);
 };
@@ -248,7 +228,6 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    debugRefresh('state:start', { requestId, seenCount: seenPostIds.length });
     setLoading(true);
     setFetchingMore(false);
     setError(null);
@@ -257,26 +236,15 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
       const firstPage = await refreshFeedPage(seenPostIds);
       if (requestIdRef.current !== requestId) return firstPage;
       setPages([firstPage]);
-      debugRefresh('state:applied', {
-        requestId,
-        postCount: firstPage.posts.length,
-        ids: firstPage.posts.map((post) => post.id),
-        nextCursor: firstPage.nextCursor ?? null,
-      });
       return firstPage;
     } catch (err) {
       if (requestIdRef.current === requestId) {
         setError(err instanceof Error ? err.message : 'Failed to refresh feed');
-        debugRefresh('state:error', {
-          requestId,
-          message: err instanceof Error ? err.message : String(err),
-        });
       }
       throw err;
     } finally {
       if (requestIdRef.current === requestId) {
         setLoading(false);
-        debugRefresh('state:done', { requestId });
       }
     }
   }, [userId]);
