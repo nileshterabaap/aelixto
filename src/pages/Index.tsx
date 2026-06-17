@@ -211,8 +211,8 @@ const Index = () => {
     }
 
     await Promise.all([
-      queryClient.removeQueries({ queryKey: ['following-count', user?.id], exact: true }),
-      queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id], exact: true }),
+      queryClient.refetchQueries({ queryKey: ['following-count', user?.id], exact: true, type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['following-has-posts', user?.id], exact: true, type: 'active' }),
     ]);
 
     await refreshFollowingFeed();
