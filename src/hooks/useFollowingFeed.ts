@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
 
 interface FeedPost {
   id: string;
@@ -114,13 +114,10 @@ const fetchFeedPage = async (cursor?: string) => {
   return { posts: mappedPosts, nextCursor };
 };
 
-type FeedPage = Awaited<ReturnType<typeof fetchFeedPage>>;
-
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
-  const [refreshEpoch, setRefreshEpoch] = useState(0);
   const queryClient = useQueryClient();
-  const queryKey = useMemo(() => ['following-feed', userId, refreshEpoch] as const, [userId, refreshEpoch]);
+  const queryKey = useMemo(() => ['following-feed', userId] as const, [userId]);
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -142,6 +139,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     refetchOnMount: true, // refetch if stale on mount/page reload
     refetchOnReconnect: true,
     structuralSharing: true,
+    placeholderData: (previousData) => previousData,
   });
 
   // Flatten all pages into single array - stable reference
@@ -193,18 +191,28 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     if (!userId) return;
 
     preloadedRef.current = false;
-    const nextEpoch = refreshEpoch + 1;
-    const nextQueryKey = ['following-feed', userId, nextEpoch] as const;
+    await queryClient.cancelQueries({ queryKey, exact: true });
 
-    await queryClient.cancelQueries({ queryKey: ['following-feed', userId], exact: false });
-    await queryClient.prefetchInfiniteQuery({
-      queryKey: nextQueryKey,
-      queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
-      initialPageParam: undefined as string | undefined,
-      getNextPageParam: (lastPage: FeedPage) => lastPage.nextCursor,
+    // Fetch the first page outside React Query, then atomically replace the
+    // active infinite-query data. This keeps the old feed visible during the
+    // network call and prevents the temporary empty query state that caused a
+    // blank screen after pull-to-refresh.
+    const firstPage = await fetchFeedPage(undefined);
+    queryClient.setQueryData(queryKey, {
+      pages: [firstPage],
+      pageParams: [undefined],
     });
-    setRefreshEpoch(nextEpoch);
-  }, [queryClient, refreshEpoch, userId]);
+
+    // Clean up inactive epoch-based feed caches left by the previous refresh
+    // strategy so they cannot be restored later by navigation.
+    queryClient.removeQueries({
+      predicate: (query) =>
+        Array.isArray(query.queryKey) &&
+        query.queryKey[0] === 'following-feed' &&
+        query.queryKey[1] === userId &&
+        query.queryKey.length > 2,
+    });
+  }, [queryClient, queryKey, userId]);
 
   return {
     items,
