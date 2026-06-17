@@ -44,18 +44,27 @@ const Index = () => {
     staleTime: 60_000,
   });
 
-  // Check if the feed has any eligible unseen posts. Empty + no unseen posts
-  // means the user is caught up.
-  const { data: followingHasUnseenPosts } = useQuery({
-    queryKey: ['following-has-unseen-posts', user?.id],
+  // Check if followings have any public posts at all (ignoring seen state).
+  // If yes but feed is empty → user has caught up on everything.
+  const { data: followingHasAnyPosts } = useQuery({
+    queryKey: ['following-has-posts', user?.id],
     queryFn: async () => {
       if (!user?.id) return false;
-      const { data, error } = await supabase.rpc('has_unseen_following_feed_posts');
-      if (error) throw error;
-      return Boolean(data);
+      const { data: follows } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', user.id);
+      const ids = (follows ?? []).map((f) => f.following_id);
+      ids.push(user.id);
+      const { count } = await supabase
+        .from('posts')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_public', true)
+        .in('user_id', ids);
+      return (count ?? 0) > 0;
     },
     enabled: Boolean(user?.id),
-    staleTime: 15_000,
+    staleTime: 60_000,
   });
   
   
@@ -68,8 +77,8 @@ const Index = () => {
     empty: followingEmpty,
     loading: followingLoading,
     loadMore,
-    refresh: refreshFollowingFeed,
     hasMore,
+    reachedEnd,
   } = useFollowingFeed(user?.id);
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -202,27 +211,25 @@ const Index = () => {
 
     await Promise.all([
       refreshFollowingFeed(),
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-unseen-posts', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
     ]);
-  }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
 
-  useEffect(() => {
-    if (!user?.id || showDemoFeed) return;
-    const refreshHomeFeed = () => {
-      void handleRefresh();
-    };
-    window.addEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
-    return () => window.removeEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
-  }, [handleRefresh, showDemoFeed, user?.id]);
+    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
 
-  useEffect(() => {
-    if (!user?.id || !followingLoading || allPosts.length > 0) return;
-    const retry = window.setTimeout(() => {
-      void refreshFollowingFeed();
-    }, 7000);
-    return () => window.clearTimeout(retry);
-  }, [allPosts.length, followingLoading, refreshFollowingFeed, user?.id]);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
+    ]);
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    window.location.reload();
+    await new Promise(() => {});
+  }, [flushNow, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
@@ -245,9 +252,9 @@ const Index = () => {
     return () => observer.disconnect();
   }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
-  // Only show skeleton on truly empty first load - prevent flicker.
+  // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
-  const shouldShowSkeleton = allPosts.length === 0 && (sessionLoading || loading);
+  const shouldShowSkeleton = !hasRenderedOnce.current && (sessionLoading || loading) && allPosts.length === 0;
 
   if (shouldShowSkeleton) {
     return (
