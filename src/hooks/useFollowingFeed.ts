@@ -43,7 +43,6 @@ interface UseFollowingFeedResult {
   error: string | null;
   loadMore: () => void;
   hasMore: boolean;
-  reachedEnd: boolean;
 }
 
 interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
@@ -144,11 +143,6 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     [data?.pages]
   );
 
-  const reachedEnd = useMemo(
-    () => data?.pages.some((page) => page.posts.length === 0) ?? false,
-    [data?.pages]
-  );
-
   // Aggressively preload ALL thumbnails once on data arrival
   useEffect(() => {
     if (items.length > 0 && !preloadedRef.current) {
@@ -190,7 +184,6 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     error: feedError?.message ?? null,
     loadMore,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
-    reachedEnd: Boolean(userId) && reachedEnd,
   };
 };
 
