@@ -1,7 +1,7 @@
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo, useCallback } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 
 interface FeedPost {
   id: string;
@@ -42,8 +42,8 @@ interface UseFollowingFeedResult {
   loading: boolean;
   error: string | null;
   loadMore: () => void;
-  refresh: () => Promise<unknown>;
   hasMore: boolean;
+  reachedEnd: boolean;
 }
 
 interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
@@ -104,25 +104,24 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  // End pagination as soon as the server returns fewer rows than PAGE_SIZE.
+  // Only end pagination when the server returns zero rows. Returning fewer
+  // than PAGE_SIZE can still mean more unseen posts exist beyond this cursor
+  // band, so keep paging until the backend confirms an empty page.
   const lastCursor = mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
-  const nextCursor = mappedPosts.length < PAGE_SIZE ? undefined : lastCursor;
+  const nextCursor = mappedPosts.length === 0 ? undefined : lastCursor;
 
   return { posts: mappedPosts, nextCursor };
 };
 
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
-  const queryClient = useQueryClient();
 
   // Fetch feed directly — no count gate, single RPC call
   const {
     data,
     isLoading: feedLoading,
-    isFetching,
     error: feedError,
     fetchNextPage,
-    refetch,
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
@@ -134,15 +133,19 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: 'always', // refresh on mount/page reload so an empty first paint cannot stick
+    refetchOnMount: true, // refetch if stale on mount/page reload
     refetchOnReconnect: true,
-    retry: 2,
     structuralSharing: true,
   });
 
   // Flatten all pages into single array - stable reference
   const items = useMemo(
     () => data?.pages.flatMap((page) => page.posts) ?? [],
+    [data?.pages]
+  );
+
+  const reachedEnd = useMemo(
+    () => data?.pages.some((page) => page.posts.length === 0) ?? false,
     [data?.pages]
   );
 
@@ -180,30 +183,14 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     }
   };
 
-  const refresh = useCallback(async () => {
-    preloadedRef.current = false;
-    await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
-    // Reset cached pages so refresh always re-fetches page 1 from scratch.
-    // Without this, refetch() re-runs each existing page with its old cursor,
-    // which can hide brand-new posts from followings behind stale page boundaries.
-    queryClient.setQueryData(['following-feed', userId], (old: unknown) => {
-      if (!old || typeof old !== 'object') return old;
-      return { pages: [], pageParams: [undefined] };
-    });
-    return await refetch();
-  }, [queryClient, refetch, userId]);
-
-  const hasReceivedPage = data !== undefined;
-  const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
-
   return {
     items,
-    empty: Boolean(userId) && !initialFeedPending && items.length === 0 && (hasReceivedPage || Boolean(feedError)),
-    loading: initialFeedPending,
+    empty: Boolean(userId) && !feedLoading && items.length === 0,
+    loading: Boolean(userId) && feedLoading,
     error: feedError?.message ?? null,
     loadMore,
-    refresh,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
+    reachedEnd: Boolean(userId) && reachedEnd,
   };
 };
 
