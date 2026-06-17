@@ -1,7 +1,7 @@
-import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo, useCallback } from 'react';
+import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 
 interface FeedPost {
   id: string;
@@ -43,6 +43,7 @@ interface UseFollowingFeedResult {
   error: string | null;
   loadMore: () => void;
   hasMore: boolean;
+  reachedEnd: boolean;
   refresh: () => Promise<void>;
 }
 
@@ -117,8 +118,9 @@ type FeedPage = Awaited<ReturnType<typeof fetchFeedPage>>;
 
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
+  const [refreshEpoch, setRefreshEpoch] = useState(0);
   const queryClient = useQueryClient();
-  const queryKey = useMemo(() => ['following-feed', userId] as const, [userId]);
+  const queryKey = useMemo(() => ['following-feed', userId, refreshEpoch] as const, [userId, refreshEpoch]);
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -145,6 +147,11 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   // Flatten all pages into single array - stable reference
   const items = useMemo(
     () => data?.pages.flatMap((page) => page.posts) ?? [],
+    [data?.pages]
+  );
+
+  const reachedEnd = useMemo(
+    () => data?.pages.some((page) => page.posts.length === 0) ?? false,
     [data?.pages]
   );
 
@@ -186,14 +193,18 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     if (!userId) return;
 
     preloadedRef.current = false;
-    await queryClient.cancelQueries({ queryKey, exact: true });
+    const nextEpoch = refreshEpoch + 1;
+    const nextQueryKey = ['following-feed', userId, nextEpoch] as const;
 
-    const firstPage = await fetchFeedPage(undefined);
-    queryClient.setQueryData<InfiniteData<FeedPage, string | undefined>>(queryKey, {
-      pages: [firstPage],
-      pageParams: [undefined],
+    await queryClient.cancelQueries({ queryKey: ['following-feed', userId], exact: false });
+    await queryClient.prefetchInfiniteQuery({
+      queryKey: nextQueryKey,
+      queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
+      initialPageParam: undefined as string | undefined,
+      getNextPageParam: (lastPage: FeedPage) => lastPage.nextCursor,
     });
-  }, [queryClient, queryKey, userId]);
+    setRefreshEpoch(nextEpoch);
+  }, [queryClient, refreshEpoch, userId]);
 
   return {
     items,
@@ -202,6 +213,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     error: feedError?.message ?? null,
     loadMore,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
+    reachedEnd: Boolean(userId) && reachedEnd,
     refresh,
   };
 };
