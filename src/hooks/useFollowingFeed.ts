@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
 import { useRef, useEffect, useMemo, useCallback } from 'react';
@@ -53,8 +53,17 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
   profile_avatar_url: string | null;
 }
 
+interface FeedPage {
+  posts: FeedPost[];
+  nextCursor: string | undefined;
+}
+
 const PAGE_SIZE = 20;
-const fetchFeedPage = async (cursor?: string) => {
+const REFRESH_SCAN_DELAYS_MS = [0, 450, 900, 1400];
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const fetchFeedPage = async (cursor?: string): Promise<FeedPage> => {
   const rpc = supabase.rpc as unknown as (
     fn: 'get_following_feed_v2',
     args: { limit_count: number; cursor_key: string | null }
@@ -193,11 +202,27 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     preloadedRef.current = false;
     await queryClient.cancelQueries({ queryKey, exact: true });
 
-    // Fetch the first page outside React Query, then atomically replace the
-    // active infinite-query data. This keeps the old feed visible during the
-    // network call and prevents the temporary empty query state that caused a
-    // blank screen after pull-to-refresh.
-    const firstPage = await fetchFeedPage(undefined);
+    const previousData = queryClient.getQueryData<InfiniteData<FeedPage>>(queryKey);
+    const knownPostIds = new Set(
+      previousData?.pages.flatMap((page) => page.posts.map((post) => post.id)) ?? []
+    );
+
+    // Pull-to-refresh should behave like a real scan, not a cache flip: keep
+    // the current feed visible while we poll the fresh first page briefly.
+    // This catches posts that were just created/expanded and avoids replacing
+    // the feed with an empty result before the backend has settled.
+    let firstPage: FeedPage = { posts: [], nextCursor: undefined };
+    for (let attempt = 0; attempt < REFRESH_SCAN_DELAYS_MS.length; attempt += 1) {
+      const delay = REFRESH_SCAN_DELAYS_MS[attempt];
+      if (delay > 0) await wait(delay);
+
+      firstPage = await fetchFeedPage(undefined);
+      const hasNewTopPost = firstPage.posts.some((post) => !knownPostIds.has(post.id));
+      const isLastAttempt = attempt === REFRESH_SCAN_DELAYS_MS.length - 1;
+
+      if (hasNewTopPost || isLastAttempt) break;
+    }
+
     queryClient.setQueryData(queryKey, {
       pages: [firstPage],
       pageParams: [undefined],
