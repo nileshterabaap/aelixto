@@ -1,7 +1,7 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
 
 interface FeedPost {
   id: string;
@@ -43,6 +43,7 @@ interface UseFollowingFeedResult {
   error: string | null;
   loadMore: () => void;
   hasMore: boolean;
+  refresh: () => Promise<void>;
 }
 
 interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
@@ -112,8 +113,12 @@ const fetchFeedPage = async (cursor?: string) => {
   return { posts: mappedPosts, nextCursor };
 };
 
+type FeedPage = Awaited<ReturnType<typeof fetchFeedPage>>;
+
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
+  const queryClient = useQueryClient();
+  const queryKey = useMemo(() => ['following-feed', userId] as const, [userId]);
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -124,7 +129,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['following-feed', userId],
+    queryKey,
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -177,6 +182,19 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     }
   };
 
+  const refresh = useCallback(async () => {
+    if (!userId) return;
+
+    preloadedRef.current = false;
+    await queryClient.cancelQueries({ queryKey, exact: true });
+
+    const firstPage = await fetchFeedPage(undefined);
+    queryClient.setQueryData<InfiniteData<FeedPage, string | undefined>>(queryKey, {
+      pages: [firstPage],
+      pageParams: [undefined],
+    });
+  }, [queryClient, queryKey, userId]);
+
   return {
     items,
     empty: Boolean(userId) && !feedLoading && items.length === 0,
@@ -184,6 +202,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     error: feedError?.message ?? null,
     loadMore,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
+    refresh,
   };
 };
 

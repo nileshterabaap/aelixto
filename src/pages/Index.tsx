@@ -78,6 +78,7 @@ const Index = () => {
     loading: followingLoading,
     loadMore,
     hasMore,
+    refresh: refreshFollowingFeed,
   } = useFollowingFeed(user?.id);
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -209,25 +210,12 @@ const Index = () => {
     }
 
     await Promise.all([
-      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
-    ]);
-
-    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
-
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
       queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
       queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
     ]);
 
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    window.location.reload();
-    await new Promise(() => {});
-  }, [flushNow, queryClient, user?.id]);
+    await refreshFollowingFeed();
+  }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
