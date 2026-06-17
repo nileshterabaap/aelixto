@@ -210,7 +210,6 @@ const Index = () => {
     }
 
     await Promise.all([
-      refreshFollowingFeed(),
       queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
       queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
       queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
@@ -281,7 +280,7 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
             {!showDemoFeed && followingEmpty ? (
-            followingCount === undefined || followingHasUnseenPosts === undefined ? (
+            followingCount === undefined || followingHasAnyPosts === undefined ? (
               <div className="space-y-4">
                 {[...Array(2)].map((_, i) => (
                   <PostSkeleton key={i} />
@@ -297,12 +296,22 @@ const Index = () => {
                   Discover people to follow
                 </Link>
               </div>
-            ) : (
+            ) : followingHasAnyPosts && reachedEnd ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                 <h3 className="text-lg font-semibold">You're all caught up</h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   You've seen all recent posts from people you follow.
+                </p>
+              </div>
+            ) : followingHasAnyPosts ? (
+              <div className="py-16" />
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
+                <h3 className="text-lg font-semibold">No posts yet</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  People you follow haven't posted anything yet. Check back soon.
                 </p>
               </div>
             )
@@ -332,7 +341,7 @@ const Index = () => {
               {/* No visible loader — pagination happens silently far before
                   the user reaches the end. */}
               {/* All caught up message */}
-              {!hasMore && !showDemoFeed && allPosts.length > 0 && (
+              {reachedEnd && !hasMore && !showDemoFeed && allPosts.length > 0 && (
                 <motion.div
                   className="flex flex-col items-center justify-center pt-24 pb-10 text-center"
                   initial={{ opacity: 0, y: 32 }}
