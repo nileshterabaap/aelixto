@@ -10,6 +10,7 @@ import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
+import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -134,7 +135,7 @@ export const HydratedEmbed = memo(({
 
   // Track click-throughs to the original platform (iframe focus or anchor clicks).
   // Awards +1 engagement score to the author on top of the impression score.
-  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate);
+  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost);
 
   const forceTwitterRenderer =
     r.kind === 'raw' &&
@@ -157,6 +158,10 @@ export const HydratedEmbed = memo(({
   const handleRawEmbedError = useCallback(() => {
     setRawEmbedFailed(true);
     requestSourceValidation(post.id);
+  }, [post.id]);
+
+  const handleOriginalVisit = useCallback(() => {
+    markOriginalVisit(post.id);
   }, [post.id]);
   
   // For YouTube, prefer their thumbnail
@@ -277,7 +282,7 @@ export const HydratedEmbed = memo(({
         {/* Raw embed HTML (Instagram, Facebook, Spotify) */}
         {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && r.html && !rawEmbedFailed && (
           <ImageViewTracker postId={post.id}>
-            <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} />
+            <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} onOriginalVisit={handleOriginalVisit} />
           </ImageViewTracker>
         )}
 
