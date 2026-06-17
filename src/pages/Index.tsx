@@ -208,7 +208,7 @@ const Index = () => {
     try {
       await flushNow();
     } catch {
-      // best-effort — proceed with reload regardless
+      // best-effort — still refresh the feed
     }
 
     await refreshFollowingFeed();
