@@ -97,11 +97,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     
     if (isAlreadyOnHome) {
       window.dispatchEvent(new CustomEvent('aelixto:refresh-home-feed'));
-      if (isAtTop) {
-        // Already at top - force refresh the feed (refetchQueries actually refetches, invalidate just marks stale)
-        queryClient.refetchQueries({ queryKey: ["following-feed"] });
-        queryClient.refetchQueries({ queryKey: ["posts"] });
-      } else {
+      if (!isAtTop) {
         // Not at top - scroll to top smoothly
         window.scrollTo({ top: 0, behavior: "smooth" });
       }

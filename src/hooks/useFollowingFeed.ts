@@ -1,7 +1,7 @@
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
 
 interface FeedPost {
   id: string;
@@ -118,9 +118,8 @@ type FeedPage = Awaited<ReturnType<typeof fetchFeedPage>>;
 
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
-  const [refreshEpoch, setRefreshEpoch] = useState(0);
   const queryClient = useQueryClient();
-  const queryKey = useMemo(() => ['following-feed', userId, refreshEpoch] as const, [userId, refreshEpoch]);
+  const queryKey = useMemo(() => ['following-feed', userId] as const, [userId]);
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -192,19 +191,26 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   const refresh = useCallback(async () => {
     if (!userId) return;
 
-    preloadedRef.current = false;
-    const nextEpoch = refreshEpoch + 1;
-    const nextQueryKey = ['following-feed', userId, nextEpoch] as const;
-
-    await queryClient.cancelQueries({ queryKey: ['following-feed', userId], exact: false });
-    await queryClient.prefetchInfiniteQuery({
-      queryKey: nextQueryKey,
-      queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
-      initialPageParam: undefined as string | undefined,
-      getNextPageParam: (lastPage: FeedPage) => lastPage.nextCursor,
-    });
-    setRefreshEpoch(nextEpoch);
-  }, [queryClient, refreshEpoch, userId]);
+    // Cancel any in-flight feed requests for this user, then fetch a fresh
+    // first page and atomically replace the infinite-query cache with just
+    // that page. We do NOT swap the query key, so the existing posts stay
+    // mounted until the fresh data arrives. If the request fails, we keep
+    // the previous feed visible instead of going blank.
+    await queryClient.cancelQueries({ queryKey, exact: true });
+    try {
+      const firstPage = await fetchFeedPage(undefined);
+      preloadedRef.current = false;
+      queryClient.setQueryData<InfiniteData<FeedPage, string | undefined>>(
+        queryKey,
+        {
+          pages: [firstPage],
+          pageParams: [undefined],
+        },
+      );
+    } catch {
+      // Keep previous feed on failure — pull-to-refresh should never blank.
+    }
+  }, [queryClient, queryKey, userId]);
 
   return {
     items,
