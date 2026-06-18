@@ -1,44 +1,30 @@
-## Deep checkout result
+I’m sorry — you’re right to be frustrated. The previous fixes were too close to the same implementation. I found a stronger likely cause: pull-to-refresh is currently competing with several global touch systems at once (`SwipeableView`, iframe freeze, browser scroll, and Framer-motion content translation). I would stop patching around that and replace it with a more isolated gesture model.
 
-I found two concrete issues that can explain exactly what you’re seeing:
+Plan:
 
-1. **Spinner snaps back / refresh feels unreliable**
-   - `PullToRefresh` attaches touch listeners only after `containerRef.current` exists, but then listens on `window` while the referenced wrapper is not the real scroll container.
-   - The app scrolls on `window`, not inside the pull wrapper, so the component is mixing container scroll checks with page scroll checks.
-   - This can make the gesture fragile on the Home empty/caught-up screen and with keep-alive/display changes.
+1. Rebuild `PullToRefresh` as the single owner of vertical pull gestures
+   - Attach touch handling directly to the pull wrapper, not `window`.
+   - Capture the gesture once downward movement wins over horizontal movement.
+   - Ignore all later scroll-position changes until touchend, so browser address-bar movement/layout changes cannot cancel it.
+   - While pulling, move only the spinner/indicator — not the whole feed content — to remove layout shifts that can cause snap-back.
 
-2. **Refresh may not load posts even if the spinner triggers**
-   - `useMarkPostSeen` has `visibleRef`, but `takePendingSeenPostIds()` only sends `pending` + `inFlight` posts to the refresh RPC.
-   - So the post currently on screen, or posts visible for less than the dwell/flush timing, may not be sent as “seen” during pull refresh.
-   - That means the backend can return the same visible posts again or keep the feed looking unchanged.
+2. Prevent conflicts with horizontal swipe navigation
+   - Add a lightweight handshake between `PullToRefresh` and `SwipeableView` using a shared DOM flag/custom event.
+   - When vertical pull wins, horizontal swipe should stand down for that gesture.
+   - When horizontal swipe wins, pull-to-refresh should stand down.
 
-Backend health/log check:
-- Hosted backend is healthy.
-- No recent backend errors for `refresh_following_feed`, `get_following_feed`, or `post_seen`.
-- The refresh RPC itself correctly inserts passed seen IDs, then returns the refreshed following feed.
+3. Fix the “it probably won’t load posts” path separately
+   - Keep sending visible/pending seen post IDs into `refresh_following_feed_v1`.
+   - Add short-lived, non-noisy diagnostic logging only around the refresh RPC result while testing, then remove it before finishing.
+   - Verify whether refresh returns posts, empty, or an error; if empty, the backend is behaving as “caught up,” not failing.
 
-## Plan
+4. Verify on the real mobile-sized preview
+   - Use Playwright touch events at the current 354px-wide viewport.
+   - Test caught-up/empty state: spinner should follow finger, hold during refresh, then return smoothly.
+   - Test feed state if posts are available: refresh call should include seen IDs and replace the list with returned posts.
+   - Check console/network for errors before declaring it fixed.
 
-1. **Make pull-to-refresh own the gesture reliably**
-   - In `src/components/PullToRefresh.tsx`, remove dependency on the wrapper as a scroll container.
-   - Use `window/document.scrollingElement` as the single source of truth for “at top”.
-   - Attach touch listeners unconditionally while the component is mounted.
-   - Keep the existing horizontal-swipe guard so `SwipeableView` does not get broken.
-
-2. **Prevent instant snap-back from browser/scroll conflicts**
-   - Once a downward pull is confirmed, prevent default consistently while pulling.
-   - Keep the spinner resting for the existing minimum refresh duration.
-   - Do not change feed thresholds/timing unless needed.
-
-3. **Fix the refresh data path**
-   - In `src/hooks/useMarkPostSeen.ts`, include `visibleRef.current` in `takePendingSeenPostIds()` along with pending/in-flight IDs.
-   - Clear those visible IDs after taking them so the refresh RPC can mark them seen immediately.
-   - This makes pull refresh capable of moving past posts the user is currently looking at, not just posts already batch-flushed.
-
-4. **Remove temporary debug noise**
-   - Remove `[PTR-DEBUG]` console logs from `Index.tsx` and `useFollowingFeed.ts` after the fix so the app stays clean.
-
-5. **Verify**
-   - Check Home caught-up state: spinner should follow the finger, hold briefly, then return smoothly.
-   - Check feed state with visible posts: pull refresh should send visible post IDs to the backend refresh RPC.
-   - Confirm Saved/Messages/Profile pull behavior is not regressed.
+Technical details:
+- Files likely touched: `src/components/PullToRefresh.tsx`, `src/components/SwipeableView.tsx`, and possibly `src/pages/Index.tsx` only for temporary verification cleanup.
+- I will not change backend schema or auth.
+- I will avoid another small tweak and instead replace the fragile gesture coordination with explicit gesture arbitration.
