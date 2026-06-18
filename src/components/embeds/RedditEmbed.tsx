@@ -294,9 +294,14 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     return () => window.removeEventListener("message", onMessage);
   }, [embedSrc]);
 
-  const renderFallbackCard = () => (
-    <div data-embed-status="ready">
-      {isDirectMedia ? (
+  if (resolving || (!resolvedUrl && !failed)) {
+    return <div data-embed-status="loading" className="w-full" style={{ minHeight: iframeHeight }} />;
+  }
+
+  if (!resolvedUrl || failed || !embedSrc) {
+    return (
+      <div data-embed-status="ready">
+        {isDirectMedia ? (
           <a
             href={normalizedUrl}
             target="_blank"
@@ -340,21 +345,8 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
             </div>
           </a>
         )}
-    </div>
-  );
-
-  if (resolving || (!resolvedUrl && !failed)) {
-    return <div data-embed-status="loading" className="w-full" style={{ minHeight: iframeHeight }} />;
-  }
-
-  if (!resolvedUrl || failed || !embedSrc) {
-    return renderFallbackCard();
-  }
-
-  // Reddit's official iframe is unreliable for image/gallery submissions
-  // (blank frames, oversized chrome). Render the thumbnail card instead.
-  if (mediaKind === "image" || mediaKind === "gallery") {
-    return renderFallbackCard();
+      </div>
+    );
   }
 
   return (

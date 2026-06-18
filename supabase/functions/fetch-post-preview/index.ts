@@ -71,12 +71,13 @@ serve(async (req) => {
   }
 
   try {
-    const { postId, url, platform } = await req.json();
-    
-    console.log(`[fetch-post-preview] Processing postId=${postId}, platform=${platform}, url=${url}`);
+    const { postId, url, platform, previewOnly } = await req.json();
+    const isPreviewOnly = !!previewOnly || !postId;
 
-    if (!postId || !url) {
-      return new Response(JSON.stringify({ error: 'Missing postId or url' }), {
+    console.log(`[fetch-post-preview] Processing postId=${postId ?? '(preview)'}, platform=${platform}, url=${url}`);
+
+    if (!url) {
+      return new Response(JSON.stringify({ error: 'Missing url' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -219,32 +220,34 @@ serve(async (req) => {
       }
     }
 
-    // Update database
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Update database (skipped in preview-only mode used before the post exists)
+    if (!isPreviewOnly) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const updatePayload: Record<string, string | number | null> = {
-      thumbnail_url: thumbnailUrl,
-      preview_image_url: thumbnailUrl,
-      preview_text: previewText,
-      media_kind: sizing.media_kind,
-      aspect_ratio: sizing.aspect_ratio,
-      suggested_height: sizing.suggested_height,
-    };
-    if (previewTitle) {
-      updatePayload.title = previewTitle;
-      updatePayload.preview_title = previewTitle;
-    }
-    const { error: updateError } = await supabase
-      .from('posts')
-      .update(updatePayload)
-      .eq('id', postId);
+      const updatePayload: Record<string, string | number | null> = {
+        thumbnail_url: thumbnailUrl,
+        preview_image_url: thumbnailUrl,
+        preview_text: previewText,
+        media_kind: sizing.media_kind,
+        aspect_ratio: sizing.aspect_ratio,
+        suggested_height: sizing.suggested_height,
+      };
+      if (previewTitle) {
+        updatePayload.title = previewTitle;
+        updatePayload.preview_title = previewTitle;
+      }
+      const { error: updateError } = await supabase
+        .from('posts')
+        .update(updatePayload)
+        .eq('id', postId);
 
-    if (updateError) {
-      console.error('[fetch-post-preview] DB update error:', updateError);
-    } else {
-      console.log(`[fetch-post-preview] Updated post ${postId} with thumbnail: ${thumbnailUrl}`);
+      if (updateError) {
+        console.error('[fetch-post-preview] DB update error:', updateError);
+      } else {
+        console.log(`[fetch-post-preview] Updated post ${postId} with thumbnail: ${thumbnailUrl}`);
+      }
     }
 
     return new Response(
@@ -632,7 +635,12 @@ function extractRedditMediaThumbnail(post: Record<string, unknown> | null | unde
 
 function isMisleadingRedditThumbnail(url: string): boolean {
   const lower = url.toLowerCase();
-  return lower.includes('images.unsplash.com') || lower.includes('source.unsplash.com');
+  return (
+    lower.includes('images.unsplash.com') ||
+    lower.includes('source.unsplash.com') ||
+    lower.includes('redditstatic.com') ||
+    lower.includes('share.redd.it/preview/post')
+  );
 }
 
 function isGenericPlaceholderImage(url: string): boolean {

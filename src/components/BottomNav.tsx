@@ -1,7 +1,7 @@
 import { Home, Search, Plus, Bell, User, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useCallback, MouseEvent, useRef } from "react";
+import { useState, useCallback, MouseEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchRoute } from "@/lib/prefetch";
 import { setScrollPosition } from "@/hooks/useScrollRestoration";
@@ -55,10 +55,6 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     return location.pathname === path;
   };
   const [ripples, setRipples] = useState<Record<string, Ripple[]>>({});
-  
-  // Track last home tap time to detect double-tap for refresh
-  const lastHomeTapRef = useRef<number>(0);
-
   const baseIcon = "text-foreground transition-all duration-200";
   const activeIcon = "h-[3.375rem] w-[3.375rem] opacity-100";
   const inactiveIcon = "h-[2.625rem] w-[2.625rem] opacity-50 hover:opacity-80";
@@ -91,20 +87,13 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const handleHomeClick = (e: MouseEvent<HTMLButtonElement>) => {
     createRipple(e, "home");
     
-    const now = Date.now();
     const isAlreadyOnHome = location.pathname === "/";
     const isAtTop = window.scrollY < 50;
     
     if (isAlreadyOnHome) {
-      if (isAtTop) {
-        // Already at top - force refresh the feed (refetchQueries actually refetches, invalidate just marks stale)
-        queryClient.refetchQueries({ queryKey: ["following-feed"] });
-        queryClient.refetchQueries({ queryKey: ["posts"] });
-      } else {
-        // Not at top - scroll to top smoothly
+      if (!isAtTop) {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
-      lastHomeTapRef.current = now;
     } else {
       // Navigate to home
       setScrollPosition(location.pathname, window.scrollY);

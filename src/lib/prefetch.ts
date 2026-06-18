@@ -75,9 +75,10 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
       // Preload images for instant display
       preloadFeedImages(mappedPosts);
       
+      const PAGE_SIZE = 20;
       return {
         posts: mappedPosts,
-        nextCursor: mappedPosts.length === 20 ? mappedPosts[mappedPosts.length - 1].feed_cursor : undefined,
+        nextCursor: mappedPosts.length < PAGE_SIZE ? undefined : mappedPosts[mappedPosts.length - 1]?.feed_cursor,
       };
     },
     initialPageParam: undefined,

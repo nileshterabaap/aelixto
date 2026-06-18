@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
-import { motion, useMotionValue, useTransform, animate } from "framer-motion";
+import { animate, motion, useMotionValue, useTransform } from "framer-motion";
 import { Loader2 } from "lucide-react";
 
 interface PullToRefreshProps {
@@ -7,9 +7,10 @@ interface PullToRefreshProps {
   children: ReactNode;
 }
 
-const THRESHOLD = 60;
-const MAX_PULL = 180;
-const LOADING_REST = 55;
+const TRIGGER_DISTANCE = 58;
+const MAX_DISTANCE = 132;
+const REFRESH_RESTING_DISTANCE = 52;
+const MIN_REFRESH_MS = 650;
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -21,16 +22,14 @@ const shouldIgnorePullTarget = (target: EventTarget | null) => {
 export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const [refreshing, setRefreshing] = useState(false);
   const pullY = useMotionValue(0);
-  const touchStartY = useRef(0);
-  const touchStartX = useRef(0);
-  const directionLocked = useRef<"none" | "vertical" | "horizontal">("none");
-  const pulling = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const startRef = useRef({ x: 0, y: 0 });
+  const gestureRef = useRef<"idle" | "pending" | "pulling" | "blocked">("idle");
+  const refreshingRef = useRef(false);
 
-  // Spinner transforms — fade in quickly, scale smoothly
-  const spinnerOpacity = useTransform(pullY, [0, 20, THRESHOLD], [0, 0.6, 1]);
-  const spinnerScale = useTransform(pullY, [0, THRESHOLD], [0.4, 1]);
-  const spinnerRotate = useTransform(pullY, [0, MAX_PULL], [0, 270]);
+  const spinnerOpacity = useTransform(pullY, [0, 16, TRIGGER_DISTANCE], [0, 0.65, 1]);
+  const spinnerScale = useTransform(pullY, [0, TRIGGER_DISTANCE], [0.55, 1]);
+  const spinnerRotate = useTransform(pullY, [0, MAX_DISTANCE], [0, 300]);
 
   const isAtTop = useCallback(() => {
     const containerScrollTop = containerRef.current?.scrollTop ?? 0;
@@ -43,110 +42,114 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     return containerScrollTop <= 0 && pageScrollTop <= 0;
   }, []);
 
+  const finishWithoutRefresh = useCallback(() => {
+    gestureRef.current = "idle";
+    animate(pullY, 0, { type: "spring", stiffness: 360, damping: 30 });
+  }, [pullY]);
+
+  const runRefresh = useCallback(() => {
+    if (refreshingRef.current) return;
+    console.info('[feed-refresh] gesture:trigger', { pullY: pullY.get() });
+    refreshingRef.current = true;
+    gestureRef.current = "idle";
+    setRefreshing(true);
+    animate(pullY, REFRESH_RESTING_DISTANCE, { type: "spring", stiffness: 220, damping: 24 });
+
+    void (async () => {
+      const startedAt = Date.now();
+      try {
+        await onRefresh();
+        console.info('[feed-refresh] gesture:refresh-complete');
+      } catch (error) {
+        console.error('[feed-refresh] gesture:refresh-error', {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      } finally {
+        const remaining = MIN_REFRESH_MS - (Date.now() - startedAt);
+        if (remaining > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, remaining));
+        }
+        refreshingRef.current = false;
+        setRefreshing(false);
+        animate(pullY, 0, { type: "spring", stiffness: 280, damping: 28 });
+      }
+    })();
+  }, [onRefresh, pullY]);
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    const handleTouchStart = (event: TouchEvent) => {
-      if (refreshing) return;
-      if (shouldIgnorePullTarget(event.target)) return;
-      if (!isAtTop()) return;
+    const handleStart = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch || event.touches.length !== 1 || refreshingRef.current) return;
+      if (shouldIgnorePullTarget(event.target) || !isAtTop()) return;
 
+      startRef.current = { x: touch.clientX, y: touch.clientY };
+      gestureRef.current = "pending";
+    };
+
+    const handleMove = (event: TouchEvent) => {
+      if (gestureRef.current === "idle" || gestureRef.current === "blocked") return;
       const touch = event.touches[0];
       if (!touch) return;
 
-      touchStartY.current = touch.clientY;
-      touchStartX.current = touch.clientX;
-      directionLocked.current = "none";
-      pulling.current = true;
-    };
+      const diffX = touch.clientX - startRef.current.x;
+      const diffY = touch.clientY - startRef.current.y;
 
-    const handleTouchMove = (event: TouchEvent) => {
-      if (!pulling.current || refreshing) return;
-
-      const touch = event.touches[0];
-      if (!touch) return;
-
-      const diffY = touch.clientY - touchStartY.current;
-      const diffX = touch.clientX - touchStartX.current;
-
-      // Lock direction after small movement; bail on horizontal swipes (e.g. SwipeableView)
-      if (directionLocked.current === "none") {
-        if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
-          directionLocked.current =
-            Math.abs(diffX) > Math.abs(diffY) ? "horizontal" : "vertical";
+      if (gestureRef.current === "pending") {
+        if (Math.abs(diffX) < 8 && Math.abs(diffY) < 8) return;
+        if (Math.abs(diffX) > Math.abs(diffY) || diffY <= 0) {
+          gestureRef.current = "blocked";
+          return;
         }
+        gestureRef.current = "pulling";
       }
 
-      if (directionLocked.current === "horizontal") {
-        pulling.current = false;
-        pullY.set(0);
+      if (!isAtTop() || diffY <= 0) {
+        finishWithoutRefresh();
         return;
       }
 
-      const diff = diffY;
-
-      if (diff > 0 && isAtTop()) {
-        // 1:1 tracking up to threshold, then gentle resistance for elastic over-pull
-        let dampened: number;
-        if (diff <= THRESHOLD) {
-          dampened = diff;
-        } else {
-          const over = diff - THRESHOLD;
-          dampened = THRESHOLD + over * 0.55 * (1 - over / (over + 400));
-        }
-        pullY.set(Math.min(MAX_PULL, dampened));
-        return;
-      }
-
-      pullY.set(0);
+      if (event.cancelable) event.preventDefault();
+      const resisted = diffY <= TRIGGER_DISTANCE
+        ? diffY
+        : TRIGGER_DISTANCE + (diffY - TRIGGER_DISTANCE) * 0.42;
+      pullY.set(Math.min(MAX_DISTANCE, resisted));
     };
 
-    const handleTouchEnd = () => {
-      if (!pulling.current) return;
-      pulling.current = false;
-
-      const currentPull = pullY.get();
-
-      if (currentPull >= THRESHOLD && !refreshing) {
-        animate(pullY, LOADING_REST, { type: "spring", stiffness: 200, damping: 25 });
-        setRefreshing(true);
-
-        void (async () => {
-          try {
-            await onRefresh();
-          } finally {
-            setRefreshing(false);
-            animate(pullY, 0, { type: "spring", stiffness: 250, damping: 28 });
-          }
-        })();
-
+    const handleEnd = () => {
+      if (gestureRef.current !== "pulling") {
+        gestureRef.current = "idle";
         return;
       }
 
-      animate(pullY, 0, { type: "spring", stiffness: 350, damping: 28 });
+      if (pullY.get() >= TRIGGER_DISTANCE) {
+        runRefresh();
+      } else {
+        finishWithoutRefresh();
+      }
     };
 
-    el.addEventListener("touchstart", handleTouchStart, { passive: true });
-    el.addEventListener("touchmove", handleTouchMove, { passive: true });
-    el.addEventListener("touchend", handleTouchEnd, { passive: true });
-    el.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+    el.addEventListener("touchstart", handleStart, { passive: true });
+    window.addEventListener("touchmove", handleMove, { passive: false });
+    window.addEventListener("touchend", handleEnd, { passive: true });
+    window.addEventListener("touchcancel", handleEnd, { passive: true });
 
     return () => {
-      el.removeEventListener("touchstart", handleTouchStart);
-      el.removeEventListener("touchmove", handleTouchMove);
-      el.removeEventListener("touchend", handleTouchEnd);
-      el.removeEventListener("touchcancel", handleTouchEnd);
+      el.removeEventListener("touchstart", handleStart);
+      window.removeEventListener("touchmove", handleMove);
+      window.removeEventListener("touchend", handleEnd);
+      window.removeEventListener("touchcancel", handleEnd);
     };
-  }, [isAtTop, onRefresh, pullY, refreshing]);
+  }, [finishWithoutRefresh, isAtTop, pullY, runRefresh]);
 
   return (
     <div
       ref={containerRef}
       className="relative"
-      style={{ touchAction: "pan-y" }}
+      style={{ overscrollBehaviorY: "contain" }}
     >
-      {/* Pull indicator — overlays on top, content does NOT move */}
       <motion.div
         className="absolute left-0 right-0 flex justify-center pointer-events-none z-50"
         style={{ top: 12, y: pullY, x: 0 }}
@@ -159,16 +162,15 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
           }}
         >
           {refreshing ? (
-            <Loader2 className="h-4.5 w-4.5 text-primary animate-spin" />
+            <Loader2 className="h-[18px] w-[18px] text-primary animate-spin" />
           ) : (
             <motion.div style={{ rotate: spinnerRotate }}>
-              <Loader2 className="h-4.5 w-4.5 text-muted-foreground" />
+              <Loader2 className="h-[18px] w-[18px] text-muted-foreground" />
             </motion.div>
           )}
         </motion.div>
       </motion.div>
 
-      {/* Content drags down with the pull, Instagram-style */}
       <motion.div style={{ y: pullY }}>
         {children}
       </motion.div>
