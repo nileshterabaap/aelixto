@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 import { SwipeableView } from "@/components/SwipeableView";
+import { HomePullRefresh } from "@/components/HomePullRefresh";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -24,7 +25,7 @@ const Index = () => {
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
   useIframeScrollFreeze();
-  const { setObservedPostElement } = useMarkPostSeen(user?.id);
+  const { setObservedPostElement, takePendingSeenIds, restorePendingSeenIds } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -57,6 +58,18 @@ const Index = () => {
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
   const isSignedOut = !user;
   const showDemoFeed = isSignedOut && isDemoMode;
+
+  const handlePullRefresh = useCallback(async () => {
+    if (showDemoFeed || !user?.id) return;
+    const seenIds = takePendingSeenIds();
+    try {
+      await refreshFollowingFeed(seenIds);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (e) {
+      // restore IDs so they retry on next flush
+      restorePendingSeenIds(seenIds);
+    }
+  }, [showDemoFeed, user?.id, takePendingSeenIds, refreshFollowingFeed, restorePendingSeenIds]);
 
   // Map demo posts to feed format - stable memoization
   const mappedDemoPosts = useMemo(() => {
@@ -225,10 +238,11 @@ const Index = () => {
 
   return (
     <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
-      <div className="min-h-screen bg-background pb-20">
-        <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
+      <HomePullRefresh onRefresh={handlePullRefresh} disabled={showDemoFeed}>
+        <div className="min-h-screen bg-background pb-20">
+          <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
-        <main className="mx-auto max-w-2xl px-4 py-6">
+          <main className="mx-auto max-w-2xl px-4 py-6">
             {!showDemoFeed && followingEmpty ? (
             followingCount === undefined ? (
               <div className="space-y-4">
@@ -298,10 +312,11 @@ const Index = () => {
               )}
             </div>
           )}
-        </main>
+          </main>
 
-        <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
-      </div>
+          <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
+        </div>
+      </HomePullRefresh>
     </SwipeableView>
   );
 };
