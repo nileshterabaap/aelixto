@@ -145,7 +145,10 @@ const Index = () => {
   }, [followingPosts, showDemoFeed]);
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
-  
+
+  if (!showDemoFeed) {
+    console.log('[PTR-DEBUG] render state:', { followingEmpty, itemsLength: allPosts.length, hasMore, followingCount });
+  }
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
@@ -182,6 +185,7 @@ const Index = () => {
 
   const handleRefresh = useCallback(async () => {
     const seenPostIds = takePendingSeenPostIds();
+    console.log('[PTR-DEBUG] handleRefresh() takePendingSeenPostIds returned count:', seenPostIds.length);
 
     try {
       await Promise.all([

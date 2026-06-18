@@ -1,64 +1,46 @@
 ## Goal
+Find out — with evidence, not guesses — why "You're all caught up" appears after a pull-to-refresh while posts are still in the database. No rewrites. No revert. Your 5–6 recent updates stay exactly as they are.
 
-When a post's source (Instagram, TikTok, YouTube, Facebook, Threads, X, Pinterest, Reddit, LinkedIn, etc.) is deleted or made private — so the embed renders a "link broken / post removed" fallback — automatically delete that post from Aelixto and send the original poster a notification with the thumbnail preview on the right side (matching existing notification styling).
+## What changes (temporary, removable in 30 seconds)
 
-## Why this can't be done in the browser
+Only `console.log` statements. Zero behavior change.
 
-The embed iframes (instagram.com, youtube.com, …) are cross-origin, so we cannot read their DOM to detect "Sorry, this post isn't available" messages from the client. Any client-side guess would produce false positives (slow networks, ad-blockers, transient failures) and wrongly delete real posts.
+### 1. `src/hooks/useFollowingFeed.ts` — inside `refresh()`
+Add 3 logs:
+- **Before the RPC call:** log how many `seenPostIds` are being sent.
+- **After the RPC returns:** log how many posts came back and the `nextCursor`.
+- **After `setPages([firstPage])`:** log what was just set.
 
-The reliable signal is **server-side**: re-resolve each post's source URL via the official oEmbed / metadata endpoints. A consistent 404 / "not found" response means the source post is gone.
+### 2. `src/pages/Index.tsx` — inside `handleRefresh`
+Add 1 log:
+- Log the `seenPostIds` array length taken from `takePendingSeenPostIds()` right before calling `refreshFollowingFeed`.
 
-## Approach
+### 3. `src/pages/Index.tsx` — at the empty-state branch
+Add 1 log right where `followingEmpty` is evaluated for rendering:
+- Log `{ followingEmpty, itemsLength: allPosts.length, hasMore, followingCount }`.
 
-### 1. New edge function: `validate-post-source`
-For a given `postId`, fetch the canonical validation endpoint for its platform:
+All logs prefixed with `[PTR-DEBUG]` so they're easy to find and strip out later.
 
-- instagram → `graph.facebook.com/v18.0/instagram_oembed` (existing META token) — 404 / `error.code 24` = removed
-- facebook → `graph.facebook.com/v18.0/oembed_post` — same
-- youtube → `youtube.com/oembed?url=…` — 404 / 401 = removed/private
-- tiktok → `tiktok.com/oembed?url=…` — 404
-- threads / x / linkedin / pinterest / reddit → HEAD request to the post URL; treat HTTP 404 / 410 as removed. Reddit also: `…/.json` returning `{}` or "removed" flag
-- spotify / articles → skip (Spotify items rarely 404; articles handled by existing unfurl)
+## What you do
 
-Return `{ status: "ok" | "removed" | "unknown" }`. Only `removed` triggers deletion. `unknown` (timeouts, rate-limits, 5xx) never deletes.
+1. Open the app on your phone (or preview).
+2. Open the browser console (or just pull-to-refresh — the logs will reach me through the console snapshot).
+3. Pull to refresh **once** when the feed is showing posts.
+4. Send me the next message — I'll automatically see the new console logs.
 
-### 2. Confirmation gate (false-positive protection)
-A post is only deleted when it returns `removed` on **two consecutive checks at least 6 hours apart**. We add a `posts.broken_check_count` int + `posts.broken_first_seen_at` timestamp. First removal hit just records; second hit deletes.
+## What the logs will prove (one of these)
 
-### 3. New edge function: `sweep-broken-posts` (cron)
-Runs hourly via pg_cron. Selects ~100 posts ordered by `last_validated_at` ascending (oldest first), calls `validate-post-source` for each, updates counters, and when threshold is hit:
-- captures the post's `thumbnail_url`, `platform`, `caption`/`title`, `media_url`
-- inserts a row into `notifications` with `type = 'post_removed'`, `actor_user_id = null`, `target_user_id = post.user_id`, payload `{ thumbnail_url, platform, original_url, caption }`
-- deletes the post (cascade removes likes/reposts/comments/saves as already configured)
-- triggers existing push-notification pipeline
+| Log pattern | Diagnosis | Fix |
+|---|---|---|
+| RPC returns 0 posts, then `setPages([])` runs | Server has no fresh unseen posts; we wipe the list | Keep old posts on empty response, show "no new posts" toast |
+| RPC returns posts but `followingEmpty` still true | State/render race | Fix the `empty` derivation in the hook |
+| `seenPostIds` is huge (sending every post ever seen) | RPC filtering everything out | Send only currently-visible seen IDs |
+| RPC returns posts and they render fine | Bug is elsewhere (cache, hasMore) | Investigate `hasMore` / cache layer |
 
-### 4. Notification UI
-Existing `NotificationItem` already renders a right-side thumbnail when payload has `thumbnail_url`. Add a new branch for `type === 'post_removed'`:
+## After the fix
 
-> "Your <Instagram> post was removed because the original was deleted or made private." — with the platform logo + cached thumbnail on the right exactly like engagement notifications.
+Once we have a working fix confirmed by you, I remove all 5 `[PTR-DEBUG]` logs in a single cleanup pass.
 
-Tappable: opens a small sheet explaining why, no destination link.
+## Risk
 
-### 5. Manual trigger on viewer
-When `HydratedEmbed` mounts an Instagram/Facebook/Threads embed and the **`RawEmbedRenderer` onError** fires (which we already track via `rawEmbedFailed`), fire a one-shot `validate-post-source` call for that postId. This shortcuts the cron for posts the author is actively looking at, but still goes through the same 2-strike gate — no immediate deletion.
-
-## Files
-
-New:
-- `supabase/functions/validate-post-source/index.ts`
-- `supabase/functions/sweep-broken-posts/index.ts`
-- migration: add `broken_check_count`, `broken_first_seen_at`, `last_validated_at` to `posts`; add `post_removed` to notification type enum; schedule hourly cron for `sweep-broken-posts`
-- `src/components/notifications/PostRemovedNotification.tsx`
-
-Edited:
-- `src/components/notifications/NotificationItem.tsx` — route `post_removed` to new component
-- `src/components/HydratedEmbed.tsx` — on `handleRawEmbedError`, call `validate-post-source` once per session per postId
-
-## Out of scope / safeguards
-
-- No client-side "guess" deletion — only server validation deletes.
-- Posts from platforms we cannot reliably probe (Spotify, generic articles) are never auto-deleted.
-- Transient failures (5xx, network, rate-limit) are recorded as `unknown` and do not advance the strike counter.
-- Author can still manually delete; nothing changes for healthy posts.
-
-Approve and I'll implement.
+None. Logs don't change behavior. If you hate them, one message and they're gone.
