@@ -131,6 +131,7 @@ const Index = () => {
         | "pinterest",
       embed_html: post.embed_html,
       timestamp: new Date(post.created_at),
+      feedSortTime: post.reposted_at || post.created_at,
       saves: post.saves_count,
       likes_count: post.likes_count || 0,
       comments_count: post.comments_count || 0,
@@ -192,8 +193,12 @@ const Index = () => {
     // Use the newest post currently on screen as the "since" boundary so the
     // backend can prioritize posts created AFTER the user's current top item
     // (true latest-first refresh), not just any unseen older post.
+    // Use the actual feed sort time (reposted_at || created_at), not the
+    // display timestamp. The backend orders by sort_time, so the boundary
+    // must match — otherwise reposts and clustered items get missed.
     const topTimestamp = allPosts.reduce<string | null>((acc, p) => {
-      const ts = p.timestamp instanceof Date ? p.timestamp.toISOString() : null;
+      const ts = (p as { feedSortTime?: string }).feedSortTime
+        ?? (p.timestamp instanceof Date ? p.timestamp.toISOString() : null);
       if (!ts) return acc;
       if (!acc || ts > acc) return ts;
       return acc;
