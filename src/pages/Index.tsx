@@ -180,7 +180,14 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    const seenPostIds = takePendingSeenPostIds();
+    // Mark every post currently rendered in the feed as seen so that
+    // pull-to-refresh ALWAYS advances past what the user can already see.
+    // Without this, posts that didn't meet the 1.5s dwell threshold are
+    // not flagged as seen, the RPC re-returns the exact same first page,
+    // and the user perceives "refresh did nothing / no new posts".
+    const dwelledSeen = takePendingSeenPostIds();
+    const renderedIds = allPosts.map((p) => p.id);
+    const seenPostIds = Array.from(new Set([...dwelledSeen, ...renderedIds]));
 
     try {
       await Promise.all([
@@ -188,10 +195,10 @@ const Index = () => {
         queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
       ]);
     } catch (error) {
-      restorePendingSeenPostIds(seenPostIds);
+      restorePendingSeenPostIds(dwelledSeen);
       throw error;
     }
-  }, [queryClient, refreshFollowingFeed, restorePendingSeenPostIds, takePendingSeenPostIds, user?.id]);
+  }, [allPosts, queryClient, refreshFollowingFeed, restorePendingSeenPostIds, takePendingSeenPostIds, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !followingLoading || allPosts.length > 0) return;
