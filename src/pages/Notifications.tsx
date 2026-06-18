@@ -1,7 +1,6 @@
 import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
-import { PullToRefresh } from "@/components/PullToRefresh";
 import { Heart, MessageCircle, Repeat2, Bell, Shield, UserPlus } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
@@ -293,7 +292,7 @@ const NotificationSkeleton = () => (
 const Notifications = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
-  const { notifications, isLoading, markAllRead, refetch } = useNotifications();
+  const { notifications, isLoading, markAllRead } = useNotifications();
   const navigate = useNavigate();
 
   // Auto mark all as read when user opens the notifications page
@@ -313,15 +312,10 @@ const Notifications = () => {
     }
   };
 
-  const handleRefresh = useCallback(async () => {
-    await refetch();
-  }, [refetch]);
-
   return (
     <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
-      <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6 animate-fade-in">
           <div className="flex items-center justify-between mb-6">
             <h1 className="text-2xl font-bold">Notifications</h1>
@@ -353,7 +347,6 @@ const Notifications = () => {
             </div>
           )}
         </main>
-      </PullToRefresh>
 
 
       <CreatePostDialog 
