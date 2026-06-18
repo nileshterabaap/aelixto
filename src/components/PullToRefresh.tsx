@@ -7,10 +7,11 @@ interface PullToRefreshProps {
   children: ReactNode;
 }
 
-const TRIGGER_DISTANCE = 58;
-const MAX_DISTANCE = 132;
-const REFRESH_RESTING_DISTANCE = 52;
-const MIN_REFRESH_MS = 650;
+const TRIGGER_DISTANCE = 46;
+const MAX_DISTANCE = 150;
+const REFRESH_RESTING_DISTANCE = 56;
+const MIN_REFRESH_MS = 750;
+const PENDING_THRESHOLD = 4;
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -27,8 +28,8 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const gestureRef = useRef<"idle" | "pending" | "pulling" | "blocked">("idle");
   const refreshingRef = useRef(false);
 
-  const spinnerOpacity = useTransform(pullY, [0, 16, TRIGGER_DISTANCE], [0, 0.65, 1]);
-  const spinnerScale = useTransform(pullY, [0, TRIGGER_DISTANCE], [0.55, 1]);
+  const spinnerOpacity = useTransform(pullY, [0, 8, TRIGGER_DISTANCE], [0, 0.7, 1]);
+  const spinnerScale = useTransform(pullY, [0, TRIGGER_DISTANCE], [0.65, 1]);
   const spinnerRotate = useTransform(pullY, [0, MAX_DISTANCE], [0, 300]);
 
   const isAtTop = useCallback(() => {
@@ -44,7 +45,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
 
   const finishWithoutRefresh = useCallback(() => {
     gestureRef.current = "idle";
-    animate(pullY, 0, { type: "spring", stiffness: 360, damping: 30 });
+    animate(pullY, 0, { type: "spring", stiffness: 170, damping: 22, mass: 0.9 });
   }, [pullY]);
 
   const runRefresh = useCallback(() => {
@@ -52,7 +53,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     refreshingRef.current = true;
     gestureRef.current = "idle";
     setRefreshing(true);
-    animate(pullY, REFRESH_RESTING_DISTANCE, { type: "spring", stiffness: 220, damping: 24 });
+    animate(pullY, REFRESH_RESTING_DISTANCE, { type: "spring", stiffness: 140, damping: 20, mass: 0.9 });
 
     void (async () => {
       const startedAt = Date.now();
@@ -65,7 +66,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
         }
         refreshingRef.current = false;
         setRefreshing(false);
-        animate(pullY, 0, { type: "spring", stiffness: 280, damping: 28 });
+        animate(pullY, 0, { type: "spring", stiffness: 150, damping: 22, mass: 0.9 });
       }
     })();
   }, [onRefresh, pullY]);
@@ -92,23 +93,32 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       const diffY = touch.clientY - startRef.current.y;
 
       if (gestureRef.current === "pending") {
-        if (Math.abs(diffX) < 8 && Math.abs(diffY) < 8) return;
-        if (Math.abs(diffX) > Math.abs(diffY) || diffY <= 0) {
+        if (Math.abs(diffX) < PENDING_THRESHOLD && Math.abs(diffY) < PENDING_THRESHOLD) return;
+        // Block only if the motion is clearly horizontal or clearly upward.
+        if (diffY <= 0 || Math.abs(diffX) > diffY * 1.4) {
           gestureRef.current = "blocked";
           return;
         }
         gestureRef.current = "pulling";
       }
 
-      if (!isAtTop() || diffY <= 0) {
+      // Cancel only if user actually scrolled away from the top, or pulled
+       // significantly back upward — small jitter shouldn't kill the gesture.
+      if (!isAtTop() || diffY < -12) {
         finishWithoutRefresh();
+        return;
+      }
+      if (diffY <= 0) {
+        pullY.set(0);
         return;
       }
 
       if (event.cancelable) event.preventDefault();
+      // Lighter resistance below trigger (1:1) so the spinner follows the
+      // finger naturally, gentle resistance after.
       const resisted = diffY <= TRIGGER_DISTANCE
         ? diffY
-        : TRIGGER_DISTANCE + (diffY - TRIGGER_DISTANCE) * 0.42;
+        : TRIGGER_DISTANCE + (diffY - TRIGGER_DISTANCE) * 0.55;
       pullY.set(Math.min(MAX_DISTANCE, resisted));
     };
 
