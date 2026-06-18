@@ -1,46 +1,28 @@
-## Goal
-Find out — with evidence, not guesses — why "You're all caught up" appears after a pull-to-refresh while posts are still in the database. No rewrites. No revert. Your 5–6 recent updates stay exactly as they are.
+## Plan: make pull-to-refresh usable again
 
-## What changes (temporary, removable in 30 seconds)
+### Goal
 
-Only `console.log` statements. Zero behavior change.
+Fix the current problem first: pull-to-refresh feels too tight, barely triggers, and snaps back too fast, and pull to refresh in save section, notification, messages, profile also doesn't appearing after pulling. 
 
-### 1. `src/hooks/useFollowingFeed.ts` — inside `refresh()`
-Add 3 logs:
-- **Before the RPC call:** log how many `seenPostIds` are being sent.
-- **After the RPC returns:** log how many posts came back and the `nextCursor`.
-- **After `setPages([firstPage])`:** log what was just set.
+### What I’ll change
 
-### 2. `src/pages/Index.tsx` — inside `handleRefresh`
-Add 1 log:
-- Log the `seenPostIds` array length taken from `takePendingSeenPostIds()` right before calling `refreshFollowingFeed`.
+1. **Make the pull easier to start**
+  - Loosen the gesture detection so a normal downward swipe at the top is accepted.
+  - Reduce the trigger distance slightly so it doesn’t take many attempts.
+2. **Make the animation less flashy**
+  - Slow down the snap-back animation so it feels natural instead of instantly flashing away.
+  - Keep the spinner visible long enough to confirm refresh actually happened.
+3. **Avoid iframe/scroll interference**
+  - Make sure the iframe scroll-freeze behavior does not make pull-to-refresh feel blocked or overly stiff.
+4. **Keep the existing feed logic unchanged for now**
+  - I will not touch the unseen-post / “caught up” logic in this step.
+  - Once pulling feels normal again, we can use the existing `[PTR-DEBUG]` logs to fix the feed result issue separately.
 
-### 3. `src/pages/Index.tsx` — at the empty-state branch
-Add 1 log right where `followingEmpty` is evaluated for rendering:
-- Log `{ followingEmpty, itemsLength: allPosts.length, hasMore, followingCount }`.
+### Files likely involved
 
-All logs prefixed with `[PTR-DEBUG]` so they're easy to find and strip out later.
+- `src/components/PullToRefresh.tsx`
+- Possibly `src/hooks/useIframeScrollFreeze.ts` only if it is interfering with touch handling
 
-## What you do
+### Safety
 
-1. Open the app on your phone (or preview).
-2. Open the browser console (or just pull-to-refresh — the logs will reach me through the console snapshot).
-3. Pull to refresh **once** when the feed is showing posts.
-4. Send me the next message — I'll automatically see the new console logs.
-
-## What the logs will prove (one of these)
-
-| Log pattern | Diagnosis | Fix |
-|---|---|---|
-| RPC returns 0 posts, then `setPages([])` runs | Server has no fresh unseen posts; we wipe the list | Keep old posts on empty response, show "no new posts" toast |
-| RPC returns posts but `followingEmpty` still true | State/render race | Fix the `empty` derivation in the hook |
-| `seenPostIds` is huge (sending every post ever seen) | RPC filtering everything out | Send only currently-visible seen IDs |
-| RPC returns posts and they render fine | Bug is elsewhere (cache, hasMore) | Investigate `hasMore` / cache layer |
-
-## After the fix
-
-Once we have a working fix confirmed by you, I remove all 5 `[PTR-DEBUG]` logs in a single cleanup pass.
-
-## Risk
-
-None. Logs don't change behavior. If you hate them, one message and they're gone.
+No revert. No rebuild from scratch. Your latest version and recent updates stay intact.
