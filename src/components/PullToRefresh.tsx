@@ -11,7 +11,7 @@ const TRIGGER_DISTANCE = 32;
 const MAX_DISTANCE = 150;
 const REFRESH_RESTING_DISTANCE = 64;
 const MIN_REFRESH_MS = 1200;
-const PENDING_THRESHOLD = 2;
+const PENDING_THRESHOLD = 4;
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -23,6 +23,7 @@ const shouldIgnorePullTarget = (target: EventTarget | null) => {
 export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const [refreshing, setRefreshing] = useState(false);
   const pullY = useMotionValue(0);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const startRef = useRef({ x: 0, y: 0 });
   const gestureRef = useRef<"idle" | "pending" | "pulling" | "blocked">("idle");
   const refreshingRef = useRef(false);
@@ -44,6 +45,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
 
   const finishWithoutRefresh = useCallback(() => {
     gestureRef.current = "idle";
+    (window as unknown as { __pullActive?: boolean }).__pullActive = false;
     animate(pullY, 0, { type: "spring", stiffness: 90, damping: 24, mass: 1.1 });
   }, [pullY]);
 
@@ -51,6 +53,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
     gestureRef.current = "idle";
+    (window as unknown as { __pullActive?: boolean }).__pullActive = false;
     setRefreshing(true);
     animate(pullY, REFRESH_RESTING_DISTANCE, { type: "spring", stiffness: 100, damping: 20, mass: 0.9 });
 
@@ -71,6 +74,9 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   }, [onRefresh, pullY]);
 
   useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+
     const handleStart = (event: TouchEvent) => {
       const touch = event.touches[0];
       if (!touch || event.touches.length !== 1 || refreshingRef.current) return;
@@ -90,22 +96,19 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
 
       if (gestureRef.current === "pending") {
         if (Math.abs(diffX) < PENDING_THRESHOLD && Math.abs(diffY) < PENDING_THRESHOLD) return;
-        // Block only if the motion is clearly horizontal or clearly upward.
-        if (diffY <= 0 || Math.abs(diffX) > diffY * 2.2) {
+        // Block if the motion is upward or more horizontal than vertical.
+        if (diffY <= 0 || Math.abs(diffX) > diffY) {
           gestureRef.current = "blocked";
           return;
         }
         gestureRef.current = "pulling";
+        // Tell SwipeableView (and anyone else) to stand down for this gesture.
+        (window as unknown as { __pullActive?: boolean }).__pullActive = true;
       }
 
-      // Cancel only if the user pulled significantly back upward. We don't
-      // re-check isAtTop() here because mobile browsers can briefly bump
-      // scrollY during the gesture (address bar collapse, layout shift),
-      // which would spuriously kill an in-progress pull.
-      if (diffY < -24) {
-        finishWithoutRefresh();
-        return;
-      }
+      // Once locked into a pull, we own this gesture until touchend.
+      // We never recheck scroll position or cancel mid-gesture — only
+      // clamp the visual offset so the spinner can't go above its rest.
       if (diffY <= 0) {
         pullY.set(0);
         return;
@@ -123,6 +126,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     const handleEnd = () => {
       if (gestureRef.current !== "pulling") {
         gestureRef.current = "idle";
+        (window as unknown as { __pullActive?: boolean }).__pullActive = false;
         return;
       }
 
@@ -133,21 +137,26 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       }
     };
 
-    window.addEventListener("touchstart", handleStart, { passive: true });
-    window.addEventListener("touchmove", handleMove, { passive: false });
-    window.addEventListener("touchend", handleEnd, { passive: true });
-    window.addEventListener("touchcancel", handleEnd, { passive: true });
+    // Listen on our own subtree so we don't fight other global handlers,
+    // but use capture so SwipeableView (which listens on its own container)
+    // still cooperates via the __pullActive flag.
+    el.addEventListener("touchstart", handleStart, { passive: true });
+    el.addEventListener("touchmove", handleMove, { passive: false });
+    el.addEventListener("touchend", handleEnd, { passive: true });
+    el.addEventListener("touchcancel", handleEnd, { passive: true });
 
     return () => {
-      window.removeEventListener("touchstart", handleStart);
-      window.removeEventListener("touchmove", handleMove);
-      window.removeEventListener("touchend", handleEnd);
-      window.removeEventListener("touchcancel", handleEnd);
+      el.removeEventListener("touchstart", handleStart);
+      el.removeEventListener("touchmove", handleMove);
+      el.removeEventListener("touchend", handleEnd);
+      el.removeEventListener("touchcancel", handleEnd);
+      (window as unknown as { __pullActive?: boolean }).__pullActive = false;
     };
   }, [finishWithoutRefresh, isAtTop, pullY, runRefresh]);
 
   return (
     <div
+      ref={wrapperRef}
       className="relative"
       style={{ overscrollBehaviorY: "contain" }}
     >
@@ -172,9 +181,10 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
         </motion.div>
       </motion.div>
 
-      <motion.div style={{ y: pullY }}>
-        {children}
-      </motion.div>
+      {/* Content stays static — only the spinner translates. This removes
+          the layout shift that was making mobile browsers cancel the
+          gesture and snap the spinner back. */}
+      <div>{children}</div>
     </div>
   );
 };
