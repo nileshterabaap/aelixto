@@ -189,9 +189,19 @@ const Index = () => {
     const renderedIds = allPosts.map((p) => p.id);
     const seenPostIds = Array.from(new Set([...dwelledSeen, ...renderedIds]));
 
+    // Use the newest post currently on screen as the "since" boundary so the
+    // backend can prioritize posts created AFTER the user's current top item
+    // (true latest-first refresh), not just any unseen older post.
+    const topTimestamp = allPosts.reduce<string | null>((acc, p) => {
+      const ts = p.timestamp instanceof Date ? p.timestamp.toISOString() : null;
+      if (!ts) return acc;
+      if (!acc || ts > acc) return ts;
+      return acc;
+    }, null);
+
     try {
       await Promise.all([
-        refreshFollowingFeed(seenPostIds),
+        refreshFollowingFeed(seenPostIds, topTimestamp),
         queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
       ]);
     } catch (error) {
