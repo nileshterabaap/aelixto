@@ -210,13 +210,23 @@ const Index = () => {
       // best-effort — proceed with reload regardless
     }
 
-    await Promise.all([
-      queryClient.refetchQueries({ queryKey: ['following-count', user?.id], exact: true, type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['following-has-posts', user?.id], exact: true, type: 'active' }),
-    ]);
-
+    // Refresh the feed first so the user sees new posts immediately.
+    // Helper classifier queries run in the background; they only drive the
+    // empty-state copy and shouldn't block or blank the feed.
     await refreshFollowingFeed();
+
+    void queryClient.refetchQueries({ queryKey: ['following-count', user?.id], exact: true, type: 'active' });
+    void queryClient.refetchQueries({ queryKey: ['following-has-posts', user?.id], exact: true, type: 'active' });
   }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
+
+  // Bottom-nav Home tap (when already on Home + at top) dispatches this
+  // event. Route it through the same safe refresh path as pull-to-refresh
+  // so the feed never enters the blank intermediate state.
+  useEffect(() => {
+    const onRefreshEvent = () => { void handleRefresh(); };
+    window.addEventListener('aelixto:refresh-home-feed', onRefreshEvent);
+    return () => window.removeEventListener('aelixto:refresh-home-feed', onRefreshEvent);
+  }, [handleRefresh]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
@@ -284,7 +294,7 @@ const Index = () => {
                   Discover people to follow
                 </Link>
               </div>
-            ) : followingHasAnyPosts && reachedEnd ? (
+            ) : followingHasAnyPosts ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                 <h3 className="text-lg font-semibold">You're all caught up</h3>
@@ -292,8 +302,6 @@ const Index = () => {
                   You've seen all recent posts from people you follow.
                 </p>
               </div>
-            ) : followingHasAnyPosts ? (
-              <div className="py-16" />
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
