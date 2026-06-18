@@ -42,7 +42,10 @@ interface UseFollowingFeedResult {
   refreshing: boolean;
   error: string | null;
   loadMore: () => void;
-  refresh: (seenPostIds?: string[]) => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
+  refresh: (
+    seenPostIds?: string[],
+    sinceTime?: string | null
+  ) => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
   hasMore: boolean;
 }
 
@@ -114,15 +117,16 @@ const fetchFeedPage = async (cursor?: string) => {
   return toPage(data);
 };
 
-const refreshFeedPage = async (seenPostIds: string[]) => {
+const refreshFeedPage = async (seenPostIds: string[], sinceTime: string | null) => {
   const rpc = supabase.rpc as unknown as (
-    fn: 'refresh_following_feed_v1',
-    args: { limit_count: number; seen_post_ids: string[] }
+    fn: 'refresh_following_feed_v2',
+    args: { limit_count: number; seen_post_ids: string[]; since_time: string | null }
   ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
 
-  const { data, error } = await rpc('refresh_following_feed_v1', {
+  const { data, error } = await rpc('refresh_following_feed_v2', {
     limit_count: PAGE_SIZE,
     seen_post_ids: seenPostIds,
+    since_time: sinceTime,
   });
 
   if (error) throw error;
@@ -224,7 +228,10 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
       .finally(() => setFetchingMore(false));
   };
 
-  const refresh = useCallback(async (seenPostIds: string[] = []) => {
+  const refresh = useCallback(async (
+    seenPostIds: string[] = [],
+    sinceTime: string | null = null,
+  ) => {
     preloadedRef.current = false;
     if (!userId) return undefined;
 
@@ -235,8 +242,12 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     setError(null);
 
     try {
-      const firstPage = await refreshFeedPage(seenPostIds);
+      const firstPage = await refreshFeedPage(seenPostIds, sinceTime);
       if (requestIdRef.current !== requestId) return firstPage;
+      // Merge: if the refresh brought back posts we already have at the top,
+      // we still replace with the latest server-truthed page (which puts the
+      // newest posts first). This avoids stale dedupe gotchas and matches
+      // how Twitter/Instagram swap the top of the feed on PTR.
       setPages([firstPage]);
       return firstPage;
     } catch (err) {
