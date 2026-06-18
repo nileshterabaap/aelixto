@@ -163,11 +163,25 @@ export const useMarkPostSeen = (userId: string | undefined) => {
   }, []);
 
   /**
+   * For pull-to-refresh: returns all pending IDs PLUS any post currently
+   * at least 50% visible in the viewport, even if its 1.5s dwell timer
+   * hasn't fired yet. This guarantees the backend treats the posts the
+   * user is actively looking at as "seen" so refresh can return strictly
+   * newer unseen posts.
+   */
+  const takeRefreshSeenIds = useCallback((): string[] => {
+    const merged = new Set<string>(pendingRef.current);
+    visibleRef.current.forEach((id) => merged.add(id));
+    pendingRef.current.clear();
+    return Array.from(merged);
+  }, []);
+
+  /**
    * Restore IDs back into the pending set if a downstream write fails.
    */
   const restorePendingSeenIds = useCallback((ids: string[]) => {
     ids.forEach((id) => pendingRef.current.add(id));
   }, []);
 
-  return { setObservedPostElement, takePendingSeenIds, restorePendingSeenIds };
+  return { setObservedPostElement, takePendingSeenIds, takeRefreshSeenIds, restorePendingSeenIds };
 };

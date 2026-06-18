@@ -25,7 +25,7 @@ const Index = () => {
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
   useIframeScrollFreeze();
-  const { setObservedPostElement, takePendingSeenIds, restorePendingSeenIds } = useMarkPostSeen(user?.id);
+  const { setObservedPostElement, takeRefreshSeenIds, restorePendingSeenIds } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -61,15 +61,15 @@ const Index = () => {
 
   const handlePullRefresh = useCallback(async () => {
     if (showDemoFeed || !user?.id) return;
-    const seenIds = takePendingSeenIds();
+    // Include pending + currently visible posts so the backend filters them out.
+    const seenIds = takeRefreshSeenIds();
     try {
       await refreshFollowingFeed(seenIds);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
-      // restore IDs so they retry on next flush
       restorePendingSeenIds(seenIds);
     }
-  }, [showDemoFeed, user?.id, takePendingSeenIds, refreshFollowingFeed, restorePendingSeenIds]);
+  }, [showDemoFeed, user?.id, takeRefreshSeenIds, refreshFollowingFeed, restorePendingSeenIds]);
 
   // Map demo posts to feed format - stable memoization
   const mappedDemoPosts = useMemo(() => {
