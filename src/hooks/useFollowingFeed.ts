@@ -233,9 +233,12 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     setError(null);
 
     try {
+      console.log('[PTR-DEBUG] refresh() calling RPC with seenPostIds count:', seenPostIds.length);
       const firstPage = await refreshFeedPage(seenPostIds);
+      console.log('[PTR-DEBUG] refresh() RPC returned posts:', firstPage.posts.length, 'nextCursor:', firstPage.nextCursor);
       if (requestIdRef.current !== requestId) return firstPage;
       setPages([firstPage]);
+      console.log('[PTR-DEBUG] refresh() setPages called with', firstPage.posts.length, 'posts');
       return firstPage;
     } catch (err) {
       if (requestIdRef.current === requestId) {
