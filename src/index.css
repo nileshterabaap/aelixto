@@ -254,3 +254,9 @@ a:active:not(:disabled) {
 .scroll-freezing-iframes iframe {
   pointer-events: none !important;
 }
+
+/* Disable the browser's native pull-to-refresh so our in-app PullToRefresh
+   component owns the gesture on every page (especially short empty states). */
+html, body {
+  overscroll-behavior-y: none;
+}

@@ -254,7 +254,7 @@ const Index = () => {
         <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
       <PullToRefresh onRefresh={handleRefresh}>
-        <main className="mx-auto max-w-2xl px-4 py-6 min-h-[calc(100vh-9rem)]" style={{ touchAction: 'pan-y' }}>
+        <main className="mx-auto max-w-2xl px-4 py-6 min-h-[calc(100vh-9rem)]">
             {!showDemoFeed && followingEmpty ? (
             followingCount === undefined ? (
               <div className="space-y-4">
