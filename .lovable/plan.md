@@ -1,22 +1,16 @@
 ## Plan
 
-You confirmed two things:
-- The spinner now travels further but still snaps back before locking — gesture isn't quite reaching the trigger.
-- On the caught-up screen, behavior is purely visual: spinner should hold and the "caught up" message stays.
+**Root cause:** Brave/Chrome's built-in pull-to-refresh is competing with ours on Home, especially on the short "You're all caught up" view. Our spinner only gets a few pixels before the browser absorbs the rest of the pull.
 
-So this is **only a gesture-completion bug**, not a data bug.
+**Fix (small, targeted):**
 
-**Why it still snaps:** In `PullToRefresh.tsx`, every `touchmove` re-checks `isAtTop()`. Once Brave starts its overscroll bounce, `scrollY` briefly ticks above 0 mid-pull, our check fails, and we cancel the gesture even though the user is still pulling down. The trigger distance (32px) is also slightly too high on this short screen.
+1. In `src/index.css`, add one rule: disable the browser's native overscroll/pull-to-refresh on `html, body` (`overscroll-behavior-y: none`). This globally hands the gesture to our `PullToRefresh` component on every page, so Home behaves like Saved.
 
-**Fix (two small tweaks to `src/components/PullToRefresh.tsx` only):**
-
-1. **Don't re-cancel mid-pull.** Check `isAtTop()` only at the moment we transition from `pending` → `pulling`. After that, trust the gesture until the user releases or actually pulls upward past the existing −24px cancel threshold. This stops Brave's micro-bounces from killing the gesture.
-
-2. **Lower the trigger distance.** `TRIGGER_DISTANCE` 32 → 24 so the spinner locks into spinning state sooner. Keep `MAX_DISTANCE`, `REFRESH_RESTING_DISTANCE`, `MIN_REFRESH_MS` (1200ms hold), and all spring values unchanged.
+2. In `src/pages/Index.tsx`, remove the `touch-action: pan-y` I added on `<main>` last turn. With overscroll disabled at the root it's unnecessary and could fight the gesture. Keep the `min-h-[calc(100vh-9rem)]` so the empty state still gives a full pull surface.
 
 **Not changing:**
-- `useFollowingFeed`, the refresh RPC, the "seen" filter logic — caught-up message will keep showing as you want.
-- `SwipeableView`, `Index.tsx`, `index.css`.
-- Behavior on Saved/Notifications/Profile/Messages stays identical (they already worked; these tweaks only make the trigger easier to hit and remove a spurious cancel).
+- No feed logic, no unseen-post filtering, no `useFollowingFeed`.
+- No changes to `PullToRefresh` thresholds or timings (already tuned and working on the other pages).
+- No changes to `SwipeableView` beyond what's already in place.
 
-**Verify:** Pull down on Home's "You're all caught up". Spinner should now travel, lock into the spinning state, hold ~1.2s, and glide back — with the caught-up message still showing afterward.
+**Verify:** After the change, pull down on Home's caught-up screen — spinner should now travel the full pull distance, hold for ~1.2s, refresh, and glide back. Saved/Notifications/Profile/Messages stay unchanged.

@@ -7,7 +7,7 @@ interface PullToRefreshProps {
   children: ReactNode;
 }
 
-const TRIGGER_DISTANCE = 24;
+const TRIGGER_DISTANCE = 32;
 const MAX_DISTANCE = 150;
 const REFRESH_RESTING_DISTANCE = 64;
 const MIN_REFRESH_MS = 1200;
@@ -102,10 +102,9 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
         gestureRef.current = "pulling";
       }
 
-      // Once we're committed to pulling, don't re-check isAtTop — Brave's
-      // overscroll bounce briefly ticks scrollY above 0 and would otherwise
-      // cancel the gesture mid-pull. Only cancel on a clear upward pull.
-      if (diffY < -24) {
+      // Cancel only if user actually scrolled away from the top, or pulled
+       // significantly back upward — small jitter shouldn't kill the gesture.
+      if (!isAtTop() || diffY < -24) {
         finishWithoutRefresh();
         return;
       }
