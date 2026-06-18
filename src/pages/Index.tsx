@@ -27,7 +27,11 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
+  const {
+    setObservedPostElement,
+    takePendingSeenPostIds,
+    restorePendingSeenPostIds,
+  } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -44,21 +48,6 @@ const Index = () => {
     staleTime: 60_000,
   });
 
-  // Check if the feed has any eligible unseen posts. Empty + no unseen posts
-  // means the user is caught up.
-  const { data: followingHasUnseenPosts } = useQuery({
-    queryKey: ['following-has-unseen-posts', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return false;
-      const { data, error } = await supabase.rpc('has_unseen_following_feed_posts');
-      if (error) throw error;
-      return Boolean(data);
-    },
-    enabled: Boolean(user?.id),
-    staleTime: 15_000,
-  });
-  
-  
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
 
@@ -192,29 +181,18 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark only posts the user actually saw, then clear any persisted/stale
-    // feed cache so refresh always asks the backend for the latest eligible feed.
+    const seenPostIds = takePendingSeenPostIds();
+
     try {
-      await flushNow();
-    } catch {
-      // best-effort — proceed with reload regardless
+      await Promise.all([
+        refreshFollowingFeed(seenPostIds),
+        queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
+      ]);
+    } catch (error) {
+      restorePendingSeenPostIds(seenPostIds);
+      throw error;
     }
-
-    await Promise.all([
-      refreshFollowingFeed(),
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-unseen-posts', user?.id] }),
-    ]);
-  }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id || showDemoFeed) return;
-    const refreshHomeFeed = () => {
-      void handleRefresh();
-    };
-    window.addEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
-    return () => window.removeEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
-  }, [handleRefresh, showDemoFeed, user?.id]);
+  }, [queryClient, refreshFollowingFeed, restorePendingSeenPostIds, takePendingSeenPostIds, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !followingLoading || allPosts.length > 0) return;
@@ -274,7 +252,7 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
             {!showDemoFeed && followingEmpty ? (
-            followingCount === undefined || followingHasUnseenPosts === undefined ? (
+            followingCount === undefined ? (
               <div className="space-y-4">
                 {[...Array(2)].map((_, i) => (
                   <PostSkeleton key={i} />

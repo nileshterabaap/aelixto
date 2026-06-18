@@ -42,6 +42,7 @@ export const useMarkPostSeen = (userId: string | undefined) => {
   const pendingRef = useRef<Set<string>>(new Set());
   const observersRef = useRef<Map<string, IntersectionObserver>>(new Map());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const inFlightSeenRef = useRef<Set<string>>(new Set());
   // Posts currently intersecting the viewport (any visibility), so on
   // refresh we can also count posts the user is looking at right now
   // even if the periodic batch flush hasn't fired yet.
@@ -71,6 +72,7 @@ export const useMarkPostSeen = (userId: string | undefined) => {
 
     const postIds = Array.from(pendingRef.current);
     pendingRef.current.clear();
+    postIds.forEach((id) => inFlightSeenRef.current.add(id));
 
     try {
       const rows = postIds.map((post_id) => ({ user_id: userId, post_id }));
@@ -80,32 +82,23 @@ export const useMarkPostSeen = (userId: string | undefined) => {
       // Re-add failed items back to pending
       postIds.forEach((id) => pendingRef.current.add(id));
     } finally {
+      postIds.forEach((id) => inFlightSeenRef.current.delete(id));
       flushing.current = false;
     }
   }, [userId]);
 
-  // Force-flush: include currently-visible posts and await DB write.
-  // Used by pull-to-refresh so anything the user actually saw disappears next load.
-  const flushNow = useCallback(async () => {
-    if (!userId) return;
-    visibleRef.current.forEach((id) => pendingRef.current.add(id));
-    if (pendingRef.current.size === 0) return;
-    // Wait for any in-flight flush to finish
-    while (flushing.current) {
-      await new Promise((r) => setTimeout(r, 30));
-    }
-    flushing.current = true;
-    const postIds = Array.from(pendingRef.current);
+  const takePendingSeenPostIds = useCallback(() => {
+    const postIds = Array.from(new Set([
+      ...inFlightSeenRef.current,
+      ...pendingRef.current,
+    ]));
     pendingRef.current.clear();
-    try {
-      const rows = postIds.map((post_id) => ({ user_id: userId, post_id }));
-      await supabase.from('post_seen').upsert(rows, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
-    } catch {
-      postIds.forEach((id) => pendingRef.current.add(id));
-    } finally {
-      flushing.current = false;
-    }
-  }, [userId]);
+    return postIds;
+  }, []);
+
+  const restorePendingSeenPostIds = useCallback((postIds: string[]) => {
+    postIds.forEach((id) => pendingRef.current.add(id));
+  }, []);
 
   // Periodic flush
   useEffect(() => {
@@ -173,5 +166,5 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     [clearPostTracking, userId]
   );
 
-  return { setObservedPostElement, flushNow };
+  return { setObservedPostElement, takePendingSeenPostIds, restorePendingSeenPostIds };
 };

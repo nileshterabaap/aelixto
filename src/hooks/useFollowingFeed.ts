@@ -1,7 +1,6 @@
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo, useCallback } from 'react';
+import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 
 interface FeedPost {
   id: string;
@@ -42,7 +41,7 @@ interface UseFollowingFeedResult {
   loading: boolean;
   error: string | null;
   loadMore: () => void;
-  refresh: () => Promise<unknown>;
+  refresh: (seenPostIds?: string[]) => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
   hasMore: boolean;
 }
 
@@ -53,6 +52,51 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
 }
 
 const PAGE_SIZE = 20;
+const mapFeedRows = (data: FeedRpcRow[]): FeedPost[] => data.map((item) => ({
+  id: item.id,
+  user_id: item.user_id,
+  content: item.content,
+  created_at: item.created_at,
+  likes_count: item.likes_count,
+  saves_count: item.saves_count,
+  comments_count: item.comments_count,
+  reposts_count: item.reposts_count,
+  media_type: item.media_type,
+  media_url: item.media_url,
+  platform: item.platform,
+  embed_html: item.embed_html,
+  thumbnail_url: item.thumbnail_url,
+  title: item.title,
+  preview_text: item.preview_text,
+  preview_title: item.preview_title,
+  preview_image_url: item.preview_image_url,
+  media_kind: item.media_kind ?? null,
+  aspect_ratio: item.aspect_ratio ?? null,
+  suggested_height: item.suggested_height ?? null,
+  is_public: item.is_public,
+  feed_cursor: item.feed_cursor,
+  is_repost: item.is_repost,
+  reposted_by_user_id: item.reposted_by_user_id,
+  reposted_by_username: item.reposted_by_username,
+  profiles: {
+    username: item.profile_username,
+    display_name: item.profile_display_name,
+    avatar_url: item.profile_avatar_url,
+  },
+}));
+
+const toPage = (data: FeedRpcRow[] | null) => {
+  if (!data || data.length === 0) {
+    return { posts: [], nextCursor: undefined };
+  }
+
+  const mappedPosts = mapFeedRows(data);
+  const lastCursor = mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
+  const nextCursor = mappedPosts.length < PAGE_SIZE ? undefined : lastCursor;
+
+  return { posts: mappedPosts, nextCursor };
+};
+
 const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
     fn: 'get_following_feed_v2',
@@ -66,84 +110,74 @@ const fetchFeedPage = async (cursor?: string) => {
 
   if (error) throw error;
 
-  if (!data || data.length === 0) {
-    return { posts: [], nextCursor: undefined };
-  }
+  return toPage(data);
+};
 
-  // Map RPC response to FeedPost format
-  const mappedPosts: FeedPost[] = data.map((item) => ({
-    id: item.id,
-    user_id: item.user_id,
-    content: item.content,
-    created_at: item.created_at,
-    likes_count: item.likes_count,
-    saves_count: item.saves_count,
-    comments_count: item.comments_count,
-    reposts_count: item.reposts_count,
-    media_type: item.media_type,
-    media_url: item.media_url,
-    platform: item.platform,
-    embed_html: item.embed_html,
-    thumbnail_url: item.thumbnail_url,
-    title: item.title,
-    preview_text: item.preview_text,
-    preview_title: item.preview_title,
-    preview_image_url: item.preview_image_url,
-    media_kind: item.media_kind ?? null,
-    aspect_ratio: item.aspect_ratio ?? null,
-    suggested_height: item.suggested_height ?? null,
-    is_public: item.is_public,
-    feed_cursor: item.feed_cursor,
-    is_repost: item.is_repost,
-    reposted_by_user_id: item.reposted_by_user_id,
-    reposted_by_username: item.reposted_by_username,
-    profiles: {
-      username: item.profile_username,
-      display_name: item.profile_display_name,
-      avatar_url: item.profile_avatar_url,
-    },
-  }));
+const refreshFeedPage = async (seenPostIds: string[]) => {
+  const rpc = supabase.rpc as unknown as (
+    fn: 'refresh_following_feed_v1',
+    args: { limit_count: number; seen_post_ids: string[] }
+  ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
 
-  // End pagination as soon as the server returns fewer rows than PAGE_SIZE.
-  const lastCursor = mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
-  const nextCursor = mappedPosts.length < PAGE_SIZE ? undefined : lastCursor;
+  const { data, error } = await rpc('refresh_following_feed_v1', {
+    limit_count: PAGE_SIZE,
+    seen_post_ids: seenPostIds,
+  });
 
-  return { posts: mappedPosts, nextCursor };
+  if (error) throw error;
+
+  return toPage(data);
 };
 
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
-  const queryClient = useQueryClient();
+  const requestIdRef = useRef(0);
+  const [pages, setPages] = useState<Array<{
+    posts: FeedPost[];
+    nextCursor: string | undefined;
+  }> | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [fetchingMore, setFetchingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Fetch feed directly — no count gate, single RPC call
-  const {
-    data,
-    isLoading: feedLoading,
-    isFetching,
-    error: feedError,
-    fetchNextPage,
-    refetch,
-    hasNextPage,
-    isFetchingNextPage,
-  } = useInfiniteQuery({
-    queryKey: ['following-feed', userId],
-    queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-    enabled: Boolean(userId),
-    staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
-    gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: 'always', // refresh on mount/page reload so an empty first paint cannot stick
-    refetchOnReconnect: true,
-    retry: 2,
-    structuralSharing: true,
-  });
+  useEffect(() => {
+    preloadedRef.current = false;
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+
+    if (!userId) {
+      setPages(null);
+      setLoading(false);
+      setFetchingMore(false);
+      setError(null);
+      return;
+    }
+
+    setPages(null);
+    setLoading(true);
+    setFetchingMore(false);
+    setError(null);
+
+    void fetchFeedPage(undefined)
+      .then((firstPage) => {
+        if (requestIdRef.current !== requestId) return;
+        setPages([firstPage]);
+      })
+      .catch((err) => {
+        if (requestIdRef.current !== requestId) return;
+        setPages([]);
+        setError(err instanceof Error ? err.message : 'Failed to load feed');
+      })
+      .finally(() => {
+        if (requestIdRef.current !== requestId) return;
+        setLoading(false);
+      });
+  }, [userId]);
 
   // Flatten all pages into single array - stable reference
   const items = useMemo(
-    () => data?.pages.flatMap((page) => page.posts) ?? [],
-    [data?.pages]
+    () => pages?.flatMap((page) => page.posts) ?? [],
+    [pages]
   );
 
   // Aggressively preload ALL thumbnails once on data arrival
@@ -161,7 +195,6 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   // Preload new pages as they arrive
   useEffect(() => {
-    const pages = data?.pages;
     if (pages && pages.length > 1) {
       const latestPage = pages[pages.length - 1];
       if (latestPage.posts.length > 0) {
@@ -172,31 +205,61 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
         })));
       }
     }
-  }, [data?.pages]);
+  }, [pages]);
 
   const loadMore = () => {
-    if (hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
-    }
+    const nextCursor = pages?.[pages.length - 1]?.nextCursor;
+    if (!userId || !nextCursor || fetchingMore) return;
+
+    setFetchingMore(true);
+    void fetchFeedPage(nextCursor)
+      .then((nextPage) => {
+        setPages((current) => (current ? [...current, nextPage] : [nextPage]));
+      })
+      .catch((err) => {
+        setError(err instanceof Error ? err.message : 'Failed to load more posts');
+      })
+      .finally(() => setFetchingMore(false));
   };
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (seenPostIds: string[] = []) => {
     preloadedRef.current = false;
-    await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
-    return await refetch();
-  }, [queryClient, refetch, userId]);
+    if (!userId) return undefined;
 
-  const hasReceivedPage = data !== undefined;
-  const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    setLoading(true);
+    setFetchingMore(false);
+    setError(null);
+
+    try {
+      const firstPage = await refreshFeedPage(seenPostIds);
+      if (requestIdRef.current !== requestId) return firstPage;
+      setPages([firstPage]);
+      return firstPage;
+    } catch (err) {
+      if (requestIdRef.current === requestId) {
+        setError(err instanceof Error ? err.message : 'Failed to refresh feed');
+      }
+      throw err;
+    } finally {
+      if (requestIdRef.current === requestId) {
+        setLoading(false);
+      }
+    }
+  }, [userId]);
+
+  const hasReceivedPage = pages !== null;
+  const initialFeedPending = Boolean(userId) && !error && items.length === 0 && (!hasReceivedPage || loading);
 
   return {
     items,
-    empty: Boolean(userId) && !initialFeedPending && items.length === 0 && (hasReceivedPage || Boolean(feedError)),
+    empty: Boolean(userId) && !initialFeedPending && items.length === 0 && (hasReceivedPage || Boolean(error)),
     loading: initialFeedPending,
-    error: feedError?.message ?? null,
+    error,
     loadMore,
     refresh,
-    hasMore: Boolean(userId) && (hasNextPage ?? false),
+    hasMore: Boolean(userId) && Boolean(pages?.[pages.length - 1]?.nextCursor),
   };
 };
 
