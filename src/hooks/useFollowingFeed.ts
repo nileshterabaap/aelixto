@@ -1,6 +1,7 @@
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 
 interface FeedPost {
   id: string;
@@ -41,7 +42,6 @@ interface UseFollowingFeedResult {
   loading: boolean;
   error: string | null;
   loadMore: () => void;
-  refresh: (seenPostIds?: string[]) => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
   hasMore: boolean;
 }
 
@@ -52,56 +52,6 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
 }
 
 const PAGE_SIZE = 20;
-const debugRefresh = (label: string, details?: Record<string, unknown>) => {
-  if (typeof window === 'undefined') return;
-  console.info(`[feed-refresh] ${label}`, details ?? {});
-};
-
-const mapFeedRows = (data: FeedRpcRow[]): FeedPost[] => data.map((item) => ({
-  id: item.id,
-  user_id: item.user_id,
-  content: item.content,
-  created_at: item.created_at,
-  likes_count: item.likes_count,
-  saves_count: item.saves_count,
-  comments_count: item.comments_count,
-  reposts_count: item.reposts_count,
-  media_type: item.media_type,
-  media_url: item.media_url,
-  platform: item.platform,
-  embed_html: item.embed_html,
-  thumbnail_url: item.thumbnail_url,
-  title: item.title,
-  preview_text: item.preview_text,
-  preview_title: item.preview_title,
-  preview_image_url: item.preview_image_url,
-  media_kind: item.media_kind ?? null,
-  aspect_ratio: item.aspect_ratio ?? null,
-  suggested_height: item.suggested_height ?? null,
-  is_public: item.is_public,
-  feed_cursor: item.feed_cursor,
-  is_repost: item.is_repost,
-  reposted_by_user_id: item.reposted_by_user_id,
-  reposted_by_username: item.reposted_by_username,
-  profiles: {
-    username: item.profile_username,
-    display_name: item.profile_display_name,
-    avatar_url: item.profile_avatar_url,
-  },
-}));
-
-const toPage = (data: FeedRpcRow[] | null) => {
-  if (!data || data.length === 0) {
-    return { posts: [], nextCursor: undefined };
-  }
-
-  const mappedPosts = mapFeedRows(data);
-  const lastCursor = mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
-  const nextCursor = mappedPosts.length < PAGE_SIZE ? undefined : lastCursor;
-
-  return { posts: mappedPosts, nextCursor };
-};
-
 const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
     fn: 'get_following_feed_v2',
@@ -115,89 +65,84 @@ const fetchFeedPage = async (cursor?: string) => {
 
   if (error) throw error;
 
-  return toPage(data);
-};
-
-const refreshFeedPage = async (seenPostIds: string[]) => {
-  const rpc = supabase.rpc as unknown as (
-    fn: 'refresh_following_feed_v1',
-    args: { limit_count: number; seen_post_ids: string[] }
-  ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
-
-  debugRefresh('rpc:start', {
-    rpc: 'refresh_following_feed_v1',
-    seenCount: seenPostIds.length,
-    seenPostIds,
-  });
-
-  const { data, error } = await rpc('refresh_following_feed_v1', {
-    limit_count: PAGE_SIZE,
-    seen_post_ids: seenPostIds,
-  });
-
-  if (error) {
-    debugRefresh('rpc:error', { message: error.message });
-    throw error;
+  if (!data || data.length === 0) {
+    return { posts: [], nextCursor: undefined };
   }
 
-  debugRefresh('rpc:success', {
-    rowCount: data?.length ?? 0,
-    ids: data?.map((row) => row.id) ?? [],
-    cursors: data?.map((row) => row.feed_cursor).filter(Boolean) ?? [],
-  });
+  // Map RPC response to FeedPost format
+  const mappedPosts: FeedPost[] = data.map((item) => ({
+    id: item.id,
+    user_id: item.user_id,
+    content: item.content,
+    created_at: item.created_at,
+    likes_count: item.likes_count,
+    saves_count: item.saves_count,
+    comments_count: item.comments_count,
+    reposts_count: item.reposts_count,
+    media_type: item.media_type,
+    media_url: item.media_url,
+    platform: item.platform,
+    embed_html: item.embed_html,
+    thumbnail_url: item.thumbnail_url,
+    title: item.title,
+    preview_text: item.preview_text,
+    preview_title: item.preview_title,
+    preview_image_url: item.preview_image_url,
+    media_kind: (item as any).media_kind ?? null,
+    aspect_ratio: (item as any).aspect_ratio ?? null,
+    suggested_height: (item as any).suggested_height ?? null,
+    is_public: item.is_public,
+    feed_cursor: item.feed_cursor,
+    is_repost: item.is_repost,
+    reposted_by_user_id: item.reposted_by_user_id,
+    reposted_by_username: item.reposted_by_username,
+    profiles: {
+      username: item.profile_username,
+      display_name: item.profile_display_name,
+      avatar_url: item.profile_avatar_url,
+    },
+  }));
 
-  return toPage(data);
+  // Only end pagination when the server returns zero rows. Returning fewer
+  // than PAGE_SIZE can still mean more posts exist beyond this cursor band
+  // (mark-as-seen filtering, tier transitions, etc.), so we always keep
+  // a cursor as long as we got at least one row. The next call may return
+  // 0 rows — that's the true end-of-feed signal.
+  const lastCursor = mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
+  const nextCursor = mappedPosts.length === 0 ? undefined : lastCursor;
+
+  return { posts: mappedPosts, nextCursor };
 };
 
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
-  const requestIdRef = useRef(0);
-  const [pages, setPages] = useState<Array<{
-    posts: FeedPost[];
-    nextCursor: string | undefined;
-  }> | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [fetchingMore, setFetchingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    preloadedRef.current = false;
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-
-    if (!userId) {
-      setPages(null);
-      setLoading(false);
-      setFetchingMore(false);
-      setError(null);
-      return;
-    }
-
-    setPages(null);
-    setLoading(true);
-    setFetchingMore(false);
-    setError(null);
-
-    void fetchFeedPage(undefined)
-      .then((firstPage) => {
-        if (requestIdRef.current !== requestId) return;
-        setPages([firstPage]);
-      })
-      .catch((err) => {
-        if (requestIdRef.current !== requestId) return;
-        setPages([]);
-        setError(err instanceof Error ? err.message : 'Failed to load feed');
-      })
-      .finally(() => {
-        if (requestIdRef.current !== requestId) return;
-        setLoading(false);
-      });
-  }, [userId]);
+  // Fetch feed directly — no count gate, single RPC call
+  const {
+    data,
+    isLoading: feedLoading,
+    error: feedError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['following-feed', userId],
+    queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    enabled: Boolean(userId),
+    staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: true, // refetch if stale on mount/page reload
+    refetchOnReconnect: true,
+    structuralSharing: true,
+  });
 
   // Flatten all pages into single array - stable reference
   const items = useMemo(
-    () => pages?.flatMap((page) => page.posts) ?? [],
-    [pages]
+    () => data?.pages.flatMap((page) => page.posts) ?? [],
+    [data?.pages]
   );
 
   // Aggressively preload ALL thumbnails once on data arrival
@@ -215,6 +160,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   // Preload new pages as they arrive
   useEffect(() => {
+    const pages = data?.pages;
     if (pages && pages.length > 1) {
       const latestPage = pages[pages.length - 1];
       if (latestPage.posts.length > 0) {
@@ -225,73 +171,21 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
         })));
       }
     }
-  }, [pages]);
+  }, [data?.pages]);
 
   const loadMore = () => {
-    const nextCursor = pages?.[pages.length - 1]?.nextCursor;
-    if (!userId || !nextCursor || fetchingMore) return;
-
-    setFetchingMore(true);
-    void fetchFeedPage(nextCursor)
-      .then((nextPage) => {
-        setPages((current) => (current ? [...current, nextPage] : [nextPage]));
-      })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : 'Failed to load more posts');
-      })
-      .finally(() => setFetchingMore(false));
-  };
-
-  const refresh = useCallback(async (seenPostIds: string[] = []) => {
-    preloadedRef.current = false;
-    if (!userId) return undefined;
-
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    debugRefresh('state:start', { requestId, seenCount: seenPostIds.length });
-    setLoading(true);
-    setFetchingMore(false);
-    setError(null);
-
-    try {
-      const firstPage = await refreshFeedPage(seenPostIds);
-      if (requestIdRef.current !== requestId) return firstPage;
-      setPages([firstPage]);
-      debugRefresh('state:applied', {
-        requestId,
-        postCount: firstPage.posts.length,
-        ids: firstPage.posts.map((post) => post.id),
-        nextCursor: firstPage.nextCursor ?? null,
-      });
-      return firstPage;
-    } catch (err) {
-      if (requestIdRef.current === requestId) {
-        setError(err instanceof Error ? err.message : 'Failed to refresh feed');
-        debugRefresh('state:error', {
-          requestId,
-          message: err instanceof Error ? err.message : String(err),
-        });
-      }
-      throw err;
-    } finally {
-      if (requestIdRef.current === requestId) {
-        setLoading(false);
-        debugRefresh('state:done', { requestId });
-      }
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
     }
-  }, [userId]);
-
-  const hasReceivedPage = pages !== null;
-  const initialFeedPending = Boolean(userId) && !error && items.length === 0 && (!hasReceivedPage || loading);
+  };
 
   return {
     items,
-    empty: Boolean(userId) && !initialFeedPending && items.length === 0 && (hasReceivedPage || Boolean(error)),
-    loading: initialFeedPending,
-    error,
+    empty: Boolean(userId) && !feedLoading && items.length === 0,
+    loading: Boolean(userId) && feedLoading,
+    error: feedError?.message ?? null,
     loadMore,
-    refresh,
-    hasMore: Boolean(userId) && Boolean(pages?.[pages.length - 1]?.nextCursor),
+    hasMore: Boolean(userId) && (hasNextPage ?? false),
   };
 };
 

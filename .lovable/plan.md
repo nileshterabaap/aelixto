@@ -1,291 +1,64 @@
-# Successful Changes to Aelixto — Before → After
+## Goal
 
-Below are the confirmed shipped changes, written as exact "right now → turn it into" code diffs at the moment each change was made.
+When a post's source (Instagram, TikTok, YouTube, Facebook, Threads, X, Pinterest, Reddit, LinkedIn, etc.) is deleted or made private — so the embed renders a "link broken / post removed" fallback — automatically delete that post from Aelixto and send the original poster a notification with the thumbnail preview on the right side (matching existing notification styling).
 
----
+## Why this can't be done in the browser
 
-## 1. Profile cover — pink/purple gradient → solid gray
+The embed iframes (instagram.com, youtube.com, …) are cross-origin, so we cannot read their DOM to detect "Sorry, this post isn't available" messages from the client. Any client-side guess would produce false positives (slow networks, ad-blockers, transient failures) and wrongly delete real posts.
 
-**File:** `src/index.css` (`:root` tokens)
+The reliable signal is **server-side**: re-resolve each post's source URL via the official oEmbed / metadata endpoints. A consistent 404 / "not found" response means the source post is gone.
 
-Was:
-```css
-/* no --profile-cover token; cover used a hardcoded gradient in UserProfile.tsx */
-```
-And in `src/pages/UserProfile.tsx`:
-```tsx
-<div className="h-40 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500" />
-```
+## Approach
 
-Turned into:
-```css
-:root {
-  --profile-cover: 0 0% 24%;
-}
+### 1. New edge function: `validate-post-source`
+For a given `postId`, fetch the canonical validation endpoint for its platform:
 
-.profile-cover-fallback {
-  background-color: hsl(var(--profile-cover));
-}
-```
-And `UserProfile.tsx`:
-```tsx
-<div className="h-40 profile-cover-fallback" />
-```
+- instagram → `graph.facebook.com/v18.0/instagram_oembed` (existing META token) — 404 / `error.code 24` = removed
+- facebook → `graph.facebook.com/v18.0/oembed_post` — same
+- youtube → `youtube.com/oembed?url=…` — 404 / 401 = removed/private
+- tiktok → `tiktok.com/oembed?url=…` — 404
+- threads / x / linkedin / pinterest / reddit → HEAD request to the post URL; treat HTTP 404 / 410 as removed. Reddit also: `…/.json` returning `{}` or "removed" flag
+- spotify / articles → skip (Spotify items rarely 404; articles handled by existing unfurl)
 
----
+Return `{ status: "ok" | "removed" | "unknown" }`. Only `removed` triggers deletion. `unknown` (timeouts, rate-limits, 5xx) never deletes.
 
-## 2. Compact number formatting — k-suffix kicked in too early → only at 10,000+
+### 2. Confirmation gate (false-positive protection)
+A post is only deleted when it returns `removed` on **two consecutive checks at least 6 hours apart**. We add a `posts.broken_check_count` int + `posts.broken_first_seen_at` timestamp. First removal hit just records; second hit deletes.
 
-**File:** `src/lib/formatCount.ts`
+### 3. New edge function: `sweep-broken-posts` (cron)
+Runs hourly via pg_cron. Selects ~100 posts ordered by `last_validated_at` ascending (oldest first), calls `validate-post-source` for each, updates counters, and when threshold is hit:
+- captures the post's `thumbnail_url`, `platform`, `caption`/`title`, `media_url`
+- inserts a row into `notifications` with `type = 'post_removed'`, `actor_user_id = null`, `target_user_id = post.user_id`, payload `{ thumbnail_url, platform, original_url, caption }`
+- deletes the post (cascade removes likes/reposts/comments/saves as already configured)
+- triggers existing push-notification pipeline
 
-Was:
-```ts
-export function formatCompactCount(value: number | null | undefined): string {
-  const n = Number(value ?? 0);
-  if (!Number.isFinite(n)) return '0';
-  const abs = Math.abs(n);
-  if (abs < 1_000) return String(Math.trunc(n));        // 1,234 -> "1.2k"
+### 4. Notification UI
+Existing `NotificationItem` already renders a right-side thumbnail when payload has `thumbnail_url`. Add a new branch for `type === 'post_removed'`:
 
-  const fmt = (num: number, suffix: string) => {
-    const fixed = num < 10 ? num.toFixed(1) : num.toFixed(0);
-    return `${fixed.replace(/\.0$/, '')}${suffix}`;
-  };
+> "Your <Instagram> post was removed because the original was deleted or made private." — with the platform logo + cached thumbnail on the right exactly like engagement notifications.
 
-  if (abs < 1_000_000) return fmt(n / 1_000, 'k');
-  if (abs < 1_000_000_000) return fmt(n / 1_000_000, 'M');
-  return fmt(n / 1_000_000_000, 'B');
-}
-```
+Tappable: opens a small sheet explaining why, no destination link.
 
-Turned into:
-```ts
-export function formatCompactCount(value: number | null | undefined): string {
-  const n = Number(value ?? 0);
-  if (!Number.isFinite(n)) return '0';
-  const abs = Math.abs(n);
-  // Show full number up to 9999; switch to compact "k" at 10,000+.
-  if (abs < 10_000) return String(Math.trunc(n));        // 1,234 -> "1234", 12,345 -> "12.3k"
+### 5. Manual trigger on viewer
+When `HydratedEmbed` mounts an Instagram/Facebook/Threads embed and the **`RawEmbedRenderer` onError** fires (which we already track via `rawEmbedFailed`), fire a one-shot `validate-post-source` call for that postId. This shortcuts the cron for posts the author is actively looking at, but still goes through the same 2-strike gate — no immediate deletion.
 
-  const fmt = (num: number, suffix: string) => {
-    const fixed = num < 10 ? num.toFixed(1) : num.toFixed(0);
-    return `${fixed.replace(/\.0$/, '')}${suffix}`;
-  };
+## Files
 
-  if (abs < 1_000_000) return fmt(n / 1_000, 'k');
-  if (abs < 1_000_000_000) return fmt(n / 1_000_000, 'M');
-  return fmt(n / 1_000_000_000, 'B');
-}
-```
+New:
+- `supabase/functions/validate-post-source/index.ts`
+- `supabase/functions/sweep-broken-posts/index.ts`
+- migration: add `broken_check_count`, `broken_first_seen_at`, `last_validated_at` to `posts`; add `post_removed` to notification type enum; schedule hourly cron for `sweep-broken-posts`
+- `src/components/notifications/PostRemovedNotification.tsx`
 
----
+Edited:
+- `src/components/notifications/NotificationItem.tsx` — route `post_removed` to new component
+- `src/components/HydratedEmbed.tsx` — on `handleRawEmbedError`, call `validate-post-source` once per session per postId
 
-## 3. Pull-to-refresh — no spinner / no min duration → real spinner with min visible time + instrumented logs
+## Out of scope / safeguards
 
-**File:** `src/components/PullToRefresh.tsx`
+- No client-side "guess" deletion — only server validation deletes.
+- Posts from platforms we cannot reliably probe (Spotify, generic articles) are never auto-deleted.
+- Transient failures (5xx, network, rate-limit) are recorded as `unknown` and do not advance the strike counter.
+- Author can still manually delete; nothing changes for healthy posts.
 
-Was (simplified original):
-```tsx
-const runRefresh = useCallback(() => {
-  if (refreshingRef.current) return;
-  refreshingRef.current = true;
-  setRefreshing(true);
-  animate(pullY, REFRESH_RESTING_DISTANCE, { type: "spring", stiffness: 220, damping: 24 });
-
-  void (async () => {
-    try {
-      await onRefresh();
-    } finally {
-      refreshingRef.current = false;
-      setRefreshing(false);
-      animate(pullY, 0, { type: "spring", stiffness: 280, damping: 28 });
-    }
-  })();
-}, [onRefresh, pullY]);
-```
-
-Turned into:
-```tsx
-const MIN_REFRESH_MS = 650;
-
-const runRefresh = useCallback(() => {
-  if (refreshingRef.current) return;
-  console.info('[feed-refresh] gesture:trigger', { pullY: pullY.get() });
-  refreshingRef.current = true;
-  gestureRef.current = "idle";
-  setRefreshing(true);
-  animate(pullY, REFRESH_RESTING_DISTANCE, { type: "spring", stiffness: 220, damping: 24 });
-
-  void (async () => {
-    const startedAt = Date.now();
-    try {
-      await onRefresh();
-      console.info('[feed-refresh] gesture:refresh-complete');
-    } catch (error) {
-      console.error('[feed-refresh] gesture:refresh-error', {
-        message: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      const remaining = MIN_REFRESH_MS - (Date.now() - startedAt);
-      if (remaining > 0) {
-        await new Promise((resolve) => window.setTimeout(resolve, remaining));
-      }
-      refreshingRef.current = false;
-      setRefreshing(false);
-      animate(pullY, 0, { type: "spring", stiffness: 280, damping: 28 });
-    }
-  })();
-}, [onRefresh, pullY]);
-```
-
-And `src/pages/Index.tsx` — `handleRefresh` got "seen IDs flush + restore on error":
-
-Was:
-```tsx
-const handleRefresh = useCallback(async () => {
-  await refreshFollowingFeed();
-}, [refreshFollowingFeed]);
-```
-
-Turned into:
-```tsx
-const handleRefresh = useCallback(async () => {
-  const seenPostIds = takePendingSeenPostIds();
-  console.info('[feed-refresh] ui:start', {
-    seenCount: seenPostIds.length, seenPostIds,
-    visibleBefore: allPosts.length, hasMore,
-  });
-  try {
-    const [result] = await Promise.all([
-      refreshFollowingFeed(seenPostIds),
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-    ]);
-    console.info('[feed-refresh] ui:done', {
-      returnedCount: result?.posts.length ?? null,
-      returnedIds: result?.posts.map((p) => p.id) ?? [],
-      nextCursor: result?.nextCursor ?? null,
-    });
-  } catch (error) {
-    restorePendingSeenPostIds(seenPostIds);
-    console.error('[feed-refresh] ui:error', {
-      message: error instanceof Error ? error.message : String(error),
-      restoredSeenCount: seenPostIds.length,
-    });
-    throw error;
-  }
-}, [allPosts.length, hasMore, queryClient, refreshFollowingFeed,
-    restorePendingSeenPostIds, takePendingSeenPostIds, user?.id]);
-```
-
----
-
-## 4. FAB press animation — shadow slipped + scale overshoot → clamped scale, no slip
-
-**File:** `tailwind.config.ts` (keyframes/animation block for the create-post FAB)
-
-Was:
-```ts
-keyframes: {
-  "fab-press": {
-    "0%":   { transform: "scale(1)",   boxShadow: "0 8px 24px hsl(var(--shadow-soft))" },
-    "50%":  { transform: "scale(0.88)", boxShadow: "0 2px 6px hsl(var(--shadow-soft))" },
-    "100%": { transform: "scale(1.04)", boxShadow: "0 10px 28px hsl(var(--shadow-soft))" },
-  },
-},
-animation: {
-  "fab-press": "fab-press 220ms ease-out",
-},
-```
-
-Turned into:
-```ts
-keyframes: {
-  "fab-press": {
-    "0%":   { transform: "scale(1)" },
-    "50%":  { transform: "scale(0.94)" },
-    "100%": { transform: "scale(1)" },
-  },
-},
-animation: {
-  "fab-press": "fab-press 180ms ease-out",
-},
-```
-(Shadow removed from keyframes so the button no longer "slips"; scale clamped to 0.94–1.0.)
-
----
-
-## 5. Reddit embed — image/gallery posts failed silently → graceful fallback
-
-**File:** `src/components/embeds/RedditEmbed.tsx`
-
-Was:
-```tsx
-if (!embedHtml) return null;
-return <div dangerouslySetInnerHTML={{ __html: embedHtml }} />;
-```
-
-Turned into:
-```tsx
-if (!embedHtml || isImagePost || isGalleryPost) {
-  return (
-    <LinkPreviewCard
-      url={post.media_url}
-      title={post.title}
-      thumbnail={post.thumbnail_url}
-      platform="reddit"
-    />
-  );
-}
-return <div dangerouslySetInnerHTML={{ __html: sanitize(embedHtml) }} />;
-```
-
----
-
-## 6. Instagram score + realtime follow UI
-
-**File:** `src/hooks/useOriginalVisitTracker.ts` and `src/hooks/useFollow.ts`
-
-Was (visit tracker fired on every embed mount):
-```ts
-useEffect(() => {
-  void supabase.rpc('record_original_visit', { post_id: postId });
-}, [postId]);
-```
-
-Turned into (only fires on real outbound click):
-```ts
-const trackVisit = useCallback(() => {
-  if (firedRef.current) return;
-  firedRef.current = true;
-  void supabase.rpc('record_original_visit', { post_id: postId });
-}, [postId]);
-
-return { trackVisit };
-```
-
-And `useFollow.ts` got a realtime channel:
-
-Was:
-```ts
-// follow state only updated on manual refetch
-```
-
-Turned into:
-```ts
-useEffect(() => {
-  const channel = supabase
-    .channel(`follows:${targetUserId}`)
-    .on('postgres_changes',
-      { event: '*', schema: 'public', table: 'follows',
-        filter: `following_id=eq.${targetUserId}` },
-      () => queryClient.invalidateQueries({ queryKey: ['follow', targetUserId] }))
-    .subscribe();
-  return () => { supabase.removeChannel(channel); };
-}, [targetUserId, queryClient]);
-```
-
----
-
-### Notes
-- All six are live in the current codebase.
-- The June 12 screenshot items (gray cover + 10k formatting) were verified against `src/index.css` line 28 and `src/lib/formatCount.ts` line 13 — both already shipped.
-- "Before" snippets for #4, #5, #6 are reconstructed from the change summaries; the live "after" code matches what's in the repo today.
+Approve and I'll implement.
