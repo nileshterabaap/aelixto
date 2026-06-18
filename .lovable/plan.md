@@ -1,47 +1,64 @@
-## Diagnosis
+## Goal
 
-Yes — the screenshots strongly suggest the refresh is starting, then the feed enters an empty intermediate state. The most likely cause is the current refresh approach replacing the active feed query with a brand-new `refreshEpoch` cache key. During that handoff, `followingPosts` becomes empty, classifier queries may still be loading/refetching, and the UI can render a blank spacer instead of posts or “You're all caught up”.
+When a post's source (Instagram, TikTok, YouTube, Facebook, Threads, X, Pinterest, Reddit, LinkedIn, etc.) is deleted or made private — so the embed renders a "link broken / post removed" fallback — automatically delete that post from Aelixto and send the original poster a notification with the thumbnail preview on the right side (matching existing notification styling).
 
-There is also a second issue: the current refresh awaits `prefetchInfiniteQuery()` before switching the hook to the new query key. If that prefetch returns an empty/old result, fails silently, or races with `post_seen` flushing, the visible feed can be cleared even though navigating away/back later triggers a fresh active fetch that finally shows the posts.
+## Why this can't be done in the browser
 
-## Plan
+The embed iframes (instagram.com, youtube.com, …) are cross-origin, so we cannot read their DOM to detect "Sorry, this post isn't available" messages from the client. Any client-side guess would produce false positives (slow networks, ad-blockers, transient failures) and wrongly delete real posts.
 
-1. **Stop swapping feed cache keys on refresh**
-   - Remove the `refreshEpoch` query-key approach from `useFollowingFeed`.
-   - Keep one stable query key: `['following-feed', userId]`.
-   - This prevents the visible feed from losing its active data during refresh.
+The reliable signal is **server-side**: re-resolve each post's source URL via the official oEmbed / metadata endpoints. A consistent 404 / "not found" response means the source post is gone.
 
-2. **Implement refresh as an atomic first-page replacement**
-   - Add an internal `refreshing` state in `useFollowingFeed`.
-   - On pull-to-refresh:
-     - cancel active feed requests,
-     - fetch the first page directly from `get_following_feed_v2` with `cursor_key: null`,
-     - replace the existing infinite-query data with exactly one fresh first page,
-     - keep the previous feed visible if the refresh request errors.
-   - This means refresh ends in one of two valid states only: fresh posts or a real empty/caught-up result.
+## Approach
 
-3. **Prevent the blank empty-state branch**
-   - In `Index.tsx`, remove the `<div className="py-16" />` branch that creates a blank screen when the feed is empty but `reachedEnd` is not yet true.
-   - While refresh/classifier queries are settling, show skeletons or keep the previous posts instead.
-   - If the backend confirms no unseen posts, show “You're all caught up”.
+### 1. New edge function: `validate-post-source`
+For a given `postId`, fetch the canonical validation endpoint for its platform:
 
-4. **Refetch helper queries without blocking the feed refresh**
-   - Do not wait for `following-count` and `following-has-posts` before refreshing the feed.
-   - Trigger those as background invalidations/refetches after the feed refresh starts/finishes.
-   - This avoids a helper-query delay making the main feed look blank.
+- instagram → `graph.facebook.com/v18.0/instagram_oembed` (existing META token) — 404 / `error.code 24` = removed
+- facebook → `graph.facebook.com/v18.0/oembed_post` — same
+- youtube → `youtube.com/oembed?url=…` — 404 / 401 = removed/private
+- tiktok → `tiktok.com/oembed?url=…` — 404
+- threads / x / linkedin / pinterest / reddit → HEAD request to the post URL; treat HTTP 404 / 410 as removed. Reddit also: `…/.json` returning `{}` or "removed" flag
+- spotify / articles → skip (Spotify items rarely 404; articles handled by existing unfurl)
 
-5. **Make bottom-nav Home refresh use the same path**
-   - The Home button currently dispatches a refresh event but no page code listens to it, then it calls `refetchQueries()` directly.
-   - Add a listener in `Index.tsx` so Home tap refresh uses the same safe `handleRefresh()` logic as pull-to-refresh.
-   - Remove or ignore the separate direct refetch path to avoid inconsistent behavior.
+Return `{ status: "ok" | "removed" | "unknown" }`. Only `removed` triggers deletion. `unknown` (timeouts, rate-limits, 5xx) never deletes.
 
-6. **Keep the database function unchanged unless signal proves otherwise**
-   - The current symptoms are mainly client-side state/caching: posts appear after navigating away/back, meaning the backend can return them.
-   - I will not add another feed SQL migration unless runtime/network evidence shows the RPC itself is returning wrong rows.
+### 2. Confirmation gate (false-positive protection)
+A post is only deleted when it returns `removed` on **two consecutive checks at least 6 hours apart**. We add a `posts.broken_check_count` int + `posts.broken_first_seen_at` timestamp. First removal hit just records; second hit deletes.
 
-## Validation
+### 3. New edge function: `sweep-broken-posts` (cron)
+Runs hourly via pg_cron. Selects ~100 posts ordered by `last_validated_at` ascending (oldest first), calls `validate-post-source` for each, updates counters, and when threshold is hit:
+- captures the post's `thumbnail_url`, `platform`, `caption`/`title`, `media_url`
+- inserts a row into `notifications` with `type = 'post_removed'`, `actor_user_id = null`, `target_user_id = post.user_id`, payload `{ thumbnail_url, platform, original_url, caption }`
+- deletes the post (cascade removes likes/reposts/comments/saves as already configured)
+- triggers existing push-notification pipeline
 
-- Verify refresh no longer produces the blank spacer state.
-- Verify pull-to-refresh always leaves visible posts in place until fresh data is ready.
-- Verify an empty refresh ends with “You're all caught up”, not blank.
-- Check console/network for feed RPC errors after the change.
+### 4. Notification UI
+Existing `NotificationItem` already renders a right-side thumbnail when payload has `thumbnail_url`. Add a new branch for `type === 'post_removed'`:
+
+> "Your <Instagram> post was removed because the original was deleted or made private." — with the platform logo + cached thumbnail on the right exactly like engagement notifications.
+
+Tappable: opens a small sheet explaining why, no destination link.
+
+### 5. Manual trigger on viewer
+When `HydratedEmbed` mounts an Instagram/Facebook/Threads embed and the **`RawEmbedRenderer` onError** fires (which we already track via `rawEmbedFailed`), fire a one-shot `validate-post-source` call for that postId. This shortcuts the cron for posts the author is actively looking at, but still goes through the same 2-strike gate — no immediate deletion.
+
+## Files
+
+New:
+- `supabase/functions/validate-post-source/index.ts`
+- `supabase/functions/sweep-broken-posts/index.ts`
+- migration: add `broken_check_count`, `broken_first_seen_at`, `last_validated_at` to `posts`; add `post_removed` to notification type enum; schedule hourly cron for `sweep-broken-posts`
+- `src/components/notifications/PostRemovedNotification.tsx`
+
+Edited:
+- `src/components/notifications/NotificationItem.tsx` — route `post_removed` to new component
+- `src/components/HydratedEmbed.tsx` — on `handleRawEmbedError`, call `validate-post-source` once per session per postId
+
+## Out of scope / safeguards
+
+- No client-side "guess" deletion — only server validation deletes.
+- Posts from platforms we cannot reliably probe (Spotify, generic articles) are never auto-deleted.
+- Transient failures (5xx, network, rate-limit) are recorded as `unknown` and do not advance the strike counter.
+- Author can still manually delete; nothing changes for healthy posts.
+
+Approve and I'll implement.

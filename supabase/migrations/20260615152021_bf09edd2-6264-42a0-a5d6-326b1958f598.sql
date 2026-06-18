@@ -1,12 +1,44 @@
 CREATE OR REPLACE FUNCTION public.get_following_feed_v2(limit_count integer, cursor_key text DEFAULT NULL::text)
- RETURNS TABLE(id uuid, user_id uuid, content text, created_at timestamp with time zone, likes_count integer, saves_count integer, comments_count integer, reposts_count integer, media_type text, media_url text, platform text, embed_html text, thumbnail_url text, title text, preview_text text, preview_title text, preview_image_url text, is_public boolean, media_kind text, aspect_ratio numeric, suggested_height integer, profile_id uuid, profile_username text, profile_display_name text, profile_avatar_url text, is_repost boolean, reposted_by_user_id uuid, reposted_by_username text, reposted_at timestamp with time zone, feed_cursor text)
- LANGUAGE sql
- STABLE SECURITY DEFINER
- SET search_path TO 'public'
+RETURNS TABLE(
+  id uuid,
+  user_id uuid,
+  content text,
+  created_at timestamp with time zone,
+  likes_count integer,
+  saves_count integer,
+  comments_count integer,
+  reposts_count integer,
+  media_type text,
+  media_url text,
+  platform text,
+  embed_html text,
+  thumbnail_url text,
+  title text,
+  preview_text text,
+  preview_title text,
+  preview_image_url text,
+  is_public boolean,
+  media_kind text,
+  aspect_ratio numeric,
+  suggested_height integer,
+  profile_id uuid,
+  profile_username text,
+  profile_display_name text,
+  profile_avatar_url text,
+  is_repost boolean,
+  reposted_by_user_id uuid,
+  reposted_by_username text,
+  reposted_at timestamp with time zone,
+  feed_cursor text
+)
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public'
 AS $function$
   WITH cursor_values AS (
     SELECT
       CASE WHEN cursor_key IS NULL THEN NULL ELSE ((cursor_key::jsonb)->>'tier')::int END AS c_tier,
+      CASE WHEN cursor_key IS NULL THEN NULL ELSE ((cursor_key::jsonb)->>'sort_time')::timestamp with time zone END AS c_sort_time,
       CASE WHEN cursor_key IS NULL THEN NULL ELSE ((cursor_key::jsonb)->>'rank')::int END AS c_rank,
       CASE WHEN cursor_key IS NULL THEN NULL ELSE ((cursor_key::jsonb)->>'shuffle')::double precision END AS c_shuffle,
       CASE WHEN cursor_key IS NULL THEN NULL ELSE ((cursor_key::jsonb)->>'id')::uuid END AS c_id
@@ -17,7 +49,7 @@ AS $function$
   hidden_user_ids AS (
     SELECT hidden_user_id FROM public.hidden_users WHERE user_id = auth.uid()
   ),
-  eligible_posts AS (
+  candidate_posts AS (
     SELECT
       p.id, p.user_id, p.content, p.created_at,
       p.likes_count, p.saves_count, p.comments_count, p.reposts_count,
@@ -71,18 +103,18 @@ AS $function$
   ),
   tiered AS (
     SELECT
-      e.*,
+      c.*,
       CASE
-        WHEN e.sort_time > now() - interval '1 hour'  THEN 0
-        WHEN e.sort_time > now() - interval '6 hours' THEN 1
-        WHEN e.sort_time > now() - interval '1 day'   THEN 2
-        WHEN e.sort_time > now() - interval '3 days'  THEN 3
-        WHEN e.sort_time > now() - interval '7 days'  THEN 4
+        WHEN c.sort_time > now() - interval '1 hour'  THEN 0
+        WHEN c.sort_time > now() - interval '6 hours' THEN 1
+        WHEN c.sort_time > now() - interval '1 day'   THEN 2
+        WHEN c.sort_time > now() - interval '3 days'  THEN 3
+        WHEN c.sort_time > now() - interval '7 days'  THEN 4
         ELSE 5
       END AS tier,
-      (abs(hashtext(coalesce(auth.uid()::text,'') || ':' || e.id::text))::double precision
+      (abs(hashtext(coalesce(auth.uid()::text,'') || ':' || c.id::text))::double precision
         / 2147483647.0) AS shuffle_score
-    FROM eligible_posts e
+    FROM candidate_posts c
   ),
   ranked AS (
     SELECT
@@ -91,7 +123,7 @@ AS $function$
         PARTITION BY t.tier,
                      COALESCE(t.reposted_by_user_id, t.user_id),
                      COALESCE(t.platform, '')
-        ORDER BY t.shuffle_score, t.id
+        ORDER BY t.sort_time DESC, t.shuffle_score ASC, t.id ASC
       ) AS cluster_rank
     FROM tiered t
   )
@@ -105,6 +137,7 @@ AS $function$
          r.reposted_by_user_id, r.reposted_by_username, r.sort_time as reposted_at,
          jsonb_build_object(
            'tier', r.tier,
+           'sort_time', r.sort_time,
            'rank', r.cluster_rank,
            'shuffle', r.shuffle_score,
            'id', r.id
@@ -114,11 +147,12 @@ AS $function$
   WHERE (
     cursor_key IS NULL
     OR r.tier > cv.c_tier
-    OR (r.tier = cv.c_tier AND r.cluster_rank > cv.c_rank)
-    OR (r.tier = cv.c_tier AND r.cluster_rank = cv.c_rank AND r.shuffle_score > cv.c_shuffle)
-    OR (r.tier = cv.c_tier AND r.cluster_rank = cv.c_rank AND r.shuffle_score = cv.c_shuffle AND r.id > cv.c_id)
+    OR (r.tier = cv.c_tier AND r.sort_time < cv.c_sort_time)
+    OR (r.tier = cv.c_tier AND r.sort_time = cv.c_sort_time AND r.cluster_rank > cv.c_rank)
+    OR (r.tier = cv.c_tier AND r.sort_time = cv.c_sort_time AND r.cluster_rank = cv.c_rank AND r.shuffle_score > cv.c_shuffle)
+    OR (r.tier = cv.c_tier AND r.sort_time = cv.c_sort_time AND r.cluster_rank = cv.c_rank AND r.shuffle_score = cv.c_shuffle AND r.id > cv.c_id)
   )
-  ORDER BY r.tier ASC, r.cluster_rank ASC, r.shuffle_score ASC, r.id ASC
+  ORDER BY r.tier ASC, r.sort_time DESC, r.cluster_rank ASC, r.shuffle_score ASC, r.id ASC
   LIMIT GREATEST(1, LEAST(limit_count, 50));
 $function$;
 
