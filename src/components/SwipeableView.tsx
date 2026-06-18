@@ -97,6 +97,7 @@ export const SwipeableView = ({
 
     const onTouchStart = (e: TouchEvent) => {
       if (isAnimating) return;
+      if ((window as unknown as { __pullActive?: boolean }).__pullActive) return;
       const touch = e.touches[0];
       if (!touch) return;
 
@@ -124,6 +125,11 @@ export const SwipeableView = ({
     const onTouchMove = (e: TouchEvent) => {
       const g = gesture.current;
       if (!g || !g.active) return;
+      if ((window as unknown as { __pullActive?: boolean }).__pullActive) {
+        gesture.current = null;
+        setActiveDirection(null);
+        return;
+      }
       const touch = e.touches[0];
       if (!touch) return;
 
