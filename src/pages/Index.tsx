@@ -145,7 +145,10 @@ const Index = () => {
   }, [followingPosts, showDemoFeed]);
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
-  
+
+  if (!showDemoFeed) {
+    console.log('[PTR-DEBUG] render state:', { followingEmpty, itemsLength: allPosts.length, hasMore, followingCount });
+  }
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
