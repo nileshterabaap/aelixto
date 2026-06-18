@@ -7,11 +7,11 @@ interface PullToRefreshProps {
   children: ReactNode;
 }
 
-const TRIGGER_DISTANCE = 46;
+const TRIGGER_DISTANCE = 32;
 const MAX_DISTANCE = 150;
-const REFRESH_RESTING_DISTANCE = 56;
-const MIN_REFRESH_MS = 750;
-const PENDING_THRESHOLD = 4;
+const REFRESH_RESTING_DISTANCE = 64;
+const MIN_REFRESH_MS = 1200;
+const PENDING_THRESHOLD = 2;
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -45,7 +45,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
 
   const finishWithoutRefresh = useCallback(() => {
     gestureRef.current = "idle";
-    animate(pullY, 0, { type: "spring", stiffness: 170, damping: 22, mass: 0.9 });
+    animate(pullY, 0, { type: "spring", stiffness: 90, damping: 24, mass: 1.1 });
   }, [pullY]);
 
   const runRefresh = useCallback(() => {
@@ -53,7 +53,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     refreshingRef.current = true;
     gestureRef.current = "idle";
     setRefreshing(true);
-    animate(pullY, REFRESH_RESTING_DISTANCE, { type: "spring", stiffness: 140, damping: 20, mass: 0.9 });
+    animate(pullY, REFRESH_RESTING_DISTANCE, { type: "spring", stiffness: 100, damping: 20, mass: 0.9 });
 
     void (async () => {
       const startedAt = Date.now();
@@ -66,7 +66,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
         }
         refreshingRef.current = false;
         setRefreshing(false);
-        animate(pullY, 0, { type: "spring", stiffness: 150, damping: 22, mass: 0.9 });
+        animate(pullY, 0, { type: "spring", stiffness: 90, damping: 24, mass: 1.1 });
       }
     })();
   }, [onRefresh, pullY]);
@@ -95,7 +95,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       if (gestureRef.current === "pending") {
         if (Math.abs(diffX) < PENDING_THRESHOLD && Math.abs(diffY) < PENDING_THRESHOLD) return;
         // Block only if the motion is clearly horizontal or clearly upward.
-        if (diffY <= 0 || Math.abs(diffX) > diffY * 1.4) {
+        if (diffY <= 0 || Math.abs(diffX) > diffY * 2.2) {
           gestureRef.current = "blocked";
           return;
         }
@@ -104,7 +104,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
 
       // Cancel only if user actually scrolled away from the top, or pulled
        // significantly back upward — small jitter shouldn't kill the gesture.
-      if (!isAtTop() || diffY < -12) {
+      if (!isAtTop() || diffY < -24) {
         finishWithoutRefresh();
         return;
       }
@@ -118,7 +118,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       // finger naturally, gentle resistance after.
       const resisted = diffY <= TRIGGER_DISTANCE
         ? diffY
-        : TRIGGER_DISTANCE + (diffY - TRIGGER_DISTANCE) * 0.55;
+        : TRIGGER_DISTANCE + (diffY - TRIGGER_DISTANCE) * 0.7;
       pullY.set(Math.min(MAX_DISTANCE, resisted));
     };
 
