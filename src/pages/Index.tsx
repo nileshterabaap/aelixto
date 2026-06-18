@@ -226,23 +226,6 @@ const Index = () => {
   const loading = showDemoFeed ? demoLoading : followingLoading;
   const shouldShowSkeleton = allPosts.length === 0 && (sessionLoading || loading);
 
-  if (shouldShowSkeleton) {
-    return (
-      <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
-        <div className="min-h-screen bg-background pb-20">
-          <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
-          <main className="mx-auto max-w-2xl px-4 py-6">
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <PostSkeleton key={i} />
-              ))}
-            </div>
-          </main>
-        </div>
-      </SwipeableView>
-    );
-  }
-
   return (
     <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
       <div className="min-h-screen bg-background pb-20">
@@ -250,7 +233,13 @@ const Index = () => {
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6 min-h-[calc(100vh-9rem)]">
-            {!showDemoFeed && followingEmpty ? (
+            {shouldShowSkeleton ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <PostSkeleton key={i} />
+                ))}
+              </div>
+            ) : !showDemoFeed && followingEmpty ? (
             followingCount === undefined ? (
               <div className="space-y-4">
                 {[...Array(2)].map((_, i) => (
