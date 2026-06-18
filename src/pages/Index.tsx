@@ -7,7 +7,7 @@ import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
 import { PostSkeleton } from "@/components/PostSkeleton";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
-import { FeedPullToRefresh } from "@/components/FeedPullToRefresh";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
@@ -181,16 +181,16 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    const seenIds = takePendingSeenPostIds();
+    const seenPostIds = takePendingSeenPostIds();
+
     try {
       await Promise.all([
-        refreshFollowingFeed(seenIds),
+        refreshFollowingFeed(seenPostIds),
         queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
       ]);
-      window.scrollTo({ top: 0, behavior: "auto" });
-    } catch (e) {
-      restorePendingSeenPostIds(seenIds);
-      throw e;
+    } catch (error) {
+      restorePendingSeenPostIds(seenPostIds);
+      throw error;
     }
   }, [queryClient, refreshFollowingFeed, restorePendingSeenPostIds, takePendingSeenPostIds, user?.id]);
 
@@ -249,7 +249,7 @@ const Index = () => {
       <div className="min-h-screen bg-background pb-20">
         <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
-      <FeedPullToRefresh onRefresh={handleRefresh}>
+      <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
             {!showDemoFeed && followingEmpty ? (
             followingCount === undefined ? (
@@ -321,7 +321,7 @@ const Index = () => {
             </div>
           )}
         </main>
-      </FeedPullToRefresh>
+      </PullToRefresh>
 
         <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
       </div>
