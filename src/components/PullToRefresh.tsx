@@ -135,13 +135,13 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       }
     };
 
-    el.addEventListener("touchstart", handleStart, { passive: true });
+    window.addEventListener("touchstart", handleStart, { passive: true });
     window.addEventListener("touchmove", handleMove, { passive: false });
     window.addEventListener("touchend", handleEnd, { passive: true });
     window.addEventListener("touchcancel", handleEnd, { passive: true });
 
     return () => {
-      el.removeEventListener("touchstart", handleStart);
+      window.removeEventListener("touchstart", handleStart);
       window.removeEventListener("touchmove", handleMove);
       window.removeEventListener("touchend", handleEnd);
       window.removeEventListener("touchcancel", handleEnd);
