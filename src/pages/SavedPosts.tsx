@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
-import { PullToRefresh } from "@/components/PullToRefresh";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
@@ -102,14 +101,6 @@ export default function SavedPosts() {
 
   const { data: drafts = [] } = useDrafts(session?.user?.id);
 
-  const handleRefresh = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["saved-posts"] }),
-      queryClient.invalidateQueries({ queryKey: ["collections"] }),
-      queryClient.invalidateQueries({ queryKey: ["post-drafts"] }),
-    ]);
-  }, [queryClient]);
-
   useEffect(() => {
     const targets = savedPosts.filter((post: any) => {
       const platform = (post.platform || "").toLowerCase();
@@ -153,7 +144,6 @@ export default function SavedPosts() {
     <div className="min-h-screen pb-20">
       <Header onCreatePost={() => setCreatePostOpen(true)} />
 
-      <PullToRefresh onRefresh={handleRefresh}>
         <main className="container max-w-2xl mx-auto px-4 py-6 animate-fade-in">
           <h1 className="text-2xl font-bold mb-4">Saved</h1>
 
@@ -190,7 +180,6 @@ export default function SavedPosts() {
           )}
           {activeTab === "drafts" && <DraftsGrid drafts={drafts} />}
         </main>
-      </PullToRefresh>
 
       <CreatePostDialog open={createPostOpen} onOpenChange={setCreatePostOpen} />
     </div>

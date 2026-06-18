@@ -42,9 +42,8 @@ export const useMarkPostSeen = (userId: string | undefined) => {
   const pendingRef = useRef<Set<string>>(new Set());
   const observersRef = useRef<Map<string, IntersectionObserver>>(new Map());
   const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const inFlightSeenRef = useRef<Set<string>>(new Set());
   // Posts currently intersecting the viewport (any visibility), so on
-  // refresh we can also count posts the user is looking at right now
+  // periodic seen tracking only counts posts after the required dwell time
   // even if the periodic batch flush hasn't fired yet.
   const visibleRef = useRef<Set<string>>(new Set());
   const flushing = useRef(false);
@@ -72,7 +71,6 @@ export const useMarkPostSeen = (userId: string | undefined) => {
 
     const postIds = Array.from(pendingRef.current);
     pendingRef.current.clear();
-    postIds.forEach((id) => inFlightSeenRef.current.add(id));
 
     try {
       const rows = postIds.map((post_id) => ({ user_id: userId, post_id }));
@@ -82,23 +80,9 @@ export const useMarkPostSeen = (userId: string | undefined) => {
       // Re-add failed items back to pending
       postIds.forEach((id) => pendingRef.current.add(id));
     } finally {
-      postIds.forEach((id) => inFlightSeenRef.current.delete(id));
       flushing.current = false;
     }
   }, [userId]);
-
-  const takePendingSeenPostIds = useCallback(() => {
-    const postIds = Array.from(new Set([
-      ...inFlightSeenRef.current,
-      ...pendingRef.current,
-    ]));
-    pendingRef.current.clear();
-    return postIds;
-  }, []);
-
-  const restorePendingSeenPostIds = useCallback((postIds: string[]) => {
-    postIds.forEach((id) => pendingRef.current.add(id));
-  }, []);
 
   // Periodic flush
   useEffect(() => {
@@ -166,5 +150,5 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     [clearPostTracking, userId]
   );
 
-  return { setObservedPostElement, takePendingSeenPostIds, restorePendingSeenPostIds };
+  return { setObservedPostElement };
 };
