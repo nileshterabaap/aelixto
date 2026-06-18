@@ -7,6 +7,7 @@ interface FeedPost {
   user_id: string;
   content: string;
   created_at: string;
+  reposted_at?: string | null;
   likes_count: number;
   saves_count: number;
   comments_count: number | null;
@@ -61,6 +62,7 @@ const mapFeedRows = (data: FeedRpcRow[]): FeedPost[] => data.map((item) => ({
   user_id: item.user_id,
   content: item.content,
   created_at: item.created_at,
+  reposted_at: (item as unknown as { reposted_at?: string | null }).reposted_at ?? null,
   likes_count: item.likes_count,
   saves_count: item.saves_count,
   comments_count: item.comments_count,
