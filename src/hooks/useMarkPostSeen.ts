@@ -150,5 +150,24 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     [clearPostTracking, userId]
   );
 
-  return { setObservedPostElement };
+  /**
+   * Atomically take and return all post IDs that have passed the
+   * dwell-time threshold but haven't been flushed to DB yet.
+   * The caller is responsible for persisting them (e.g. via the
+   * refresh RPC which writes them atomically with the next page fetch).
+   */
+  const takePendingSeenIds = useCallback((): string[] => {
+    const ids = Array.from(pendingRef.current);
+    pendingRef.current.clear();
+    return ids;
+  }, []);
+
+  /**
+   * Restore IDs back into the pending set if a downstream write fails.
+   */
+  const restorePendingSeenIds = useCallback((ids: string[]) => {
+    ids.forEach((id) => pendingRef.current.add(id));
+  }, []);
+
+  return { setObservedPostElement, takePendingSeenIds, restorePendingSeenIds };
 };
