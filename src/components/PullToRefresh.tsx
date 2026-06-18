@@ -23,7 +23,6 @@ const shouldIgnorePullTarget = (target: EventTarget | null) => {
 export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const [refreshing, setRefreshing] = useState(false);
   const pullY = useMotionValue(0);
-  const containerRef = useRef<HTMLDivElement>(null);
   const startRef = useRef({ x: 0, y: 0 });
   const gestureRef = useRef<"idle" | "pending" | "pulling" | "blocked">("idle");
   const refreshingRef = useRef(false);
@@ -33,14 +32,14 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const spinnerRotate = useTransform(pullY, [0, MAX_DISTANCE], [0, 300]);
 
   const isAtTop = useCallback(() => {
-    const containerScrollTop = containerRef.current?.scrollTop ?? 0;
     const pageScrollTop =
       window.scrollY ||
       document.scrollingElement?.scrollTop ||
       document.documentElement.scrollTop ||
+      document.body.scrollTop ||
       0;
 
-    return containerScrollTop <= 0 && pageScrollTop <= 0;
+    return pageScrollTop <= 1;
   }, []);
 
   const finishWithoutRefresh = useCallback(() => {
@@ -72,9 +71,6 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   }, [onRefresh, pullY]);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
     const handleStart = (event: TouchEvent) => {
       const touch = event.touches[0];
       if (!touch || event.touches.length !== 1 || refreshingRef.current) return;
@@ -152,7 +148,6 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
 
   return (
     <div
-      ref={containerRef}
       className="relative"
       style={{ overscrollBehaviorY: "contain" }}
     >

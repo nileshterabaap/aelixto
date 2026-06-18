@@ -91,8 +91,10 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     const postIds = Array.from(new Set([
       ...inFlightSeenRef.current,
       ...pendingRef.current,
+      ...visibleRef.current,
     ]));
     pendingRef.current.clear();
+    postIds.forEach((id) => visibleRef.current.delete(id));
     return postIds;
   }, []);
 
