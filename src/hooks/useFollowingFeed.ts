@@ -39,6 +39,7 @@ interface UseFollowingFeedResult {
   items: FeedPost[];
   empty: boolean;
   loading: boolean;
+  refreshing: boolean;
   error: string | null;
   loadMore: () => void;
   refresh: (seenPostIds?: string[]) => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
@@ -138,6 +139,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   }> | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchingMore, setFetchingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -228,7 +230,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    setLoading(true);
+    setRefreshing(true);
     setFetchingMore(false);
     setError(null);
 
@@ -244,7 +246,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
       throw err;
     } finally {
       if (requestIdRef.current === requestId) {
-        setLoading(false);
+        setRefreshing(false);
       }
     }
   }, [userId]);
@@ -256,6 +258,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     items,
     empty: Boolean(userId) && !initialFeedPending && items.length === 0 && (hasReceivedPage || Boolean(error)),
     loading: initialFeedPending,
+    refreshing,
     error,
     loadMore,
     refresh,
