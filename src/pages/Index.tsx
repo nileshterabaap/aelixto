@@ -182,6 +182,7 @@ const Index = () => {
 
   const handleRefresh = useCallback(async () => {
     const seenPostIds = takePendingSeenPostIds();
+    console.log('[PTR-DEBUG] handleRefresh() takePendingSeenPostIds returned count:', seenPostIds.length);
 
     try {
       await Promise.all([
