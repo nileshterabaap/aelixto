@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Search } from "lucide-react";
@@ -17,18 +18,23 @@ const Messages = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const navigate = useNavigate();
-  const { conversations, loading } = useConversations();
+  const { conversations, loading, refetch } = useConversations();
   const { user } = useSession();
 
   const formatTimestamp = (dateString: string) => {
     return formatDistanceToNow(new Date(dateString), { addSuffix: true });
   };
 
+  const handleRefresh = useCallback(async () => {
+    await refetch?.();
+  }, [refetch]);
+
   return (
     <SwipeableView leftRoute="/" leftLabel="Home">
     <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
+      <PullToRefresh onRefresh={handleRefresh}>
         <main className="container max-w-2xl mx-auto px-4 py-6 animate-fade-in">
           <h2 className="text-2xl font-bold mb-6">Messages</h2>
           
@@ -113,6 +119,7 @@ const Messages = () => {
             </div>
           )}
         </main>
+      </PullToRefresh>
 
       <CreatePostDialog 
         open={isCreateDialogOpen} 

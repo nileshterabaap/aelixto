@@ -1,6 +1,7 @@
 import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useState, useCallback, useEffect } from "react";
@@ -86,10 +87,19 @@ const Discover = () => {
     navigate(`/u/${p.username}`);
   };
 
+  const handleRefresh = useCallback(async () => {
+    // Reset search to trigger a fresh search
+    const q = searchQuery;
+    setSearchQuery("");
+    await new Promise((r) => setTimeout(r, 100));
+    setSearchQuery(q);
+  }, [searchQuery]);
+
   return (
     <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
+      <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6 animate-fade-in">
           <div className="space-y-6">
             {/* Search Bar */}
@@ -198,6 +208,7 @@ const Discover = () => {
             )}
           </div>
         </main>
+      </PullToRefresh>
 
 
       <CreatePostDialog 

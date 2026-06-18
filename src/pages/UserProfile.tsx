@@ -16,6 +16,7 @@ import { useUserPlatformTabs } from "@/hooks/useUserPlatformTabs";
 import { useStartConversation } from "@/hooks/useStartConversation";
 import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
 import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { FollowListDialog, getFollowVisibility } from "@/components/profile/FollowListDialog";
 import { ProfileOptionsMenu } from "@/components/profile/ProfileOptionsMenu";
 import { AuthCTABar } from "@/components/AuthCTABar";
@@ -35,7 +36,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
   const [followListOpen, setFollowListOpen] = useState(false);
 
-  const { data: profile = null, isLoading } = useQuery({
+  const { data: profile = null, isLoading, refetch: refetchProfile } = useQuery({
     queryKey: ["user-profile", username],
     enabled: !!username,
     staleTime: 5 * 60 * 1000,
@@ -113,6 +114,10 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const contentReady = !!profile && !tabsLoading && coverReady && avatarReady;
   const showSkeleton = !contentReady;
 
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([refetchProfile(), refreshFollow()]);
+  }, [refetchProfile, refreshFollow]);
+
   if (!isLoading && !profile) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -179,6 +184,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           filter: contentReady ? 'blur(0px)' : 'blur(8px)',
         }}
       >
+      <PullToRefresh onRefresh={handleRefresh}>
       <main className="mx-auto max-w-2xl">
         {/* Cover Image with Header Overlay */}
         <div className="relative h-[400px] profile-cover-fallback">
@@ -384,6 +390,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           ) : null}
         </div>
       </main>
+      </PullToRefresh>
       </div>
       ) : null}
 

@@ -1,48 +1,64 @@
-## Why refresh is not bringing new posts
+## Goal
 
-The current rebuild only sends `pendingSeenIds` to the refresh RPC. Those are posts that already passed the 50% visibility + 1.5s dwell timer and were added to `pendingRef`.
+When a post's source (Instagram, TikTok, YouTube, Facebook, Threads, X, Pinterest, Reddit, LinkedIn, etc.) is deleted or made private — so the embed renders a "link broken / post removed" fallback — automatically delete that post from Aelixto and send the original poster a notification with the thumbnail preview on the right side (matching existing notification styling).
 
-So refresh can still fail in these cases:
+## Why this can't be done in the browser
 
-1. **The currently visible top post may not be pending yet**
-   - If you pull before the 1.5s timer finishes, `takePendingSeenIds()` returns nothing.
-   - The backend then thinks the visible/current posts are still unseen, so it returns the same posts again instead of newer unseen ones.
+The embed iframes (instagram.com, youtube.com, …) are cross-origin, so we cannot read their DOM to detect "Sorry, this post isn't available" messages from the client. Any client-side guess would produce false positives (slow networks, ad-blockers, transient failures) and wrongly delete real posts.
 
-2. **Already-flushed seen posts are okay, but visible-not-yet-flushed posts are not included**
-   - The refresh RPC atomically inserts only the IDs it receives.
-   - It does not know which posts are currently on screen unless the client sends them.
+The reliable signal is **server-side**: re-resolve each post's source URL via the official oEmbed / metadata endpoints. A consistent 404 / "not found" response means the source post is gone.
 
-3. **The pull gesture is UI-only; the feed replacement depends entirely on the seen list**
-   - New posts only appear if the backend can exclude everything the user has already seen.
-   - Right now the client is not giving it a complete “seen before refresh” list.
+## Approach
 
-## Fix plan
+### 1. New edge function: `validate-post-source`
+For a given `postId`, fetch the canonical validation endpoint for its platform:
 
-1. **Keep the Home-only pull refresh component**
-   - Do not re-add refresh to other pages.
-   - Keep the gesture scoped to the Home feed.
+- instagram → `graph.facebook.com/v18.0/instagram_oembed` (existing META token) — 404 / `error.code 24` = removed
+- facebook → `graph.facebook.com/v18.0/oembed_post` — same
+- youtube → `youtube.com/oembed?url=…` — 404 / 401 = removed/private
+- tiktok → `tiktok.com/oembed?url=…` — 404
+- threads / x / linkedin / pinterest / reddit → HEAD request to the post URL; treat HTTP 404 / 410 as removed. Reddit also: `…/.json` returning `{}` or "removed" flag
+- spotify / articles → skip (Spotify items rarely 404; articles handled by existing unfurl)
 
-2. **Change seen tracking to expose visible + pending IDs**
-   - Replace/extend `takePendingSeenIds()` with a refresh-specific method like `takeRefreshSeenIds()`.
-   - It will return:
-     - posts already pending from the 1.5s rule
-     - posts currently at least 50% visible
-   - This makes pull refresh count the currently viewed post immediately, even if the timer has not fired yet.
+Return `{ status: "ok" | "removed" | "unknown" }`. Only `removed` triggers deletion. `unknown` (timeouts, rate-limits, 5xx) never deletes.
 
-3. **Deduplicate and restore safely**
-   - Deduplicate IDs before sending to the backend RPC.
-   - If refresh fails, restore only the IDs that came from pending state so the normal batch retry still works.
+### 2. Confirmation gate (false-positive protection)
+A post is only deleted when it returns `removed` on **two consecutive checks at least 6 hours apart**. We add a `posts.broken_check_count` int + `posts.broken_first_seen_at` timestamp. First removal hit just records; second hit deletes.
 
-4. **Use the existing atomic refresh RPC**
-   - Keep `refresh_following_feed_v1` as the single backend call.
-   - It will insert those seen IDs and return the next unseen page in one transaction.
+### 3. New edge function: `sweep-broken-posts` (cron)
+Runs hourly via pg_cron. Selects ~100 posts ordered by `last_validated_at` ascending (oldest first), calls `validate-post-source` for each, updates counters, and when threshold is hit:
+- captures the post's `thumbnail_url`, `platform`, `caption`/`title`, `media_url`
+- inserts a row into `notifications` with `type = 'post_removed'`, `actor_user_id = null`, `target_user_id = post.user_id`, payload `{ thumbnail_url, platform, original_url, caption }`
+- deletes the post (cascade removes likes/reposts/comments/saves as already configured)
+- triggers existing push-notification pipeline
 
-5. **Improve front-end refresh result handling**
-   - When the RPC returns new posts, replace the first page with them.
-   - When it returns empty, show “You’re all caught up” immediately.
-   - Do not rely on cache invalidation or navigation away/back.
+### 4. Notification UI
+Existing `NotificationItem` already renders a right-side thumbnail when payload has `thumbnail_url`. Add a new branch for `type === 'post_removed'`:
 
-6. **Validate in browser**
-   - Confirm pulling while a post is visible sends that post as seen.
-   - Confirm the same post does not reappear after refresh.
-   - Confirm new/unseen posts appear above “You’re all caught up.”
+> "Your <Instagram> post was removed because the original was deleted or made private." — with the platform logo + cached thumbnail on the right exactly like engagement notifications.
+
+Tappable: opens a small sheet explaining why, no destination link.
+
+### 5. Manual trigger on viewer
+When `HydratedEmbed` mounts an Instagram/Facebook/Threads embed and the **`RawEmbedRenderer` onError** fires (which we already track via `rawEmbedFailed`), fire a one-shot `validate-post-source` call for that postId. This shortcuts the cron for posts the author is actively looking at, but still goes through the same 2-strike gate — no immediate deletion.
+
+## Files
+
+New:
+- `supabase/functions/validate-post-source/index.ts`
+- `supabase/functions/sweep-broken-posts/index.ts`
+- migration: add `broken_check_count`, `broken_first_seen_at`, `last_validated_at` to `posts`; add `post_removed` to notification type enum; schedule hourly cron for `sweep-broken-posts`
+- `src/components/notifications/PostRemovedNotification.tsx`
+
+Edited:
+- `src/components/notifications/NotificationItem.tsx` — route `post_removed` to new component
+- `src/components/HydratedEmbed.tsx` — on `handleRawEmbedError`, call `validate-post-source` once per session per postId
+
+## Out of scope / safeguards
+
+- No client-side "guess" deletion — only server validation deletes.
+- Posts from platforms we cannot reliably probe (Spotify, generic articles) are never auto-deleted.
+- Transient failures (5xx, network, rate-limit) are recorded as `unknown` and do not advance the strike counter.
+- Author can still manually delete; nothing changes for healthy posts.
+
+Approve and I'll implement.

@@ -7,25 +7,31 @@ import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
 import { PostSkeleton } from "@/components/PostSkeleton";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { usePosts } from "@/hooks/usePosts";
 import { useFollowingFeed } from "@/hooks/useFollowingFeed";
 import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 import { SwipeableView } from "@/components/SwipeableView";
-import { HomePullRefresh } from "@/components/HomePullRefresh";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
+  const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const { setObservedPostElement, takeRefreshSeenIds, restorePendingSeenIds } = useMarkPostSeen(user?.id);
+  const {
+    setObservedPostElement,
+    takePendingSeenPostIds,
+    restorePendingSeenPostIds,
+  } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -58,18 +64,6 @@ const Index = () => {
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
   const isSignedOut = !user;
   const showDemoFeed = isSignedOut && isDemoMode;
-
-  const handlePullRefresh = useCallback(async () => {
-    if (showDemoFeed || !user?.id) return;
-    // Include pending + currently visible posts so the backend filters them out.
-    const seenIds = takeRefreshSeenIds();
-    try {
-      await refreshFollowingFeed(seenIds);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (e) {
-      restorePendingSeenIds(seenIds);
-    }
-  }, [showDemoFeed, user?.id, takeRefreshSeenIds, refreshFollowingFeed, restorePendingSeenIds]);
 
   // Map demo posts to feed format - stable memoization
   const mappedDemoPosts = useMemo(() => {
@@ -186,6 +180,20 @@ const Index = () => {
     }
   }, [allPosts.length]);
 
+  const handleRefresh = useCallback(async () => {
+    const seenPostIds = takePendingSeenPostIds();
+
+    try {
+      await Promise.all([
+        refreshFollowingFeed(seenPostIds),
+        queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
+      ]);
+    } catch (error) {
+      restorePendingSeenPostIds(seenPostIds);
+      throw error;
+    }
+  }, [queryClient, refreshFollowingFeed, restorePendingSeenPostIds, takePendingSeenPostIds, user?.id]);
+
   useEffect(() => {
     if (!user?.id || !followingLoading || allPosts.length > 0) return;
     const retry = window.setTimeout(() => {
@@ -238,11 +246,11 @@ const Index = () => {
 
   return (
     <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
-      <HomePullRefresh onRefresh={handlePullRefresh} disabled={showDemoFeed}>
-        <div className="min-h-screen bg-background pb-20">
-          <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
+      <div className="min-h-screen bg-background pb-20">
+        <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
-          <main className="mx-auto max-w-2xl px-4 py-6">
+      <PullToRefresh onRefresh={handleRefresh}>
+        <main className="mx-auto max-w-2xl px-4 py-6">
             {!showDemoFeed && followingEmpty ? (
             followingCount === undefined ? (
               <div className="space-y-4">
@@ -312,11 +320,11 @@ const Index = () => {
               )}
             </div>
           )}
-          </main>
+        </main>
+      </PullToRefresh>
 
-          <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
-        </div>
-      </HomePullRefresh>
+        <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
+      </div>
     </SwipeableView>
   );
 };
