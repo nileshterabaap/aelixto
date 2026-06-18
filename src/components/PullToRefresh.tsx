@@ -6,4 +6,3 @@ interface PullToRefreshProps {
 }
 
 export const PullToRefresh = ({ children }: PullToRefreshProps) => <>{children}</>;
-};
