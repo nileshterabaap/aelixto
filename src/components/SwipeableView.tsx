@@ -130,10 +130,11 @@ export const SwipeableView = ({
       const dx = touch.clientX - g.startX;
       const dy = touch.clientY - g.startY;
 
-      // Lock direction after 10px of movement
-      if (!g.locked && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+      // Lock direction after small movement; bias toward vertical so a
+      // downward pull is never hijacked as a horizontal swipe.
+      if (!g.locked && (Math.abs(dx) > 8 || Math.abs(dy) > 6)) {
         g.locked = true;
-        g.isVertical = Math.abs(dy) > Math.abs(dx);
+        g.isVertical = Math.abs(dy) >= Math.abs(dx) * 0.75;
         if (g.isVertical) {
           gesture.current = null;
           return;
