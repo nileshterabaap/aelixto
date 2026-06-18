@@ -1,72 +1,48 @@
-## Goal
-Rebuild pull-to-refresh from scratch so Home refresh does exactly this:
+## Why refresh is not bringing new posts
 
-1. User pulls down from the very top of Home.
-2. Posts that have truly been seen are committed as seen first.
-3. The feed fetches the next unseen posts from the backend.
-4. If none are left, show “You’re all caught up”.
-5. No old spinner/gesture system, no hidden competing refresh paths.
+The current rebuild only sends `pendingSeenIds` to the refresh RPC. Those are posts that already passed the 50% visibility + 1.5s dwell timer and were added to `pendingRef`.
 
-## Plan
+So refresh can still fail in these cases:
 
-### 1. Keep refresh scoped to Home only
-- Re-add pull-to-refresh only on `src/pages/Index.tsx`.
-- Do not re-add it to Messages, Saved, Discover, Notifications, or Profile.
-- This avoids cross-page gesture conflicts and keeps the rebuild focused on the feed problem.
+1. **The currently visible top post may not be pending yet**
+   - If you pull before the 1.5s timer finishes, `takePendingSeenIds()` returns nothing.
+   - The backend then thinks the visible/current posts are still unseen, so it returns the same posts again instead of newer unseen ones.
 
-### 2. Build a brand-new pull gesture component
-- Create a new lightweight Home-only component, e.g. `HomePullRefresh`.
-- Use one simple state machine:
+2. **Already-flushed seen posts are okay, but visible-not-yet-flushed posts are not included**
+   - The refresh RPC atomically inserts only the IDs it receives.
+   - It does not know which posts are currently on screen unless the client sends them.
 
-```text
-idle -> pulling -> ready -> refreshing -> idle
-```
+3. **The pull gesture is UI-only; the feed replacement depends entirely on the seen list**
+   - New posts only appear if the backend can exclude everything the user has already seen.
+   - Right now the client is not giving it a complete “seen before refresh” list.
 
-- Trigger only when:
-  - page scroll is at top,
-  - touch starts near the page content,
-  - movement is downward,
-  - horizontal swipe is not happening.
-- Prevent it from fighting the existing left/right `SwipeableView` navigation.
-- The spinner/indicator will be newly implemented, not reused from the deleted component.
+## Fix plan
 
-### 3. Rebuild seen tracking as an explicit flush contract
-- Update `useMarkPostSeen` to expose a single method like `flushSeenNow()`.
-- `flushSeenNow()` will:
-  - take the posts that passed the 50% visible / 1.5s rule,
-  - write them to `post_seen`,
-  - wait for that write to complete,
-  - restore pending IDs if the write fails.
-- This removes the race where refresh fetches before seen posts are actually stored.
+1. **Keep the Home-only pull refresh component**
+   - Do not re-add refresh to other pages.
+   - Keep the gesture scoped to the Home feed.
 
-### 4. Make refresh deterministic in `useFollowingFeed`
-- Simplify refresh so it does one thing:
-  - call the feed RPC after seen posts are flushed,
-  - replace the current first page with returned unseen posts,
-  - clear stale pagination state,
-  - set empty state only after the fresh response returns empty.
-- Avoid cache invalidation as the main mechanism.
-- Avoid fallback retries that can mask the real refresh result.
+2. **Change seen tracking to expose visible + pending IDs**
+   - Replace/extend `takePendingSeenIds()` with a refresh-specific method like `takeRefreshSeenIds()`.
+   - It will return:
+     - posts already pending from the 1.5s rule
+     - posts currently at least 50% visible
+   - This makes pull refresh count the currently viewed post immediately, even if the timer has not fired yet.
 
-### 5. Keep backend function simple unless frontend flush is not enough
-- First use the existing backend feed RPC path already present.
-- If implementation shows a remaining race, add one new backend RPC that atomically:
-  - inserts seen post IDs,
-  - returns the next unseen posts in the same transaction.
-- Any migration will include execute grants and will not touch unrelated tables.
+3. **Deduplicate and restore safely**
+   - Deduplicate IDs before sending to the backend RPC.
+   - If refresh fails, restore only the IDs that came from pending state so the normal batch retry still works.
 
-### 6. Validate with real browser behavior
-- Test on the mobile viewport currently used in preview.
-- Verify:
-  - pull gesture triggers only at top,
-  - spinner/indicator animates while refreshing,
-  - seen posts do not come back after refresh,
-  - unseen posts appear before “You’re all caught up”,
-  - bottom navigation away/back is no longer required to see the refreshed result.
+4. **Use the existing atomic refresh RPC**
+   - Keep `refresh_following_feed_v1` as the single backend call.
+   - It will insert those seen IDs and return the next unseen page in one transaction.
 
-## Files expected to change
-- `src/pages/Index.tsx`
-- `src/hooks/useMarkPostSeen.ts`
-- `src/hooks/useFollowingFeed.ts`
-- new Home-only pull refresh component
-- optional backend migration only if needed for atomic refresh
+5. **Improve front-end refresh result handling**
+   - When the RPC returns new posts, replace the first page with them.
+   - When it returns empty, show “You’re all caught up” immediately.
+   - Do not rely on cache invalidation or navigation away/back.
+
+6. **Validate in browser**
+   - Confirm pulling while a post is visible sends that post as seen.
+   - Confirm the same post does not reappear after refresh.
+   - Confirm new/unseen posts appear above “You’re all caught up.”
