@@ -35,7 +35,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
   const [followListOpen, setFollowListOpen] = useState(false);
 
-  const { data: profile = null, isLoading, refetch: refetchProfile } = useQuery({
+  const { data: profile = null, isLoading } = useQuery({
     queryKey: ["user-profile", username],
     enabled: !!username,
     staleTime: 5 * 60 * 1000,
