@@ -102,9 +102,11 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
         gestureRef.current = "pulling";
       }
 
-      // Cancel only if user actually scrolled away from the top, or pulled
-       // significantly back upward — small jitter shouldn't kill the gesture.
-      if (!isAtTop() || diffY < -24) {
+      // Cancel only if the user pulled significantly back upward. We don't
+      // re-check isAtTop() here because mobile browsers can briefly bump
+      // scrollY during the gesture (address bar collapse, layout shift),
+      // which would spuriously kill an in-progress pull.
+      if (diffY < -24) {
         finishWithoutRefresh();
         return;
       }
