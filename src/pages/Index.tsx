@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
+import { flushSync } from "react-dom";
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
@@ -186,7 +187,7 @@ const Index = () => {
     // on pull-to-refresh and stay visible for a minimum duration, regardless
     // of how fast the network responds or whether stale posts are still cached.
     const runId = ++refreshRunIdRef.current;
-    setIsRefreshingFeed(true);
+    flushSync(() => setIsRefreshingFeed(true));
     takePendingSeenPostIds();
     const minDuration = new Promise((r) => window.setTimeout(r, 600));
     try {
@@ -246,7 +247,18 @@ const Index = () => {
       <div className="min-h-screen bg-background pb-20">
         <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
-      <PullToRefresh onRefresh={handleRefresh}>
+      <PullToRefresh
+        onRefresh={handleRefresh}
+        refreshingFallback={(
+          <main className="mx-auto max-w-2xl px-4 py-6 min-h-[calc(100vh-9rem)]" data-feed-refreshing="true">
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <PostSkeleton key={i} />
+              ))}
+            </div>
+          </main>
+        )}
+      >
         <main className="mx-auto max-w-2xl px-4 py-6 min-h-[calc(100vh-9rem)]">
             {shouldShowSkeleton ? (
               <div className="space-y-4">
