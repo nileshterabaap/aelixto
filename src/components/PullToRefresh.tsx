@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { animate, motion, useMotionValue, useTransform } from "framer-motion";
 import { Loader2 } from "lucide-react";
 
 interface PullToRefreshProps {
   onRefresh: () => Promise<void>;
   children: ReactNode;
+  refreshingFallback?: ReactNode;
 }
 
 const TRIGGER_DISTANCE = 32;
@@ -20,8 +22,9 @@ const shouldIgnorePullTarget = (target: EventTarget | null) => {
   );
 };
 
-export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
+export const PullToRefresh = ({ onRefresh, children, refreshingFallback }: PullToRefreshProps) => {
   const [refreshing, setRefreshing] = useState(false);
+  const [showRefreshFallback, setShowRefreshFallback] = useState(false);
   const pullY = useMotionValue(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const startRef = useRef({ x: 0, y: 0 });
@@ -54,7 +57,10 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     refreshingRef.current = true;
     gestureRef.current = "idle";
     (window as unknown as { __pullActive?: boolean }).__pullActive = false;
-    setRefreshing(true);
+    flushSync(() => {
+      setRefreshing(true);
+      setShowRefreshFallback(Boolean(refreshingFallback));
+    });
     animate(pullY, REFRESH_RESTING_DISTANCE, { type: "spring", stiffness: 100, damping: 20, mass: 0.9 });
 
     void (async () => {
@@ -68,10 +74,11 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
         }
         refreshingRef.current = false;
         setRefreshing(false);
+        setShowRefreshFallback(false);
         animate(pullY, 0, { type: "spring", stiffness: 90, damping: 24, mass: 1.1 });
       }
     })();
-  }, [onRefresh, pullY]);
+  }, [onRefresh, pullY, refreshingFallback]);
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -184,7 +191,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       {/* Content stays static — only the spinner translates. This removes
           the layout shift that was making mobile browsers cancel the
           gesture and snap the spinner back. */}
-      <div>{children}</div>
+      <div>{showRefreshFallback && refreshingFallback ? refreshingFallback : children}</div>
     </div>
   );
 };
