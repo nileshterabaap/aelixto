@@ -30,7 +30,6 @@ const Index = () => {
   const {
     setObservedPostElement,
     takePendingSeenPostIds,
-    restorePendingSeenPostIds,
   } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
