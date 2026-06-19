@@ -22,6 +22,8 @@ import { SwipeableView } from "@/components/SwipeableView";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isRefreshingFeed, setIsRefreshingFeed] = useState(false);
+  const refreshRunIdRef = useRef(0);
   const { user, loading: sessionLoading } = useSession();
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
@@ -180,15 +182,28 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Flush whatever the user has dwelled on so the next feed page
-    // doesn't show them the same posts again, but otherwise just refetch
-    // a brand-new first page. get_following_feed_v2 already excludes
-    // seen posts, so any newly created followed post will be at the top.
+    // Explicit refresh UI state — guarantees skeletons appear immediately
+    // on pull-to-refresh and stay visible for a minimum duration, regardless
+    // of how fast the network responds or whether stale posts are still cached.
+    const runId = ++refreshRunIdRef.current;
+    setIsRefreshingFeed(true);
     takePendingSeenPostIds();
-    await Promise.all([
-      refreshFollowingFeed(),
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-    ]);
+    const minDuration = new Promise((r) => window.setTimeout(r, 600));
+    try {
+      await Promise.all([
+        refreshFollowingFeed(),
+        queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
+        minDuration,
+      ]);
+    } catch {
+      // swallow — fall through to clear state so UI never gets stuck
+    } finally {
+      // Only the latest pull clears the skeleton, so rapid repeated pulls
+      // can't end the loading state prematurely.
+      if (refreshRunIdRef.current === runId) {
+        setIsRefreshingFeed(false);
+      }
+    }
   }, [queryClient, refreshFollowingFeed, takePendingSeenPostIds, user?.id]);
 
   useEffect(() => {
@@ -220,9 +235,11 @@ const Index = () => {
     return () => observer.disconnect();
   }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
-  // Only show skeleton on truly empty first load - prevent flicker.
   const loading = showDemoFeed ? demoLoading : followingLoading;
-  const shouldShowSkeleton = allPosts.length === 0 && (sessionLoading || loading);
+  // Show skeletons on first load OR whenever the user has actively pulled
+  // to refresh — never depend on the feed being empty for the refresh case.
+  const shouldShowSkeleton =
+    isRefreshingFeed || (allPosts.length === 0 && (sessionLoading || loading));
 
   return (
     <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
