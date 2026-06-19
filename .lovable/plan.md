@@ -1,34 +1,39 @@
-I found the most likely real cause: the refresh boundary is using the wrong timestamp.
+## Plan: make pull-to-refresh actually behave like a real feed refresh
 
-The feed is ordered by an internal feed sort time (`reposted_at` / `sort_time`), but the frontend currently sends `created_at` as the “newer than this” boundary. That means refresh can ask the backend the wrong question, especially for reposts and any feed item whose visible feed time differs from the original post creation time. Also, the new refresh RPC returns a cursor shape that does not match the current feed cursor format.
+### What I found
+- Pull-to-refresh is firing visually, but the backend refresh path still has brittle logic.
+- The normal feed function and refresh function are not fully aligned in cursor/order behavior.
+- The app currently replaces the feed instantly after refresh without a visible skeleton/loading state, which makes it feel like nothing happened even when the request runs.
+- The current refresh flow overuses `post_seen` as both “I viewed this” and “advance the feed now”, which can hide/fill results in ways that feel broken.
 
-Plan:
+### Fixes to implement
+1. **Restore the real refresh loading experience**
+   - When the user pulls to refresh, temporarily show the feed skeleton state again.
+   - Keep the spinner, but also make the feed visibly enter a loading state like the older version the user misses.
+   - Avoid empty flicker: skeleton only during active user refresh, not random background renders.
 
-1. Fix the feed data model in `useFollowingFeed`
-   - Keep `reposted_at` from the backend instead of dropping it.
-   - Expose a stable feed-sort timestamp for every item.
-   - Keep original `created_at` for post metadata/display where needed.
+2. **Make refresh fetch the latest followed posts first**
+   - Update `refresh_following_feed_v2` so its “new posts” query exactly matches the current feed eligibility rules.
+   - Use the feed sort time consistently (`created_at` for original posts, repost time for reposts).
+   - Return posts newer than the current top feed item even if they were already touched by seen tracking.
 
-2. Fix `Index.tsx` refresh boundary
-   - Stop calculating the “top timestamp” from `post.created_at`.
-   - Use the actual top feed item’s backend sort time (`reposted_at`, falling back to `created_at`).
-   - Keep sending rendered IDs as seen, but only as the “advance past current feed” signal — not as the timestamp boundary.
+3. **Stop refresh from hiding the current feed too aggressively**
+   - Keep marking visible/dwelled posts as seen for normal feed progression.
+   - Do not let “all rendered post IDs” accidentally erase the user’s current page before the newer-post check is complete.
+   - If no newer posts exist, the feed should still reload cleanly instead of looking dead.
 
-3. Replace `refresh_following_feed_v2` with a stricter backend function
-   - Match `get_following_feed_v2` eligibility rules exactly: followed users, own posts, hidden posts/users, repost rules.
-   - Use the same freshness-tier/interleaving order as the feed.
-   - For pull-to-refresh, return items whose feed sort time is newer than the current top feed item.
-   - Return feed cursors in the same JSON shape as `get_following_feed_v2` (`tier`, `sort_time`, `rank`, `shuffle`, `id`), not the older `bucket` shape.
-   - Continue falling back to normal unseen feed only when no newer item exists.
+4. **Align cursor format between normal feed and refresh**
+   - Make the refresh fallback return the same cursor shape/order as `get_following_feed_v2`.
+   - This prevents load-more and refresh from drifting into different ordering systems.
 
-4. Verify the actual PTR call path
-   - Use the live preview/network trace to confirm `refresh_following_feed_v2` fires when pulling.
-   - Confirm the request includes a non-null boundary timestamp.
-   - Confirm new rows returned by the backend become the first feed items.
+5. **Add focused diagnostics while fixing**
+   - Add temporary-safe console/debug signals around refresh result counts and since-time boundaries only if needed.
+   - Verify the request actually calls `refresh_following_feed_v2` and returns rows.
+   - Remove noisy debug output before finalizing unless it is behind development-only checks.
 
-Files expected to change after approval:
-- `src/hooks/useFollowingFeed.ts`
-- `src/pages/Index.tsx`
-- New backend migration replacing `refresh_following_feed_v2`
-
-No UI redesign, no spinner physics changes, no account-linking prompts.
+### Verification
+- Confirm a pull gesture triggers the refresh RPC.
+- Confirm active refresh shows skeletons, then turns into posts.
+- Confirm a newly created post from a followed user appears above the previous top post after refresh.
+- Confirm the caught-up state still works when there are genuinely no unseen/newer posts.
+- Confirm no database permission/RLS errors are introduced.

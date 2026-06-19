@@ -30,7 +30,6 @@ const Index = () => {
   const {
     setObservedPostElement,
     takePendingSeenPostIds,
-    restorePendingSeenPostIds,
   } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
@@ -181,39 +180,16 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark every post currently rendered in the feed as seen so that
-    // pull-to-refresh ALWAYS advances past what the user can already see.
-    // Without this, posts that didn't meet the 1.5s dwell threshold are
-    // not flagged as seen, the RPC re-returns the exact same first page,
-    // and the user perceives "refresh did nothing / no new posts".
-    const dwelledSeen = takePendingSeenPostIds();
-    const renderedIds = allPosts.map((p) => p.id);
-    const seenPostIds = Array.from(new Set([...dwelledSeen, ...renderedIds]));
-
-    // Use the newest post currently on screen as the "since" boundary so the
-    // backend can prioritize posts created AFTER the user's current top item
-    // (true latest-first refresh), not just any unseen older post.
-    // Use the actual feed sort time (reposted_at || created_at), not the
-    // display timestamp. The backend orders by sort_time, so the boundary
-    // must match — otherwise reposts and clustered items get missed.
-    const topTimestamp = allPosts.reduce<string | null>((acc, p) => {
-      const ts = (p as { feedSortTime?: string }).feedSortTime
-        ?? (p.timestamp instanceof Date ? p.timestamp.toISOString() : null);
-      if (!ts) return acc;
-      if (!acc || ts > acc) return ts;
-      return acc;
-    }, null);
-
-    try {
-      await Promise.all([
-        refreshFollowingFeed(seenPostIds, topTimestamp),
-        queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      ]);
-    } catch (error) {
-      restorePendingSeenPostIds(dwelledSeen);
-      throw error;
-    }
-  }, [allPosts, queryClient, refreshFollowingFeed, restorePendingSeenPostIds, takePendingSeenPostIds, user?.id]);
+    // Flush whatever the user has dwelled on so the next feed page
+    // doesn't show them the same posts again, but otherwise just refetch
+    // a brand-new first page. get_following_feed_v2 already excludes
+    // seen posts, so any newly created followed post will be at the top.
+    takePendingSeenPostIds();
+    await Promise.all([
+      refreshFollowingFeed(),
+      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
+    ]);
+  }, [queryClient, refreshFollowingFeed, takePendingSeenPostIds, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !followingLoading || allPosts.length > 0) return;

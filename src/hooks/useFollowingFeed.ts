@@ -43,10 +43,7 @@ interface UseFollowingFeedResult {
   refreshing: boolean;
   error: string | null;
   loadMore: () => void;
-  refresh: (
-    seenPostIds?: string[],
-    sinceTime?: string | null
-  ) => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
+  refresh: () => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
   hasMore: boolean;
 }
 
@@ -119,22 +116,10 @@ const fetchFeedPage = async (cursor?: string) => {
   return toPage(data);
 };
 
-const refreshFeedPage = async (seenPostIds: string[], sinceTime: string | null) => {
-  const rpc = supabase.rpc as unknown as (
-    fn: 'refresh_following_feed_v2',
-    args: { limit_count: number; seen_post_ids: string[]; since_time: string | null }
-  ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
-
-  const { data, error } = await rpc('refresh_following_feed_v2', {
-    limit_count: PAGE_SIZE,
-    seen_post_ids: seenPostIds,
-    since_time: sinceTime,
-  });
-
-  if (error) throw error;
-
-  return toPage(data);
-};
+// Refresh = fetch a brand-new first page of get_following_feed_v2.
+// That function already filters by `post_seen`, so any newly created
+// followed post is unseen by definition and lands at the top.
+const refreshFeedPage = async () => fetchFeedPage(undefined);
 
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
@@ -230,10 +215,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
       .finally(() => setFetchingMore(false));
   };
 
-  const refresh = useCallback(async (
-    seenPostIds: string[] = [],
-    sinceTime: string | null = null,
-  ) => {
+  const refresh = useCallback(async () => {
     preloadedRef.current = false;
     if (!userId) return undefined;
 
@@ -242,19 +224,19 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     setRefreshing(true);
     setFetchingMore(false);
     setError(null);
+    // Clear current pages so the feed shows the skeleton state again,
+    // matching the classic "skeleton → posts" refresh experience.
+    setPages(null);
 
     try {
-      const firstPage = await refreshFeedPage(seenPostIds, sinceTime);
+      const firstPage = await refreshFeedPage();
       if (requestIdRef.current !== requestId) return firstPage;
-      // Merge: if the refresh brought back posts we already have at the top,
-      // we still replace with the latest server-truthed page (which puts the
-      // newest posts first). This avoids stale dedupe gotchas and matches
-      // how Twitter/Instagram swap the top of the feed on PTR.
       setPages([firstPage]);
       return firstPage;
     } catch (err) {
       if (requestIdRef.current === requestId) {
         setError(err instanceof Error ? err.message : 'Failed to refresh feed');
+        setPages([]);
       }
       throw err;
     } finally {
