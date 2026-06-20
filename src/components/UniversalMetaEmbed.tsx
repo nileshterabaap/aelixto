@@ -413,27 +413,28 @@ const buildLinkedInEmbed = (url: string): string | null => {
   try {
     const u = new URL(url);
 
-    // Tall iframe + scrolling enabled so LinkedIn's cookie-consent banner
-    // can be dismissed and the actual post content remains accessible.
-    const liFrame = (urn: string) =>
-      `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" width="100%" height="760" frameborder="0" allowfullscreen="" scrolling="auto" style="border:none;display:block;width:100%;height:760px;min-height:760px;background:#fff;" loading="lazy"></iframe>`;
-
     // Pattern 1: /feed/update/urn:li:activity:ID or urn:li:share:ID or urn:li:ugcPost:ID
     const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
-    if (feedMatch) return liFrame(feedMatch[1]);
+    if (feedMatch) {
+      const urn = feedMatch[1];
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
+    }
 
     // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
+    // Note: separator before type can be underscore or hyphen
     const postMatch = u.pathname.match(/\/posts\/[^/]+[_-](?:ugcPost|activity)-(\d+)-/);
     if (postMatch) {
       const id = postMatch[1];
       const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
       const type = typeMatch ? typeMatch[1] : 'ugcPost';
-      return liFrame(`urn:li:${type}:${id}`);
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
     }
 
     // Pattern 3: /posts/username_slug-share-ID-hash
     const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
-    if (shareMatch) return liFrame(`urn:li:share:${shareMatch[1]}`);
+    if (shareMatch) {
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
+    }
   } catch {
     // Fall through to null
   }
