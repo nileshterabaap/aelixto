@@ -102,6 +102,31 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     postIds.forEach((id) => pendingRef.current.add(id));
   }, []);
 
+  // Force-flush: include currently-visible posts and await DB write.
+  // Used by pull-to-refresh so anything the user actually saw disappears next load.
+  const flushNow = useCallback(async () => {
+    if (!userId) return;
+    visibleRef.current.forEach((id) => pendingRef.current.add(id));
+    if (pendingRef.current.size === 0) return;
+
+    while (flushing.current) {
+      await new Promise((resolve) => window.setTimeout(resolve, 30));
+    }
+
+    flushing.current = true;
+    const postIds = Array.from(pendingRef.current);
+    pendingRef.current.clear();
+
+    try {
+      const rows = postIds.map((post_id) => ({ user_id: userId, post_id }));
+      await supabase.from('post_seen').upsert(rows, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
+    } catch {
+      postIds.forEach((id) => pendingRef.current.add(id));
+    } finally {
+      flushing.current = false;
+    }
+  }, [userId]);
+
   // Periodic flush
   useEffect(() => {
     if (!userId) return;
@@ -168,5 +193,5 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     [clearPostTracking, userId]
   );
 
-  return { setObservedPostElement, takePendingSeenPostIds, restorePendingSeenPostIds };
+  return { setObservedPostElement, takePendingSeenPostIds, restorePendingSeenPostIds, flushNow };
 };
