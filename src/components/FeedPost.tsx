@@ -640,12 +640,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <UniversalMetaEmbed
-                    url={r.url}
-                    fallbackTitle={previewTitle || post.title}
-                    fallbackImage={previewImageUrl || thumbnailUrl}
-                    fallbackDescription={previewText || post.content}
-                  />
+                  <UniversalMetaEmbed url={r.url} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -656,12 +651,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <UniversalMetaEmbed
-                  url={r.url}
-                  fallbackTitle={previewTitle || post.title}
-                  fallbackImage={previewImageUrl || thumbnailUrl}
-                  fallbackDescription={previewText || post.content}
-                />
+                <UniversalMetaEmbed url={r.url} />
               </LazyEmbed>
             )}
             {r.kind === 'universal' && isFacebookUnavailable && (

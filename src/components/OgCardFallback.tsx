@@ -10,15 +10,8 @@ interface OgCardFallbackProps {
 }
 
 export const OgCardFallback = ({ url, title, image, description, platform }: OgCardFallbackProps) => {
-  let hostname = url;
-  try {
-    hostname = new URL(url).hostname.replace(/^www\./, '');
-  } catch {
-    hostname = url.replace(/^https?:\/\//, '').split('/')[0] || url;
-  }
-
   return (
-    <Card className="overflow-hidden border border-border shadow-none hover:border-primary/50 transition-colors">
+    <Card className="overflow-hidden border-2 border-border hover:border-primary/50 transition-colors">
       <a 
         href={url} 
         target="_blank" 
@@ -46,7 +39,7 @@ export const OgCardFallback = ({ url, title, image, description, platform }: OgC
                 </p>
               )}
               <p className="text-sm text-muted-foreground truncate">
-                {hostname}
+                {new URL(url).hostname}
               </p>
             </div>
             <ExternalLink className="h-5 w-5 text-muted-foreground shrink-0" />

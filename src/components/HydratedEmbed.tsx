@@ -168,9 +168,6 @@ export const HydratedEmbed = memo(({
   const effectiveThumbnail = post.platform === 'youtube' && r.url 
     ? getYouTubeThumbnail(r.url) || thumbnailUrl 
     : thumbnailUrl;
-  const fallbackTitle = (post as any).preview_title || post.title || undefined;
-  const fallbackImage = (post as any).preview_image_url || effectiveThumbnail || undefined;
-  const fallbackDescription = (post as any).preview_text || post.content || undefined;
   
   const aspectClass = post.platform === 'youtube' && r.url && isYouTubeShort(r.url, post.title, (post as any).content)
     ? 'aspect-[9/16]'
@@ -278,7 +275,7 @@ export const HydratedEmbed = memo(({
 
         {forceUniversalRenderer && mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={mediaUrl} fallbackTitle={fallbackTitle} fallbackImage={fallbackImage} fallbackDescription={fallbackDescription} />
+            <UniversalMetaEmbed url={mediaUrl} />
           </ImageViewTracker>
         )}
         
@@ -292,7 +289,7 @@ export const HydratedEmbed = memo(({
         {/* Fallback when raw embed fails — show UniversalMetaEmbed to rebuild */}
         {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && rawEmbedFailed && post.mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={post.mediaUrl} fallbackTitle={fallbackTitle} fallbackImage={fallbackImage} fallbackDescription={fallbackDescription} />
+            <UniversalMetaEmbed url={post.mediaUrl} />
           </ImageViewTracker>
         )}
         
@@ -337,7 +334,7 @@ export const HydratedEmbed = memo(({
         {/* Universal Meta embed (Instagram, Facebook, etc) */}
         {r.kind === 'universal' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={r.url} fallbackTitle={fallbackTitle} fallbackImage={fallbackImage} fallbackDescription={fallbackDescription} />
+            <UniversalMetaEmbed url={r.url} />
           </ImageViewTracker>
         )}
       </div>

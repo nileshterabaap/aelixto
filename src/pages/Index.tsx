@@ -27,11 +27,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const {
-    setObservedPostElement,
-    takePendingSeenPostIds,
-    restorePendingSeenPostIds,
-  } = useMarkPostSeen(user?.id);
+  const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -79,7 +75,6 @@ const Index = () => {
     items: followingPosts,
     empty: followingEmpty,
     loading: followingLoading,
-    refresh: refreshFollowingFeed,
     loadMore,
     hasMore,
   } = useFollowingFeed(user?.id);
@@ -108,17 +103,13 @@ const Index = () => {
         mediaType: post.media_type as "image" | "video" | "none",
         mediaUrl: post.media_url || undefined,
         thumbnailUrl: post.thumbnail_url || undefined,
-        preview_title: post.preview_title,
-        preview_text: post.preview_text,
-        preview_image_url: post.preview_image_url,
         platform: post.platform as
           | "youtube"
           | "instagram"
           | "tiktok"
           | "reddit"
           | "twitter"
-          | "pinterest"
-          | "linkedin",
+          | "pinterest",
         embed_html: post.embed_html,
         timestamp: new Date(post.created_at),
         saves: post.saves_count,
@@ -149,17 +140,13 @@ const Index = () => {
       mediaType: post.media_type as "image" | "video" | "none",
       mediaUrl: post.media_url || undefined,
       thumbnailUrl: post.thumbnail_url || undefined,
-      preview_title: post.preview_title,
-      preview_text: post.preview_text,
-      preview_image_url: post.preview_image_url,
       platform: post.platform as
         | "youtube"
         | "instagram"
         | "tiktok"
         | "reddit"
         | "twitter"
-        | "pinterest"
-        | "linkedin",
+        | "pinterest",
       embed_html: post.embed_html,
       timestamp: new Date(post.created_at),
       feedSortTime: post.reposted_at || post.created_at,
@@ -212,21 +199,32 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Pause pending seen writes while the refresh RPC runs. Otherwise posts
-    // that are still on screen can be written to post_seen during refresh and
-    // make the first refreshed page come back empty.
-    const pausedSeenPostIds = takePendingSeenPostIds();
-
+    // Flush any pending "seen" tracking first, then refetch in-place.
+    // Important: do NOT window.location.reload() — a hard reload races the
+    // Supabase auth rehydration, so the RPC can fire with auth.uid() = NULL
+    // and return zero posts ("You're all caught up") even when new posts exist.
     try {
-      await Promise.all([
-        refreshFollowingFeed(),
-        queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-        queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
-      ]);
-    } finally {
-      restorePendingSeenPostIds(pausedSeenPostIds);
+      await flushNow();
+    } catch {
+      // best-effort
     }
-  }, [queryClient, refreshFollowingFeed, restorePendingSeenPostIds, takePendingSeenPostIds, user?.id]);
+
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
+    ]);
+
+    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
+
+    await Promise.all([
+      queryClient.refetchQueries({ queryKey: ['following-feed', user?.id], exact: true }),
+      queryClient.refetchQueries({ queryKey: ['following-count', user?.id], exact: true }),
+      queryClient.refetchQueries({ queryKey: ['following-has-posts', user?.id], exact: true }),
+    ]);
+  }, [flushNow, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
