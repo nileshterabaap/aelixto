@@ -1,36 +1,60 @@
-**Success probability: 86%**
+## Goal
 
-## Investigation findings
-- The skeleton now triggers, so the gesture/UI layer is no longer the main blocker.
-- The client still refreshes with `get_following_feed_v2`, which filters out posts already in `post_seen`.
-- The app has a newer backend function, `refresh_following_feed_v2(seen_post_ids, since_time)`, designed specifically for this exact refresh case, but the client is not using it.
-- `Index.tsx` calls `takePendingSeenPostIds()` and then discards the returned IDs, so visible/current posts are not being passed into the refresh RPC.
-- Likely result: refresh clears the visible list, the normal unseen-feed RPC returns zero rows for a user who has already seen everything, then the UI exits skeleton into the “caught up”/empty state instead of posts.
+Restore only the refresh / "You're all caught up" / feed-serving logic to its state **just before 12 Jun 16:16**, while keeping every other change you made between 12 Jun 16:16 and now intact.
 
-## Plan
-1. **Use the dedicated refresh RPC in `useFollowingFeed`**
-   - Add a `refreshFeedPage(seenPostIds, sinceTime)` path that calls `refresh_following_feed_v2` instead of `get_following_feed_v2`.
-   - Keep normal initial load and pagination on `get_following_feed_v2`.
+## Strategy: Surgical rollback (not a History revert)
 
-2. **Pass the current refresh context from `Index.tsx`**
-   - Capture `const seenPostIds = takePendingSeenPostIds()` instead of discarding it.
-   - Capture the current top feed sort time from `allPosts[0]` before the skeleton replaces the feed.
-   - Call `refreshFollowingFeed({ seenPostIds, sinceTime })`.
+A History revert would wipe all unrelated work after 12 Jun 16:16. Instead, we restore *only the files that touch the feed-refresh / caught-up / serving system* back to their pre-12 Jun 16:16 state — everything else stays untouched.
 
-3. **Do not blank the feed permanently when refresh returns no rows**
-   - During refresh, skeletons can replace the visible UI.
-   - If the refresh RPC returns an empty page but the app already had posts, restore/keep the previous posts after skeleton ends instead of leaving the user with no posts.
-   - Only show “caught up” if there were truly no posts available or the feed is intentionally empty.
+## Step 1 — Identify the exact pre-16:16 baseline
 
-4. **Make rapid pulls safe**
-   - Preserve the existing request-id guard.
-   - Ensure an older refresh response cannot overwrite a newer refresh response or clear the feed.
+Use `chat_search` / `recall_chat_history` to locate the assistant message immediately before the 12 Jun 16:16 prompt, and pull the verbatim contents of the feed-related files from that turn (and surrounding turns if needed).
 
-5. **Verify the actual path**
-   - Confirm the client calls `refresh_following_feed_v2` on pull-to-refresh.
-   - Confirm the DOM sequence is: existing posts → skeletons → posts again.
-   - Confirm no console/network errors appear during the refresh.
+## Step 2 — Define the scope (files in the blast radius)
 
-## Files expected to change
-- `src/hooks/useFollowingFeed.ts`
-- `src/pages/Index.tsx`
+Likely set, to be confirmed in Step 1:
+
+1. `src/hooks/useFollowingFeed.ts` — refresh signature, fallback-to-previous-pages logic
+2. `src/pages/Index.tsx` — `isRefreshingFeed`, `handleRefresh`, `shouldShowSkeleton`, PullToRefresh wiring, caught-up block
+3. `src/components/PullToRefresh.tsx` — refreshingFallback / skeleton-trigger changes
+4. `src/components/PostSkeleton.tsx` — visual tweaks tied to refresh
+5. Supabase RPCs: `get_following_feed_v2`, `refresh_following_feed_v2` — including the 20260620045543 migration and any other migrations created on/after 12 Jun 16:16 that touched them
+
+I will list the exact final set for your confirmation before any file is rewritten.
+
+## Step 3 — Restore frontend files
+
+Rewrite each in-scope file to its pre-16:16 contents exactly. No reinterpretation.
+
+## Step 4 — Restore the RPC
+
+Supabase migrations are append-only, so I create one new migration that redefines `refresh_following_feed_v2` (and `get_following_feed_v2` if needed) to their pre-16:16 bodies — recovered from the earlier migration files already in `supabase/migrations/`.
+
+## Step 5 — Verify nothing else moved
+
+- Diff confirms only the in-scope files changed
+- Build passes
+- Drive Playwright against the preview: load feed → pull-to-refresh → confirm behavior matches the pre-16:16 baseline (no infinite "caught up" loop, skeleton + content arrive correctly)
+
+## Step 6 — Lock it
+
+Add the in-scope files + RPCs to `STABILITY_GUARD.md` / stability-lock so future prompts can't silently re-break them without an explicit unlock.
+
+## What you keep
+
+Every change from 12 Jun 16:16 → now that is NOT part of the feed/refresh/caught-up/serving logic.
+
+## What you lose
+
+Only the feed/refresh attempts made from 12 Jun 16:16 onward.
+
+## Risk / success probability
+
+~85%. Two uncertainties:
+- Whether chat history retains the verbatim file contents from just before 12 Jun 16:16 for every in-scope file. If any file isn't recoverable, I'll stop and ask you to paste it rather than guess.
+- Whether any *other* file (outside the 4 above) was touched as part of those attempts. I'll surface the full confirmed file list after Step 1 before editing anything.
+
+## Before I start, confirm:
+
+1. Approve this surgical-rollback approach, and
+2. If you remember any *other* file that was changed as part of the refresh/caught-up work after 12 Jun 16:16, name it so I add it to scope.
