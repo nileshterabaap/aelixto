@@ -114,7 +114,8 @@ const Index = () => {
           | "tiktok"
           | "reddit"
           | "twitter"
-          | "pinterest",
+          | "pinterest"
+          | "linkedin",
         embed_html: post.embed_html,
         timestamp: new Date(post.created_at),
         saves: post.saves_count,
@@ -151,7 +152,8 @@ const Index = () => {
         | "tiktok"
         | "reddit"
         | "twitter"
-        | "pinterest",
+        | "pinterest"
+        | "linkedin",
       embed_html: post.embed_html,
       timestamp: new Date(post.created_at),
       feedSortTime: post.reposted_at || post.created_at,
