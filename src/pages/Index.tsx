@@ -188,11 +188,18 @@ const Index = () => {
     // of how fast the network responds or whether stale posts are still cached.
     const runId = ++refreshRunIdRef.current;
     flushSync(() => setIsRefreshingFeed(true));
-    takePendingSeenPostIds();
+    // Capture what's visible/seen RIGHT NOW so the backend can advance past
+    // it, and the top post's sort time so the backend can return strictly
+    // newer posts even if they would otherwise be filtered as already-seen.
+    const seenPostIds = takePendingSeenPostIds();
+    const topPost = allPosts[0] as (typeof allPosts)[number] & { feedSortTime?: string };
+    const sinceTime = topPost
+      ? (topPost.feedSortTime ?? topPost.timestamp?.toISOString?.() ?? null)
+      : null;
     const minDuration = new Promise((r) => window.setTimeout(r, 600));
     try {
       await Promise.all([
-        refreshFollowingFeed(),
+        refreshFollowingFeed({ seenPostIds, sinceTime }),
         queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
         minDuration,
       ]);
@@ -205,7 +212,7 @@ const Index = () => {
         setIsRefreshingFeed(false);
       }
     }
-  }, [queryClient, refreshFollowingFeed, takePendingSeenPostIds, user?.id]);
+  }, [allPosts, queryClient, refreshFollowingFeed, takePendingSeenPostIds, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !followingLoading || allPosts.length > 0) return;
