@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
-import { flushSync } from "react-dom";
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
@@ -23,8 +22,6 @@ import { SwipeableView } from "@/components/SwipeableView";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isRefreshingFeed, setIsRefreshingFeed] = useState(false);
-  const refreshRunIdRef = useRef(0);
   const { user, loading: sessionLoading } = useSession();
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
@@ -32,7 +29,6 @@ const Index = () => {
   useIframeScrollFreeze();
   const {
     setObservedPostElement,
-    takePendingSeenPostIds,
   } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
@@ -183,36 +179,15 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Explicit refresh UI state — guarantees skeletons appear immediately
-    // on pull-to-refresh and stay visible for a minimum duration, regardless
-    // of how fast the network responds or whether stale posts are still cached.
-    const runId = ++refreshRunIdRef.current;
-    flushSync(() => setIsRefreshingFeed(true));
-    // Capture what's visible/seen RIGHT NOW so the backend can advance past
-    // it, and the top post's sort time so the backend can return strictly
-    // newer posts even if they would otherwise be filtered as already-seen.
-    const seenPostIds = takePendingSeenPostIds();
-    const topPost = allPosts[0] as (typeof allPosts)[number] & { feedSortTime?: string };
-    const sinceTime = topPost
-      ? (topPost.feedSortTime ?? topPost.timestamp?.toISOString?.() ?? null)
-      : null;
-    const minDuration = new Promise((r) => window.setTimeout(r, 600));
     try {
       await Promise.all([
-        refreshFollowingFeed({ seenPostIds, sinceTime }),
+        refreshFollowingFeed(),
         queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-        minDuration,
       ]);
     } catch {
-      // swallow — fall through to clear state so UI never gets stuck
-    } finally {
-      // Only the latest pull clears the skeleton, so rapid repeated pulls
-      // can't end the loading state prematurely.
-      if (refreshRunIdRef.current === runId) {
-        setIsRefreshingFeed(false);
-      }
+      // swallow — PullToRefresh handles the spinner timing.
     }
-  }, [allPosts, queryClient, refreshFollowingFeed, takePendingSeenPostIds, user?.id]);
+  }, [queryClient, refreshFollowingFeed, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !followingLoading || allPosts.length > 0) return;
@@ -244,10 +219,7 @@ const Index = () => {
   }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
   const loading = showDemoFeed ? demoLoading : followingLoading;
-  // Show skeletons on first load OR whenever the user has actively pulled
-  // to refresh — never depend on the feed being empty for the refresh case.
-  const shouldShowSkeleton =
-    isRefreshingFeed || (allPosts.length === 0 && (sessionLoading || loading));
+  const shouldShowSkeleton = allPosts.length === 0 && (sessionLoading || loading);
 
   return (
     <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
@@ -256,15 +228,6 @@ const Index = () => {
 
       <PullToRefresh
         onRefresh={handleRefresh}
-        refreshingFallback={(
-          <main className="mx-auto max-w-2xl px-4 py-6 min-h-[calc(100vh-9rem)]" data-feed-refreshing="true">
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <PostSkeleton key={i} />
-              ))}
-            </div>
-          </main>
-        )}
       >
         <main className="mx-auto max-w-2xl px-4 py-6 min-h-[calc(100vh-9rem)]">
             {shouldShowSkeleton ? (

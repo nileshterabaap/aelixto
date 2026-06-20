@@ -6,7 +6,6 @@ import { Loader2 } from "lucide-react";
 interface PullToRefreshProps {
   onRefresh: () => Promise<void>;
   children: ReactNode;
-  refreshingFallback?: ReactNode;
 }
 
 const TRIGGER_DISTANCE = 32;
@@ -22,9 +21,8 @@ const shouldIgnorePullTarget = (target: EventTarget | null) => {
   );
 };
 
-export const PullToRefresh = ({ onRefresh, children, refreshingFallback }: PullToRefreshProps) => {
+export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const [refreshing, setRefreshing] = useState(false);
-  const [showRefreshFallback, setShowRefreshFallback] = useState(false);
   const pullY = useMotionValue(0);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const startRef = useRef({ x: 0, y: 0 });
@@ -59,7 +57,6 @@ export const PullToRefresh = ({ onRefresh, children, refreshingFallback }: PullT
     (window as unknown as { __pullActive?: boolean }).__pullActive = false;
     flushSync(() => {
       setRefreshing(true);
-      setShowRefreshFallback(Boolean(refreshingFallback));
     });
     animate(pullY, REFRESH_RESTING_DISTANCE, { type: "spring", stiffness: 100, damping: 20, mass: 0.9 });
 
@@ -74,11 +71,10 @@ export const PullToRefresh = ({ onRefresh, children, refreshingFallback }: PullT
         }
         refreshingRef.current = false;
         setRefreshing(false);
-        setShowRefreshFallback(false);
         animate(pullY, 0, { type: "spring", stiffness: 90, damping: 24, mass: 1.1 });
       }
     })();
-  }, [onRefresh, pullY, refreshingFallback]);
+  }, [onRefresh, pullY]);
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -191,7 +187,7 @@ export const PullToRefresh = ({ onRefresh, children, refreshingFallback }: PullT
       {/* Content stays static — only the spinner translates. This removes
           the layout shift that was making mobile browsers cancel the
           gesture and snap the spinner back. */}
-      <div>{showRefreshFallback && refreshingFallback ? refreshingFallback : children}</div>
+      <div>{children}</div>
     </div>
   );
 };
