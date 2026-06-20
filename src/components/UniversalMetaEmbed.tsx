@@ -421,6 +421,7 @@ const buildLinkedInEmbed = (url: string): string | null => {
     }
 
     // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
+    // Note: separator before type can be underscore or hyphen
     const postMatch = u.pathname.match(/\/posts\/[^/]+[_-](?:ugcPost|activity)-(\d+)-/);
     if (postMatch) {
       const id = postMatch[1];
