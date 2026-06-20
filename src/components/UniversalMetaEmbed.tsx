@@ -236,6 +236,9 @@ const FacebookIframeEmbed = ({
 
 interface UniversalMetaEmbedProps {
   url: string;
+  fallbackTitle?: string | null;
+  fallbackImage?: string | null;
+  fallbackDescription?: string | null;
 }
 
 // Cache resolved embeds to avoid re-processing when navigating between tabs/pages
@@ -449,12 +452,20 @@ const buildTikTokEmbed = (url: string): string | null => {
 };
 
 
-export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
+export const UniversalMetaEmbed = ({ url, fallbackTitle, fallbackImage, fallbackDescription }: UniversalMetaEmbedProps) => {
   const cached = embedCache.get(url);
+  const initialFallbackData =
+    fallbackTitle || fallbackImage || fallbackDescription
+      ? {
+          title: fallbackTitle || undefined,
+          image: fallbackImage || undefined,
+          description: fallbackDescription || undefined,
+        }
+      : null;
 
   const [embedHtml, setEmbedHtml] = useState<string | null>(cached?.embedHtml ?? null);
   const [fallbackData, setFallbackData] = useState<{ title?: string; image?: string; description?: string } | null>(
-    cached?.fallbackData ?? null
+    cached?.fallbackData ?? initialFallbackData
   );
   const [expandedUrl, setExpandedUrl] = useState(cached?.expandedUrl ?? url);
   const [embedUrl, setEmbedUrl] = useState(cached?.embedUrl ?? url); // Separate URL for embedding
@@ -754,9 +765,9 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
     <div data-embed-status="ready">
       <OgCardFallback
         url={expandedUrl}
-        title={fallbackData?.title}
-        image={fallbackData?.image}
-        description={fallbackData?.description}
+        title={fallbackData?.title || fallbackTitle || undefined}
+        image={fallbackData?.image || fallbackImage || undefined}
+        description={fallbackData?.description || fallbackDescription || undefined}
         platform={platformName}
       />
     </div>
