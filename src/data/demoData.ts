@@ -18,7 +18,7 @@ export interface Post {
   media_kind?: string | null;
   aspect_ratio?: number | null;
   suggested_height?: number | null;
-  platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest' | 'facebook' | 'spotify' | 'quora' | 'medium';
+  platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest' | 'facebook' | 'spotify' | 'quora' | 'medium' | 'linkedin' | 'threads';
   embed_html?: string | null;
   timestamp: Date;
   saves: number;
