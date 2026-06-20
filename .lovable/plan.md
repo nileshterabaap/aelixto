@@ -1,60 +1,62 @@
+## What I found
+
+- You were right: the previous “rollback” did not produce a visible pending change now; the working tree is clean.
+- The real pre-Jun-12 feed baseline appears to be commit `9473f70`.
+- Current feed files still differ heavily from that baseline, especially:
+  - `src/hooks/useFollowingFeed.ts`
+  - `src/pages/Index.tsx`
+  - `src/components/PullToRefresh.tsx`
+  - `src/components/PostSkeleton.tsx`
+  - feed-related backend migrations/functions
+- The earlier rollback restored a newer/manual implementation, not the exact pre-Jun-12 behavior.
+
 ## Goal
 
-Restore only the refresh / "You're all caught up" / feed-serving logic to its state **just before 12 Jun 16:16**, while keeping every other change you made between 12 Jun 16:16 and now intact.
+Restore only the refresh / “You’re all caught up” / feed-serving behavior to the state just before Jun 12 16:16, while keeping unrelated work after that date intact.
 
-## Strategy: Surgical rollback (not a History revert)
+## Implementation plan
 
-A History revert would wipe all unrelated work after 12 Jun 16:16. Instead, we restore *only the files that touch the feed-refresh / caught-up / serving system* back to their pre-12 Jun 16:16 state — everything else stays untouched.
+1. **Use `9473f70` as the verified target baseline**
+   - Treat this as the “before the bad prompt” source for feed refresh/caught-up behavior.
+   - Do not do a full project revert.
 
-## Step 1 — Identify the exact pre-16:16 baseline
+2. **Surgically restore frontend behavior**
+   - In `useFollowingFeed.ts`, restore the pre-Jun-12 query-driven feed behavior:
+     - TanStack infinite query feed loading
+     - no custom `refresh()` state machine
+     - no manual page state replacement
+     - no post-refresh fallback-to-empty behavior
+   - In `Index.tsx`, restore the pre-Jun-12 refresh handler:
+     - flush seen-post tracking
+     - clear/invalidate feed-related queries
+     - reload after refresh, matching the old behavior
+   - Restore pre-Jun-12 caught-up display rules:
+     - “You’re all caught up” appears only when the feed-serving logic says the user has actually exhausted available unseen posts
+     - no skeleton flash loop from refresh state
+   - Keep unrelated later UI/content improvements where they do not affect refresh/feed-serving logic.
 
-Use `chat_search` / `recall_chat_history` to locate the assistant message immediately before the 12 Jun 16:16 prompt, and pull the verbatim contents of the feed-related files from that turn (and surrounding turns if needed).
+3. **Restore PullToRefresh behavior only if needed**
+   - Compare current `PullToRefresh.tsx` against `9473f70`.
+   - Only revert pieces that affect the refresh/caught-up flow.
+   - Preserve unrelated gesture improvements unless they are part of the broken loop.
 
-## Step 2 — Define the scope (files in the blast radius)
+4. **Fix backend function state append-only**
+   - Do not delete old migrations.
+   - Add one new migration that redefines active feed RPC behavior to the pre-Jun-12 version.
+   - Ensure `get_following_feed_v2` matches the old serving behavior.
+   - Remove/neutralize `refresh_following_feed_v2` as an active dependency if the restored frontend no longer uses it.
+   - Include required function grants.
 
-Likely set, to be confirmed in Step 1:
+5. **Verification**
+   - Confirm diff is limited to feed-refresh/caught-up/serving scope.
+   - Run a targeted feed behavior check:
+     - initial load does not flash wrong empty state
+     - refresh from caught-up does not skeleton-loop back incorrectly
+     - feed content renders when eligible posts exist
+     - caught-up appears only at real end state
 
-1. `src/hooks/useFollowingFeed.ts` — refresh signature, fallback-to-previous-pages logic
-2. `src/pages/Index.tsx` — `isRefreshingFeed`, `handleRefresh`, `shouldShowSkeleton`, PullToRefresh wiring, caught-up block
-3. `src/components/PullToRefresh.tsx` — refreshingFallback / skeleton-trigger changes
-4. `src/components/PostSkeleton.tsx` — visual tweaks tied to refresh
-5. Supabase RPCs: `get_following_feed_v2`, `refresh_following_feed_v2` — including the 20260620045543 migration and any other migrations created on/after 12 Jun 16:16 that touched them
+## Risk
 
-I will list the exact final set for your confirmation before any file is rewritten.
+**Success probability: 89%**
 
-## Step 3 — Restore frontend files
-
-Rewrite each in-scope file to its pre-16:16 contents exactly. No reinterpretation.
-
-## Step 4 — Restore the RPC
-
-Supabase migrations are append-only, so I create one new migration that redefines `refresh_following_feed_v2` (and `get_following_feed_v2` if needed) to their pre-16:16 bodies — recovered from the earlier migration files already in `supabase/migrations/`.
-
-## Step 5 — Verify nothing else moved
-
-- Diff confirms only the in-scope files changed
-- Build passes
-- Drive Playwright against the preview: load feed → pull-to-refresh → confirm behavior matches the pre-16:16 baseline (no infinite "caught up" loop, skeleton + content arrive correctly)
-
-## Step 6 — Lock it
-
-Add the in-scope files + RPCs to `STABILITY_GUARD.md` / stability-lock so future prompts can't silently re-break them without an explicit unlock.
-
-## What you keep
-
-Every change from 12 Jun 16:16 → now that is NOT part of the feed/refresh/caught-up/serving logic.
-
-## What you lose
-
-Only the feed/refresh attempts made from 12 Jun 16:16 onward.
-
-## Risk / success probability
-
-~85%. Two uncertainties:
-- Whether chat history retains the verbatim file contents from just before 12 Jun 16:16 for every in-scope file. If any file isn't recoverable, I'll stop and ask you to paste it rather than guess.
-- Whether any *other* file (outside the 4 above) was touched as part of those attempts. I'll surface the full confirmed file list after Step 1 before editing anything.
-
-## Before I start, confirm:
-
-1. Approve this surgical-rollback approach, and
-2. If you remember any *other* file that was changed as part of the refresh/caught-up work after 12 Jun 16:16, name it so I add it to scope.
+The remaining risk is that some same-file changes after Jun 12 are unrelated and should be preserved, so this must be a surgical patch rather than wholesale file replacement.
