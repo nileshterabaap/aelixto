@@ -199,12 +199,14 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark only posts the user actually saw, then clear any persisted/stale
-    // feed cache so refresh always asks the backend for the latest eligible feed.
+    // Flush any pending "seen" tracking first, then refetch in-place.
+    // Important: do NOT window.location.reload() — a hard reload races the
+    // Supabase auth rehydration, so the RPC can fire with auth.uid() = NULL
+    // and return zero posts ("You're all caught up") even when new posts exist.
     try {
       await flushNow();
     } catch {
-      // best-effort — proceed with reload regardless
+      // best-effort
     }
 
     await Promise.all([
@@ -218,14 +220,10 @@ const Index = () => {
     queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
 
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
+      queryClient.refetchQueries({ queryKey: ['following-feed', user?.id], exact: true }),
+      queryClient.refetchQueries({ queryKey: ['following-count', user?.id], exact: true }),
+      queryClient.refetchQueries({ queryKey: ['following-has-posts', user?.id], exact: true }),
     ]);
-
-    await new Promise((resolve) => window.setTimeout(resolve, 150));
-    window.location.reload();
-    await new Promise(() => {});
   }, [flushNow, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
