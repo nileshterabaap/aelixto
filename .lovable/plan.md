@@ -1,64 +1,73 @@
-## Goal
+## What's actually happening
 
-When a post's source (Instagram, TikTok, YouTube, Facebook, Threads, X, Pinterest, Reddit, LinkedIn, etc.) is deleted or made private — so the embed renders a "link broken / post removed" fallback — automatically delete that post from Aelixto and send the original poster a notification with the thumbnail preview on the right side (matching existing notification styling).
+### 1. "You're all caught up" right after refresh, then posts appear on tab switch
 
-## Why this can't be done in the browser
+`handleRefresh` in `src/pages/Index.tsx` currently ends with `window.location.reload()`. After a full page reload:
 
-The embed iframes (instagram.com, youtube.com, …) are cross-origin, so we cannot read their DOM to detect "Sorry, this post isn't available" messages from the client. Any client-side guess would produce false positives (slow networks, ad-blockers, transient failures) and wrongly delete real posts.
+- The feed query (`useFollowingFeed`) becomes enabled the moment `user?.id` is set by `useSession`.
+- But the Supabase JS client rehydrates its access token asynchronously from `localStorage`. There is a short window where `user.id` is already in memory but the auth header has not yet been attached to the next HTTP request.
+- The RPC `get_following_feed_v2` gates everything on `auth.uid()`. If the call lands in that window, `auth.uid()` is NULL → 0 eligible posts → `followingEmpty = true` → "You're all caught up".
+- When you tap Search / Notifications / Profile and come back, `refetchOnMount: true` re-runs the query, this time with the auth header attached, and the friend's new post shows up.
 
-The reliable signal is **server-side**: re-resolve each post's source URL via the official oEmbed / metadata endpoints. A consistent 404 / "not found" response means the source post is gone.
+So the reload itself is the bug. Refresh should not hard-reload the page — it should refetch in-place where the session is already alive.
 
-## Approach
+### 2. LinkedIn still not rendering
 
-### 1. New edge function: `validate-post-source`
-For a given `postId`, fetch the canonical validation endpoint for its platform:
+Even after widening the iframe to 760px, the user reports it still doesn't render. We need to actually look at the live preview with Playwright on a known LinkedIn post URL, capture:
 
-- instagram → `graph.facebook.com/v18.0/instagram_oembed` (existing META token) — 404 / `error.code 24` = removed
-- facebook → `graph.facebook.com/v18.0/oembed_post` — same
-- youtube → `youtube.com/oembed?url=…` — 404 / 401 = removed/private
-- tiktok → `tiktok.com/oembed?url=…` — 404
-- threads / x / linkedin / pinterest / reddit → HEAD request to the post URL; treat HTTP 404 / 410 as removed. Reddit also: `…/.json` returning `{}` or "removed" flag
-- spotify / articles → skip (Spotify items rarely 404; articles handled by existing unfurl)
+- whether `buildLinkedInEmbed` returns an iframe or null for that exact URL (URL pattern may not match — e.g. modern `/posts/...` slugs without `-activity-` / `-ugcPost-` / `-share-` infix).
+- whether the iframe loads at all (network 200 vs blocked X-Frame).
+- screenshot of the post card.
 
-Return `{ status: "ok" | "removed" | "unknown" }`. Only `removed` triggers deletion. `unknown` (timeouts, rate-limits, 5xx) never deletes.
+Only after we see that evidence can we land the right fix (URL pattern, fallback strategy, or both).
 
-### 2. Confirmation gate (false-positive protection)
-A post is only deleted when it returns `removed` on **two consecutive checks at least 6 hours apart**. We add a `posts.broken_check_count` int + `posts.broken_first_seen_at` timestamp. First removal hit just records; second hit deletes.
+## Plan
 
-### 3. New edge function: `sweep-broken-posts` (cron)
-Runs hourly via pg_cron. Selects ~100 posts ordered by `last_validated_at` ascending (oldest first), calls `validate-post-source` for each, updates counters, and when threshold is hit:
-- captures the post's `thumbnail_url`, `platform`, `caption`/`title`, `media_url`
-- inserts a row into `notifications` with `type = 'post_removed'`, `actor_user_id = null`, `target_user_id = post.user_id`, payload `{ thumbnail_url, platform, original_url, caption }`
-- deletes the post (cascade removes likes/reposts/comments/saves as already configured)
-- triggers existing push-notification pipeline
+### Step 1 — Fix refresh race (frontend only)
 
-### 4. Notification UI
-Existing `NotificationItem` already renders a right-side thumbnail when payload has `thumbnail_url`. Add a new branch for `type === 'post_removed'`:
+In `src/pages/Index.tsx`, rewrite `handleRefresh` so it does NOT reload the page:
 
-> "Your <Instagram> post was removed because the original was deleted or made private." — with the platform logo + cached thumbnail on the right exactly like engagement notifications.
+1. `await flushNow()` (best effort).
+2. `queryClient.removeQueries({ queryKey: ['following-feed', user?.id] })` and same for `following-count` and `following-has-posts`.
+3. `await queryClient.refetchQueries({ queryKey: ['following-feed', user?.id], exact: true })` and refetch the two helper queries.
+4. Return; no `window.location.reload()`, no artificial sleep.
 
-Tappable: opens a small sheet explaining why, no destination link.
+This keeps the live Supabase session attached, so `auth.uid()` is always set when the RPC runs. The friend's new post will appear immediately after the pull-to-refresh resolves.
 
-### 5. Manual trigger on viewer
-When `HydratedEmbed` mounts an Instagram/Facebook/Threads embed and the **`RawEmbedRenderer` onError** fires (which we already track via `rawEmbedFailed`), fire a one-shot `validate-post-source` call for that postId. This shortcuts the cron for posts the author is actively looking at, but still goes through the same 2-strike gate — no immediate deletion.
+No backend / RPC changes needed for this issue. The pre-Jun-12 baseline already worked this way.
 
-## Files
+### Step 2 — Diagnose LinkedIn before patching
 
-New:
-- `supabase/functions/validate-post-source/index.ts`
-- `supabase/functions/sweep-broken-posts/index.ts`
-- migration: add `broken_check_count`, `broken_first_seen_at`, `last_validated_at` to `posts`; add `post_removed` to notification type enum; schedule hourly cron for `sweep-broken-posts`
-- `src/components/notifications/PostRemovedNotification.tsx`
+In build mode, run a Playwright script that:
 
-Edited:
-- `src/components/notifications/NotificationItem.tsx` — route `post_removed` to new component
-- `src/components/HydratedEmbed.tsx` — on `handleRawEmbedError`, call `validate-post-source` once per session per postId
+1. Restores the Supabase session, navigates to `/`.
+2. Finds the LinkedIn post card in the feed.
+3. Logs the post's `external_url` / `media_url` from the DOM.
+4. Captures a screenshot of the card and reads the inner HTML of the embed container.
+5. Independently calls `buildLinkedInEmbed(url)` logic against that URL to confirm whether a match is produced.
 
-## Out of scope / safeguards
+Based on results, land one of:
 
-- No client-side "guess" deletion — only server validation deletes.
-- Posts from platforms we cannot reliably probe (Spotify, generic articles) are never auto-deleted.
-- Transient failures (5xx, network, rate-limit) are recorded as `unknown` and do not advance the strike counter.
-- Author can still manually delete; nothing changes for healthy posts.
+- **A.** Extend `buildLinkedInEmbed` URL patterns (likely `/posts/<slug>` without the legacy `-activity-/-ugcPost-/-share-` infix; modern URLs use only a numeric activity ID at the end).
+- **B.** If LinkedIn refuses to frame at all from `lovableproject.com`, render an `OgCardFallback` (we already use this for Facebook/Threads) instead of an empty iframe.
 
-Approve and I'll implement.
+We only pick A vs B after seeing the captured evidence — no speculative URL-pattern changes.
+
+### Step 3 — Verify
+
+- Pull-to-refresh on Home with a brand-new friend post → post appears immediately, no "all caught up" flash.
+- Refresh with truly nothing new → "all caught up" still shown correctly.
+- LinkedIn post renders (or falls back cleanly to an OG card with the LinkedIn logo).
+
+### Files expected to change
+
+- `src/pages/Index.tsx` (refresh handler)
+- `src/components/UniversalMetaEmbed.tsx` (LinkedIn — only after Playwright evidence)
+
+No DB migration needed.
+
+## Risk
+
+**Success probability: 86%**
+
+Risk on refresh fix is low — it's a straightforward removal of `window.location.reload()` and an in-place refetch. Risk on LinkedIn depends entirely on what Playwright reveals; the plan deliberately holds the patch until we have that evidence so we don't ship another guess.

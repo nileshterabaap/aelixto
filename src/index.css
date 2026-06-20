@@ -25,6 +25,7 @@ All colors MUST be HSL.
 
     --muted: 0 0% 96%;
     --muted-foreground: 0 0% 45%;
+    --profile-cover: 0 0% 24%;
 
     --accent: 0 0% 96%;
     --accent-foreground: 0 0% 0%;
@@ -162,6 +163,10 @@ span[data-pin-href] button {
     0 10px 28px -10px hsl(220 40% 12% / 0.10);
 }
 
+.profile-cover-fallback {
+  background-color: hsl(var(--profile-cover));
+}
+
 /* Instagram embed styles */
 .embed-container .instagram-media,
 .embed-container iframe[src*="instagram.com"] {
@@ -248,4 +253,10 @@ a:active:not(:disabled) {
    touch events which causes 1-2s scroll input delay on mobile */
 .scroll-freezing-iframes iframe {
   pointer-events: none !important;
+}
+
+/* Disable the browser's native pull-to-refresh so our in-app PullToRefresh
+   component owns the gesture on every page (especially short empty states). */
+html, body {
+  overscroll-behavior-y: none;
 }

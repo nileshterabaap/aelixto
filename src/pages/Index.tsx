@@ -44,6 +44,9 @@ const Index = () => {
     staleTime: 60_000,
   });
 
+  // Demo feed for signed-out users
+  const { data: demoPostsData, isLoading: demoLoading } = usePosts();
+
   // Check if followings have any public posts at all (ignoring seen state).
   // If yes but feed is empty → user has caught up on everything.
   const { data: followingHasAnyPosts } = useQuery({
@@ -66,10 +69,6 @@ const Index = () => {
     enabled: Boolean(user?.id),
     staleTime: 60_000,
   });
-  
-  
-  // Demo feed for signed-out users
-  const { data: demoPostsData, isLoading: demoLoading } = usePosts();
 
   // Following feed for signed-in users
   const {
@@ -150,6 +149,7 @@ const Index = () => {
         | "pinterest",
       embed_html: post.embed_html,
       timestamp: new Date(post.created_at),
+      feedSortTime: post.reposted_at || post.created_at,
       saves: post.saves_count,
       likes_count: post.likes_count || 0,
       comments_count: post.comments_count || 0,
@@ -164,7 +164,6 @@ const Index = () => {
   }, [followingPosts, showDemoFeed]);
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
-  
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
@@ -200,12 +199,14 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark only posts the user actually saw, then clear any persisted/stale
-    // feed cache so refresh always asks the backend for the latest eligible feed.
+    // Flush any pending "seen" tracking first, then refetch in-place.
+    // Important: do NOT window.location.reload() — a hard reload races the
+    // Supabase auth rehydration, so the RPC can fire with auth.uid() = NULL
+    // and return zero posts ("You're all caught up") even when new posts exist.
     try {
       await flushNow();
     } catch {
-      // best-effort — proceed with reload regardless
+      // best-effort
     }
 
     await Promise.all([
@@ -219,14 +220,10 @@ const Index = () => {
     queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
 
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
+      queryClient.refetchQueries({ queryKey: ['following-feed', user?.id], exact: true }),
+      queryClient.refetchQueries({ queryKey: ['following-count', user?.id], exact: true }),
+      queryClient.refetchQueries({ queryKey: ['following-has-posts', user?.id], exact: true }),
     ]);
-
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    window.location.reload();
-    await new Promise(() => {});
   }, [flushNow, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
@@ -250,38 +247,26 @@ const Index = () => {
     return () => observer.disconnect();
   }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
-  // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
-  const shouldShowSkeleton = !hasRenderedOnce.current && (sessionLoading || loading) && allPosts.length === 0;
-
-  if (shouldShowSkeleton) {
-    return (
-      <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
-        <div className="min-h-screen bg-background pb-20">
-          <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
-          <main className="mx-auto max-w-2xl px-4 py-6">
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <PostSkeleton key={i} />
-              ))}
-            </div>
-          </main>
-        </div>
-      </SwipeableView>
-    );
-  }
+  const shouldShowSkeleton = !hasRenderedOnce.current && allPosts.length === 0 && (sessionLoading || loading);
 
   return (
     <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
       <div className="min-h-screen bg-background pb-20">
         <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
-      <PullToRefresh onRefresh={handleRefresh}>
-        <main className="mx-auto max-w-2xl px-4 py-6">
-          {!showDemoFeed && followingEmpty ? (
+      <PullToRefresh
+        onRefresh={handleRefresh}
+      >
+        <main className="mx-auto max-w-2xl px-4 py-6 min-h-[calc(100vh-9rem)]">
+            {shouldShowSkeleton ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <PostSkeleton key={i} />
+                ))}
+              </div>
+            ) : !showDemoFeed && followingEmpty ? (
             followingCount === undefined || followingHasAnyPosts === undefined ? (
-              // Empty-state classifier queries haven't resolved yet —
-              // render nothing to avoid a flash of the wrong message.
               <div className="py-16" />
             ) : followingCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">

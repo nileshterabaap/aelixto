@@ -408,38 +408,13 @@ const buildSpotifyEmbed = (url: string): string | null => {
   return `<iframe style="border-radius:12px;display:block;" src="${embedUrl}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
 };
 
-// Build LinkedIn embed HTML using their native embed endpoint
-const buildLinkedInEmbed = (url: string): string | null => {
-  try {
-    const u = new URL(url);
-
-    // Pattern 1: /feed/update/urn:li:activity:ID or urn:li:share:ID or urn:li:ugcPost:ID
-    const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
-    if (feedMatch) {
-      const urn = feedMatch[1];
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
-    }
-
-    // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
-    // Note: separator before type can be underscore or hyphen
-    const postMatch = u.pathname.match(/\/posts\/[^/]+[_-](?:ugcPost|activity)-(\d+)-/);
-    if (postMatch) {
-      const id = postMatch[1];
-      const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
-      const type = typeMatch ? typeMatch[1] : 'ugcPost';
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
-    }
-
-    // Pattern 3: /posts/username_slug-share-ID-hash
-    const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
-    if (shareMatch) {
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
-    }
-  } catch {
-    // Fall through to null
-  }
-  return null;
-};
+// LinkedIn embed: we intentionally do NOT use LinkedIn's native iframe.
+// In webviews and mobile contexts it almost always renders only a cookie /
+// "sign in to view" wall over the post, which feels broken. Returning null
+// makes UniversalMetaEmbed fall through to OgCardFallback, which shows a
+// clean preview card built from real OG metadata (title, image, description)
+// — same approach used for Reddit / Quora / Medium.
+const buildLinkedInEmbed = (_url: string): string | null => null;
 
 // Build Threads embed HTML using direct iframe (reliable in SPAs, no SDK needed)
 const buildThreadsEmbed = (url: string): string | null => {

@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
-import { motion, useMotionValue, useTransform, animate } from "framer-motion";
+import { flushSync } from "react-dom";
+import { animate, motion, useMotionValue, useTransform } from "framer-motion";
 import { Loader2 } from "lucide-react";
 
 interface PullToRefreshProps {
@@ -7,9 +8,11 @@ interface PullToRefreshProps {
   children: ReactNode;
 }
 
-const THRESHOLD = 60;
-const MAX_PULL = 180;
-const LOADING_REST = 55;
+const TRIGGER_DISTANCE = 32;
+const MAX_DISTANCE = 150;
+const REFRESH_RESTING_DISTANCE = 64;
+const MIN_REFRESH_MS = 1200;
+const PENDING_THRESHOLD = 4;
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -21,132 +24,145 @@ const shouldIgnorePullTarget = (target: EventTarget | null) => {
 export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const [refreshing, setRefreshing] = useState(false);
   const pullY = useMotionValue(0);
-  const touchStartY = useRef(0);
-  const touchStartX = useRef(0);
-  const directionLocked = useRef<"none" | "vertical" | "horizontal">("none");
-  const pulling = useRef(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const startRef = useRef({ x: 0, y: 0 });
+  const gestureRef = useRef<"idle" | "pending" | "pulling" | "blocked">("idle");
+  const refreshingRef = useRef(false);
 
-  // Spinner transforms — fade in quickly, scale smoothly
-  const spinnerOpacity = useTransform(pullY, [0, 20, THRESHOLD], [0, 0.6, 1]);
-  const spinnerScale = useTransform(pullY, [0, THRESHOLD], [0.4, 1]);
-  const spinnerRotate = useTransform(pullY, [0, MAX_PULL], [0, 270]);
+  const spinnerOpacity = useTransform(pullY, [0, 8, TRIGGER_DISTANCE], [0, 0.7, 1]);
+  const spinnerScale = useTransform(pullY, [0, TRIGGER_DISTANCE], [0.65, 1]);
+  const spinnerRotate = useTransform(pullY, [0, MAX_DISTANCE], [0, 300]);
 
   const isAtTop = useCallback(() => {
-    const containerScrollTop = containerRef.current?.scrollTop ?? 0;
     const pageScrollTop =
       window.scrollY ||
       document.scrollingElement?.scrollTop ||
       document.documentElement.scrollTop ||
+      document.body.scrollTop ||
       0;
 
-    return containerScrollTop <= 0 && pageScrollTop <= 0;
+    return pageScrollTop <= 1;
   }, []);
 
+  const finishWithoutRefresh = useCallback(() => {
+    gestureRef.current = "idle";
+    (window as unknown as { __pullActive?: boolean }).__pullActive = false;
+    animate(pullY, 0, { type: "spring", stiffness: 90, damping: 24, mass: 1.1 });
+  }, [pullY]);
+
+  const runRefresh = useCallback(() => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    gestureRef.current = "idle";
+    (window as unknown as { __pullActive?: boolean }).__pullActive = false;
+    flushSync(() => {
+      setRefreshing(true);
+    });
+    animate(pullY, REFRESH_RESTING_DISTANCE, { type: "spring", stiffness: 100, damping: 20, mass: 0.9 });
+
+    void (async () => {
+      const startedAt = Date.now();
+      try {
+        await onRefresh();
+      } finally {
+        const remaining = MIN_REFRESH_MS - (Date.now() - startedAt);
+        if (remaining > 0) {
+          await new Promise((resolve) => window.setTimeout(resolve, remaining));
+        }
+        refreshingRef.current = false;
+        setRefreshing(false);
+        animate(pullY, 0, { type: "spring", stiffness: 90, damping: 24, mass: 1.1 });
+      }
+    })();
+  }, [onRefresh, pullY]);
+
   useEffect(() => {
-    const el = containerRef.current;
+    const el = wrapperRef.current;
     if (!el) return;
 
-    const handleTouchStart = (event: TouchEvent) => {
-      if (refreshing) return;
-      if (shouldIgnorePullTarget(event.target)) return;
-      if (!isAtTop()) return;
-
+    const handleStart = (event: TouchEvent) => {
       const touch = event.touches[0];
-      if (!touch) return;
+      if (!touch || event.touches.length !== 1 || refreshingRef.current) return;
+      if (shouldIgnorePullTarget(event.target) || !isAtTop()) return;
 
-      touchStartY.current = touch.clientY;
-      touchStartX.current = touch.clientX;
-      directionLocked.current = "none";
-      pulling.current = true;
+      startRef.current = { x: touch.clientX, y: touch.clientY };
+      gestureRef.current = "pending";
     };
 
-    const handleTouchMove = (event: TouchEvent) => {
-      if (!pulling.current || refreshing) return;
-
+    const handleMove = (event: TouchEvent) => {
+      if (gestureRef.current === "idle" || gestureRef.current === "blocked") return;
       const touch = event.touches[0];
       if (!touch) return;
 
-      const diffY = touch.clientY - touchStartY.current;
-      const diffX = touch.clientX - touchStartX.current;
+      const diffX = touch.clientX - startRef.current.x;
+      const diffY = touch.clientY - startRef.current.y;
 
-      // Lock direction after small movement; bail on horizontal swipes (e.g. SwipeableView)
-      if (directionLocked.current === "none") {
-        if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
-          directionLocked.current =
-            Math.abs(diffX) > Math.abs(diffY) ? "horizontal" : "vertical";
+      if (gestureRef.current === "pending") {
+        if (Math.abs(diffX) < PENDING_THRESHOLD && Math.abs(diffY) < PENDING_THRESHOLD) return;
+        // Block if the motion is upward or more horizontal than vertical.
+        if (diffY <= 0 || Math.abs(diffX) > diffY) {
+          gestureRef.current = "blocked";
+          return;
         }
+        gestureRef.current = "pulling";
+        // Tell SwipeableView (and anyone else) to stand down for this gesture.
+        (window as unknown as { __pullActive?: boolean }).__pullActive = true;
       }
 
-      if (directionLocked.current === "horizontal") {
-        pulling.current = false;
+      // Once locked into a pull, we own this gesture until touchend.
+      // We never recheck scroll position or cancel mid-gesture — only
+      // clamp the visual offset so the spinner can't go above its rest.
+      if (diffY <= 0) {
         pullY.set(0);
         return;
       }
 
-      const diff = diffY;
+      if (event.cancelable) event.preventDefault();
+      // Lighter resistance below trigger (1:1) so the spinner follows the
+      // finger naturally, gentle resistance after.
+      const resisted = diffY <= TRIGGER_DISTANCE
+        ? diffY
+        : TRIGGER_DISTANCE + (diffY - TRIGGER_DISTANCE) * 0.7;
+      pullY.set(Math.min(MAX_DISTANCE, resisted));
+    };
 
-      if (diff > 0 && isAtTop()) {
-        // 1:1 tracking up to threshold, then gentle resistance for elastic over-pull
-        let dampened: number;
-        if (diff <= THRESHOLD) {
-          dampened = diff;
-        } else {
-          const over = diff - THRESHOLD;
-          dampened = THRESHOLD + over * 0.55 * (1 - over / (over + 400));
-        }
-        pullY.set(Math.min(MAX_PULL, dampened));
+    const handleEnd = () => {
+      if (gestureRef.current !== "pulling") {
+        gestureRef.current = "idle";
+        (window as unknown as { __pullActive?: boolean }).__pullActive = false;
         return;
       }
 
-      pullY.set(0);
-    };
-
-    const handleTouchEnd = () => {
-      if (!pulling.current) return;
-      pulling.current = false;
-
-      const currentPull = pullY.get();
-
-      if (currentPull >= THRESHOLD && !refreshing) {
-        animate(pullY, LOADING_REST, { type: "spring", stiffness: 200, damping: 25 });
-        setRefreshing(true);
-
-        void (async () => {
-          try {
-            await onRefresh();
-          } finally {
-            setRefreshing(false);
-            animate(pullY, 0, { type: "spring", stiffness: 250, damping: 28 });
-          }
-        })();
-
-        return;
+      if (pullY.get() >= TRIGGER_DISTANCE) {
+        runRefresh();
+      } else {
+        finishWithoutRefresh();
       }
-
-      animate(pullY, 0, { type: "spring", stiffness: 350, damping: 28 });
     };
 
-    el.addEventListener("touchstart", handleTouchStart, { passive: true });
-    el.addEventListener("touchmove", handleTouchMove, { passive: true });
-    el.addEventListener("touchend", handleTouchEnd, { passive: true });
-    el.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+    // Listen on our own subtree so we don't fight other global handlers,
+    // but use capture so SwipeableView (which listens on its own container)
+    // still cooperates via the __pullActive flag.
+    el.addEventListener("touchstart", handleStart, { passive: true });
+    el.addEventListener("touchmove", handleMove, { passive: false });
+    el.addEventListener("touchend", handleEnd, { passive: true });
+    el.addEventListener("touchcancel", handleEnd, { passive: true });
 
     return () => {
-      el.removeEventListener("touchstart", handleTouchStart);
-      el.removeEventListener("touchmove", handleTouchMove);
-      el.removeEventListener("touchend", handleTouchEnd);
-      el.removeEventListener("touchcancel", handleTouchEnd);
+      el.removeEventListener("touchstart", handleStart);
+      el.removeEventListener("touchmove", handleMove);
+      el.removeEventListener("touchend", handleEnd);
+      el.removeEventListener("touchcancel", handleEnd);
+      (window as unknown as { __pullActive?: boolean }).__pullActive = false;
     };
-  }, [isAtTop, onRefresh, pullY, refreshing]);
+  }, [finishWithoutRefresh, isAtTop, pullY, runRefresh]);
 
   return (
     <div
-      ref={containerRef}
+      ref={wrapperRef}
       className="relative"
-      style={{ touchAction: "pan-y" }}
+      style={{ overscrollBehaviorY: "contain" }}
     >
-      {/* Pull indicator — overlays on top, content does NOT move */}
       <motion.div
         className="absolute left-0 right-0 flex justify-center pointer-events-none z-50"
         style={{ top: 12, y: pullY, x: 0 }}
@@ -159,19 +175,19 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
           }}
         >
           {refreshing ? (
-            <Loader2 className="h-4.5 w-4.5 text-primary animate-spin" />
+            <Loader2 className="h-[18px] w-[18px] text-primary animate-spin" />
           ) : (
             <motion.div style={{ rotate: spinnerRotate }}>
-              <Loader2 className="h-4.5 w-4.5 text-muted-foreground" />
+              <Loader2 className="h-[18px] w-[18px] text-muted-foreground" />
             </motion.div>
           )}
         </motion.div>
       </motion.div>
 
-      {/* Content drags down with the pull, Instagram-style */}
-      <motion.div style={{ y: pullY }}>
-        {children}
-      </motion.div>
+      {/* Content stays static — only the spinner translates. This removes
+          the layout shift that was making mobile browsers cancel the
+          gesture and snap the spinner back. */}
+      <div>{children}</div>
     </div>
   );
 };
