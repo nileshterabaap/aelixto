@@ -27,9 +27,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const {
-    setObservedPostElement,
-  } = useMarkPostSeen(user?.id);
+  const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -49,13 +47,35 @@ const Index = () => {
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
 
+  // Check if followings have any public posts at all (ignoring seen state).
+  // If yes but feed is empty → user has caught up on everything.
+  const { data: followingHasAnyPosts } = useQuery({
+    queryKey: ['following-has-posts', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return false;
+      const { data: follows } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', user.id);
+      const ids = (follows ?? []).map((f) => f.following_id);
+      ids.push(user.id);
+      const { count } = await supabase
+        .from('posts')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_public', true)
+        .in('user_id', ids);
+      return (count ?? 0) > 0;
+    },
+    enabled: Boolean(user?.id),
+    staleTime: 60_000,
+  });
+
   // Following feed for signed-in users
   const {
     items: followingPosts,
     empty: followingEmpty,
     loading: followingLoading,
     loadMore,
-    refresh: refreshFollowingFeed,
     hasMore,
   } = useFollowingFeed(user?.id);
 
@@ -179,23 +199,34 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
+    // Mark only posts the user actually saw, then clear any persisted/stale
+    // feed cache so refresh always asks the backend for the latest eligible feed.
     try {
-      await Promise.all([
-        refreshFollowingFeed(),
-        queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      ]);
+      await flushNow();
     } catch {
-      // swallow — PullToRefresh handles the spinner timing.
+      // best-effort — proceed with reload regardless
     }
-  }, [queryClient, refreshFollowingFeed, user?.id]);
 
-  useEffect(() => {
-    if (!user?.id || !followingLoading || allPosts.length > 0) return;
-    const retry = window.setTimeout(() => {
-      void refreshFollowingFeed();
-    }, 7000);
-    return () => window.clearTimeout(retry);
-  }, [allPosts.length, followingLoading, refreshFollowingFeed, user?.id]);
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
+    ]);
+
+    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
+    ]);
+
+    await new Promise((resolve) => window.setTimeout(resolve, 150));
+    window.location.reload();
+    await new Promise(() => {});
+  }, [flushNow, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
@@ -219,7 +250,7 @@ const Index = () => {
   }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
   const loading = showDemoFeed ? demoLoading : followingLoading;
-  const shouldShowSkeleton = allPosts.length === 0 && (sessionLoading || loading);
+  const shouldShowSkeleton = !hasRenderedOnce.current && allPosts.length === 0 && (sessionLoading || loading);
 
   return (
     <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
@@ -237,12 +268,8 @@ const Index = () => {
                 ))}
               </div>
             ) : !showDemoFeed && followingEmpty ? (
-            followingCount === undefined ? (
-              <div className="space-y-4">
-                {[...Array(2)].map((_, i) => (
-                  <PostSkeleton key={i} />
-                ))}
-              </div>
+            followingCount === undefined || followingHasAnyPosts === undefined ? (
+              <div className="py-16" />
             ) : followingCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <h3 className="text-lg font-semibold">Nothing here yet 👀</h3>
@@ -253,12 +280,20 @@ const Index = () => {
                   Discover people to follow
                 </Link>
               </div>
-            ) : (
+            ) : followingHasAnyPosts ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                 <h3 className="text-lg font-semibold">You're all caught up</h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   You've seen all recent posts from people you follow.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
+                <h3 className="text-lg font-semibold">No posts yet</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  People you follow haven't posted anything yet. Check back soon.
                 </p>
               </div>
             )
