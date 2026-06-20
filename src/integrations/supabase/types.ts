@@ -1337,45 +1337,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      refresh_following_feed_v2: {
-        Args: {
-          limit_count: number
-          seen_post_ids?: string[]
-          since_time?: string
-        }
-        Returns: {
-          aspect_ratio: number
-          comments_count: number
-          content: string
-          created_at: string
-          embed_html: string
-          feed_cursor: string
-          id: string
-          is_public: boolean
-          is_repost: boolean
-          likes_count: number
-          media_kind: string
-          media_type: string
-          media_url: string
-          platform: string
-          preview_image_url: string
-          preview_text: string
-          preview_title: string
-          profile_avatar_url: string
-          profile_display_name: string
-          profile_id: string
-          profile_username: string
-          reposted_at: string
-          reposted_by_user_id: string
-          reposted_by_username: string
-          reposts_count: number
-          saves_count: number
-          suggested_height: number
-          thumbnail_url: string
-          title: string
-          user_id: string
-        }[]
-      }
       request_or_follow: { Args: { _target: string }; Returns: string }
       respond_to_follow_request: {
         Args: { _approve: boolean; _requester: string }
