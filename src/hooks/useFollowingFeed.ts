@@ -43,7 +43,7 @@ interface UseFollowingFeedResult {
   refreshing: boolean;
   error: string | null;
   loadMore: () => void;
-  refresh: (opts?: { seenPostIds?: string[]; sinceTime?: string | null }) => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
+  refresh: () => Promise<{ posts: FeedPost[]; nextCursor: string | undefined } | undefined>;
   hasMore: boolean;
 }
 
@@ -113,29 +113,6 @@ const fetchFeedPage = async (cursor?: string) => {
 
   if (error) throw error;
 
-  return toPage(data);
-};
-
-// Refresh uses the dedicated RPC, which:
-//   1) marks the posts the user is currently viewing as seen, and
-//   2) returns posts newer than `since_time` (bypassing the seen filter)
-//      then fills with the standard unseen feed page.
-const refreshFeedPage = async (
-  seenPostIds: string[] = [],
-  sinceTime: string | null = null,
-) => {
-  const rpc = supabase.rpc as unknown as (
-    fn: 'refresh_following_feed_v2',
-    args: { limit_count: number; seen_post_ids: string[]; since_time: string | null }
-  ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
-
-  const { data, error } = await rpc('refresh_following_feed_v2', {
-    limit_count: PAGE_SIZE,
-    seen_post_ids: seenPostIds,
-    since_time: sinceTime,
-  });
-
-  if (error) throw error;
   return toPage(data);
 };
 
@@ -233,7 +210,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
       .finally(() => setFetchingMore(false));
   };
 
-  const refresh = useCallback(async (opts?: { seenPostIds?: string[]; sinceTime?: string | null }) => {
+  const refresh = useCallback(async () => {
     preloadedRef.current = false;
     if (!userId) return undefined;
 
@@ -242,30 +219,15 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     setRefreshing(true);
     setFetchingMore(false);
     setError(null);
-    // NOTE: we intentionally do NOT clear `pages` here. The page-level
-    // `isRefreshingFeed` flag controls the skeleton UI, and keeping the
-    // last pages around lets us fall back to them if the refresh response
-    // is empty (so the user never lands on a blank "caught up" screen).
 
     try {
-      const firstPage = await refreshFeedPage(
-        opts?.seenPostIds ?? [],
-        opts?.sinceTime ?? null,
-      );
+      const firstPage = await fetchFeedPage(undefined);
       if (requestIdRef.current !== requestId) return firstPage;
-      // If the refresh returns zero rows, keep the previous pages so the
-      // feed doesn't go blank. Otherwise replace with the fresh page.
-      setPages((current) => {
-        if (firstPage.posts.length === 0 && current && current.some((p) => p.posts.length > 0)) {
-          return current;
-        }
-        return [firstPage];
-      });
+      setPages([firstPage]);
       return firstPage;
     } catch (err) {
       if (requestIdRef.current === requestId) {
         setError(err instanceof Error ? err.message : 'Failed to refresh feed');
-        // Don't blank existing posts on a failed refresh.
       }
       throw err;
     } finally {
