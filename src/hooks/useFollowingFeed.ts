@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
 
 interface FeedPost {
   id: string;
@@ -42,6 +42,7 @@ interface UseFollowingFeedResult {
   empty: boolean;
   loading: boolean;
   error: string | null;
+  refresh: () => Promise<void>;
   loadMore: () => void;
   hasMore: boolean;
 }
@@ -120,8 +121,10 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     isLoading: feedLoading,
     error: feedError,
     fetchNextPage,
+    refetch,
     hasNextPage,
     isFetchingNextPage,
+    isRefetching,
   } = useInfiniteQuery({
     queryKey: ['following-feed', userId],
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam as string | undefined),
@@ -172,11 +175,17 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     }
   };
 
+  const refresh = useCallback(async () => {
+    preloadedRef.current = false;
+    await refetch();
+  }, [refetch]);
+
   return {
     items,
-    empty: Boolean(userId) && !feedLoading && items.length === 0,
+    empty: Boolean(userId) && !feedLoading && !isRefetching && items.length === 0,
     loading: Boolean(userId) && feedLoading,
     error: feedError?.message ?? null,
+    refresh,
     loadMore,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
   };
