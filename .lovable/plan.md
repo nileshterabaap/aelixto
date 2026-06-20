@@ -1,24 +1,36 @@
-## Plan: make pull-to-refresh visibly and reliably reload
+**Success probability: 86%**
 
-1. **Add an explicit refresh-loading signal**
-   - Track `isRefreshingFeed` in `Index.tsx` separately from `useFollowingFeed.loading`.
-   - Set it to `true` immediately when pull-to-refresh starts.
-   - Keep it true for a short minimum duration so even fast network responses show skeletons.
-   - Use a refresh run id / guard so rapid repeated pulls cannot turn the skeleton off early.
+## Investigation findings
+- The skeleton now triggers, so the gesture/UI layer is no longer the main blocker.
+- The client still refreshes with `get_following_feed_v2`, which filters out posts already in `post_seen`.
+- The app has a newer backend function, `refresh_following_feed_v2(seen_post_ids, since_time)`, designed specifically for this exact refresh case, but the client is not using it.
+- `Index.tsx` calls `takePendingSeenPostIds()` and then discards the returned IDs, so visible/current posts are not being passed into the refresh RPC.
+- Likely result: refresh clears the visible list, the normal unseen-feed RPC returns zero rows for a user who has already seen everything, then the UI exits skeleton into the “caught up”/empty state instead of posts.
 
-2. **Show skeletons because refresh is active, not because feed happens to be empty**
-   - Change `shouldShowSkeleton` so active refresh always renders `PostSkeleton`s.
-   - This guarantees the old “skeleton turns into posts” behavior even when stale posts already exist or the hook resolves quickly.
+## Plan
+1. **Use the dedicated refresh RPC in `useFollowingFeed`**
+   - Add a `refreshFeedPage(seenPostIds, sinceTime)` path that calls `refresh_following_feed_v2` instead of `get_following_feed_v2`.
+   - Keep normal initial load and pagination on `get_following_feed_v2`.
 
-3. **Make refresh fetch a fresh first page cleanly**
-   - Keep the current simplified refresh path: flush pending seen markers, call `refreshFollowingFeed()`, invalidate following-count.
-   - Ensure the skeleton remains on screen until that fresh request finishes, then render the newly fetched feed.
+2. **Pass the current refresh context from `Index.tsx`**
+   - Capture `const seenPostIds = takePendingSeenPostIds()` instead of discarding it.
+   - Capture the current top feed sort time from `allPosts[0]` before the skeleton replaces the feed.
+   - Call `refreshFollowingFeed({ seenPostIds, sinceTime })`.
 
-4. **Handle edge cases**
-   - Rapid pulls while a refresh is in-flight should not start competing refreshes or hide skeletons prematurely.
-   - Failed refresh should still exit skeleton state cleanly and show the current feed/empty state instead of getting stuck.
+3. **Do not blank the feed permanently when refresh returns no rows**
+   - During refresh, skeletons can replace the visible UI.
+   - If the refresh RPC returns an empty page but the app already had posts, restore/keep the previous posts after skeleton ends instead of leaving the user with no posts.
+   - Only show “caught up” if there were truly no posts available or the feed is intentionally empty.
 
-5. **Verify**
-   - Confirm the code path makes `shouldShowSkeleton === true` immediately during refresh.
-   - Confirm the skeleton state is not dependent on `allPosts.length === 0`.
-   - Confirm the feed renders again after the refresh promise settles.
+4. **Make rapid pulls safe**
+   - Preserve the existing request-id guard.
+   - Ensure an older refresh response cannot overwrite a newer refresh response or clear the feed.
+
+5. **Verify the actual path**
+   - Confirm the client calls `refresh_following_feed_v2` on pull-to-refresh.
+   - Confirm the DOM sequence is: existing posts → skeletons → posts again.
+   - Confirm no console/network errors appear during the refresh.
+
+## Files expected to change
+- `src/hooks/useFollowingFeed.ts`
+- `src/pages/Index.tsx`
