@@ -65,6 +65,22 @@ function readNum(obj: unknown, path: Array<string | number>): number | null {
   return typeof cur === 'number' && isFinite(cur) ? cur : null;
 }
 
+function isJunkRedditThumbnail(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return (
+    lower.includes("redditstatic.com") ||
+    lower.includes("/snoo") ||
+    lower.includes("snoo.png") ||
+    lower.includes("snoo-") ||
+    lower.includes("default-avatar") ||
+    lower.includes("share.redd.it/preview/post") ||
+    lower.includes("/brand") ||
+    lower.includes("/icon") ||
+    lower.includes("favicon")
+  );
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
