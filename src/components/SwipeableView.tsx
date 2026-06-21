@@ -97,7 +97,6 @@ export const SwipeableView = ({
 
     const onTouchStart = (e: TouchEvent) => {
       if (isAnimating) return;
-      if ((window as unknown as { __pullActive?: boolean }).__pullActive) return;
       const touch = e.touches[0];
       if (!touch) return;
 
@@ -125,22 +124,16 @@ export const SwipeableView = ({
     const onTouchMove = (e: TouchEvent) => {
       const g = gesture.current;
       if (!g || !g.active) return;
-      if ((window as unknown as { __pullActive?: boolean }).__pullActive) {
-        gesture.current = null;
-        setActiveDirection(null);
-        return;
-      }
       const touch = e.touches[0];
       if (!touch) return;
 
       const dx = touch.clientX - g.startX;
       const dy = touch.clientY - g.startY;
 
-      // Lock direction after small movement; bias toward vertical so a
-      // downward pull is never hijacked as a horizontal swipe.
-      if (!g.locked && (Math.abs(dx) > 8 || Math.abs(dy) > 6)) {
+      // Lock direction after 10px of movement
+      if (!g.locked && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
         g.locked = true;
-        g.isVertical = Math.abs(dy) >= Math.abs(dx) * 0.75;
+        g.isVertical = Math.abs(dy) > Math.abs(dx);
         if (g.isVertical) {
           gesture.current = null;
           return;
