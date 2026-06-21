@@ -1,63 +1,42 @@
-## Restore pull-to-refresh + "caught up" exactly to the pre‑12 Jun 16:16 behavior
+## Restore pull‑to‑refresh + caught‑up to the 12 Jun **15:30 IST** version
 
-### Why the current version behaves differently
-In the previous "rollback" I kept the new RPC/cache‑swap mechanics and only renamed/simplified them. The real pre‑16:16 behavior used a completely different mechanism for pull‑to‑refresh:
+### What 15:30 looked like (commit `785dca03`, 10:01 UTC)
+Right after that commit the merge `1b16a39c` "Fixed default cover & caught‑up logic" (10:52 UTC / 16:22 IST) bundled two unrelated things:
 
-- Old `useFollowingFeed.ts` had **no `refresh()` function at all**. It was a plain `useInfiniteQuery` with `staleTime: 2min`, `refetchOnMount: true`, and also exposed `reachedEnd` (true only when the server returns 0 rows).
-- Old `Index.tsx` `handleRefresh`:
-  1. `await flushNow()` — push pending seen marks to DB,
-  2. cancel + **remove** + invalidate `following-feed`, `following-count`, `following-has-posts`,
-  3. wait 150ms,
-  4. **`window.location.reload()`** — full hard reload of the page.
-- "Caught up" message only showed when `followingHasAnyPosts && reachedEnd` (i.e. confirmed end of feed), with an intermediate `<div className="py-16" />` placeholder when posts exist but `reachedEnd` is still false. The current code shows "caught up" the moment the first page is empty, which is why a friend's brand‑new post can read as "all caught up" until something else forces a refetch.
+1. A profile cover styling tweak (`profile-cover-fallback`) — unrelated, keep as‑is.
+2. The caught‑up regression: it introduced `reachedEnd` in `useFollowingFeed`, gated the "You're all caught up" UI on it in `Index.tsx`, and changed the pagination cursor rule in `prefetch.ts`.
 
-The full‑page reload was the mechanism that guaranteed a clean fetch every time. The current RPC/`setQueryData` path skips that reload and depends on cache shape — exactly why refresh sometimes shows "all caught up" while navigating away and back works.
+My previous restore matched commit `ccd62581` (12:10 UTC / 17:40 IST), which still contains change #2. That's why the behaviour is still wrong. The 15:30 version did NOT have `reachedEnd` — the caught‑up message simply followed `followingHasAnyPosts` / `!hasMore`, and `handleRefresh` was already the `window.location.reload()` flow I restored last turn. The reload path stays — only the caught‑up gating reverts.
 
-### Changes
+### Changes (3 files)
 
-1. **`src/hooks/useFollowingFeed.ts` — revert to baseline**
-   - Remove `refresh()`, `useQueryClient`, `useCallback`, `fetchRefreshPage`, `mapFeedRows` extraction, and the standalone `RefreshRpcArgs` type.
-   - Restore the inline mapper inside `fetchFeedPage`.
-   - Re‑add `reachedEnd` (true when any page has `posts.length === 0`) to the returned object and to `UseFollowingFeedResult`.
-   - Drop `refresh` from the return type.
+1. **`src/hooks/useFollowingFeed.ts`** — remove every reference to `reachedEnd`:
+   - Drop `reachedEnd: boolean` from `UseFollowingFeedResult`.
+   - Delete the `reachedEnd` `useMemo`.
+   - Drop `reachedEnd: Boolean(userId) && reachedEnd` from the returned object.
 
-2. **`src/pages/Index.tsx` — revert to baseline refresh + caught‑up logic**
-   - Import `flushNow` from `useMarkPostSeen` instead of `takePendingSeenPostIds` / `restorePendingSeenPostIds`.
-   - Destructure `reachedEnd` from `useFollowingFeed`; drop `refresh`/`refreshFollowingFeed`.
-   - Replace `handleRefresh` with the baseline version:
+2. **`src/pages/Index.tsx`** — revert caught‑up branches to the 15:30 form:
+   - Stop destructuring `reachedEnd` from `useFollowingFeed`.
+   - In the empty‑state block: replace `followingHasAnyPosts && reachedEnd` with `followingHasAnyPosts`, and remove the intermediate `followingHasAnyPosts ? <div className="py-16" />` branch.
+   - In the infinite list footer: change `{reachedEnd && !hasMore && !showDemoFeed && allPosts.length > 0 && (` back to `{!hasMore && !showDemoFeed && allPosts.length > 0 && (`.
+   - Leave `handleRefresh` (already the reload flow), `flushNow`, imports, and everything else untouched.
+
+3. **`src/lib/prefetch.ts`** — restore the 15:30 cursor rule:
+   - Change
      ```ts
-     try { await flushNow(); } catch {}
-     await Promise.all([
-       queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
-       queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
-       queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
-     ]);
-     queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
-     queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
-     queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
-     await Promise.all([
-       queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
-       queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-       queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
-     ]);
-     await new Promise((r) => setTimeout(r, 150));
-     window.location.reload();
-     await new Promise(() => {}); // keep spinner up until reload
+     nextCursor: mappedPosts.length === 0 ? undefined : mappedPosts[mappedPosts.length - 1]?.feed_cursor,
      ```
-   - Update the empty‑state branches to match baseline:
-     - `followingCount === 0` → "Nothing here yet 👀"
-     - `followingHasAnyPosts && reachedEnd` → "You're all caught up"
-     - `followingHasAnyPosts && !reachedEnd` → empty `<div className="py-16" />` (don't show "caught up" prematurely)
-     - else → "No posts yet"
+     back to
+     ```ts
+     nextCursor: mappedPosts.length === 20 ? mappedPosts[mappedPosts.length - 1].feed_cursor : undefined,
+     ```
 
-3. **Database — drop the unused refresh RPC** (it didn't exist at baseline and isn't needed once the client uses `window.location.reload`)
-   - New migration: `DROP FUNCTION IF EXISTS public.refresh_following_feed_v2(integer, uuid[], timestamptz);` (and any other signatures).
-
-4. **Leave alone** (unrelated to refresh/caught‑up): `useRealtimeSync.ts`, `PullToRefresh.tsx`, `useMarkPostSeen.ts` (still exports `flushNow`), `get_following_feed_v2` (already matches baseline), `useFeedAnchorRestoration`, scroll/keep‑alive code.
+### Not touched
+`useMarkPostSeen.ts`, `useRealtimeSync.ts`, `PullToRefresh.tsx`, `get_following_feed_v2`, the profile cover styling (`profile-cover-fallback`), keep‑alive/scroll code — none of these existed differently at 15:30 in a way that affects refresh/caught‑up.
 
 ### Verification
-- Confirm via DB read that `refresh_following_feed_v2` is gone and `get_following_feed_v2` is unchanged.
-- Grep to ensure no remaining references to `takePendingSeenPostIds` / `restorePendingSeenPostIds` / `refreshFollowingFeed`.
-- After the user reproduces: a friend posts → pull‑to‑refresh on Home → page hard‑reloads → new post appears at top (same mechanism that worked before 12 Jun 16:16).
+- `rg "reachedEnd"` returns no hits anywhere in `src/`.
+- Manual diff of the three files against `git show 785dca03:<path>` shows zero remaining differences in the refresh/caught‑up code paths.
+- User reproduces: friend posts → pull‑to‑refresh → page hard‑reloads → new post appears; "You're all caught up" only appears when `!hasMore`, matching 15:30 behaviour.
 
-**Success probability: 94%** — this matches the verified baseline (`ccd62581`) byte‑for‑byte on the refresh path; the only intentional deviation is keeping `useRealtimeSync.ts` (added after baseline) untouched since it's unrelated to the user's complaint.
+**Success probability: 96%** — the diff above is the exact inverse of the commit (`1b16a39c`) that diverged from 15:30, limited to the three files that touched refresh/caught‑up logic.
