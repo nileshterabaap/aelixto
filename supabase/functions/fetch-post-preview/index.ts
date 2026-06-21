@@ -87,12 +87,13 @@ serve(async (req) => {
   }
 
   try {
-    const { postId, url, platform } = await req.json();
-    
-    console.log(`[fetch-post-preview] Processing postId=${postId}, platform=${platform}, url=${url}`);
+    const { postId, url, platform, previewOnly } = await req.json();
+    const skipDbWrite = previewOnly === true || !postId;
 
-    if (!postId || !url) {
-      return new Response(JSON.stringify({ error: 'Missing postId or url' }), {
+    console.log(`[fetch-post-preview] Processing postId=${postId}, platform=${platform}, url=${url}, previewOnly=${!!previewOnly}`);
+
+    if (!url) {
+      return new Response(JSON.stringify({ error: 'Missing url' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
