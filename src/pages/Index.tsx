@@ -76,7 +76,6 @@ const Index = () => {
     items: followingPosts,
     empty: followingEmpty,
     loading: followingLoading,
-    refresh: refreshFollowingFeed,
     loadMore,
     hasMore,
   } = useFollowingFeed(user?.id);
@@ -201,19 +200,34 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark only posts the user actually saw, then refresh the still-mounted
-    // feed query directly so PullToRefresh waits for the real network work.
+    // Mark only posts the user actually saw, then clear any persisted/stale
+    // feed cache so refresh always asks the backend for the latest eligible feed.
     try {
       await flushNow();
     } catch {
-      // best-effort — proceed with refresh regardless
+      // best-effort — proceed with reload regardless
     }
 
-    await refreshFollowingFeed();
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
+    ]);
 
-    void queryClient.invalidateQueries({ queryKey: ['following-count', user?.id], exact: true });
-    void queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id], exact: true });
-  }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
+    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
+    ]);
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    window.location.reload();
+    await new Promise(() => {});
+  }, [flushNow, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
