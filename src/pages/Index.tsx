@@ -76,6 +76,7 @@ const Index = () => {
     items: followingPosts,
     empty: followingEmpty,
     loading: followingLoading,
+    refresh: refreshFollowingFeed,
     loadMore,
     hasMore,
   } = useFollowingFeed(user?.id);
@@ -200,34 +201,19 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark only posts the user actually saw, then clear any persisted/stale
-    // feed cache so refresh always asks the backend for the latest eligible feed.
+    // Mark only posts the user actually saw, then refresh the still-mounted
+    // feed query directly so PullToRefresh waits for the real network work.
     try {
       await flushNow();
     } catch {
-      // best-effort — proceed with reload regardless
+      // best-effort — proceed with refresh regardless
     }
 
-    await Promise.all([
-      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
-    ]);
+    await refreshFollowingFeed();
 
-    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
-
-    // Re-fetch the feed in-place. Awaiting the refetch keeps the
-    // pull-to-refresh spinner up until new posts are actually rendered,
-    // and avoids the destructive full-page reload that was causing the
-    // feed to come back empty.
-    await Promise.all([
-      queryClient.refetchQueries({ queryKey: ['following-feed', user?.id], exact: true, type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['following-count', user?.id], exact: true, type: 'active' }),
-      queryClient.refetchQueries({ queryKey: ['following-has-posts', user?.id], exact: true, type: 'active' }),
-    ]);
-  }, [flushNow, queryClient, user?.id]);
+    void queryClient.invalidateQueries({ queryKey: ['following-count', user?.id], exact: true });
+    void queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id], exact: true });
+  }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
