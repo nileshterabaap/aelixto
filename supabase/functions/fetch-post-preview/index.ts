@@ -65,6 +65,22 @@ function readNum(obj: unknown, path: Array<string | number>): number | null {
   return typeof cur === 'number' && isFinite(cur) ? cur : null;
 }
 
+function isJunkRedditThumbnail(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return (
+    lower.includes("redditstatic.com") ||
+    lower.includes("/snoo") ||
+    lower.includes("snoo.png") ||
+    lower.includes("snoo-") ||
+    lower.includes("default-avatar") ||
+    lower.includes("share.redd.it/preview/post") ||
+    lower.includes("/brand") ||
+    lower.includes("/icon") ||
+    lower.includes("favicon")
+  );
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -135,6 +151,9 @@ serve(async (req) => {
       const redditData = await fetchRedditPreview(url);
       redditPostData = redditData.post_data ?? null;
       thumbnailUrl = redditData.thumbnail_url;
+      if (isJunkRedditThumbnail(thumbnailUrl)) {
+        thumbnailUrl = null;
+      }
       previewTitle = redditData.title;
       previewText = redditData.description || redditData.title;
       sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
