@@ -1,47 +1,47 @@
-## Rebuild plan — reapply Keep items from `mem://rebuild/from-june-12`
+## Continuing rebuild — Items 3–6
 
-Working agreement (from the memory file): apply Keep items one at a time, smallest first; you verify in the live preview after each before I move on; do not touch anything on the Skip list (useFollowingFeed, PullToRefresh, useMarkPostSeen, Index refresh path, seen logic). After the 6 Keeps are in, I'll ask before touching U1 (per-event scoring).
+Items 1 & 2 verified. Proceeding with the remaining Keeps, one at a time, smallest first.
 
-Probability of success: ~90% per item individually.
+### Item 3 — Reddit thumbnail filtering (next)
 
-### Order of work
+**Client (`src/lib/getPostThumb.ts`)**
+- In `isMisleadingThumbnail`, for `platform === 'reddit'` reject URLs whose lowercase form contains any of: `redditstatic.com`, `/snoo`, `snoo.png`, `snoo-`, `default-avatar`, `share.redd.it/preview/post`, `/brand`, `/icon`, `favicon`.
+- Result: falls through to `TextCardThumbnail` instead of showing the Reddit alien logo.
 
-**1. Compact Aelix score (10k threshold)**
-- Create `src/lib/formatCount.ts` with `formatCount(n)`: `<10000 → full number`, `≥10000 → 12.3k`, `≥1e6 → 1.2M`, `≥1e9 → 1.2B`.
-- Use it in `src/pages/UserProfile.tsx` where the Aelix score renders.
+**Server (`supabase/functions/fetch-post-preview/index.ts`)**
+- Before writing a Reddit `thumbnail_url` / `preview_image_url`, run the same reject list and drop the field if it matches, so new posts don't store junk.
 
-**2. Dark gray default profile cover**
-- Add `--profile-cover: 0 0% 24%` + `.profile-cover-fallback { background: hsl(var(--profile-cover)); }` to `src/index.css`.
-- Replace the current cover gradient/`bg-muted` and the matching skeleton class in `src/pages/UserProfile.tsx` with `profile-cover-fallback`.
+**One-time data cleanup (via insert tool)**
+```sql
+UPDATE public.posts
+SET thumbnail_url = NULL
+WHERE platform = 'reddit'
+  AND thumbnail_url ~* '(redditstatic\.com|/snoo|default-avatar|share\.redd\.it/preview/post|/brand|/icon|favicon)';
 
-**3. Reddit thumbnail filtering (client + server)**
-- `src/lib/getPostThumb.ts`: when `platform === 'reddit'`, reject URLs matching `redditstatic.com`, `snoo`, `brand`, `icon`, `favicon`, `default-avatar`, `share.redd.it/preview/post` → fall back to text card.
-- Mirror the same reject list in `supabase/functions/fetch-post-preview/index.ts` so future posts don't store junk thumbnails.
-- One-time `UPDATE` (via insert tool) to null `thumbnail_url` / `preview_image_url` on existing rows containing `share.redd.it/preview/post`.
+UPDATE public.posts
+SET preview_image_url = NULL
+WHERE platform = 'reddit'
+  AND preview_image_url ~* '(redditstatic\.com|/snoo|default-avatar|share\.redd\.it/preview/post|/brand|/icon|favicon)';
+```
 
-**4. Reddit preview-only mode at create time**
-- `supabase/functions/fetch-post-preview/index.ts`: accept `previewOnly: boolean`; when true (or `postId` missing) skip the DB write and just return the preview payload.
-- `src/components/CreatePostDialog.tsx`: for Reddit URLs, swap the `fetch-og` call for `fetch-post-preview` with `previewOnly: true` so the create-dialog preview matches what publishes.
+You verify in preview → I move to Item 4.
 
-**5. Follow system polish — Follow Back / Asked / Alright / Sorry**
-- `src/hooks/useFollow.ts`: expose `followsMe` and `isRequested`.
-- Update the search RPC `search_profiles` to return `is_requested` and `follows_me` (migration).
-- Update buttons in `src/pages/UserProfile.tsx` and `src/components/SearchResultItem.tsx` to render **Follow Back** (target follows you, you don't follow back) and **Asked** (pending request to a private account).
-- `src/pages/Notifications.tsx`: `follow_request` rows read `@username asked to Follow` with **Alright** (approve) and **Sorry** (silently delete the request).
+### Item 4 — Reddit preview-only mode at create time
+- `fetch-post-preview/index.ts`: accept `previewOnly: boolean`; when true (or `postId` missing) skip DB write, return payload only.
+- `CreatePostDialog.tsx`: for Reddit URLs swap `fetch-og` → `fetch-post-preview` with `previewOnly: true`.
 
-**6. Aelix Score info popup on Edit Profile**
-- `src/pages/EditProfile.tsx`: add a small `i` button next to the "Aelix Score" label. Plain `useState` + `setTimeout`, NOT Radix Tooltip. Auto-dismiss after 5s; tapping again cancels the timer. Body:
-  > Aelix Score represents the total engagement earned by your shared posts.
-  > • View a shared post (+1)
-  > • Play shared content (+1)
-  > • Visit the original source (+1)
+### Item 5 — Follow polish (Follow Back / Asked / Alright / Sorry)
+- `useFollow.ts` exposes `followsMe`, `isRequested`.
+- Migration: update `search_profiles` RPC to return `is_requested`, `follows_me`.
+- `UserProfile.tsx` + `SearchResultItem.tsx`: render Follow Back / Asked labels.
+- `Notifications.tsx`: follow_request rows show **Alright** (approve) / **Sorry** (silently delete).
 
-### After all 6 are verified
+### Item 6 — Aelix Score info popup on Edit Profile
+- `EditProfile.tsx`: small `i` button next to "Aelix Score" label. Plain `useState` + `setTimeout` (no Radix Tooltip), 5s auto-dismiss, tap-again cancels timer. Body: view (+1), play (+1), visit (+1).
 
-I'll ask whether to attempt **U1 (per-event scoring: +1 view / +1 play / +1 original visit)** with a clean implementation, or leave scoring on the June 12 baseline.
+### After all 6 verified
+I'll ask about **U1** (per-event scoring) before touching it.
 
-### Out of scope (Skip list — staying on June 12 baseline)
+Probability of success: ~90% per item.
 
-`reachedEnd`, `has_unseen_following_feed_posts`, "Feed couldn't load" UI, `manualPages`, React Query removal in `useFollowingFeed`, `refresh_following_feed_v1`, `useRealtimeSync`, PullToRefresh rewrites, `SEEN_DWELL_MS`, `refetchOnMount: 'always'`, `window.location.reload()` in `handleRefresh`, duplicate-trigger removal.
-
-Approve and I'll start with item 1.
+Approve and I'll start with Item 3.
