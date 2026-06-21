@@ -27,7 +27,11 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
+  const {
+    setObservedPostElement,
+    takePendingSeenPostIds,
+    restorePendingSeenPostIds,
+  } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -43,6 +47,9 @@ const Index = () => {
     enabled: Boolean(user?.id),
     staleTime: 60_000,
   });
+
+  // Demo feed for signed-out users
+  const { data: demoPostsData, isLoading: demoLoading } = usePosts();
 
   // Check if followings have any public posts at all (ignoring seen state).
   // If yes but feed is empty → user has caught up on everything.
@@ -66,10 +73,6 @@ const Index = () => {
     enabled: Boolean(user?.id),
     staleTime: 60_000,
   });
-  
-  
-  // Demo feed for signed-out users
-  const { data: demoPostsData, isLoading: demoLoading } = usePosts();
 
   // Following feed for signed-in users
   const {
@@ -78,6 +81,7 @@ const Index = () => {
     loading: followingLoading,
     loadMore,
     hasMore,
+    refresh: refreshFollowingFeed,
   } = useFollowingFeed(user?.id);
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -150,6 +154,7 @@ const Index = () => {
         | "pinterest",
       embed_html: post.embed_html,
       timestamp: new Date(post.created_at),
+      feedSortTime: post.reposted_at || post.created_at,
       saves: post.saves_count,
       likes_count: post.likes_count || 0,
       comments_count: post.comments_count || 0,
@@ -164,7 +169,6 @@ const Index = () => {
   }, [followingPosts, showDemoFeed]);
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
-  
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
@@ -200,34 +204,22 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark only posts the user actually saw, then clear any persisted/stale
-    // feed cache so refresh always asks the backend for the latest eligible feed.
+    // Drain pending "seen" marks so the refresh RPC can mark them and
+    // surface new posts above them in a single round-trip.
+    const drained = takePendingSeenPostIds();
+    const countKey = ['following-count', user?.id] as const;
+    const hasPostsKey = ['following-has-posts', user?.id] as const;
+
     try {
-      await flushNow();
+      await Promise.all([
+        refreshFollowingFeed(drained),
+        queryClient.refetchQueries({ queryKey: countKey, exact: true, type: 'active' }),
+        queryClient.refetchQueries({ queryKey: hasPostsKey, exact: true, type: 'active' }),
+      ]);
     } catch {
-      // best-effort — proceed with reload regardless
+      restorePendingSeenPostIds(drained);
     }
-
-    await Promise.all([
-      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
-    ]);
-
-    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
-
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
-    ]);
-
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    window.location.reload();
-    await new Promise(() => {});
-  }, [flushNow, queryClient, user?.id]);
+  }, [takePendingSeenPostIds, restorePendingSeenPostIds, refreshFollowingFeed, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
@@ -250,38 +242,26 @@ const Index = () => {
     return () => observer.disconnect();
   }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
-  // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
-  const shouldShowSkeleton = !hasRenderedOnce.current && (sessionLoading || loading) && allPosts.length === 0;
-
-  if (shouldShowSkeleton) {
-    return (
-      <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
-        <div className="min-h-screen bg-background pb-20">
-          <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
-          <main className="mx-auto max-w-2xl px-4 py-6">
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <PostSkeleton key={i} />
-              ))}
-            </div>
-          </main>
-        </div>
-      </SwipeableView>
-    );
-  }
+  const shouldShowSkeleton = !hasRenderedOnce.current && allPosts.length === 0 && (sessionLoading || loading);
 
   return (
     <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
       <div className="min-h-screen bg-background pb-20">
         <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
-      <PullToRefresh onRefresh={handleRefresh}>
-        <main className="mx-auto max-w-2xl px-4 py-6">
-          {!showDemoFeed && followingEmpty ? (
+      <PullToRefresh
+        onRefresh={handleRefresh}
+      >
+        <main className="mx-auto max-w-2xl px-4 py-6 min-h-[calc(100vh-9rem)]">
+            {shouldShowSkeleton ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <PostSkeleton key={i} />
+                ))}
+              </div>
+            ) : !showDemoFeed && followingEmpty ? (
             followingCount === undefined || followingHasAnyPosts === undefined ? (
-              // Empty-state classifier queries haven't resolved yet —
-              // render nothing to avoid a flash of the wrong message.
               <div className="py-16" />
             ) : followingCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
