@@ -208,22 +208,24 @@ const Index = () => {
     // written on the next normal flush — keeping seen-tracking accurate
     // without racing the refresh response.
     const drained = takePendingSeenPostIds();
+    const feedKey = ['following-feed', user?.id] as const;
+    const countKey = ['following-count', user?.id] as const;
+    const hasPostsKey = ['following-has-posts', user?.id] as const;
 
     try {
       await Promise.all([
-        queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
-        queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
-        queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
+        queryClient.cancelQueries({ queryKey: feedKey, exact: true }),
+        queryClient.cancelQueries({ queryKey: countKey, exact: true }),
+        queryClient.cancelQueries({ queryKey: hasPostsKey, exact: true }),
       ]);
 
-      queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
-      queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
-      queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
-
+      // Navigation back to Home works because BottomNav prefetches a missing
+      // feed query. Pull-to-refresh should not remove the active query and hope
+      // a later navigation recreates it; it must refetch the active observer now.
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
-        queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-        queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
+        queryClient.refetchQueries({ queryKey: feedKey, exact: true, type: 'active' }),
+        queryClient.refetchQueries({ queryKey: countKey, exact: true, type: 'active' }),
+        queryClient.refetchQueries({ queryKey: hasPostsKey, exact: true, type: 'active' }),
       ]);
     } finally {
       restorePendingSeenPostIds(drained);
