@@ -1,28 +1,56 @@
-Plan to fix the current refresh regression
+## Goal
 
-1. Reproduce the exact failing path first
-   - Use the live preview in a mobile viewport.
-   - Capture: initial rendered post count, pull-to-refresh spinner duration, feed RPC/network timing, final rendered post count, and screenshot after refresh.
-   - Also capture the navigation-away/back-to-home path so we can compare what succeeds there.
+After you revert to the June 12 version, give you a clean, ordered rebuild list of only the changes between June 12 → June 15 that actually worked (no ones you later asked me to fix, redo, or improve), and store it somewhere that survives future reverts so you never have to re-explain.
 
-2. Fix why the spinner returns immediately
-   - The current refresh handler removes the active `following-feed` query and then calls `refetchQueries` on that same exact active query key.
-   - Once removed, there may be no active query left for `refetchQueries` to await, so `onRefresh()` resolves immediately and `PullToRefresh` stops spinning.
-   - Replace that with a refresh path that keeps the active query observable and awaits the actual feed fetch completion.
+## Why a normal file won't work
 
-3. Make refresh render posts deterministically
-   - Expose a real `refetch`/`refresh` function from `useFollowingFeed` instead of driving refresh indirectly from `Index.tsx` via cache removal.
-   - In `handleRefresh`, await `flushNow()`, then await the feed refresh function, then refresh only the lightweight classifier queries (`following-count`, `following-has-posts`) without blocking the spinner if they are not needed for visible posts.
-   - Do not hard reload the page and do not remove the active feed query during refresh.
+If I save the rebuild list as a project file (e.g. `docs/REBUILD.md`), reverting the project will erase it too. The only place that survives a project revert is **persistent memory** (`mem://`), which lives outside the codebase.
 
-4. Keep existing navigation behavior unchanged
-   - Leave keep-alive navigation intact because that is currently the working path.
-   - Only change pull-to-refresh/feed-query coordination.
+So the plan has two outputs:
+1. A **memory entry** (`mem://rebuild/from-june-12`) — the durable rebuild list.
+2. A **chat-visible summary** so you can read/copy it right now.
 
-5. Verify before reporting success
-   - Re-run the same browser test after the change.
-   - Confirm the spinner remains visible while the feed request is in flight.
-   - Confirm refresh ends with rendered posts or the correct caught-up state, not a premature blank/empty render.
-   - Confirm tapping another navigation tab and returning Home still shows posts.
+## Step 1 — Reconstruct the June 12 → June 15 timeline (read-only)
 
-Success probability: 86%.
+I'll search our chat history for that window and extract, per change:
+- What you asked for
+- What I changed (files + intent, not full diffs)
+- Whether you later complained, asked for revision, or reverted it
+
+Tools: `chat_search--search_chat_history`, `chat_search--read_chat_messages`.
+
+## Step 2 — Classify each change
+
+Each item gets one label:
+- **Keep** — shipped, no follow-up complaint, no rework requested.
+- **Skip** — you asked me to fix/redo it later, or it caused the regression you're escaping from (e.g. the refresh / mark-as-seen / RPC churn).
+- **Uncertain** — I'll list these separately and ask you before including.
+
+The refresh/feed/`useFollowingFeed`/`useMarkPostSeen`/`get_following_feed_v2` thread from the last few days will almost certainly land in **Skip**.
+
+## Step 3 — Produce the rebuild list
+
+Ordered by safest-first (independent UI tweaks → isolated features → anything touching feed/auth/RPC last), each item written as:
+
+```
+[ ] <short title>
+    Files: <paths>
+    Intent: <one line>
+    Verify: <what to click/check after>
+```
+
+## Step 4 — Persist it
+
+- Write `mem://rebuild/from-june-12` with the full list.
+- Add a one-line pointer in `mem://index.md` under Memories so any future session picks it up automatically.
+- Also paste the list into chat so you have it immediately.
+
+After you revert, you just say "apply the rebuild list" and I'll work through it in order, verifying each step before moving on — instead of stacking fixes.
+
+## What I need from you before starting
+
+1. Confirm the window is **June 12 → June 15** (inclusive of the 15th).
+2. Confirm you want the refresh / pull-to-refresh / mark-as-seen work classified as **Skip** by default (you can override per-item when you review the list).
+3. Anything from that window you already know you want to **Skip** or **Keep** regardless of my classification.
+
+Success probability: 90%.
