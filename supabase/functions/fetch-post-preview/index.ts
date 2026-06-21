@@ -87,12 +87,13 @@ serve(async (req) => {
   }
 
   try {
-    const { postId, url, platform } = await req.json();
-    
-    console.log(`[fetch-post-preview] Processing postId=${postId}, platform=${platform}, url=${url}`);
+    const { postId, url, platform, previewOnly } = await req.json();
+    const skipDbWrite = previewOnly === true || !postId;
 
-    if (!postId || !url) {
-      return new Response(JSON.stringify({ error: 'Missing postId or url' }), {
+    console.log(`[fetch-post-preview] Processing postId=${postId}, platform=${platform}, url=${url}, previewOnly=${!!previewOnly}`);
+
+    if (!url) {
+      return new Response(JSON.stringify({ error: 'Missing url' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -236,6 +237,20 @@ serve(async (req) => {
       } else {
         sizing = { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(previewText) };
       }
+    }
+
+    if (skipDbWrite) {
+      return new Response(
+        JSON.stringify({
+          thumbnail_url: thumbnailUrl,
+          title: previewTitle,
+          preview_text: previewText,
+          media_kind: sizing.media_kind,
+          aspect_ratio: sizing.aspect_ratio,
+          suggested_height: sizing.suggested_height,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     // Update database
