@@ -41,6 +41,7 @@ interface UseFollowingFeedResult {
   empty: boolean;
   loading: boolean;
   error: string | null;
+  refresh: () => Promise<void>;
   loadMore: () => void;
   hasMore: boolean;
 }
@@ -123,6 +124,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     isLoading: feedLoading,
     error: feedError,
     fetchNextPage,
+    refetch,
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
@@ -179,11 +181,17 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     }
   };
 
+  const refresh = async () => {
+    if (!userId) return;
+    await refetch();
+  };
+
   return {
     items,
     empty: Boolean(userId) && !feedLoading && items.length === 0,
     loading: Boolean(userId) && feedLoading,
     error: feedError?.message ?? null,
+    refresh,
     loadMore,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
   };
