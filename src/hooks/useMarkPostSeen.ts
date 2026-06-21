@@ -127,7 +127,10 @@ export const useMarkPostSeen = (userId: string | undefined) => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
       observersRef.current.forEach((observer) => observer.disconnect());
       observersRef.current.clear();
+      dwellTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      dwellTimersRef.current.clear();
       visibleRef.current.clear();
+      visibleSinceRef.current.clear();
       flush(); // flush remaining on unmount
     };
   }, [userId, flush]);
@@ -142,6 +145,7 @@ export const useMarkPostSeen = (userId: string | undefined) => {
         ([entry]) => {
           if (entry.isIntersecting && entry.intersectionRatio >= VISIBILITY_THRESHOLD) {
             visibleRef.current.add(postId);
+            if (dwellTimersRef.current.has(postId)) return;
             visibleSinceRef.current.set(postId, Date.now());
             const timer = window.setTimeout(() => {
               if (visibleRef.current.has(postId)) {
