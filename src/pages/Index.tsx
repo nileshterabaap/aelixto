@@ -81,6 +81,7 @@ const Index = () => {
     loading: followingLoading,
     loadMore,
     hasMore,
+    refresh: refreshFollowingFeed,
   } = useFollowingFeed(user?.id);
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -203,34 +204,22 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Drain pending "seen" marks so the refresh RPC doesn't filter out posts
-    // the user just scrolled past. We restore them afterwards so they are
-    // written on the next normal flush — keeping seen-tracking accurate
-    // without racing the refresh response.
+    // Drain pending "seen" marks so the refresh RPC can mark them and
+    // surface new posts above them in a single round-trip.
     const drained = takePendingSeenPostIds();
-    const feedKey = ['following-feed', user?.id] as const;
     const countKey = ['following-count', user?.id] as const;
     const hasPostsKey = ['following-has-posts', user?.id] as const;
 
     try {
       await Promise.all([
-        queryClient.cancelQueries({ queryKey: feedKey, exact: true }),
-        queryClient.cancelQueries({ queryKey: countKey, exact: true }),
-        queryClient.cancelQueries({ queryKey: hasPostsKey, exact: true }),
-      ]);
-
-      // Navigation back to Home works because BottomNav prefetches a missing
-      // feed query. Pull-to-refresh should not remove the active query and hope
-      // a later navigation recreates it; it must refetch the active observer now.
-      await Promise.all([
-        queryClient.refetchQueries({ queryKey: feedKey, exact: true, type: 'active' }),
+        refreshFollowingFeed(drained),
         queryClient.refetchQueries({ queryKey: countKey, exact: true, type: 'active' }),
         queryClient.refetchQueries({ queryKey: hasPostsKey, exact: true, type: 'active' }),
       ]);
-    } finally {
+    } catch {
       restorePendingSeenPostIds(drained);
     }
-  }, [takePendingSeenPostIds, restorePendingSeenPostIds, queryClient, user?.id]);
+  }, [takePendingSeenPostIds, restorePendingSeenPostIds, refreshFollowingFeed, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
