@@ -1,64 +1,47 @@
-## Goal
+## Rebuild plan — reapply Keep items from `mem://rebuild/from-june-12`
 
-When a post's source (Instagram, TikTok, YouTube, Facebook, Threads, X, Pinterest, Reddit, LinkedIn, etc.) is deleted or made private — so the embed renders a "link broken / post removed" fallback — automatically delete that post from Aelixto and send the original poster a notification with the thumbnail preview on the right side (matching existing notification styling).
+Working agreement (from the memory file): apply Keep items one at a time, smallest first; you verify in the live preview after each before I move on; do not touch anything on the Skip list (useFollowingFeed, PullToRefresh, useMarkPostSeen, Index refresh path, seen logic). After the 6 Keeps are in, I'll ask before touching U1 (per-event scoring).
 
-## Why this can't be done in the browser
+Probability of success: ~90% per item individually.
 
-The embed iframes (instagram.com, youtube.com, …) are cross-origin, so we cannot read their DOM to detect "Sorry, this post isn't available" messages from the client. Any client-side guess would produce false positives (slow networks, ad-blockers, transient failures) and wrongly delete real posts.
+### Order of work
 
-The reliable signal is **server-side**: re-resolve each post's source URL via the official oEmbed / metadata endpoints. A consistent 404 / "not found" response means the source post is gone.
+**1. Compact Aelix score (10k threshold)**
+- Create `src/lib/formatCount.ts` with `formatCount(n)`: `<10000 → full number`, `≥10000 → 12.3k`, `≥1e6 → 1.2M`, `≥1e9 → 1.2B`.
+- Use it in `src/pages/UserProfile.tsx` where the Aelix score renders.
 
-## Approach
+**2. Dark gray default profile cover**
+- Add `--profile-cover: 0 0% 24%` + `.profile-cover-fallback { background: hsl(var(--profile-cover)); }` to `src/index.css`.
+- Replace the current cover gradient/`bg-muted` and the matching skeleton class in `src/pages/UserProfile.tsx` with `profile-cover-fallback`.
 
-### 1. New edge function: `validate-post-source`
-For a given `postId`, fetch the canonical validation endpoint for its platform:
+**3. Reddit thumbnail filtering (client + server)**
+- `src/lib/getPostThumb.ts`: when `platform === 'reddit'`, reject URLs matching `redditstatic.com`, `snoo`, `brand`, `icon`, `favicon`, `default-avatar`, `share.redd.it/preview/post` → fall back to text card.
+- Mirror the same reject list in `supabase/functions/fetch-post-preview/index.ts` so future posts don't store junk thumbnails.
+- One-time `UPDATE` (via insert tool) to null `thumbnail_url` / `preview_image_url` on existing rows containing `share.redd.it/preview/post`.
 
-- instagram → `graph.facebook.com/v18.0/instagram_oembed` (existing META token) — 404 / `error.code 24` = removed
-- facebook → `graph.facebook.com/v18.0/oembed_post` — same
-- youtube → `youtube.com/oembed?url=…` — 404 / 401 = removed/private
-- tiktok → `tiktok.com/oembed?url=…` — 404
-- threads / x / linkedin / pinterest / reddit → HEAD request to the post URL; treat HTTP 404 / 410 as removed. Reddit also: `…/.json` returning `{}` or "removed" flag
-- spotify / articles → skip (Spotify items rarely 404; articles handled by existing unfurl)
+**4. Reddit preview-only mode at create time**
+- `supabase/functions/fetch-post-preview/index.ts`: accept `previewOnly: boolean`; when true (or `postId` missing) skip the DB write and just return the preview payload.
+- `src/components/CreatePostDialog.tsx`: for Reddit URLs, swap the `fetch-og` call for `fetch-post-preview` with `previewOnly: true` so the create-dialog preview matches what publishes.
 
-Return `{ status: "ok" | "removed" | "unknown" }`. Only `removed` triggers deletion. `unknown` (timeouts, rate-limits, 5xx) never deletes.
+**5. Follow system polish — Follow Back / Asked / Alright / Sorry**
+- `src/hooks/useFollow.ts`: expose `followsMe` and `isRequested`.
+- Update the search RPC `search_profiles` to return `is_requested` and `follows_me` (migration).
+- Update buttons in `src/pages/UserProfile.tsx` and `src/components/SearchResultItem.tsx` to render **Follow Back** (target follows you, you don't follow back) and **Asked** (pending request to a private account).
+- `src/pages/Notifications.tsx`: `follow_request` rows read `@username asked to Follow` with **Alright** (approve) and **Sorry** (silently delete the request).
 
-### 2. Confirmation gate (false-positive protection)
-A post is only deleted when it returns `removed` on **two consecutive checks at least 6 hours apart**. We add a `posts.broken_check_count` int + `posts.broken_first_seen_at` timestamp. First removal hit just records; second hit deletes.
+**6. Aelix Score info popup on Edit Profile**
+- `src/pages/EditProfile.tsx`: add a small `i` button next to the "Aelix Score" label. Plain `useState` + `setTimeout`, NOT Radix Tooltip. Auto-dismiss after 5s; tapping again cancels the timer. Body:
+  > Aelix Score represents the total engagement earned by your shared posts.
+  > • View a shared post (+1)
+  > • Play shared content (+1)
+  > • Visit the original source (+1)
 
-### 3. New edge function: `sweep-broken-posts` (cron)
-Runs hourly via pg_cron. Selects ~100 posts ordered by `last_validated_at` ascending (oldest first), calls `validate-post-source` for each, updates counters, and when threshold is hit:
-- captures the post's `thumbnail_url`, `platform`, `caption`/`title`, `media_url`
-- inserts a row into `notifications` with `type = 'post_removed'`, `actor_user_id = null`, `target_user_id = post.user_id`, payload `{ thumbnail_url, platform, original_url, caption }`
-- deletes the post (cascade removes likes/reposts/comments/saves as already configured)
-- triggers existing push-notification pipeline
+### After all 6 are verified
 
-### 4. Notification UI
-Existing `NotificationItem` already renders a right-side thumbnail when payload has `thumbnail_url`. Add a new branch for `type === 'post_removed'`:
+I'll ask whether to attempt **U1 (per-event scoring: +1 view / +1 play / +1 original visit)** with a clean implementation, or leave scoring on the June 12 baseline.
 
-> "Your <Instagram> post was removed because the original was deleted or made private." — with the platform logo + cached thumbnail on the right exactly like engagement notifications.
+### Out of scope (Skip list — staying on June 12 baseline)
 
-Tappable: opens a small sheet explaining why, no destination link.
+`reachedEnd`, `has_unseen_following_feed_posts`, "Feed couldn't load" UI, `manualPages`, React Query removal in `useFollowingFeed`, `refresh_following_feed_v1`, `useRealtimeSync`, PullToRefresh rewrites, `SEEN_DWELL_MS`, `refetchOnMount: 'always'`, `window.location.reload()` in `handleRefresh`, duplicate-trigger removal.
 
-### 5. Manual trigger on viewer
-When `HydratedEmbed` mounts an Instagram/Facebook/Threads embed and the **`RawEmbedRenderer` onError** fires (which we already track via `rawEmbedFailed`), fire a one-shot `validate-post-source` call for that postId. This shortcuts the cron for posts the author is actively looking at, but still goes through the same 2-strike gate — no immediate deletion.
-
-## Files
-
-New:
-- `supabase/functions/validate-post-source/index.ts`
-- `supabase/functions/sweep-broken-posts/index.ts`
-- migration: add `broken_check_count`, `broken_first_seen_at`, `last_validated_at` to `posts`; add `post_removed` to notification type enum; schedule hourly cron for `sweep-broken-posts`
-- `src/components/notifications/PostRemovedNotification.tsx`
-
-Edited:
-- `src/components/notifications/NotificationItem.tsx` — route `post_removed` to new component
-- `src/components/HydratedEmbed.tsx` — on `handleRawEmbedError`, call `validate-post-source` once per session per postId
-
-## Out of scope / safeguards
-
-- No client-side "guess" deletion — only server validation deletes.
-- Posts from platforms we cannot reliably probe (Spotify, generic articles) are never auto-deleted.
-- Transient failures (5xx, network, rate-limit) are recorded as `unknown` and do not advance the strike counter.
-- Author can still manually delete; nothing changes for healthy posts.
-
-Approve and I'll implement.
+Approve and I'll start with item 1.
