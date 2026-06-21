@@ -71,6 +71,12 @@ All colors MUST be HSL.
 
 }
 
+@layer components {
+  .profile-cover-fallback {
+    background-color: hsl(var(--profile-cover));
+  }
+}
+
 /* Like animation keyframes */
 @keyframes like-pop {
   0% { transform: scale(1); }
