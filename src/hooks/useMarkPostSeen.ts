@@ -117,6 +117,10 @@ export const useMarkPostSeen = (userId: string | undefined) => {
   useEffect(() => {
     if (!userId) return;
     const interval = setInterval(flush, BATCH_INTERVAL);
+    const observers = observersRef.current;
+    const dwellTimers = dwellTimersRef.current;
+    const visiblePosts = visibleRef.current;
+    const visibleSince = visibleSinceRef.current;
     // Flush on page hide (tab switch, navigate away)
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') flush();
@@ -125,12 +129,12 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      observersRef.current.forEach((observer) => observer.disconnect());
-      observersRef.current.clear();
-      dwellTimersRef.current.forEach((timer) => window.clearTimeout(timer));
-      dwellTimersRef.current.clear();
-      visibleRef.current.clear();
-      visibleSinceRef.current.clear();
+      observers.forEach((observer) => observer.disconnect());
+      observers.clear();
+      dwellTimers.forEach((timer) => window.clearTimeout(timer));
+      dwellTimers.clear();
+      visiblePosts.clear();
+      visibleSince.clear();
       flush(); // flush remaining on unmount
     };
   }, [userId, flush]);
