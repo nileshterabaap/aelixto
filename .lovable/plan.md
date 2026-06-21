@@ -1,56 +1,36 @@
-Yes — there are still essential differences left. The earlier restore fixed `useFollowingFeed.ts` and most of `Index.tsx`, but the exact 12 Jun 15:30 behavior also depends on mark-as-seen timing, the pull gesture component, realtime cache invalidation, prefetch cursor behavior, and the backend feed RPC.
+## What is actually different
+
+- Pull-to-refresh currently does a destructive cache clear and then `window.location.reload()`.
+- Tapping another navigation button and returning does **not** reload the app. Home is kept alive with `display:none`, so it simply reveals the already-mounted feed state.
+- The backend `post_seen` access is still suspicious: direct privilege checks pass, but `information_schema.role_table_grants` returned no grant rows. I will verify this with live browser/network tests instead of assuming.
 
 ## Plan
 
-1. **Restore mark-as-seen behavior to 15:30**
-   - Revert `src/hooks/useMarkPostSeen.ts` to the 15:30 logic:
-     - `VISIBILITY_THRESHOLD = 0`
-     - no 50% visibility requirement
-     - no 1.5s dwell timer
-     - mark a post as seen immediately when any part enters the viewport
-     - return only `{ setObservedPostElement, flushNow }`
-   - This is essential because current behavior waits longer before marking posts seen, so refresh/feed serving will not match that period.
+1. **Reproduce both paths in the browser**
+   - Use the logged-in preview session.
+   - Capture network calls, DOM post counts, route changes, and screenshots for:
+     - initial Home load
+     - pull-to-refresh
+     - navigation away and back to Home
+   - Confirm whether refresh returns zero rows from `get_following_feed_v2`, loses auth/session timing, or clears the render cache incorrectly.
 
-2. **Restore pull-to-refresh gesture to 15:30**
-   - Revert `src/components/PullToRefresh.tsx` to the 15:30 version:
-     - threshold back to `60`
-     - max pull back to `180`
-     - content moves down with the pull
-     - no `flushSync`, no `MIN_REFRESH_MS`, no `__pullActive` coordination
-   - This is essential because the current gesture triggers differently and visually behaves differently.
+2. **Add temporary local instrumentation only while testing**
+   - Log feed RPC row counts, errors, query state, and refresh steps in the browser console.
+   - Remove this instrumentation before finalizing.
 
-3. **Restore swipe coordination around pull gestures**
-   - Revert only the later pull-related changes in `src/components/SwipeableView.tsx`:
-     - remove `window.__pullActive` checks
-     - restore the old direction-lock threshold/bias
-   - This keeps horizontal swipe behavior from changing the old pull-to-refresh feel.
+3. **Fix the proven cause only**
+   - If refresh is empty because it reloads before the query/session/cache lifecycle settles: replace hard reload with an in-app query reset/refetch flow and keep Home mounted.
+   - If refresh is empty because `flushNow()` marks too many currently rendered posts as seen before fetching replacements: adjust refresh to fetch the next unseen feed without over-clearing visible posts.
+   - If backend grants/RLS are still blocking seen writes or RPC reads in the real client path: add the missing migration and verify with authenticated browser requests.
 
-4. **Remove realtime feed invalidation from the 15:30 path**
-   - Remove `useRealtimeSync()` usage from `src/App.tsx`.
-   - Optionally delete the now-unused `src/hooks/useRealtimeSync.ts` if it has no callers.
-   - This is essential for exact 15:30 behavior because this hook did not exist then and it can background-refresh/reorder feed data independently of pull-to-refresh.
+4. **Verify before claiming success**
+   - Re-run the same browser test.
+   - Confirm pull-to-refresh ends with rendered feed posts, not only skeleton/empty state.
+   - Confirm navigation away/back still works.
+   - Confirm no relevant console or network errors.
 
-5. **Restore prefetch cursor rule exactly**
-   - In `src/lib/prefetch.ts`, change the first-page prefetch cursor back to:
-     ```ts
-     nextCursor: mappedPosts.length === 20 ? mappedPosts[mappedPosts.length - 1].feed_cursor : undefined
-     ```
-   - This is small, but it was explicitly different from the requested snapshot.
+## Likely fix direction
 
-6. **Restore backend feed RPC ranking/filter placement**
-   - Add a migration that recreates `public.get_following_feed_v2(integer, text)` as it was at the 12 Jun 15:30 snapshot.
-   - The key behavioral restore: filter `post_seen` inside the eligible-post selection before tiering/ranking, not after ranking.
-   - Keep the same freshness-tiered/interleaved feed order from that snapshot.
-   - Keep execute grants for authenticated users and service role as required.
+Most likely the refresh should stop using `window.location.reload()` and instead perform an awaited in-app `resetQueries/refetchQueries` for `['following-feed', user.id]`. The reload path is the key behavior navigation-back does not share.
 
-7. **Verify the restore**
-   - Confirm no source diffs remain against `785dca03` for the feed/refresh files except intentionally unrelated UI files.
-   - Confirm the backend function text matches the 15:30 version.
-   - Confirm pull-to-refresh performs the old hard reload path and feed serving uses the restored ranking/filter behavior.
-
-## Not included
-
-- No changes to unrelated UI/embed/profile files unless they directly affect feed refresh.
-- No reintroduction of the later `refresh_following_feed_v2` path, because that was not part of the 15:30 behavior.
-
-**Success probability: 94%.**
+Success probability: 88%
