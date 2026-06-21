@@ -218,15 +218,15 @@ const Index = () => {
     queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
     queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
 
+    // Re-fetch the feed in-place. Awaiting the refetch keeps the
+    // pull-to-refresh spinner up until new posts are actually rendered,
+    // and avoids the destructive full-page reload that was causing the
+    // feed to come back empty.
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
+      queryClient.refetchQueries({ queryKey: ['following-feed', user?.id], exact: true, type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['following-count', user?.id], exact: true, type: 'active' }),
+      queryClient.refetchQueries({ queryKey: ['following-has-posts', user?.id], exact: true, type: 'active' }),
     ]);
-
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    window.location.reload();
-    await new Promise(() => {});
   }, [flushNow, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
