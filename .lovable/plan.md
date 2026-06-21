@@ -1,42 +1,56 @@
-## Restore pull‑to‑refresh + caught‑up to the 12 Jun **15:30 IST** version
+Yes — there are still essential differences left. The earlier restore fixed `useFollowingFeed.ts` and most of `Index.tsx`, but the exact 12 Jun 15:30 behavior also depends on mark-as-seen timing, the pull gesture component, realtime cache invalidation, prefetch cursor behavior, and the backend feed RPC.
 
-### What 15:30 looked like (commit `785dca03`, 10:01 UTC)
-Right after that commit the merge `1b16a39c` "Fixed default cover & caught‑up logic" (10:52 UTC / 16:22 IST) bundled two unrelated things:
+## Plan
 
-1. A profile cover styling tweak (`profile-cover-fallback`) — unrelated, keep as‑is.
-2. The caught‑up regression: it introduced `reachedEnd` in `useFollowingFeed`, gated the "You're all caught up" UI on it in `Index.tsx`, and changed the pagination cursor rule in `prefetch.ts`.
+1. **Restore mark-as-seen behavior to 15:30**
+   - Revert `src/hooks/useMarkPostSeen.ts` to the 15:30 logic:
+     - `VISIBILITY_THRESHOLD = 0`
+     - no 50% visibility requirement
+     - no 1.5s dwell timer
+     - mark a post as seen immediately when any part enters the viewport
+     - return only `{ setObservedPostElement, flushNow }`
+   - This is essential because current behavior waits longer before marking posts seen, so refresh/feed serving will not match that period.
 
-My previous restore matched commit `ccd62581` (12:10 UTC / 17:40 IST), which still contains change #2. That's why the behaviour is still wrong. The 15:30 version did NOT have `reachedEnd` — the caught‑up message simply followed `followingHasAnyPosts` / `!hasMore`, and `handleRefresh` was already the `window.location.reload()` flow I restored last turn. The reload path stays — only the caught‑up gating reverts.
+2. **Restore pull-to-refresh gesture to 15:30**
+   - Revert `src/components/PullToRefresh.tsx` to the 15:30 version:
+     - threshold back to `60`
+     - max pull back to `180`
+     - content moves down with the pull
+     - no `flushSync`, no `MIN_REFRESH_MS`, no `__pullActive` coordination
+   - This is essential because the current gesture triggers differently and visually behaves differently.
 
-### Changes (3 files)
+3. **Restore swipe coordination around pull gestures**
+   - Revert only the later pull-related changes in `src/components/SwipeableView.tsx`:
+     - remove `window.__pullActive` checks
+     - restore the old direction-lock threshold/bias
+   - This keeps horizontal swipe behavior from changing the old pull-to-refresh feel.
 
-1. **`src/hooks/useFollowingFeed.ts`** — remove every reference to `reachedEnd`:
-   - Drop `reachedEnd: boolean` from `UseFollowingFeedResult`.
-   - Delete the `reachedEnd` `useMemo`.
-   - Drop `reachedEnd: Boolean(userId) && reachedEnd` from the returned object.
+4. **Remove realtime feed invalidation from the 15:30 path**
+   - Remove `useRealtimeSync()` usage from `src/App.tsx`.
+   - Optionally delete the now-unused `src/hooks/useRealtimeSync.ts` if it has no callers.
+   - This is essential for exact 15:30 behavior because this hook did not exist then and it can background-refresh/reorder feed data independently of pull-to-refresh.
 
-2. **`src/pages/Index.tsx`** — revert caught‑up branches to the 15:30 form:
-   - Stop destructuring `reachedEnd` from `useFollowingFeed`.
-   - In the empty‑state block: replace `followingHasAnyPosts && reachedEnd` with `followingHasAnyPosts`, and remove the intermediate `followingHasAnyPosts ? <div className="py-16" />` branch.
-   - In the infinite list footer: change `{reachedEnd && !hasMore && !showDemoFeed && allPosts.length > 0 && (` back to `{!hasMore && !showDemoFeed && allPosts.length > 0 && (`.
-   - Leave `handleRefresh` (already the reload flow), `flushNow`, imports, and everything else untouched.
-
-3. **`src/lib/prefetch.ts`** — restore the 15:30 cursor rule:
-   - Change
+5. **Restore prefetch cursor rule exactly**
+   - In `src/lib/prefetch.ts`, change the first-page prefetch cursor back to:
      ```ts
-     nextCursor: mappedPosts.length === 0 ? undefined : mappedPosts[mappedPosts.length - 1]?.feed_cursor,
+     nextCursor: mappedPosts.length === 20 ? mappedPosts[mappedPosts.length - 1].feed_cursor : undefined
      ```
-     back to
-     ```ts
-     nextCursor: mappedPosts.length === 20 ? mappedPosts[mappedPosts.length - 1].feed_cursor : undefined,
-     ```
+   - This is small, but it was explicitly different from the requested snapshot.
 
-### Not touched
-`useMarkPostSeen.ts`, `useRealtimeSync.ts`, `PullToRefresh.tsx`, `get_following_feed_v2`, the profile cover styling (`profile-cover-fallback`), keep‑alive/scroll code — none of these existed differently at 15:30 in a way that affects refresh/caught‑up.
+6. **Restore backend feed RPC ranking/filter placement**
+   - Add a migration that recreates `public.get_following_feed_v2(integer, text)` as it was at the 12 Jun 15:30 snapshot.
+   - The key behavioral restore: filter `post_seen` inside the eligible-post selection before tiering/ranking, not after ranking.
+   - Keep the same freshness-tiered/interleaved feed order from that snapshot.
+   - Keep execute grants for authenticated users and service role as required.
 
-### Verification
-- `rg "reachedEnd"` returns no hits anywhere in `src/`.
-- Manual diff of the three files against `git show 785dca03:<path>` shows zero remaining differences in the refresh/caught‑up code paths.
-- User reproduces: friend posts → pull‑to‑refresh → page hard‑reloads → new post appears; "You're all caught up" only appears when `!hasMore`, matching 15:30 behaviour.
+7. **Verify the restore**
+   - Confirm no source diffs remain against `785dca03` for the feed/refresh files except intentionally unrelated UI files.
+   - Confirm the backend function text matches the 15:30 version.
+   - Confirm pull-to-refresh performs the old hard reload path and feed serving uses the restored ranking/filter behavior.
 
-**Success probability: 96%** — the diff above is the exact inverse of the commit (`1b16a39c`) that diverged from 15:30, limited to the three files that touched refresh/caught‑up logic.
+## Not included
+
+- No changes to unrelated UI/embed/profile files unless they directly affect feed refresh.
+- No reintroduction of the later `refresh_following_feed_v2` path, because that was not part of the 15:30 behavior.
+
+**Success probability: 94%.**
