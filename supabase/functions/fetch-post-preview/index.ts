@@ -239,6 +239,20 @@ serve(async (req) => {
       }
     }
 
+    if (skipDbWrite) {
+      return new Response(
+        JSON.stringify({
+          thumbnail_url: thumbnailUrl,
+          title: previewTitle,
+          preview_text: previewText,
+          media_kind: sizing.media_kind,
+          aspect_ratio: sizing.aspect_ratio,
+          suggested_height: sizing.suggested_height,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Update database
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
