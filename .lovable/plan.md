@@ -1,38 +1,63 @@
-## Plan to fix Home feed pull-to-refresh
+## Restore pull-to-refresh + "caught up" exactly to the pre‑12 Jun 16:16 behavior
 
-**Success probability: 86%.**
+### Why the current version behaves differently
+In the previous "rollback" I kept the new RPC/cache‑swap mechanics and only renamed/simplified them. The real pre‑16:16 behavior used a completely different mechanism for pull‑to‑refresh:
 
-### What is happening
-- Home is kept mounted with `display:none`, so tapping Search/Profile and coming back does **not** rebuild the Home page.
-- The difference is that navigation makes the Home feed become visible/active again, while pull-to-refresh currently only asks React Query to refetch the existing infinite query.
-- The old dedicated refresh path (`refresh_following_feed_v2`) was removed, so pull-to-refresh no longer has a refresh-specific backend path that can prioritize posts newer than the current feed and handle seen-post timing safely.
-- `useRealtimeSync` also invalidates `following-count` and other feed-related keys, but not the actual `['following-feed', userId]` query for new posts, so refresh can stay on a caught-up cache unless a later visibility/navigation event shakes it loose.
+- Old `useFollowingFeed.ts` had **no `refresh()` function at all**. It was a plain `useInfiniteQuery` with `staleTime: 2min`, `refetchOnMount: true`, and also exposed `reachedEnd` (true only when the server returns 0 rows).
+- Old `Index.tsx` `handleRefresh`:
+  1. `await flushNow()` — push pending seen marks to DB,
+  2. cancel + **remove** + invalidate `following-feed`, `following-count`, `following-has-posts`,
+  3. wait 150ms,
+  4. **`window.location.reload()`** — full hard reload of the page.
+- "Caught up" message only showed when `followingHasAnyPosts && reachedEnd` (i.e. confirmed end of feed), with an intermediate `<div className="py-16" />` placeholder when posts exist but `reachedEnd` is still false. The current code shows "caught up" the moment the first page is empty, which is why a friend's brand‑new post can read as "all caught up" until something else forces a refetch.
 
-### Implementation
-1. **Restore a dedicated backend refresh function**
-   - Re-create `refresh_following_feed_v2(limit_count, seen_post_ids, since_time)`.
-   - It will:
-     - accept posts currently visible/pending-seen from the client;
-     - prioritize posts newer than the current top feed timestamp;
-     - then fall back to the normal following feed;
-     - keep execute access limited to signed-in users/backend service.
+The full‑page reload was the mechanism that guaranteed a clean fetch every time. The current RPC/`setQueryData` path skips that reload and depends on cache shape — exactly why refresh sometimes shows "all caught up" while navigating away and back works.
 
-2. **Add a real refresh fetcher in `useFollowingFeed`**
-   - Export reusable mapping/fetch logic.
-   - Add a refresh helper that calls the restored refresh function with:
-     - pending/visible post IDs;
-     - the current newest feed timestamp.
-   - Return rows in the same shape as the current infinite feed.
+### Changes
 
-3. **Make `handleRefresh` replace the first feed page directly**
-   - Instead of only invalidating/refetching and hoping observers update, explicitly fetch the refresh result and write it into the active `['following-feed', userId]` infinite-query cache.
-   - Preserve later pages only if appropriate; otherwise reset to a clean first page so new posts render immediately.
-   - Continue restoring pending seen IDs after the refresh request so seen tracking remains accurate.
+1. **`src/hooks/useFollowingFeed.ts` — revert to baseline**
+   - Remove `refresh()`, `useQueryClient`, `useCallback`, `fetchRefreshPage`, `mapFeedRows` extraction, and the standalone `RefreshRpcArgs` type.
+   - Restore the inline mapper inside `fetchFeedPage`.
+   - Re‑add `reachedEnd` (true when any page has `posts.length === 0`) to the returned object and to `UseFollowingFeedResult`.
+   - Drop `refresh` from the return type.
 
-4. **Fix realtime feed invalidation**
-   - When posts/reposts/follows change, invalidate the actual signed-in feed key (`['following-feed', userId]`) as well as the related counters.
-   - This keeps the feed cache consistent outside pull-to-refresh too.
+2. **`src/pages/Index.tsx` — revert to baseline refresh + caught‑up logic**
+   - Import `flushNow` from `useMarkPostSeen` instead of `takePendingSeenPostIds` / `restorePendingSeenPostIds`.
+   - Destructure `reachedEnd` from `useFollowingFeed`; drop `refresh`/`refreshFollowingFeed`.
+   - Replace `handleRefresh` with the baseline version:
+     ```ts
+     try { await flushNow(); } catch {}
+     await Promise.all([
+       queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
+       queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
+       queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
+     ]);
+     queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
+     queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
+     queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
+     await Promise.all([
+       queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
+       queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
+       queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
+     ]);
+     await new Promise((r) => setTimeout(r, 150));
+     window.location.reload();
+     await new Promise(() => {}); // keep spinner up until reload
+     ```
+   - Update the empty‑state branches to match baseline:
+     - `followingCount === 0` → "Nothing here yet 👀"
+     - `followingHasAnyPosts && reachedEnd` → "You're all caught up"
+     - `followingHasAnyPosts && !reachedEnd` → empty `<div className="py-16" />` (don't show "caught up" prematurely)
+     - else → "No posts yet"
 
-5. **Validate the mechanism**
-   - Use a read-only database check to confirm the function exists after migration.
-   - Verify the source path now calls the refresh RPC and writes directly to the feed cache, matching the behavior users observe after leaving and returning Home.
+3. **Database — drop the unused refresh RPC** (it didn't exist at baseline and isn't needed once the client uses `window.location.reload`)
+   - New migration: `DROP FUNCTION IF EXISTS public.refresh_following_feed_v2(integer, uuid[], timestamptz);` (and any other signatures).
+
+4. **Leave alone** (unrelated to refresh/caught‑up): `useRealtimeSync.ts`, `PullToRefresh.tsx`, `useMarkPostSeen.ts` (still exports `flushNow`), `get_following_feed_v2` (already matches baseline), `useFeedAnchorRestoration`, scroll/keep‑alive code.
+
+### Verification
+- Confirm via DB read that `refresh_following_feed_v2` is gone and `get_following_feed_v2` is unchanged.
+- Grep to ensure no remaining references to `takePendingSeenPostIds` / `restorePendingSeenPostIds` / `refreshFollowingFeed`.
+- After the user reproduces: a friend posts → pull‑to‑refresh on Home → page hard‑reloads → new post appears at top (same mechanism that worked before 12 Jun 16:16).
+
+**Success probability: 94%** — this matches the verified baseline (`ccd62581`) byte‑for‑byte on the refresh path; the only intentional deviation is keeping `useRealtimeSync.ts` (added after baseline) untouched since it's unrelated to the user's complaint.
