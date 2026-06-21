@@ -17,8 +17,6 @@ const invalidateGroup = (queryClient: ReturnType<typeof useQueryClient>, group: 
     case 'feed':
       queryClient.invalidateQueries({ queryKey: ['following-count'] });
       queryClient.invalidateQueries({ queryKey: ['following-has-unseen-posts'] });
-      queryClient.invalidateQueries({ queryKey: ['following-has-posts'] });
-      queryClient.invalidateQueries({ queryKey: ['following-feed'] });
       queryClient.invalidateQueries({ queryKey: ['posts'] });
       queryClient.invalidateQueries({ queryKey: ['platform-posts'] });
       queryClient.invalidateQueries({ queryKey: ['user-platform-tabs'] });

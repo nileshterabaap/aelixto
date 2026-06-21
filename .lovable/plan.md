@@ -1,38 +1,62 @@
-## Plan to fix Home feed pull-to-refresh
+## What I found
 
-**Success probability: 86%.**
+- You were right: the previous “rollback” did not produce a visible pending change now; the working tree is clean.
+- The real pre-Jun-12 feed baseline appears to be commit `9473f70`.
+- Current feed files still differ heavily from that baseline, especially:
+  - `src/hooks/useFollowingFeed.ts`
+  - `src/pages/Index.tsx`
+  - `src/components/PullToRefresh.tsx`
+  - `src/components/PostSkeleton.tsx`
+  - feed-related backend migrations/functions
+- The earlier rollback restored a newer/manual implementation, not the exact pre-Jun-12 behavior.
 
-### What is happening
-- Home is kept mounted with `display:none`, so tapping Search/Profile and coming back does **not** rebuild the Home page.
-- The difference is that navigation makes the Home feed become visible/active again, while pull-to-refresh currently only asks React Query to refetch the existing infinite query.
-- The old dedicated refresh path (`refresh_following_feed_v2`) was removed, so pull-to-refresh no longer has a refresh-specific backend path that can prioritize posts newer than the current feed and handle seen-post timing safely.
-- `useRealtimeSync` also invalidates `following-count` and other feed-related keys, but not the actual `['following-feed', userId]` query for new posts, so refresh can stay on a caught-up cache unless a later visibility/navigation event shakes it loose.
+## Goal
 
-### Implementation
-1. **Restore a dedicated backend refresh function**
-   - Re-create `refresh_following_feed_v2(limit_count, seen_post_ids, since_time)`.
-   - It will:
-     - accept posts currently visible/pending-seen from the client;
-     - prioritize posts newer than the current top feed timestamp;
-     - then fall back to the normal following feed;
-     - keep execute access limited to signed-in users/backend service.
+Restore only the refresh / “You’re all caught up” / feed-serving behavior to the state just before Jun 12 16:16, while keeping unrelated work after that date intact.
 
-2. **Add a real refresh fetcher in `useFollowingFeed`**
-   - Export reusable mapping/fetch logic.
-   - Add a refresh helper that calls the restored refresh function with:
-     - pending/visible post IDs;
-     - the current newest feed timestamp.
-   - Return rows in the same shape as the current infinite feed.
+## Implementation plan
 
-3. **Make `handleRefresh` replace the first feed page directly**
-   - Instead of only invalidating/refetching and hoping observers update, explicitly fetch the refresh result and write it into the active `['following-feed', userId]` infinite-query cache.
-   - Preserve later pages only if appropriate; otherwise reset to a clean first page so new posts render immediately.
-   - Continue restoring pending seen IDs after the refresh request so seen tracking remains accurate.
+1. **Use `9473f70` as the verified target baseline**
+   - Treat this as the “before the bad prompt” source for feed refresh/caught-up behavior.
+   - Do not do a full project revert.
 
-4. **Fix realtime feed invalidation**
-   - When posts/reposts/follows change, invalidate the actual signed-in feed key (`['following-feed', userId]`) as well as the related counters.
-   - This keeps the feed cache consistent outside pull-to-refresh too.
+2. **Surgically restore frontend behavior**
+   - In `useFollowingFeed.ts`, restore the pre-Jun-12 query-driven feed behavior:
+     - TanStack infinite query feed loading
+     - no custom `refresh()` state machine
+     - no manual page state replacement
+     - no post-refresh fallback-to-empty behavior
+   - In `Index.tsx`, restore the pre-Jun-12 refresh handler:
+     - flush seen-post tracking
+     - clear/invalidate feed-related queries
+     - reload after refresh, matching the old behavior
+   - Restore pre-Jun-12 caught-up display rules:
+     - “You’re all caught up” appears only when the feed-serving logic says the user has actually exhausted available unseen posts
+     - no skeleton flash loop from refresh state
+   - Keep unrelated later UI/content improvements where they do not affect refresh/feed-serving logic.
 
-5. **Validate the mechanism**
-   - Use a read-only database check to confirm the function exists after migration.
-   - Verify the source path now calls the refresh RPC and writes directly to the feed cache, matching the behavior users observe after leaving and returning Home.
+3. **Restore PullToRefresh behavior only if needed**
+   - Compare current `PullToRefresh.tsx` against `9473f70`.
+   - Only revert pieces that affect the refresh/caught-up flow.
+   - Preserve unrelated gesture improvements unless they are part of the broken loop.
+
+4. **Fix backend function state append-only**
+   - Do not delete old migrations.
+   - Add one new migration that redefines active feed RPC behavior to the pre-Jun-12 version.
+   - Ensure `get_following_feed_v2` matches the old serving behavior.
+   - Remove/neutralize `refresh_following_feed_v2` as an active dependency if the restored frontend no longer uses it.
+   - Include required function grants.
+
+5. **Verification**
+   - Confirm diff is limited to feed-refresh/caught-up/serving scope.
+   - Run a targeted feed behavior check:
+     - initial load does not flash wrong empty state
+     - refresh from caught-up does not skeleton-loop back incorrectly
+     - feed content renders when eligible posts exist
+     - caught-up appears only at real end state
+
+## Risk
+
+**Success probability: 89%**
+
+The remaining risk is that some same-file changes after Jun 12 are unrelated and should be preserved, so this must be a surgical patch rather than wholesale file replacement.

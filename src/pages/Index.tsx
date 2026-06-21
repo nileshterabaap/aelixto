@@ -27,11 +27,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const {
-    setObservedPostElement,
-    takePendingSeenPostIds,
-    restorePendingSeenPostIds,
-  } = useMarkPostSeen(user?.id);
+  const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -81,7 +77,6 @@ const Index = () => {
     loading: followingLoading,
     loadMore,
     hasMore,
-    refresh: refreshFollowingFeed,
   } = useFollowingFeed(user?.id);
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -204,22 +199,34 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Drain pending "seen" marks so the refresh RPC can mark them and
-    // surface new posts above them in a single round-trip.
-    const drained = takePendingSeenPostIds();
-    const countKey = ['following-count', user?.id] as const;
-    const hasPostsKey = ['following-has-posts', user?.id] as const;
-
+    // Mark only posts the user actually saw, then clear any persisted/stale
+    // feed cache so refresh always asks the backend for the latest eligible feed.
     try {
-      await Promise.all([
-        refreshFollowingFeed(drained),
-        queryClient.refetchQueries({ queryKey: countKey, exact: true, type: 'active' }),
-        queryClient.refetchQueries({ queryKey: hasPostsKey, exact: true, type: 'active' }),
-      ]);
+      await flushNow();
     } catch {
-      restorePendingSeenPostIds(drained);
+      // best-effort — proceed with reload regardless
     }
-  }, [takePendingSeenPostIds, restorePendingSeenPostIds, refreshFollowingFeed, queryClient, user?.id]);
+
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
+    ]);
+
+    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
+    ]);
+
+    await new Promise((resolve) => window.setTimeout(resolve, 150));
+    window.location.reload();
+    await new Promise(() => {});
+  }, [flushNow, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver

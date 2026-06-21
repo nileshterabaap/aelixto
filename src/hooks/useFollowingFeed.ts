@@ -1,7 +1,7 @@
-import { useInfiniteQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo, useCallback } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 
 interface FeedPost {
   id: string;
@@ -44,7 +44,6 @@ interface UseFollowingFeedResult {
   error: string | null;
   loadMore: () => void;
   hasMore: boolean;
-  refresh: (pendingSeenPostIds?: string[]) => Promise<void>;
 }
 
 interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
@@ -113,39 +112,8 @@ const fetchFeedPage = async (cursor?: string) => {
   return { posts: mappedPosts, nextCursor };
 };
 
-type RefreshRpcArgs = {
-  limit_count: number;
-  seen_post_ids: string[];
-  since_time: string | null;
-};
-
-const fetchRefreshPage = async (seenPostIds: string[], sinceTime: string | null) => {
-  const rpc = supabase.rpc as unknown as (
-    fn: 'refresh_following_feed_v2',
-    args: RefreshRpcArgs
-  ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
-
-  const { data, error } = await rpc('refresh_following_feed_v2', {
-    limit_count: PAGE_SIZE,
-    seen_post_ids: seenPostIds,
-    since_time: sinceTime,
-  });
-
-  if (error) throw error;
-
-  if (!data || data.length === 0) {
-    return { posts: [], nextCursor: undefined as string | undefined };
-  }
-
-  const mappedPosts = mapFeedRows(data);
-  const lastCursor = mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
-  return { posts: mappedPosts, nextCursor: lastCursor };
-};
-
 export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
-  const queryClient = useQueryClient();
-  const queryKey = useMemo(() => ['following-feed', userId] as const, [userId]);
 
   const {
     data,
@@ -155,7 +123,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey,
+    queryKey: ['following-feed', userId],
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam as string | undefined),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -204,37 +172,6 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     }
   };
 
-  const refresh = useCallback(async (pendingSeenPostIds: string[] = []) => {
-    if (!userId) return;
-
-    // Find the newest post currently in the cached feed so the backend can
-    // surface anything newer first, bypassing the seen-filter for those.
-    const existing = queryClient.getQueryData<InfiniteData<{ posts: FeedPost[]; nextCursor?: string }>>(queryKey);
-    let sinceTime: string | null = null;
-    if (existing?.pages?.length) {
-      for (const page of existing.pages) {
-        for (const post of page.posts) {
-          const ts = post.reposted_at || post.created_at;
-          if (ts && (!sinceTime || ts > sinceTime)) sinceTime = ts;
-        }
-      }
-    }
-
-    try {
-      const fresh = await fetchRefreshPage(pendingSeenPostIds, sinceTime);
-
-      // Replace the cached infinite-query with a clean first page so the new
-      // post renders inline instantly, the same way it does after navigation.
-      queryClient.setQueryData<InfiniteData<{ posts: FeedPost[]; nextCursor?: string }>>(queryKey, {
-        pages: [fresh],
-        pageParams: [undefined as unknown as string | undefined],
-      });
-    } catch (e) {
-      // Best-effort: fall back to a normal refetch so the user still sees something fresh.
-      await queryClient.refetchQueries({ queryKey, exact: true, type: 'active' });
-    }
-  }, [queryClient, queryKey, userId]);
-
   return {
     items,
     empty: Boolean(userId) && !feedLoading && items.length === 0,
@@ -242,6 +179,5 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     error: feedError?.message ?? null,
     loadMore,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
-    refresh,
   };
 };
