@@ -1,36 +1,28 @@
-## What is actually different
+Plan to fix the current refresh regression
 
-- Pull-to-refresh currently does a destructive cache clear and then `window.location.reload()`.
-- Tapping another navigation button and returning does **not** reload the app. Home is kept alive with `display:none`, so it simply reveals the already-mounted feed state.
-- The backend `post_seen` access is still suspicious: direct privilege checks pass, but `information_schema.role_table_grants` returned no grant rows. I will verify this with live browser/network tests instead of assuming.
+1. Reproduce the exact failing path first
+   - Use the live preview in a mobile viewport.
+   - Capture: initial rendered post count, pull-to-refresh spinner duration, feed RPC/network timing, final rendered post count, and screenshot after refresh.
+   - Also capture the navigation-away/back-to-home path so we can compare what succeeds there.
 
-## Plan
+2. Fix why the spinner returns immediately
+   - The current refresh handler removes the active `following-feed` query and then calls `refetchQueries` on that same exact active query key.
+   - Once removed, there may be no active query left for `refetchQueries` to await, so `onRefresh()` resolves immediately and `PullToRefresh` stops spinning.
+   - Replace that with a refresh path that keeps the active query observable and awaits the actual feed fetch completion.
 
-1. **Reproduce both paths in the browser**
-   - Use the logged-in preview session.
-   - Capture network calls, DOM post counts, route changes, and screenshots for:
-     - initial Home load
-     - pull-to-refresh
-     - navigation away and back to Home
-   - Confirm whether refresh returns zero rows from `get_following_feed_v2`, loses auth/session timing, or clears the render cache incorrectly.
+3. Make refresh render posts deterministically
+   - Expose a real `refetch`/`refresh` function from `useFollowingFeed` instead of driving refresh indirectly from `Index.tsx` via cache removal.
+   - In `handleRefresh`, await `flushNow()`, then await the feed refresh function, then refresh only the lightweight classifier queries (`following-count`, `following-has-posts`) without blocking the spinner if they are not needed for visible posts.
+   - Do not hard reload the page and do not remove the active feed query during refresh.
 
-2. **Add temporary local instrumentation only while testing**
-   - Log feed RPC row counts, errors, query state, and refresh steps in the browser console.
-   - Remove this instrumentation before finalizing.
+4. Keep existing navigation behavior unchanged
+   - Leave keep-alive navigation intact because that is currently the working path.
+   - Only change pull-to-refresh/feed-query coordination.
 
-3. **Fix the proven cause only**
-   - If refresh is empty because it reloads before the query/session/cache lifecycle settles: replace hard reload with an in-app query reset/refetch flow and keep Home mounted.
-   - If refresh is empty because `flushNow()` marks too many currently rendered posts as seen before fetching replacements: adjust refresh to fetch the next unseen feed without over-clearing visible posts.
-   - If backend grants/RLS are still blocking seen writes or RPC reads in the real client path: add the missing migration and verify with authenticated browser requests.
+5. Verify before reporting success
+   - Re-run the same browser test after the change.
+   - Confirm the spinner remains visible while the feed request is in flight.
+   - Confirm refresh ends with rendered posts or the correct caught-up state, not a premature blank/empty render.
+   - Confirm tapping another navigation tab and returning Home still shows posts.
 
-4. **Verify before claiming success**
-   - Re-run the same browser test.
-   - Confirm pull-to-refresh ends with rendered feed posts, not only skeleton/empty state.
-   - Confirm navigation away/back still works.
-   - Confirm no relevant console or network errors.
-
-## Likely fix direction
-
-Most likely the refresh should stop using `window.location.reload()` and instead perform an awaited in-app `resetQueries/refetchQueries` for `['following-feed', user.id]`. The reload path is the key behavior navigation-back does not share.
-
-Success probability: 88%
+Success probability: 86%.
