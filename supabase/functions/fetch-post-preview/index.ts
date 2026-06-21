@@ -151,6 +151,9 @@ serve(async (req) => {
       const redditData = await fetchRedditPreview(url);
       redditPostData = redditData.post_data ?? null;
       thumbnailUrl = redditData.thumbnail_url;
+      if (isJunkRedditThumbnail(thumbnailUrl)) {
+        thumbnailUrl = null;
+      }
       previewTitle = redditData.title;
       previewText = redditData.description || redditData.title;
       sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
