@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { BottomNav } from "@/components/BottomNav";
+import { formatCompactCount } from "@/lib/formatCount";
+import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,6 +32,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const navigate = useNavigate();
   const { user } = useSession();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
   const [followListOpen, setFollowListOpen] = useState(false);
 
@@ -53,7 +55,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
     },
   });
 
-  const { isFollowing, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
+  const { isFollowing, isRequested, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
@@ -151,7 +153,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
         style={{ opacity: showSkeleton ? 1 : 0 }}
       >
         <div className="mx-auto max-w-2xl">
-          <div className="relative h-[400px] bg-gradient-to-r from-purple-500/20 to-pink-500/20 animate-shimmer" />
+          <div className="relative h-[400px] profile-cover-fallback animate-shimmer" />
           <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
             <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
               <div className="text-center flex-shrink-0 w-20 -ml-2">
@@ -199,7 +201,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
       <PullToRefresh onRefresh={handleRefresh}>
       <main className="mx-auto max-w-2xl">
         {/* Cover Image with Header Overlay */}
-        <div className="relative h-[400px] bg-gradient-to-r from-purple-500 to-pink-500">
+        <div className="relative h-[400px] profile-cover-fallback">
           {profile.cover_url && (
             <img
               src={profile.cover_url}
@@ -286,7 +288,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           {(profile.settings as { aelix_score_enabled?: boolean })?.aelix_score_enabled && (
             <div className="flex justify-center mt-4 mb-4">
               <div className="border-2 border-foreground rounded-[16px] px-10 py-2">
-                <div className="text-2xl font-bold text-center leading-none mb-0.5">{profile.aelix_score.toLocaleString()}</div>
+                <div className="text-2xl font-bold text-center leading-none mb-0.5">{formatCompactCount(profile.aelix_score)}</div>
                 <div className="text-[9px] font-bold text-center tracking-[0.15em] uppercase">Aelix Score</div>
               </div>
             </div>
@@ -337,14 +339,20 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             <div className="flex gap-3 mb-6">
               <Button 
                 disabled={followLoading}
-                onClick={() => (isFollowing ? unfollow() : follow())}
+                onClick={() => ((isFollowing || isRequested) ? unfollow() : follow())}
                 className={`flex-1 rounded-full py-4 text-sm font-bold border-2 ${
-                  isFollowing 
+                  (isFollowing || isRequested)
                     ? 'bg-foreground text-background hover:bg-foreground/90' 
                     : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
               >
-                {isFollowing ? 'Following' : 'Follow'}
+                {isFollowing
+                  ? 'Following'
+                  : isRequested
+                  ? 'Asked'
+                  : isFollowedByTarget
+                  ? 'Follow Back'
+                  : 'Follow'}
               </Button>
               <Button
                 disabled={conversationLoading}
@@ -407,11 +415,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
       </div>
       ) : null}
 
-      {user ? (
-        <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
-      ) : (
-        <AuthCTABar />
-      )}
+      {user ? null : <AuthCTABar />}
 
       <CreatePostDialog 
         open={isCreateDialogOpen} 

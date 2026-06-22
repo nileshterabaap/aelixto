@@ -137,9 +137,22 @@ function isMisleadingThumbnail(platform: string, url: string): boolean {
   // For Reddit, thumbnails should come from reddit/redd.it/redditmedia/redditstatic
   // or from our own storage bucket. Anything else is a foreign OG scrape.
   if (platform === "reddit") {
-    // Reddit posts can legitimately point to external image/video hosts
-    // (Imgur, Gfycat/CDN mirrors, news images, etc.). Only reject the known
-    // generic placeholders above; otherwise let real scraped media render.
+    // Reject Reddit's own brand/icon/avatar assets and share-preview
+    // placeholders. These are never the actual post media and just render
+    // as the Reddit alien logo on the text card.
+    if (
+      lower.includes("redditstatic.com") ||
+      lower.includes("/snoo") ||
+      lower.includes("snoo.png") ||
+      lower.includes("snoo-") ||
+      lower.includes("default-avatar") ||
+      lower.includes("share.redd.it/preview/post") ||
+      lower.includes("/brand") ||
+      lower.includes("/icon") ||
+      lower.includes("favicon")
+    ) {
+      return true;
+    }
     return false;
   }
   return false;

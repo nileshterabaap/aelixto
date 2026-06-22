@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +21,10 @@ export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) =>
     initialIsFollowing: result.is_following,
     skipInitialRefresh: true,
   });
+  // Local state for "Asked" so the label flips immediately on tap
+  // without waiting for a refresh round-trip.
+  const [requested, setRequested] = useState<boolean>(!!result.is_requested);
+  const followsMe = !!result.follows_me;
   
   const isMe = user?.id === result.user_id;
 
@@ -32,7 +37,9 @@ export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) =>
     e.stopPropagation();
     if (isFollowing) {
       unfollow();
+      setRequested(false);
     } else {
+      if (!requested) setRequested(true); // optimistic for private accounts
       follow();
     }
   };
@@ -61,12 +68,20 @@ export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) =>
       {!isMe && user && (
         <Button
           size="sm"
-          variant={isFollowing ? "secondary" : "default"}
+          variant={isFollowing || requested ? "secondary" : "default"}
           disabled={loading}
           onClick={handleFollowClick}
           className="text-xs"
         >
-          {loading ? "..." : isFollowing ? "Following" : "Follow"}
+          {loading
+            ? "..."
+            : isFollowing
+            ? "Following"
+            : requested
+            ? "Asked"
+            : followsMe
+            ? "Follow Back"
+            : "Follow"}
         </Button>
       )}
     </div>

@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trackArticleOpen, trackExternalVisit } from "@/hooks/useViewTracking";
 
 // --- Helpers: safe DOM parsing on reader HTML (r.jina.ai result) ---
 // Safe entity decoding using DOMParser instead of innerHTML assignment
@@ -104,9 +105,22 @@ interface ArticleContentEmbedProps {
       html: string;
     };
   };
+  postId?: string;
+  platform?: string | null;
 }
 
-export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
+export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEmbedProps) => {
+  const isExternal = platform === 'external';
+  const ctaLabel = isExternal ? 'Visit' : 'Continue Reading';
+
+  const handleCtaClick = () => {
+    if (!postId) return;
+    if (isExternal) {
+      void trackExternalVisit(postId);
+    } else {
+      void trackArticleOpen(postId);
+    }
+  };
   const formatDate = (dateString: string | null) => {
     if (!dateString) return null;
     try {
@@ -234,9 +248,10 @@ export const ArticleContentEmbed = ({ data }: ArticleContentEmbedProps) => {
               href={data.resolvedUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={handleCtaClick}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
-              Continue Reading
+              {ctaLabel}
             </a>
           </Button>
         </div>

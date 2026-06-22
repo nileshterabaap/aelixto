@@ -9,6 +9,11 @@ import { ArrowLeft, Link2, Loader2, Sparkles, X, Check } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
+import {
+  extractRootDomain,
+  getDomainOverride,
+  recordDomainClassification,
+} from "@/lib/domainClassification";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 
@@ -80,15 +85,14 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           }
         }
       } else if (linkUrl.includes("reddit.com") || linkUrl.includes("redd.it")) {
-        console.log('[CreatePostDialog] Fetching Reddit thumbnail via edge function');
+        console.log('[CreatePostDialog] Fetching Reddit preview via fetch-post-preview (previewOnly)');
         try {
-          const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
-            body: { url: linkUrl }
+          const { data: previewData, error } = await supabase.functions.invoke('fetch-post-preview', {
+            body: { url: linkUrl, platform: 'reddit', previewOnly: true }
           });
-          if (!error && ogData) {
-            videoTitle = ogData.title || "";
-            thumbnail = ogData.image || "";
-            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
+          if (!error && previewData) {
+            videoTitle = previewData.title || "";
+            thumbnail = previewData.thumbnail_url || "";
           }
         } catch (error) {
           console.error('[CreatePostDialog] Reddit fetch failed:', error);
@@ -168,12 +172,14 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       
       // Fetch oEmbed HTML in parallel for instant embed rendering
       console.log('[CreatePostDialog] Fetching oEmbed HTML...');
+      let fetchedEmbedHtml = "";
       try {
         const { data: oembedData, error: oembedError } = await supabase.functions.invoke('fetch-oembed', {
           body: { url: linkUrl }
         });
         if (!oembedError && oembedData?.embed_html) {
           setEmbedHtml(oembedData.embed_html);
+          fetchedEmbedHtml = oembedData.embed_html;
           console.log('[CreatePostDialog] Got oEmbed HTML, length:', oembedData.embed_html.length);
         }
       } catch (error) {
@@ -184,24 +190,45 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       setTitle(videoTitle);
 
       // Smart privacy check — verify the source is publicly accessible.
-      // If the platform explicitly says the post is missing/private, stop here
-      // so users can't share content they don't have permission to share.
+      const platform = classifyUrl(linkUrl, detectedOgType);
+      const platformLabel = platform && platform !== "external"
+        ? platform.charAt(0).toUpperCase() + platform.slice(1)
+        : "this site";
+      let verdict: string | undefined;
       try {
-        const platform = classifyUrl(linkUrl, detectedOgType);
         const { data: validation } = await supabase.functions.invoke(
           "validate-post-source",
           { body: { url: linkUrl, platform } }
         );
-        if (validation?.verdict === "removed") {
-          toast.error(
-            "This post is private or unavailable and can't be shared publicly.",
-            { duration: 5000 }
-          );
-          return;
-        }
+        verdict = validation?.verdict;
       } catch (err) {
         console.error("[CreatePostDialog] Privacy check failed:", err);
-        // Network issue — don't block, fall through.
+      }
+
+      if (verdict === "removed") {
+        toast.error(
+          `We couldn't load this ${platformLabel} post. It looks private, deleted, or region-restricted — try a different link.`,
+          { duration: 6000 }
+        );
+        return;
+      }
+
+      // Content-availability check — if we got nothing usable to render,
+      // tell the user the likely reason instead of letting them publish a broken card.
+      const hasAnyContent = Boolean(thumbnail) || Boolean(fetchedEmbedHtml) || Boolean(videoTitle);
+      if (!hasAnyContent) {
+        if (platform === "external") {
+          toast.error(
+            "We couldn't read this link. It may not be a supported platform, the page may block previews, or the URL might be wrong.",
+            { duration: 6000 }
+          );
+        } else {
+          toast.error(
+            `We couldn't fetch this ${platformLabel} post. It may be private, deleted, age- or region-restricted, or ${platformLabel} is blocking the preview right now. Double-check the link or try another post.`,
+            { duration: 6000 }
+          );
+        }
+        return;
       }
 
       setStep(2);
@@ -210,7 +237,53 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
   };
 
-  const handlePost = () => {
+  const promptSectionFeedback = (
+    postId: string | undefined,
+    url: string,
+    currentType: "article" | "external"
+  ) => {
+    if (!postId) return;
+    const domain = extractRootDomain(url);
+    if (!domain) return;
+    const otherType: "article" | "external" =
+      currentType === "article" ? "external" : "article";
+    const otherLabel = otherType === "article" ? "Articles" : "External";
+    const currentLabel = currentType === "article" ? "Articles" : "External";
+
+    const id = toast(
+      `Posted to ${currentLabel}. Wrong section?`,
+      {
+        description: `Move it to ${otherLabel} — Aelixto will remember ${domain} for next time.`,
+        duration: 12000,
+        action: {
+          label: `Move to ${otherLabel}`,
+          onClick: async () => {
+            try {
+              const { error } = await supabase
+                .from("posts")
+                .update({ platform: otherType })
+                .eq("id", postId);
+              if (error) throw error;
+              await recordDomainClassification(domain, otherType);
+              toast.success(`Moved to ${otherLabel}. Aelixto will remember.`);
+            } catch (e: any) {
+              toast.error(e?.message || "Couldn't move the post.");
+            }
+          },
+        },
+        cancel: {
+          label: "Keep here",
+          onClick: async () => {
+            // Confirming the current placement also teaches the system.
+            try { await recordDomainClassification(domain, currentType); } catch {}
+          },
+        },
+      }
+    );
+    return id;
+  };
+
+  const handlePost = async () => {
     if (!linkUrl.trim()) return;
 
     if (limitReached) {
@@ -219,8 +292,28 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
 
     // Use centralised classification
-    const platform = classifyUrl(linkUrl, ogType);
+    let platform = classifyUrl(linkUrl, ogType);
+
+    // Apply user-learned override for unknown sites (article vs external).
+    if (platform === "article" || platform === "external") {
+      const domain = extractRootDomain(linkUrl);
+      const override = await getDomainOverride(domain);
+      if (override) platform = override;
+    }
+
     const mediaType = deriveMediaType(linkUrl, platform);
+
+    // Final safety net — never publish a card with nothing to show.
+    if (!thumbnailUrl && !embedHtml && !title.trim()) {
+      const label = platform && platform !== "external"
+        ? platform.charAt(0).toUpperCase() + platform.slice(1)
+        : "this link";
+      toast.error(
+        `We couldn't find any content for this ${label} post. It may be private, deleted, or unsupported — try a different link.`,
+        { duration: 6000 }
+      );
+      return;
+    }
 
     // Validate Facebook embed HTML before saving
     if (platform === 'facebook' && embedHtml) {
@@ -253,8 +346,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
     }, {
-      onSuccess: () => {
+      onSuccess: (created: any) => {
         incrementDailyCount();
+        if (platform === "article" || platform === "external") {
+          promptSectionFeedback(created?.id, linkUrl, platform);
+        }
       },
     });
 
