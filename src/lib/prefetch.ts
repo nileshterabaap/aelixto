@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { preloadFeedImages, preloadProfileImages } from "./preloadImages";
+import { preloadProfileImages } from "./preloadImages";
 
 // Centralized prefetch functions for instant navigation
 
