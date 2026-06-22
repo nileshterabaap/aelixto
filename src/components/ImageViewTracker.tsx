@@ -15,7 +15,7 @@ interface ImageViewTrackerProps {
 export const ImageViewTracker = ({ 
   postId, 
   children, 
-  threshold = 0.3,
+  threshold = 0.5,
   viewDuration = 2000 
 }: ImageViewTrackerProps) => {
   const containerRef = useRef<HTMLDivElement>(null);

@@ -17,8 +17,7 @@ export const localStoragePersister = createSyncStoragePersister({
         queries: data.clientState.queries.filter((query) => {
           // Only persist feed and profile data, not session
           const key = query.queryKey[0];
-          return key === 'following-feed' ||
-                 key === 'profile' || 
+          return key === 'profile' || 
                  key === 'discover-posts' ||
                  key === 'posts' ||
                  key === 'user-profile' ||
@@ -39,5 +38,5 @@ export const localStoragePersister = createSyncStoragePersister({
 export const persistOptions = {
   persister: localStoragePersister,
   maxAge: MAX_AGE,
-  buster: 'v7-following-feed-persisted', // Keep the feed visible after app refresh while fresh posts load
+  buster: 'v6-unified-thumbnail-preview-fields', // Clears stale profile/saved grid snapshots so preview metadata renders everywhere
 };

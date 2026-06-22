@@ -2,8 +2,9 @@ import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 const BATCH_INTERVAL = 3000; // flush every 3s
-const VISIBILITY_THRESHOLD = 0.5; // 50% visible
-const MIN_VIEW_TIME = 1500; // 1.5s minimum viewing time
+// Any visibility — the moment a post enters the viewport it counts as seen
+// so it never reappears in the feed, regardless of how briefly it scrolled past.
+const VISIBILITY_THRESHOLD = 0;
 
 /**
  * Mark a single post as seen immediately (fire-and-forget).
@@ -40,8 +41,22 @@ export const markPostsSeenImmediate = async (userId: string, postIds: string[]) 
  */
 export const useMarkPostSeen = (userId: string | undefined) => {
   const pendingRef = useRef<Set<string>>(new Set());
-  const viewTimers = useRef<Map<string, number>>(new Map());
+  const observersRef = useRef<Map<string, IntersectionObserver>>(new Map());
+  // Posts currently intersecting the viewport (any visibility), so on
+  // refresh we can also count posts the user is looking at right now
+  // even if the periodic batch flush hasn't fired yet.
+  const visibleRef = useRef<Set<string>>(new Set());
   const flushing = useRef(false);
+
+  const clearPostTracking = useCallback((postId: string) => {
+    const observer = observersRef.current.get(postId);
+    if (observer) {
+      observer.disconnect();
+      observersRef.current.delete(postId);
+    }
+
+    visibleRef.current.delete(postId);
+  }, []);
 
   // Flush pending seen posts to DB
   const flush = useCallback(async () => {
@@ -63,6 +78,29 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     }
   }, [userId]);
 
+  // Force-flush: include currently-visible posts and await DB write.
+  // Used by pull-to-refresh so anything the user actually saw disappears next load.
+  const flushNow = useCallback(async () => {
+    if (!userId) return;
+    visibleRef.current.forEach((id) => pendingRef.current.add(id));
+    if (pendingRef.current.size === 0) return;
+    // Wait for any in-flight flush to finish
+    while (flushing.current) {
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    flushing.current = true;
+    const postIds = Array.from(pendingRef.current);
+    pendingRef.current.clear();
+    try {
+      const rows = postIds.map((post_id) => ({ user_id: userId, post_id }));
+      await supabase.from('post_seen').upsert(rows, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
+    } catch {
+      postIds.forEach((id) => pendingRef.current.add(id));
+    } finally {
+      flushing.current = false;
+    }
+  }, [userId]);
+
   // Periodic flush
   useEffect(() => {
     if (!userId) return;
@@ -75,44 +113,43 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      observersRef.current.forEach((observer) => observer.disconnect());
+      observersRef.current.clear();
+      visibleRef.current.clear();
       flush(); // flush remaining on unmount
     };
   }, [userId, flush]);
 
-  // Returns an IntersectionObserver callback ref for a post element
-  const observePost = useCallback(
-    (postId: string) => {
-      return (el: HTMLDivElement | null) => {
-        if (!el || !userId) return;
+  const setObservedPostElement = useCallback(
+    (postId: string, el: HTMLDivElement | null) => {
+      clearPostTracking(postId);
 
-        const observer = new IntersectionObserver(
-          ([entry]) => {
-            if (entry.isIntersecting) {
-              // Start timer when post becomes visible
-              if (!viewTimers.current.has(postId)) {
-                viewTimers.current.set(postId, window.setTimeout(() => {
-                  pendingRef.current.add(postId);
-                  viewTimers.current.delete(postId);
-                }, MIN_VIEW_TIME));
-              }
-            } else {
-              // Cancel timer if post scrolls out before min time
-              const timer = viewTimers.current.get(postId);
-              if (timer) {
-                clearTimeout(timer);
-                viewTimers.current.delete(postId);
-              }
+      if (!el || !userId) return;
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            // Mark as seen the moment any part of the post enters the
+            // viewport — no dwell timer. Once recorded, stop observing.
+            visibleRef.current.add(postId);
+            pendingRef.current.add(postId);
+            const obs = observersRef.current.get(postId);
+            if (obs) {
+              obs.disconnect();
+              observersRef.current.delete(postId);
             }
-          },
-          { threshold: VISIBILITY_THRESHOLD }
-        );
+          } else {
+            visibleRef.current.delete(postId);
+          }
+        },
+        { threshold: [VISIBILITY_THRESHOLD] }
+      );
 
-        observer.observe(el);
-        (el as any).__seenObserver = observer;
-      };
+      observersRef.current.set(postId, observer);
+      observer.observe(el);
     },
-    [userId]
+    [clearPostTracking, userId]
   );
 
-  return { observePost };
+  return { setObservedPostElement, flushNow };
 };
