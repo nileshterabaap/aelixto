@@ -1,12 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 
 export const usePostActions = (postId: string, userId: string | undefined) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { decrement: decrementDailyCount } = useDailyPostLimit();
 
   // Check if post is liked
   const { data: isLiked } = useQuery({
@@ -143,14 +141,6 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
     mutationFn: async () => {
       if (!userId) throw new Error("Not authenticated");
 
-      // Fetch created_at first so we can decide whether to refund the daily credit
-      const { data: existing } = await supabase
-        .from("posts")
-        .select("created_at")
-        .eq("id", postId)
-        .eq("user_id", userId)
-        .maybeSingle();
-
       const { error } = await supabase
         .from("posts")
         .delete()
@@ -158,37 +148,10 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
         .eq("user_id", userId);
 
       if (error) throw error;
-
-      return { createdAt: existing?.created_at as string | undefined };
     },
-    onSuccess: (result) => {
-      // Refund the daily post credit only if the post was created today (same local day)
-      let refunded = false;
-      try {
-        if (result?.createdAt) {
-          const createdLocal = new Date(result.createdAt).toLocaleDateString();
-          const todayLocal = new Date().toLocaleDateString();
-          if (createdLocal === todayLocal) {
-            decrementDailyCount();
-            refunded = true;
-          }
-        }
-      } catch { /* ignore */ }
-
-      // Invalidate every cache that may contain this post so the UI updates immediately
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["following-feed"] });
-      queryClient.invalidateQueries({ queryKey: ["platform-posts"] });
-      queryClient.invalidateQueries({ queryKey: ["saved-posts"] });
-      queryClient.invalidateQueries({ queryKey: ["user-posts"] });
-      queryClient.invalidateQueries({ queryKey: ["profile-posts"] });
-
-      toast({
-        title: "Post deleted",
-        description: refunded
-          ? "Your post has been removed. Daily credit refunded."
-          : "Your post has been removed.",
-      });
+      toast({ title: "Post deleted", description: "Your post has been removed" });
     },
     onError: () => {
       toast({ 

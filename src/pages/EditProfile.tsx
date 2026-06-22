@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Loader2, Check, X } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { ImageUploadButton } from "@/components/ImageUploadButton";
@@ -35,7 +35,6 @@ const EditProfile = () => {
     cover_url: '',
   });
   const [aelixScoreEnabled, setAelixScoreEnabled] = useState(true);
-  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'self'>('idle');
 
   // Check ownership and redirect if not owner
   useEffect(() => {
@@ -60,38 +59,6 @@ const EditProfile = () => {
     }
   }, [profile]);
 
-  // Debounced username availability check
-  useEffect(() => {
-    const uname = formData.username.trim();
-    if (!profile) return;
-    if (uname === profile.username) {
-      setUsernameStatus('self');
-      return;
-    }
-    if (!/^[a-zA-Z0-9_.]{3,30}$/.test(uname)) {
-      setUsernameStatus('invalid');
-      return;
-    }
-    setUsernameStatus('checking');
-    const t = setTimeout(async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('user_id')
-        .ilike('username', uname)
-        .maybeSingle();
-      if (error) {
-        setUsernameStatus('idle');
-        return;
-      }
-      if (!data || data.user_id === profile.user_id) {
-        setUsernameStatus('available');
-      } else {
-        setUsernameStatus('taken');
-      }
-    }, 400);
-    return () => clearTimeout(t);
-  }, [formData.username, profile]);
-
   const handleAvatarUpload = async (file: File) => {
     if (!user) return;
     const url = await uploadImage(file, "avatars", user.id);
@@ -110,14 +77,6 @@ const EditProfile = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (usernameStatus === 'taken' || usernameStatus === 'invalid' || usernameStatus === 'checking') {
-      toast({
-        title: "Username unavailable",
-        description: usernameStatus === 'checking' ? "Still checking, please wait." : "Please choose a different username.",
-        variant: "destructive",
-      });
-      return;
-    }
     await upsertProfile({
       ...formData,
       settings: {
@@ -169,42 +128,17 @@ const EditProfile = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
-            <div className="relative">
-              <Input
-                id="username"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                placeholder="your_username"
-                pattern="^[a-zA-Z0-9_.]{3,30}$"
-                required
-                className="pr-10"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                {usernameStatus === 'checking' && (
-                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                )}
-                {usernameStatus === 'available' && (
-                  <Check className="h-4 w-4 text-green-600" />
-                )}
-                {(usernameStatus === 'taken' || usernameStatus === 'invalid') && (
-                  <X className="h-4 w-4 text-destructive" />
-                )}
-              </div>
-            </div>
-            {usernameStatus === 'available' && (
-              <p className="text-sm text-green-600">Username is available</p>
-            )}
-            {usernameStatus === 'taken' && (
-              <p className="text-sm text-destructive">Username is not available</p>
-            )}
-            {usernameStatus === 'invalid' && (
-              <p className="text-sm text-destructive">3-30 characters, letters, numbers, dots and underscores only</p>
-            )}
-            {(usernameStatus === 'idle' || usernameStatus === 'self' || usernameStatus === 'checking') && (
-              <p className="text-sm text-muted-foreground">
-                3-30 characters, letters, numbers, dots and underscores only
-              </p>
-            )}
+            <Input
+              id="username"
+              value={formData.username}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              placeholder="your_username"
+              pattern="^[a-zA-Z0-9_.]{3,30}$"
+              required
+            />
+            <p className="text-sm text-muted-foreground">
+              3-30 characters, letters, numbers, dots and underscores only
+            </p>
           </div>
 
           <div className="space-y-2">

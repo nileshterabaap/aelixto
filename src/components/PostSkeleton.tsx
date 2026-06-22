@@ -1,8 +1,10 @@
+import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const PostSkeleton = () => {
   return (
-    <div className="px-1">
+    <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
+      <div className="p-5">
         {/* Author Info Skeleton */}
         <div className="flex items-center gap-3 mb-4">
           <Skeleton className="h-12 w-12 rounded-full" />
@@ -30,6 +32,7 @@ export const PostSkeleton = () => {
           <Skeleton className="h-7 w-7 rounded-full" />
           <Skeleton className="h-7 w-7 rounded-full" />
         </div>
-    </div>
+      </div>
+    </Card>
   );
 };

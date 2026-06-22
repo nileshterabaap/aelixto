@@ -41,9 +41,7 @@ import { PostReportMenu } from "@/components/PostReportMenu";
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
 const revealedPostsCache = new Set<string>();
-// Hydrate posts well ahead of the viewport so the next ~6–7 posts in the
-// feed are always ready to display the moment the user scrolls to them.
-const HYDRATION_ROOT_MARGIN = '4500px 0px';
+const HYDRATION_ROOT_MARGIN = '3000px 0px';
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
