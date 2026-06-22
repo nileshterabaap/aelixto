@@ -24,6 +24,7 @@ interface FeedPost {
   is_repost?: boolean;
   reposted_by_user_id?: string | null;
   reposted_by_username?: string | null;
+  reposted_at?: string | null;
   profiles?: {
     username: string;
     display_name: string | null;
@@ -99,6 +100,53 @@ const fetchFeedPage = async (cursor?: string) => {
   return { posts: mappedPosts, nextCursor };
 };
 
+const fetchRefreshPage = async (seenPostIds: string[], sinceTime?: string) => {
+  const rpc = supabase.rpc as unknown as (
+    fn: 'refresh_following_feed_v2',
+    args: { limit_count: number; seen_post_ids: string[]; since_time: string | null }
+  ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
+
+  const { data, error } = await rpc('refresh_following_feed_v2', {
+    limit_count: PAGE_SIZE,
+    seen_post_ids: seenPostIds,
+    since_time: sinceTime || null,
+  });
+
+  if (error) throw error;
+  if (!data || data.length === 0) return { posts: [], nextCursor: undefined };
+
+  const mappedPosts: FeedPost[] = data.map((item) => ({
+    id: item.id,
+    user_id: item.user_id,
+    content: item.content,
+    created_at: item.created_at,
+    likes_count: item.likes_count,
+    saves_count: item.saves_count,
+    comments_count: item.comments_count,
+    reposts_count: item.reposts_count,
+    media_type: item.media_type,
+    media_url: item.media_url,
+    platform: item.platform,
+    embed_html: item.embed_html,
+    thumbnail_url: item.thumbnail_url,
+    title: item.title,
+    is_public: item.is_public,
+    feed_cursor: item.feed_cursor,
+    is_repost: item.is_repost,
+    reposted_by_user_id: item.reposted_by_user_id,
+    reposted_by_username: item.reposted_by_username,
+    reposted_at: item.reposted_at,
+    profiles: {
+      username: item.profile_username,
+      display_name: item.profile_display_name,
+      avatar_url: item.profile_avatar_url,
+    },
+  }));
+
+  const nextCursor = data.length < PAGE_SIZE ? undefined : mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
+  return { posts: mappedPosts, nextCursor };
+};
+
 export const useFollowingFeed = (): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
   const queryClient = useQueryClient();
@@ -166,7 +214,14 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
   // Pull-to-refresh: fetch fresh first page, prepend only posts not already
   // in the cache. Existing (possibly already-seen) posts stay on screen.
   const prependNewer = async (): Promise<number> => {
-    const fresh = await fetchFeedPage(undefined);
+    const cachedPosts: FeedPost[] = queryClient
+      .getQueryData<any>(['following-feed'])
+      ?.pages?.flatMap((page: any) => page.posts ?? []) ?? [];
+    const seenPostIds = cachedPosts.map((post) => post.id);
+    const sinceTime = cachedPosts
+      .map((post) => post.reposted_at ?? post.created_at)
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+    const fresh = await fetchRefreshPage(seenPostIds, sinceTime);
     if (!fresh.posts.length) return 0;
 
     let added = 0;
