@@ -2,7 +2,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 
 interface FeedPost {
   id: string;
@@ -50,15 +50,16 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
 
 const PAGE_SIZE = 20;
 
-const fetchFeedPage = async (cursor?: string) => {
+const fetchFeedPage = async (cursor?: string, refreshSeed: string = '') => {
   const rpc = supabase.rpc as unknown as (
     fn: 'get_following_feed_v2',
-    args: { limit_count: number; cursor_key: string | null }
+    args: { limit_count: number; cursor_key: string | null; refresh_seed?: string }
   ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
 
   const { data, error } = await rpc('get_following_feed_v2', {
     limit_count: PAGE_SIZE,
     cursor_key: cursor || null,
+    refresh_seed: refreshSeed,
   });
 
   if (error) throw error;
@@ -104,7 +105,11 @@ const fetchFeedPage = async (cursor?: string) => {
 export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
   const queryClient = useQueryClient();
-  const feedQueryKey = useMemo(() => ['following-feed', userId] as const, [userId]);
+  const [refreshSeed, setRefreshSeed] = useState<string>('');
+  const feedQueryKey = useMemo(
+    () => ['following-feed', userId, refreshSeed] as const,
+    [userId, refreshSeed]
+  );
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -116,7 +121,7 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
     isFetchingNextPage,
   } = useInfiniteQuery({
     queryKey: feedQueryKey,
-    queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
+    queryFn: ({ pageParam }) => fetchFeedPage(pageParam, refreshSeed),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: Boolean(userId),
@@ -171,11 +176,17 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
   // pages and fetch page 1 with cursor=null so seen-filtered posts can rotate out.
   const refresh = async (): Promise<number> => {
     if (!userId) return 0;
-    const firstPage = await fetchFeedPage(undefined);
-    queryClient.setQueryData(feedQueryKey, {
+    // New seed → completely new shuffle order from the RPC, even when
+    // post_seen hasn't changed. This is what makes pull-to-refresh feel
+    // alive even on a small follow graph.
+    const newSeed = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const firstPage = await fetchFeedPage(undefined, newSeed);
+    const newKey = ['following-feed', userId, newSeed] as const;
+    queryClient.setQueryData(newKey, {
       pages: [firstPage],
       pageParams: [undefined],
     });
+    setRefreshSeed(newSeed);
     return firstPage.posts.length;
   };
 
