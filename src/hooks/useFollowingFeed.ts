@@ -20,7 +20,6 @@ interface FeedPost {
   thumbnail_url: string | null;
   title: string | null;
   is_public: boolean;
-  feed_cursor?: string | null;
   is_repost?: boolean;
   reposted_by_user_id?: string | null;
   reposted_by_username?: string | null;
@@ -50,16 +49,15 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
 
 const PAGE_SIZE = 20;
 
-const fetchFeedPage = async (cursor?: string, refreshSeed: string = '') => {
+const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
-    fn: 'get_following_feed_v2',
-    args: { limit_count: number; cursor_key: string | null; refresh_seed?: string }
+    fn: 'get_following_feed',
+    args: { limit_count: number; cursor: string | null }
   ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
 
-  const { data, error } = await rpc('get_following_feed_v2', {
+  const { data, error } = await rpc('get_following_feed', {
     limit_count: PAGE_SIZE,
-    cursor_key: cursor || null,
-    refresh_seed: refreshSeed,
+    cursor: cursor || null,
   });
 
   if (error) throw error;
@@ -85,7 +83,6 @@ const fetchFeedPage = async (cursor?: string, refreshSeed: string = '') => {
     thumbnail_url: item.thumbnail_url,
     title: item.title,
     is_public: item.is_public,
-    feed_cursor: item.feed_cursor,
     is_repost: item.is_repost,
     reposted_by_user_id: item.reposted_by_user_id,
     reposted_by_username: item.reposted_by_username,
@@ -97,7 +94,13 @@ const fetchFeedPage = async (cursor?: string, refreshSeed: string = '') => {
     },
   }));
 
-  const nextCursor = data.length < PAGE_SIZE ? undefined : mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
+  // Use reposted_at (sort_time) when present, else created_at — matches the
+  // 17:08 RPC which orders by sort_time DESC.
+  const last = mappedPosts[mappedPosts.length - 1];
+  const nextCursor =
+    data.length < PAGE_SIZE
+      ? undefined
+      : last?.reposted_at ?? last?.created_at ?? undefined;
 
   return { posts: mappedPosts, nextCursor };
 };
@@ -105,10 +108,10 @@ const fetchFeedPage = async (cursor?: string, refreshSeed: string = '') => {
 export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
   const queryClient = useQueryClient();
-  const [refreshSeed, setRefreshSeed] = useState<string>('');
+  const [refreshNonce, setRefreshNonce] = useState<number>(0);
   const feedQueryKey = useMemo(
-    () => ['following-feed', userId, refreshSeed] as const,
-    [userId, refreshSeed]
+    () => ['following-feed', userId, refreshNonce] as const,
+    [userId, refreshNonce]
   );
 
   // Fetch feed directly — no count gate, single RPC call
@@ -121,7 +124,7 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
     isFetchingNextPage,
   } = useInfiniteQuery({
     queryKey: feedQueryKey,
-    queryFn: ({ pageParam }) => fetchFeedPage(pageParam, refreshSeed),
+    queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: Boolean(userId),
@@ -176,17 +179,15 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
   // pages and fetch page 1 with cursor=null so seen-filtered posts can rotate out.
   const refresh = async (): Promise<number> => {
     if (!userId) return 0;
-    // New seed → completely new shuffle order from the RPC, even when
-    // post_seen hasn't changed. This is what makes pull-to-refresh feel
-    // alive even on a small follow graph.
-    const newSeed = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const firstPage = await fetchFeedPage(undefined, newSeed);
-    const newKey = ['following-feed', userId, newSeed] as const;
+    // Fresh fetch of page 1 with no cursor — restores 17:08 behavior.
+    const firstPage = await fetchFeedPage(undefined);
+    const nextNonce = refreshNonce + 1;
+    const newKey = ['following-feed', userId, nextNonce] as const;
     queryClient.setQueryData(newKey, {
       pages: [firstPage],
       pageParams: [undefined],
     });
-    setRefreshSeed(newSeed);
+    setRefreshNonce(nextNonce);
     return firstPage.posts.length;
   };
 
