@@ -3,7 +3,7 @@ import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
+import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,6 @@ import { MessagesSkeleton } from "@/components/messages/MessagesSkeleton";
 
 const Messages = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const navigate = useNavigate();
   const { conversations, loading, refetch } = useConversations();
   const { user } = useSession();
@@ -121,6 +120,7 @@ const Messages = () => {
         </main>
       </PullToRefresh>
 
+      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
       <CreatePostDialog 
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen}

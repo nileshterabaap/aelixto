@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
-import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
+import { BottomNav } from "@/components/BottomNav";
 import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
 import { PostSkeleton } from "@/components/PostSkeleton";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
@@ -23,7 +22,6 @@ const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
-  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
@@ -157,9 +155,6 @@ const Index = () => {
       isRealPost: true,
       isRepost: post.is_repost,
       repostedByUsername: post.reposted_by_username,
-      media_kind: post.media_kind,
-      aspect_ratio: post.aspect_ratio,
-      suggested_height: post.suggested_height,
     }));
   }, [followingPosts, showDemoFeed]);
 
@@ -172,24 +167,9 @@ const Index = () => {
   );
 
   useEffect(() => {
-    if (sessionLoading || user || isDemoMode) return;
-    // Guard against a brief flash to /auth before the persisted Supabase
-    // session is rehydrated. If a token exists in localStorage, wait for
-    // onAuthStateChange to populate the user instead of redirecting.
-    let hasStoredToken = false;
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
-          hasStoredToken = true;
-          break;
-        }
-      }
-    } catch {
-      // ignore
+    if (!sessionLoading && !user && !isDemoMode) {
+      navigate("/auth");
     }
-    if (hasStoredToken) return;
-    navigate("/auth");
   }, [user, sessionLoading, isDemoMode, navigate]);
 
   // Mark first render complete to prevent flicker on subsequent renders
@@ -266,6 +246,7 @@ const Index = () => {
               ))}
             </div>
           </main>
+          <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
         </div>
       </SwipeableView>
     );
@@ -279,11 +260,7 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
-            followingCount === undefined || followingHasAnyPosts === undefined ? (
-              // Empty-state classifier queries haven't resolved yet —
-              // render nothing to avoid a flash of the wrong message.
-              <div className="py-16" />
-            ) : followingCount === 0 ? (
+            followingCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <h3 className="text-lg font-semibold">Nothing here yet 👀</h3>
                 <p className="text-sm text-muted-foreground mt-1 mb-4">
@@ -337,24 +314,20 @@ const Index = () => {
                   the user reaches the end. */}
               {/* All caught up message */}
               {!hasMore && !showDemoFeed && allPosts.length > 0 && (
-                <motion.div
-                  className="flex flex-col items-center justify-center pt-24 pb-10 text-center"
-                  initial={{ opacity: 0, y: 32 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.6 }}
-                  transition={{ type: 'spring', stiffness: 180, damping: 22 }}
-                >
+                <div className="flex flex-col items-center justify-center py-10 text-center">
                   <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                   <h3 className="text-lg font-semibold">You're all caught up</h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     You've seen all recent posts from people you follow.
                   </p>
-                </motion.div>
+                </div>
               )}
             </div>
           )}
         </main>
       </PullToRefresh>
+
+      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
         <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
       </div>

@@ -123,8 +123,7 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
 
   // Share functionality
   const handleShare = async () => {
-    const { buildShortUrl, buildPostPath } = await import("@/lib/shortUrl");
-    const url = await buildShortUrl(buildPostPath(postId));
+    const url = `${window.location.origin}/post/${postId}`;
     if (navigator.share) {
       try {
         await navigator.share({ url });

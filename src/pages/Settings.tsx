@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
+import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
@@ -22,7 +22,6 @@ const Settings = () => {
   const { toast } = useToast();
   const { isSupported: pushSupported } = usePushNotifications();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
 
   // Dialogs
   const [changeEmailOpen, setChangeEmailOpen] = useState(false);
@@ -151,6 +150,7 @@ const Settings = () => {
         </div>
       </main>
 
+      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
       <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
 
       {/* Change Email Dialog */}

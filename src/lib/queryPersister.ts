@@ -38,5 +38,5 @@ export const localStoragePersister = createSyncStoragePersister({
 export const persistOptions = {
   persister: localStoragePersister,
   maxAge: MAX_AGE,
-  buster: 'v6-unified-thumbnail-preview-fields', // Clears stale profile/saved grid snapshots so preview metadata renders everywhere
+  buster: 'v3-live-following-feed', // Clears previously persisted home-feed snapshots so refresh always re-fetches live feed data
 };

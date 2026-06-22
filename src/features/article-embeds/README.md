@@ -66,8 +66,11 @@ Main orchestrator component that:
 - Routes to appropriate sub-component based on `kind`
 - Handles errors with fallback
 
-#### Reddit posts
-Reddit posts are routed to `@/components/embeds/RedditEmbed`, which uses Reddit's official `reddit-embed-bq` + `widgets.js` renderer and keeps the parent skeleton active until the widget iframe appears.
+#### `RedditPostEmbed.tsx`
+Renders Reddit posts using official Reddit embed widget:
+- Loads Reddit's embed.js script
+- Creates blockquote with reddit-card class
+- Shows "View on Reddit" footer link
 
 #### `ArticleContentEmbed.tsx`
 Rich content card for Medium and generic articles:

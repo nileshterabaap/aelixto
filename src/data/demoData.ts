@@ -15,9 +15,6 @@ export interface Post {
   preview_image_url?: string | null;
   preview_title?: string | null;
   preview_text?: string | null;
-  media_kind?: string | null;
-  aspect_ratio?: number | null;
-  suggested_height?: number | null;
   platform?: 'youtube' | 'tiktok' | 'instagram' | 'reddit' | 'twitter' | 'pinterest' | 'facebook' | 'spotify' | 'quora' | 'medium';
   embed_html?: string | null;
   timestamp: Date;

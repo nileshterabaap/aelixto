@@ -20,115 +20,30 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
   const lastScrollY = useRef(0);
   const ticking = useRef(false);
   const { remaining, limit } = useDailyPostLimit();
-  // Continuous rotation in degrees. Even multiples of 360° = front (title),
-  // odd multiples of 180° = back (credits ring).
-  const [rotation, setRotation] = useState(0);
-  const [animating, setAnimating] = useState(true);
-  const rotationRef = useRef(0);
-  const dragStartX = useRef<number | null>(null);
-  const dragStartRotation = useRef(0);
-  const dragging = useRef(false);
-  const autoReturnTimeout = useRef<number | null>(null);
+  const [flipped, setFlipped] = useState(false);
+  const flipTimeout = useRef<number | null>(null);
+  const flipInProgress = useRef(false);
+  const touchStartY = useRef<number | null>(null);
 
-  const setRotationSafe = (deg: number) => {
-    rotationRef.current = deg;
-    setRotation(deg);
+  const triggerFlip = () => {
+    if (flipInProgress.current) return;
+    flipInProgress.current = true;
+    setFlipped(true);
+    if (flipTimeout.current) window.clearTimeout(flipTimeout.current);
+    flipTimeout.current = window.setTimeout(() => {
+      setFlipped(false);
+      // allow back-flip animation (0.5s) to finish before re-enabling
+      window.setTimeout(() => {
+        flipInProgress.current = false;
+      }, 550);
+    }, 3000);
   };
 
-  const snapToNearestFront = (animate = true) => {
-    // Snap to nearest multiple of 360° (front face)
-    const current = rotationRef.current;
-    const target = Math.round(current / 360) * 360;
-    setAnimating(animate);
-    setRotationSafe(target);
-  };
-
-  const scheduleReturn = (delay = 2500) => {
-    if (autoReturnTimeout.current) window.clearTimeout(autoReturnTimeout.current);
-    autoReturnTimeout.current = window.setTimeout(() => {
-      snapToNearestFront(true);
-    }, delay);
-  };
-
-  // Auto-spin once per session to reveal credits ring
   useEffect(() => {
-    const KEY = 'aelixto-spin-shown';
-    let cancelled = false;
-    try {
-      if (sessionStorage.getItem(KEY)) {
-        setAnimating(false);
-        setRotationSafe(0);
-        return;
-      }
-      sessionStorage.setItem(KEY, '1');
-    } catch {}
-
-    // Start at 0, animate to 360 (one full spin) after a short delay
-    setAnimating(false);
-    setRotationSafe(0);
-    const t1 = window.setTimeout(() => {
-      if (cancelled) return;
-      setAnimating(true);
-      setRotationSafe(180); // show credits
-      const t2 = window.setTimeout(() => {
-        if (cancelled) return;
-        setRotationSafe(360); // complete the spin back to front
-      }, 900);
-      (window as any).__aelixto_t2 = t2;
-    }, 400);
-
     return () => {
-      cancelled = true;
-      window.clearTimeout(t1);
-      if ((window as any).__aelixto_t2) window.clearTimeout((window as any).__aelixto_t2);
-      if (autoReturnTimeout.current) window.clearTimeout(autoReturnTimeout.current);
+      if (flipTimeout.current) window.clearTimeout(flipTimeout.current);
     };
   }, []);
-
-  // Drag handlers (touch + mouse)
-  const beginDrag = (clientX: number) => {
-    dragging.current = true;
-    dragStartX.current = clientX;
-    dragStartRotation.current = rotationRef.current;
-    setAnimating(false);
-    if (autoReturnTimeout.current) {
-      window.clearTimeout(autoReturnTimeout.current);
-      autoReturnTimeout.current = null;
-    }
-  };
-
-  const moveDrag = (clientX: number) => {
-    if (!dragging.current || dragStartX.current === null) return;
-    const dx = clientX - dragStartX.current;
-    // ~1° per pixel — feels natural, 180px swipe = half turn
-    const next = dragStartRotation.current + dx * 1.2;
-    setRotationSafe(next);
-  };
-
-  const endDrag = () => {
-    if (!dragging.current) return;
-    dragging.current = false;
-    dragStartX.current = null;
-    // Snap to nearest 180° step (so we land cleanly on front or back)
-    const current = rotationRef.current;
-    const target = Math.round(current / 180) * 180;
-    setAnimating(true);
-    setRotationSafe(target);
-    // If we landed on credits side, auto-return to front shortly
-    if (Math.abs(target % 360) === 180) {
-      scheduleReturn(2500);
-    }
-  };
-
-  const handleTap = () => {
-    if (dragging.current) return;
-    setAnimating(true);
-    // Snap to nearest 180° (credits side), then auto-return to front
-    const current = rotationRef.current;
-    const nearestFront = Math.round(current / 360) * 360;
-    setRotationSafe(nearestFront + 180);
-    scheduleReturn(2500);
-  };
 
   // Circular ring math
   const ringRadius = 14;
@@ -182,46 +97,41 @@ className="h-14 w-14"
 
         {/* Center: Title */}
         <div
-          className="cursor-pointer select-none touch-none"
+          className="cursor-pointer select-none"
           style={{ perspective: "800px" }}
-          onClick={(e) => {
-            // Suppress click if it was a drag
-            if (Math.abs(rotationRef.current - dragStartRotation.current) > 8 && dragStartX.current === null) {
-              return;
-            }
+          onClick={() => {
             if (window.location.pathname === '/') {
               window.scrollTo({ top: 0, behavior: 'smooth' });
             } else {
               navigate('/');
             }
-            handleTap();
+            triggerFlip();
           }}
           onTouchStart={(e) => {
-            const t = e.touches[0];
-            if (t) beginDrag(t.clientX);
+            touchStartY.current = e.touches[0]?.clientY ?? null;
           }}
           onTouchMove={(e) => {
-            const t = e.touches[0];
-            if (t) moveDrag(t.clientX);
+            if (touchStartY.current == null) return;
+            const dy = (e.touches[0]?.clientY ?? touchStartY.current) - touchStartY.current;
+            if (dy > 18) {
+              touchStartY.current = null;
+              triggerFlip();
+            }
           }}
-          onTouchEnd={endDrag}
-          onTouchCancel={endDrag}
-          onPointerDown={(e) => {
-            if (e.pointerType === 'mouse') beginDrag(e.clientX);
+          onTouchEnd={() => {
+            touchStartY.current = null;
           }}
-          onPointerMove={(e) => {
-            if (e.pointerType === 'mouse') moveDrag(e.clientX);
-          }}
-          onPointerUp={(e) => {
-            if (e.pointerType === 'mouse') endDrag();
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            triggerFlip();
           }}
         >
           <div
             className="relative h-10"
             style={{
               transformStyle: "preserve-3d",
-              transition: animating ? "transform 0.6s cubic-bezier(0.22, 1, 0.36, 1)" : "none",
-              transform: `rotateY(${rotation}deg)`,
+              transition: "transform 0.5s ease",
+              transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
               minWidth: "9rem",
             }}
           >

@@ -7,7 +7,7 @@ export interface Notification {
   id: string;
   recipient_id: string;
   actor_id: string;
-  type: 'like' | 'comment' | 'repost' | 'follow' | 'follow_request' | 'report_outcome';
+  type: 'like' | 'comment' | 'repost' | 'follow' | 'report_outcome';
   post_id: string | null;
   comment_id: string | null;
   is_read: boolean;
@@ -83,24 +83,9 @@ export const useNotificationCount = () => {
 export const useNotifications = () => {
   const { user } = useSession();
   const queryClient = useQueryClient();
-  const cacheKey = user?.id ? `aelixto-notifications-${user.id}` : null;
-
-  const readCache = (): Notification[] => {
-    if (!cacheKey || typeof window === 'undefined') return [];
-    try {
-      const raw = window.localStorage.getItem(cacheKey);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  };
 
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ["notifications", user?.id],
-    initialData: readCache,
-    initialDataUpdatedAt: 0,
     queryFn: async () => {
       if (!user?.id) return [];
       
@@ -146,21 +131,11 @@ export const useNotifications = () => {
       const postMap = new Map<string, { id: string; title: string | null; thumbnail_url: string | null }>();
       posts?.forEach(p => postMap.set(p.id, p));
       
-      const result = data.map(notification => ({
+      return data.map(notification => ({
         ...notification,
         actor: profileMap.get(notification.actor_id),
         post: notification.post_id ? postMap.get(notification.post_id) : undefined,
       })) as Notification[];
-
-      if (cacheKey) {
-        try {
-          window.localStorage.setItem(cacheKey, JSON.stringify(result.slice(0, 50)));
-        } catch {
-          /* quota exceeded - ignore */
-        }
-      }
-
-      return result;
     },
     enabled: !!user?.id,
   });
