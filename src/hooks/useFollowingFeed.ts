@@ -214,7 +214,14 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
   // Pull-to-refresh: fetch fresh first page, prepend only posts not already
   // in the cache. Existing (possibly already-seen) posts stay on screen.
   const prependNewer = async (): Promise<number> => {
-    const fresh = await fetchFeedPage(undefined);
+    const cachedPosts: FeedPost[] = queryClient
+      .getQueryData<any>(['following-feed'])
+      ?.pages?.flatMap((page: any) => page.posts ?? []) ?? [];
+    const seenPostIds = cachedPosts.map((post) => post.id);
+    const sinceTime = cachedPosts
+      .map((post) => post.reposted_at ?? post.created_at)
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0];
+    const fresh = await fetchRefreshPage(seenPostIds, sinceTime);
     if (!fresh.posts.length) return 0;
 
     let added = 0;
