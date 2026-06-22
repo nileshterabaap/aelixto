@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Loader2, Check, X, Share2 } from "lucide-react";
+import { ArrowLeft, Loader2, Check, X, Share2, Info } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { ImageUploadButton } from "@/components/ImageUploadButton";
@@ -39,6 +39,29 @@ const EditProfile = () => {
   });
   const [aelixScoreEnabled, setAelixScoreEnabled] = useState(true);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'self'>('idle');
+  const [showScoreInfo, setShowScoreInfo] = useState(false);
+  const [scoreInfoTimer, setScoreInfoTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+
+  const toggleScoreInfo = () => {
+    if (showScoreInfo) {
+      if (scoreInfoTimer) clearTimeout(scoreInfoTimer);
+      setScoreInfoTimer(null);
+      setShowScoreInfo(false);
+      return;
+    }
+    setShowScoreInfo(true);
+    const t = setTimeout(() => {
+      setShowScoreInfo(false);
+      setScoreInfoTimer(null);
+    }, 5000);
+    setScoreInfoTimer(t);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (scoreInfoTimer) clearTimeout(scoreInfoTimer);
+    };
+  }, [scoreInfoTimer]);
 
   // Check ownership and redirect if not owner
   useEffect(() => {
@@ -302,7 +325,17 @@ const EditProfile = () => {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label htmlFor="aelix-score">Aelix Score</Label>
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="aelix-score">Aelix Score</Label>
+                  <button
+                    type="button"
+                    onClick={toggleScoreInfo}
+                    aria-label="About Aelix Score"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Display your Aelix Score on your profile
                 </p>
@@ -313,6 +346,11 @@ const EditProfile = () => {
                 onCheckedChange={setAelixScoreEnabled}
               />
             </div>
+            {showScoreInfo && (
+              <div className="rounded-md border bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+                Each engagement on your post adds to your score: view (+1), play (+1), visit (+1).
+              </div>
+            )}
           </div>
 
           <div className="space-y-2">
