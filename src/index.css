@@ -130,6 +130,14 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Prevent the browser's native pull-to-refresh (e.g. Brave/Chrome on Android)
+     from firing when the user pulls down inside Aelixto's own PullToRefresh.
+     `contain` also blocks scroll chaining into the address bar / parent. */
+  html,
+  body {
+    overscroll-behavior-y: contain;
+  }
 }
 
 /* Hide Pinterest Save button */
