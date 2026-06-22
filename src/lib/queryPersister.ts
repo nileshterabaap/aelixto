@@ -17,8 +17,7 @@ export const localStoragePersister = createSyncStoragePersister({
         queries: data.clientState.queries.filter((query) => {
           // Only persist feed and profile data, not session
           const key = query.queryKey[0];
-          return key === 'following-feed' || 
-                 key === 'profile' || 
+          return key === 'profile' || 
                  key === 'discover-posts' ||
                  key === 'posts' ||
                  key === 'user-profile' ||
@@ -39,5 +38,5 @@ export const localStoragePersister = createSyncStoragePersister({
 export const persistOptions = {
   persister: localStoragePersister,
   maxAge: MAX_AGE,
-  buster: 'v1', // Change this to invalidate all cached data
+  buster: 'v3-live-following-feed', // Clears previously persisted home-feed snapshots so refresh always re-fetches live feed data
 };

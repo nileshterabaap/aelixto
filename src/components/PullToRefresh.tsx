@@ -7,9 +7,9 @@ interface PullToRefreshProps {
   children: ReactNode;
 }
 
-const THRESHOLD = 55;
-const MAX_PULL = 100;
-const LOADING_REST = 45;
+const THRESHOLD = 60;
+const MAX_PULL = 180;
+const LOADING_REST = 55;
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -66,8 +66,15 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       const diff = touch.clientY - touchStartY.current;
 
       if (diff > 0 && isAtTop()) {
-        const dampened = Math.min(MAX_PULL, diff * 0.5 * (1 - diff / (diff + 300)));
-        pullY.set(dampened);
+        // 1:1 tracking up to threshold, then gentle resistance for elastic over-pull
+        let dampened: number;
+        if (diff <= THRESHOLD) {
+          dampened = diff;
+        } else {
+          const over = diff - THRESHOLD;
+          dampened = THRESHOLD + over * 0.55 * (1 - over / (over + 400));
+        }
+        pullY.set(Math.min(MAX_PULL, dampened));
         return;
       }
 
