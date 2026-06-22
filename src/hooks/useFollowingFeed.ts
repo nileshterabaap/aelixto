@@ -38,7 +38,7 @@ interface UseFollowingFeedResult {
   error: string | null;
   loadMore: () => void;
   hasMore: boolean;
-  refresh: (seenPostIds?: string[], sinceTime?: string | null) => Promise<number>;
+  refresh: (seenPostIds?: string[]) => Promise<number>;
 }
 
 interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
