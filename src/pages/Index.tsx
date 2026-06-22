@@ -14,8 +14,6 @@ import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 import { SwipeableView } from "@/components/SwipeableView";
 const Index = () => {
@@ -26,44 +24,6 @@ const Index = () => {
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
   const { observePost } = useMarkPostSeen(user?.id);
-
-  // Check if the user follows anyone (to differentiate empty state)
-  const { data: followingCount } = useQuery({
-    queryKey: ['following-count', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return 0;
-      const { count } = await supabase
-        .from('follows')
-        .select('*', { count: 'exact', head: true })
-        .eq('follower_id', user.id);
-      return count ?? 0;
-    },
-    enabled: Boolean(user?.id),
-    staleTime: 60_000,
-  });
-
-  // Check if followings have any public posts at all (ignoring seen state).
-  // If yes but feed is empty → user has caught up on everything.
-  const { data: followingHasAnyPosts } = useQuery({
-    queryKey: ['following-has-posts', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return false;
-      const { data: follows } = await supabase
-        .from('follows')
-        .select('following_id')
-        .eq('follower_id', user.id);
-      const ids = (follows ?? []).map((f) => f.following_id);
-      ids.push(user.id);
-      const { count } = await supabase
-        .from('posts')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_public', true)
-        .in('user_id', ids);
-      return (count ?? 0) > 0;
-    },
-    enabled: Boolean(user?.id),
-    staleTime: 60_000,
-  });
   
   
   // Demo feed for signed-out users
@@ -180,11 +140,8 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Show the spinner spinning briefly before triggering a hard reload
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    // Hard refresh — reload the app like a website refresh / app reopen
     window.location.reload();
-    // Keep the promise pending so the spinner stays visible until the page unloads
-    await new Promise(() => {});
   }, []);
 
   // Data-friendly invisible pagination: load the next page only when the
@@ -238,33 +195,13 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
-            followingCount === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <h3 className="text-lg font-semibold">Your feed is empty</h3>
-                <p className="text-sm text-muted-foreground mt-1 mb-4">
-                  Follow people to see their posts here.
-                </p>
-                <Link to="/discover" className="text-sm font-medium text-primary">
-                  Discover people to follow
-                </Link>
-              </div>
-            ) : followingHasAnyPosts ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
-                <h3 className="text-lg font-semibold">You're all caught up</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  You've seen all recent posts from people you follow.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
-                <h3 className="text-lg font-semibold">No posts yet</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  People you follow haven't posted anything yet. Check back soon.
-                </p>
-              </div>
-            )
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
+              <h3 className="text-lg font-semibold">You're all caught up</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                You've seen all recent posts from people you follow.
+              </p>
+            </div>
           ) : (
             <div className="space-y-6">
               {allPosts.map((post, index) => (
