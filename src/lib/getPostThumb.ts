@@ -5,100 +5,19 @@ function decodeHtmlEntities(text: string): string {
   return doc.body.textContent || '';
 }
 
-function sameUrl(a?: string | null, b?: string | null): boolean {
-  if (!a || !b) return false;
-  return a.trim() === b.trim();
-}
-
-function isDirectImageUrl(url?: string | null): boolean {
-  if (!url) return false;
-  try {
-    const parsed = new URL(url);
-    const host = parsed.hostname.toLowerCase();
-    const path = parsed.pathname.toLowerCase();
-    return (
-      /\.(png|jpe?g|webp|gif)(\?|$)/i.test(url) ||
-      host === "i.redd.it" ||
-      host === "preview.redd.it" ||
-      host.endsWith("redditmedia.com")
-    );
-  } catch {
-    return false;
-  }
-}
-
-function isTextOnlySocialAvatar(platform: string, url: string): boolean {
-  const lower = url.toLowerCase();
-  if ((platform === "twitter" || platform === "x") && lower.includes("pbs.twimg.com/profile_images/")) {
-    return true;
-  }
-  if ((platform === "twitter" || platform === "x") && lower.includes("abs.twimg.com/")) {
-    return true;
-  }
-  if (platform === "threads" && isThreadsProfilePictureUrl(lower)) {
-    return true;
-  }
-  return false;
-}
-
-function isThreadsProfilePictureUrl(lowerUrl: string): boolean {
-  if (lowerUrl.includes("profile_pic")) return true;
-  if (lowerUrl.includes("/t51.82787-19/")) return true;
-  return false;
-}
-
 export function getPostThumb(p: {
   platform?: string | null;
   thumbnail_url?: string | null;   // server field
   thumbnailUrl?: string | null;    // legacy/feed field
-  preview_image_url?: string | null;
-  previewImageUrl?: string | null;
   media_url?: string | null;       // server field
   mediaUrl?: string | null;        // legacy/feed field
-  // Aelixto post author's avatar — used to detect misleading OG scrapes
-  // (e.g. Reddit posts whose thumbnail_url accidentally captured the poster's
-  // Aelixto profile picture). When the stored thumbnail equals the user's
-  // own avatar, treat it as no thumbnail.
-  author_avatar_url?: string | null;
-  profile_avatar_url?: string | null;
-}): string | null {
+}) {
   const platform = (p.platform || "").toLowerCase();
   const tu = p.thumbnail_url || p.thumbnailUrl;
-  const piu = p.preview_image_url || p.previewImageUrl;
   const mu = p.media_url || p.mediaUrl;
-  const authorAvatar = p.author_avatar_url || p.profile_avatar_url || null;
-  const previewIsThreadsAvatar = platform === "threads" && piu ? isThreadsProfilePictureUrl(decodeHtmlEntities(piu).toLowerCase()) : false;
 
-  // 1) server-derived thumbnail wins (decode HTML entities first),
-  //    BUT filter out misleading generic OG placeholders (e.g. Unsplash
-  //    fallbacks scraped from Reddit /s/ share links). For platforms where
-  //    the thumbnail should plausibly come from the platform itself, drop
-  //    anything hosted on a clearly-foreign domain so the typographic
-  //    TextCardThumbnail can take over instead of showing a wrong image.
-  if (tu) {
-    const decoded = decodeHtmlEntities(tu);
-    // If the stored thumbnail happens to be the Aelixto poster's own
-    // avatar (a known creation-time bug for text-only posts on X /
-    // Threads / Reddit), treat the post as having no thumbnail so the
-    // typographic TextCardThumbnail can render the actual text instead
-    // of a misleading avatar tile.
-    const matchesOwnAvatar = !!authorAvatar && sameUrl(decoded, authorAvatar);
-    if (matchesOwnAvatar || previewIsThreadsAvatar || isMisleadingThumbnail(platform, decoded) || isTextOnlySocialAvatar(platform, decoded)) {
-      // Fall through to platform/media derivations or placeholder.
-    } else {
-      return decoded;
-    }
-  }
-
-  // 1b) article/unfurl preview images are stored separately from thumbnails.
-  // Use them consistently anywhere a grid/share card asks for a post thumb.
-  if (piu) {
-    const decoded = decodeHtmlEntities(piu);
-    const matchesOwnAvatar = !!authorAvatar && sameUrl(decoded, authorAvatar);
-    if (!matchesOwnAvatar && !isMisleadingThumbnail(platform, decoded) && !isTextOnlySocialAvatar(platform, decoded)) {
-      return decoded;
-    }
-  }
+  // 1) server-derived thumbnail wins (decode HTML entities first)
+  if (tu) return decodeHtmlEntities(tu);
 
   // 2) platform-based derivations used in Feed
   if (platform === "youtube" && mu) {
@@ -107,55 +26,11 @@ export function getPostThumb(p: {
     if (id) return `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
   }
 
-  // 2b) Reddit: only use media_url when it is the actual image/media asset.
-  //     Never return a reddit post page URL as an <img> src, and never fall
-  //     back to the Aelixto user's avatar.
-  if (platform === "reddit") {
-    if (isDirectImageUrl(mu)) return mu!;
-    return null;
-  }
-
   // 3) direct image media
   if (mu && /\.(png|jpg|jpeg|webp|gif)(\?|$)/i.test(mu)) return mu;
 
-  // 4) no reliable image thumbnail — callers can render a branded text tile
-  return null;
-}
-
-/**
- * Returns true for thumbnails that are almost certainly NOT representative
- * of the actual post (e.g. Unsplash stock images served as OG fallback by
- * a link-resolver). When this returns true, callers should treat the post
- * as having no thumbnail and use the platform-branded text card instead.
- */
-function isMisleadingThumbnail(platform: string, url: string): boolean {
-  const lower = url.toLowerCase();
-  // Generic stock image hosts are never a real post preview.
-  if (lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com")) {
-    return true;
-  }
-  // For Reddit, thumbnails should come from reddit/redd.it/redditmedia/redditstatic
-  // or from our own storage bucket. Anything else is a foreign OG scrape.
-  if (platform === "reddit") {
-    // Reject Reddit's own brand/icon/avatar assets and share-preview
-    // placeholders. These are never the actual post media and just render
-    // as the Reddit alien logo on the text card.
-    if (
-      lower.includes("redditstatic.com") ||
-      lower.includes("/snoo") ||
-      lower.includes("snoo.png") ||
-      lower.includes("snoo-") ||
-      lower.includes("default-avatar") ||
-      lower.includes("share.redd.it/preview/post") ||
-      lower.includes("/brand") ||
-      lower.includes("/icon") ||
-      lower.includes("favicon")
-    ) {
-      return true;
-    }
-    return false;
-  }
-  return false;
+  // 4) safe placeholder
+  return "/placeholder.svg";
 }
 
 /** 
@@ -165,7 +40,7 @@ function isMisleadingThumbnail(platform: string, url: string): boolean {
  * 3. Provide caching
  */
 export function maybeProxy(url?: string | null, w = 480) {
-  if (!url) return null;
+  if (!url) return "/placeholder.svg";
   
   // Don't proxy local/relative paths or placeholders
   if (url.startsWith("/")) return url;
@@ -174,12 +49,12 @@ export function maybeProxy(url?: string | null, w = 480) {
   try { 
     new URL(url); 
   } catch { 
-    return null; 
+    return "/placeholder.svg"; 
   }
   
   // Only allow HTTPS URLs
   if (!url.startsWith("https://")) {
-    return null;
+    return "/placeholder.svg";
   }
   
   // Return ALL URLs directly - no proxying needed

@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getDeviceId, sha256 } from '@/lib/deviceId';
 
-type EventType = 'video_play' | 'image_view' | 'article_open' | 'external_visit' | 'original_visit';
+type EventType = 'video_play' | 'image_view';
 
 interface TrackViewParams {
   postId: string;
@@ -72,26 +72,4 @@ export function useImageViewTracking() {
       durationMs: 2000,
     });
   };
-}
-
-/**
- * Track article open (Continue Reading click) for +1 engagement score.
- */
-export async function trackArticleOpen(postId: string): Promise<boolean> {
-  return await trackView({ postId, eventType: 'article_open' });
-}
-
-/**
- * Track external link visit (Visit click) for +1 engagement score.
- */
-export async function trackExternalVisit(postId: string): Promise<boolean> {
-  return await trackView({ postId, eventType: 'external_visit' });
-}
-
-/**
- * Track a click-through to the original platform (any embed) for +1 engagement score.
- * Fires once per post per cooldown window — backend dedups.
- */
-export async function trackOriginalVisit(postId: string): Promise<boolean> {
-  return await trackView({ postId, eventType: 'original_visit' });
 }

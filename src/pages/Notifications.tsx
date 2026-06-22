@@ -1,15 +1,13 @@
 import { Header } from "@/components/Header";
-import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
+import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { Heart, MessageCircle, Repeat2, Bell, Shield, UserPlus } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Bell, Shield } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 const getNotificationIcon = (type: string) => {
   switch (type) {
@@ -19,8 +17,6 @@ const getNotificationIcon = (type: string) => {
       return { icon: MessageCircle, bgColor: 'bg-blue-100', iconColor: 'text-blue-500' };
     case 'repost':
       return { icon: Repeat2, bgColor: 'bg-green-100', iconColor: 'text-green-500' };
-    case 'follow_request':
-      return { icon: UserPlus, bgColor: 'bg-violet-100', iconColor: 'text-violet-500' };
     case 'report_outcome':
       return { icon: Shield, bgColor: 'bg-amber-100', iconColor: 'text-amber-600' };
     default:
@@ -38,8 +34,6 @@ const getNotificationMessage = (type: string) => {
       return 'reposted your post';
     case 'follow':
       return 'started following you';
-    case 'follow_request':
-      return 'requested to follow you';
     default:
       return 'interacted with you';
   }
@@ -52,92 +46,24 @@ const NotificationItem = ({
   notification: Notification; 
   onClick: () => void;
 }) => {
-  const [busy, setBusy] = useState<"delete" | "keep" | null>(null);
-  const [resolved, setResolved] = useState<"deleted" | "kept" | null>(null);
-  const [reqBusy, setReqBusy] = useState<"approve" | "decline" | null>(null);
-  const [reqResolved, setReqResolved] = useState<"approved" | "declined" | null>(null);
   const { icon: Icon, bgColor, iconColor } = getNotificationIcon(notification.type);
   const message = getNotificationMessage(notification.type);
   const actorName = notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
   const isReportOutcome = notification.type === 'report_outcome';
-  const isFollowRequest = notification.type === 'follow_request';
   const outcome = notification.metadata?.action as 'removed' | 'kept' | undefined;
   const reportKind = notification.metadata?.kind as
     | 'report_outcome'
     | 'post_removed'
     | 'account_warning'
-    | 'source_removed'
     | undefined;
   const isAuthorRemoval = reportKind === 'post_removed';
   const isAccountWarning = reportKind === 'account_warning';
-  const isSourceRemoved = reportKind === 'source_removed';
-  const sourcePlatform = (notification.metadata?.platform as string | undefined) || '';
-  const originalAuthor =
-    (notification.metadata?.original_author as string | undefined) ||
-    (notification.metadata?.post_snapshot as { original_author?: string } | undefined)?.original_author ||
-    '';
   const snapshot = notification.metadata?.post_snapshot as
     | { title?: string; content?: string; thumbnail_url?: string }
     | undefined;
   
   const handleClick = () => {
-    if (busy) return;
     onClick();
-  };
-
-  const handleApproveFollow = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (reqBusy || !notification.actor_id) return;
-    setReqBusy("approve");
-    const { error } = await supabase.rpc("respond_to_follow_request", {
-      _requester: notification.actor_id,
-      _approve: true,
-    });
-    if (error) {
-      toast.error("Couldn't approve");
-      setReqBusy(null);
-      return;
-    }
-    setReqResolved("approved");
-    setReqBusy(null);
-  };
-
-  const handleDeclineFollow = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (reqBusy || !notification.actor_id) return;
-    setReqBusy("decline");
-    const { error } = await supabase.rpc("respond_to_follow_request", {
-      _requester: notification.actor_id,
-      _approve: false,
-    });
-    if (error) {
-      toast.error("Couldn't decline");
-      setReqBusy(null);
-      return;
-    }
-    setReqResolved("declined");
-    setReqBusy(null);
-  };
-
-  const handleDeletePost = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (busy || !notification.post_id) return;
-    setBusy("delete");
-    const { error } = await supabase.from("posts").delete().eq("id", notification.post_id);
-    if (error) {
-      toast.error("Couldn't delete the post");
-      setBusy(null);
-      return;
-    }
-    toast.success("Post deleted from your profile");
-    setResolved("deleted");
-    setBusy(null);
-  };
-
-  const handleKeepPost = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (busy) return;
-    setResolved("kept");
   };
 
   return (
@@ -157,9 +83,7 @@ const NotificationItem = ({
           {isReportOutcome ? (
             <p className="text-sm">
               <span className="font-semibold">
-                {isSourceRemoved
-                  ? 'Your post was removed'
-                  : isAccountWarning
+                {isAccountWarning
                   ? 'Account warning'
                   : isAuthorRemoval
                   ? 'Your post was removed'
@@ -168,9 +92,7 @@ const NotificationItem = ({
                   : 'Report reviewed'}
               </span>{' '}
               <span className="text-muted-foreground">
-                {isSourceRemoved
-                  ? `— the original ${sourcePlatform ? sourcePlatform.charAt(0).toUpperCase() + sourcePlatform.slice(1) + ' ' : ''}post was deleted or made private at the source.`
-                  : isAccountWarning
+                {isAccountWarning
                   ? '— a report against your account was upheld. Repeated violations may lead to account action.'
                   : isAuthorRemoval
                   ? '— it was reported and found to violate our community guidelines.'
@@ -179,71 +101,11 @@ const NotificationItem = ({
                   : "— thanks for the report. We didn't find a violation this time."}
               </span>
             </p>
-          ) : null}
-          {isSourceRemoved && (originalAuthor || snapshot?.title) && (
-            <p className="text-xs text-muted-foreground mt-1 truncate">
-              {originalAuthor ? <>by <span className="font-medium text-foreground">@{originalAuthor}</span></> : null}
-              {originalAuthor && snapshot?.title ? ' · ' : ''}
-              {snapshot?.title ? <span className="italic">"{snapshot.title.slice(0, 60)}{snapshot.title.length > 60 ? '…' : ''}"</span> : null}
-            </p>
-          )}
-          {isSourceRemoved && notification.post_id && (
-            <div className="flex gap-2 mt-3">
-              {resolved === "deleted" ? (
-                <span className="text-xs text-muted-foreground">Removed from your profile.</span>
-              ) : resolved === "kept" ? (
-                <span className="text-xs text-muted-foreground">Kept on your profile.</span>
-              ) : (
-                <>
-                  <button
-                    onClick={handleDeletePost}
-                    disabled={busy !== null}
-                    className="text-xs font-medium px-3 py-1.5 rounded-full bg-destructive text-destructive-foreground hover:opacity-90 transition disabled:opacity-50"
-                  >
-                    {busy === "delete" ? "Deleting…" : "Delete post"}
-                  </button>
-                  <button
-                    onClick={handleKeepPost}
-                    disabled={busy !== null}
-                    className="text-xs font-medium px-3 py-1.5 rounded-full bg-muted hover:bg-muted/70 transition disabled:opacity-50"
-                  >
-                    Keep
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-          {!isReportOutcome && (
+          ) : (
             <p className="text-sm">
               <span className="font-semibold">{actorName}</span>{' '}
               <span className="text-muted-foreground">{message}</span>
             </p>
-          )}
-          {isFollowRequest && (
-            <div className="flex gap-2 mt-3">
-              {reqResolved === "approved" ? (
-                <span className="text-xs text-muted-foreground">Approved.</span>
-              ) : reqResolved === "declined" ? (
-                <span className="text-xs text-muted-foreground">Declined.</span>
-              ) : (
-                <>
-                  <button
-                    onClick={handleApproveFollow}
-                    disabled={reqBusy !== null}
-                    className="text-xs font-medium px-3 py-1.5 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition disabled:opacity-50"
-                  >
-                    {reqBusy === "approve" ? "…" : "Alright"}
-                  </button>
-                  <button
-                    onClick={handleDeclineFollow}
-                    disabled={reqBusy !== null}
-                    className="text-xs font-medium px-3 py-1.5 rounded-full bg-muted hover:bg-muted/70 transition disabled:opacity-50"
-                  >
-                    {reqBusy === "decline" ? "…" : "Sorry"}
-                  </button>
-                </>
-              )}
-            </div>
           )}
           <p className="text-xs text-muted-foreground mt-2">
             {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
@@ -280,7 +142,6 @@ const NotificationSkeleton = () => (
 
 const Notifications = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const { notifications, isLoading, markAllRead, refetch } = useNotifications();
   const navigate = useNavigate();
 
@@ -343,6 +204,7 @@ const Notifications = () => {
         </main>
       </PullToRefresh>
 
+      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
       <CreatePostDialog 
         open={isCreateDialogOpen} 

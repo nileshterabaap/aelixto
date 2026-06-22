@@ -21,7 +21,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { buildShortUrl, buildProfilePath } from "@/lib/shortUrl";
 
 interface ProfileOptionsMenuProps {
   targetUserId: string;
@@ -45,25 +44,23 @@ export const ProfileOptionsMenu = ({
   const [reportOpen, setReportOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const profileUrl = `${window.location.origin}/u/${username}`;
   const name = displayName || username;
 
-  const handleCopyUrl = async () => {
-    const url = await buildShortUrl(buildProfilePath(username));
-    navigator.clipboard.writeText(url);
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(profileUrl);
     toast.success("Profile link copied");
   };
 
   const handleShare = async () => {
-    const url = await buildShortUrl(buildProfilePath(username));
     if (navigator.share) {
       try {
-        await navigator.share({ title: `${name} on Aelixto`, url });
+        await navigator.share({ title: `${name} on Aelixto`, url: profileUrl });
       } catch {
         // user cancelled
       }
     } else {
-      navigator.clipboard.writeText(url);
-      toast.success("Profile link copied");
+      handleCopyUrl();
     }
   };
 

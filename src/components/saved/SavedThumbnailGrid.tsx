@@ -1,9 +1,7 @@
 import { useState } from "react";
-import { createPortal } from "react-dom";
+import { motion } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import { SavedPostViewer } from "@/components/saved/SavedPostViewer";
-import { TextCardThumbnail } from "@/components/TextCardThumbnail";
-import { getThumbnailText } from "@/lib/getThumbnailText";
 import instagramIcon from "@/assets/platforms/instagram.svg";
 import youtubeIcon from "@/assets/platforms/youtube.svg";
 import xIcon from "@/assets/platforms/x.svg";
@@ -46,10 +44,7 @@ export interface SavedPost {
   platform?: string;
   embed_html?: string;
   thumbnail_url?: string;
-  preview_text?: string | null;
-  preview_title?: string | null;
-  preview_image_url?: string | null;
-  timestamp: Date | string;
+  timestamp: Date;
   likes: number;
   comments: number;
   shares: number;
@@ -65,55 +60,26 @@ interface SavedThumbnailGridProps {
 
 function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void }) {
   const [imgError, setImgError] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const rawThumb = getPostThumb({
-    platform: post.platform,
-    thumbnail_url: post.thumbnail_url,
-    preview_image_url: post.preview_image_url,
-    media_url: post.mediaUrl,
-    author_avatar_url: post.author?.avatar,
-  });
+  const rawThumb = getPostThumb({ platform: post.platform, thumbnail_url: post.thumbnail_url, media_url: post.mediaUrl });
   const src = imgError ? null : maybeProxy(rawThumb, 480);
   const platform = (post.platform || "").toLowerCase();
   const icon = PLATFORM_ICONS[platform];
   const gradient = PLATFORM_GRADIENTS[platform] || "bg-muted";
+
   if (!src || src === "/placeholder.svg") {
-    // Prefer the post's title/text as the thumbnail content. Only fall back to
-    // the author's profile avatar when there is no usable text at all.
-    const textSource = getThumbnailText(post);
-    const useProfileFallback =
-      !textSource && ["threads", "x", "twitter"].includes(platform);
     return (
-      <button
-        onClick={onClick}
-        className="relative overflow-hidden rounded-2xl aspect-square block"
-      >
-        <TextCardThumbnail
-          platform={post.platform}
-          text={textSource}
-          username={post.author?.username}
-          displayName={post.author?.name}
-          profileAvatarUrl={post.author?.avatar}
-          preferProfile={useProfileFallback}
-          aspect="aspect-square"
-        />
+      <button onClick={onClick} className={`relative overflow-hidden rounded-2xl aspect-square ${gradient} flex items-center justify-center`}>
+        {icon && <img src={icon} alt="" className="w-10 h-10 opacity-60 invert" />}
+        {post.title && (
+          <span className="absolute bottom-2 left-2 right-2 text-[10px] text-white/80 line-clamp-2 text-left font-medium">{post.title}</span>
+        )}
       </button>
     );
   }
 
   return (
     <button onClick={onClick} className="relative overflow-hidden rounded-2xl aspect-square bg-muted/50 group">
-      {!imageLoaded && (
-        <div className="absolute inset-0 bg-muted/70 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-muted before:to-transparent before:animate-shimmer" />
-      )}
-      <img
-        src={src}
-        alt=""
-        onError={() => setImgError(true)}
-        onLoad={() => setImageLoaded(true)}
-        loading="eager"
-        className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
-      />
+      <img src={src} alt="" onError={() => setImgError(true)} className="w-full h-full object-cover" loading="lazy" />
       {icon && (
         <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center">
           <img src={icon} alt="" className="w-3.5 h-3.5 invert" />
@@ -138,19 +104,25 @@ export const SavedThumbnailGrid = ({ posts, userId }: SavedThumbnailGridProps) =
   return (
     <>
       <div className="grid grid-cols-3 gap-1.5">
-        {posts.map((post) => (
-          <ThumbnailCard key={post.id} post={post} onClick={() => setSelectedPostId(post.id)} />
+        {posts.map((post, i) => (
+          <motion.div
+            key={post.id}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.3, delay: Math.min(i * 0.05, 0.4), ease: [0.4, 0, 0.2, 1] }}
+          >
+            <ThumbnailCard post={post} onClick={() => setSelectedPostId(post.id)} />
+          </motion.div>
         ))}
       </div>
 
-      {selectedPostId && createPortal(
+      {selectedPostId && (
         <SavedPostViewer
           posts={posts}
           initialPostId={selectedPostId}
           userId={userId}
           onClose={() => setSelectedPostId(null)}
-        />,
-        document.body
+        />
       )}
     </>
   );
