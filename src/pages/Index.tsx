@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
+import { BottomNav } from "@/components/BottomNav";
 import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
 import { PostSkeleton } from "@/components/PostSkeleton";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
@@ -20,12 +20,12 @@ const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
-  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const { observePost, getPendingSeenPostIds } = useMarkPostSeen(user?.id);
-
+  const { observePost } = useMarkPostSeen(user?.id);
+  
+  
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
 
@@ -36,8 +36,7 @@ const Index = () => {
     loading: followingLoading,
     loadMore,
     hasMore,
-    refresh: refreshFollowingFeed,
-  } = useFollowingFeed(user?.id);
+  } = useFollowingFeed();
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
   const isSignedOut = !user;
@@ -73,9 +72,9 @@ const Index = () => {
         embed_html: post.embed_html,
         timestamp: new Date(post.created_at),
         saves: post.saves_count,
-        likes_count: post.likes_count || 0,
-        comments_count: post.comments_count || 0,
-        hide_likes: post.profiles?.settings?.hide_likes || false,
+        likes_count: (post as any).likes_count || 0,
+        comments_count: (post as any).comments_count || 0,
+        hide_likes: (post.profiles as any)?.settings?.hide_likes || false,
         isRealPost: true,
       }))
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
@@ -141,14 +140,8 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    if (showDemoFeed) {
-      await queryClient.invalidateQueries({ queryKey: ["posts"] });
-      return;
-    }
-    const pendingSeenPostIds = getPendingSeenPostIds();
-    await refreshFollowingFeed(pendingSeenPostIds);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [getPendingSeenPostIds, queryClient, showDemoFeed, refreshFollowingFeed]);
+    await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
+  }, [queryClient, showDemoFeed]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
@@ -187,6 +180,7 @@ const Index = () => {
               ))}
             </div>
           </main>
+          <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
         </div>
       </SwipeableView>
     );
@@ -252,6 +246,8 @@ const Index = () => {
           )}
         </main>
       </PullToRefresh>
+
+      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
         <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
       </div>
