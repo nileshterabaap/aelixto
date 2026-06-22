@@ -27,7 +27,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
+  const { setObservedPostElement } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -76,7 +76,6 @@ const Index = () => {
     items: followingPosts,
     empty: followingEmpty,
     loading: followingLoading,
-    refresh: refreshFollowingFeed,
     loadMore,
     hasMore,
   } = useFollowingFeed(user?.id);
@@ -201,19 +200,10 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark only posts the user actually saw, then refresh the still-mounted
-    // feed query directly so PullToRefresh waits for the real network work.
-    try {
-      await flushNow();
-    } catch {
-      // best-effort — proceed with refresh regardless
-    }
-
-    await refreshFollowingFeed();
-
+    await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
     void queryClient.invalidateQueries({ queryKey: ['following-count', user?.id], exact: true });
     void queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id], exact: true });
-  }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
+  }, [queryClient, showDemoFeed, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
