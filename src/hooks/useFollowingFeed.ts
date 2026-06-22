@@ -119,8 +119,8 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: true, // refetch if stale on mount/page reload
-    refetchOnReconnect: true,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
     structuralSharing: true,
   });
 
