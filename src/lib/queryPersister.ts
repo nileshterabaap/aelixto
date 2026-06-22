@@ -39,5 +39,5 @@ export const localStoragePersister = createSyncStoragePersister({
 export const persistOptions = {
   persister: localStoragePersister,
   maxAge: MAX_AGE,
-  buster: 'v7-following-feed-persisted', // Keep the feed visible after app refresh while fresh posts load
+  buster: 'v8-user-keyed-feed-refresh', // Clear old unkeyed feed caches that blocked refresh after reloads
 };
