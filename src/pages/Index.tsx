@@ -24,7 +24,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const { observePost } = useMarkPostSeen(user?.id);
+  const { observePost, getPendingSeenPostIds } = useMarkPostSeen(user?.id);
 
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
@@ -145,10 +145,11 @@ const Index = () => {
       await queryClient.invalidateQueries({ queryKey: ["posts"] });
       return;
     }
-    // Reset to the first fresh feed page, same as reopening Home.
-    await refreshFollowingFeed();
+    const pendingSeenPostIds = getPendingSeenPostIds();
+    const topPostTime = allPosts[0]?.timestamp?.toISOString?.() ?? null;
+    await refreshFollowingFeed(pendingSeenPostIds, topPostTime);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [queryClient, showDemoFeed, refreshFollowingFeed]);
+  }, [allPosts, getPendingSeenPostIds, queryClient, showDemoFeed, refreshFollowingFeed]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver

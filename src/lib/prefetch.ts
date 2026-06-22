@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { preloadFeedImages, preloadProfileImages } from "./preloadImages";
+import { preloadProfileImages } from "./preloadImages";
 
 // Centralized prefetch functions for instant navigation
 
@@ -36,53 +36,8 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Then prefetch first page of feed
-  await queryClient.prefetchInfiniteQuery({
-    queryKey: ['following-feed', session.user.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_following_feed_v2', {
-        limit_count: 20,
-        cursor_key: null,
-      });
-      if (error) throw error;
-      
-      // Map to the same format useFollowingFeed expects
-      const mappedPosts = (data || []).map((item: any) => ({
-        id: item.id,
-        user_id: item.user_id,
-        content: item.content,
-        created_at: item.created_at,
-        likes_count: item.likes_count,
-        saves_count: item.saves_count,
-        media_type: item.media_type,
-        media_url: item.media_url,
-        platform: item.platform,
-        embed_html: item.embed_html,
-        thumbnail_url: item.thumbnail_url,
-        title: item.title,
-        is_public: item.is_public,
-        is_repost: item.is_repost,
-        reposted_by_user_id: item.reposted_by_user_id,
-        reposted_by_username: item.reposted_by_username,
-        feed_cursor: item.feed_cursor,
-        profiles: {
-          username: item.profile_username,
-          display_name: item.profile_display_name,
-          avatar_url: item.profile_avatar_url,
-        },
-      }));
-      
-      // Preload images for instant display
-      preloadFeedImages(mappedPosts);
-      
-      return {
-        posts: mappedPosts,
-        nextCursor: mappedPosts.length === 20 ? mappedPosts[mappedPosts.length - 1].feed_cursor : undefined,
-      };
-    },
-    initialPageParam: undefined,
-    staleTime: 5 * 60 * 1000,
-  });
+  // The home feed is seen-filtered and must be loaded by useFollowingFeed,
+  // otherwise app-start prefetch can race ahead of the signed-in feed state.
 };
 
 export const prefetchProfile = async (queryClient: QueryClient) => {

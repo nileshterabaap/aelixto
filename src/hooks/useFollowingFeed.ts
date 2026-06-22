@@ -2,7 +2,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo, useState } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 
 interface FeedPost {
   id: string;
@@ -38,10 +38,18 @@ interface UseFollowingFeedResult {
   error: string | null;
   loadMore: () => void;
   hasMore: boolean;
-  refresh: () => Promise<number>;
+  refresh: (seenPostIds?: string[], sinceTime?: string | null) => Promise<number>;
 }
 
 interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
+  feed_cursor: string | null;
+  media_kind?: string | null;
+  aspect_ratio?: number | null;
+  suggested_height?: number | null;
+  preview_text?: string | null;
+  preview_title?: string | null;
+  preview_image_url?: string | null;
+  profile_id?: string | null;
   profile_username: string;
   profile_display_name: string | null;
   profile_avatar_url: string | null;
@@ -51,13 +59,13 @@ const PAGE_SIZE = 20;
 
 const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
-    fn: 'get_following_feed',
-    args: { limit_count: number; cursor: string | null }
+    fn: 'get_following_feed_v3',
+    args: { limit_count: number; cursor_key: string | null }
   ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
 
-  const { data, error } = await rpc('get_following_feed', {
+  const { data, error } = await rpc('get_following_feed_v3', {
     limit_count: PAGE_SIZE,
-    cursor: cursor || null,
+    cursor_key: cursor || null,
   });
 
   if (error) throw error;
@@ -94,13 +102,61 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  // Use reposted_at (sort_time) when present, else created_at — matches the
-  // 17:08 RPC which orders by sort_time DESC.
   const last = mappedPosts[mappedPosts.length - 1];
   const nextCursor =
     data.length < PAGE_SIZE
       ? undefined
-      : last?.reposted_at ?? last?.created_at ?? undefined;
+      : data[data.length - 1]?.feed_cursor ?? last?.reposted_at ?? last?.created_at ?? undefined;
+
+  return { posts: mappedPosts, nextCursor };
+};
+
+const refreshFeedPage = async (seenPostIds: string[] = [], sinceTime?: string | null) => {
+  const rpc = supabase.rpc as unknown as (
+    fn: 'refresh_following_feed_v3',
+    args: { limit_count: number; seen_post_ids: string[]; since_time: string | null }
+  ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
+
+  const { data, error } = await rpc('refresh_following_feed_v3', {
+    limit_count: PAGE_SIZE,
+    seen_post_ids: seenPostIds,
+    since_time: sinceTime ?? null,
+  });
+
+  if (error) throw error;
+
+  if (!data || data.length === 0) {
+    return { posts: [], nextCursor: undefined };
+  }
+
+  const mappedPosts: FeedPost[] = data.map((item) => ({
+    id: item.id,
+    user_id: item.user_id,
+    content: item.content,
+    created_at: item.created_at,
+    likes_count: item.likes_count,
+    saves_count: item.saves_count,
+    comments_count: item.comments_count,
+    reposts_count: item.reposts_count,
+    media_type: item.media_type,
+    media_url: item.media_url,
+    platform: item.platform,
+    embed_html: item.embed_html,
+    thumbnail_url: item.thumbnail_url,
+    title: item.title,
+    is_public: item.is_public,
+    is_repost: item.is_repost,
+    reposted_by_user_id: item.reposted_by_user_id,
+    reposted_by_username: item.reposted_by_username,
+    reposted_at: item.reposted_at,
+    profiles: {
+      username: item.profile_username,
+      display_name: item.profile_display_name,
+      avatar_url: item.profile_avatar_url,
+    },
+  }));
+
+  const nextCursor = data.length < PAGE_SIZE ? undefined : data[data.length - 1]?.feed_cursor ?? undefined;
 
   return { posts: mappedPosts, nextCursor };
 };
@@ -108,10 +164,9 @@ const fetchFeedPage = async (cursor?: string) => {
 export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
   const queryClient = useQueryClient();
-  const [refreshNonce, setRefreshNonce] = useState<number>(0);
   const feedQueryKey = useMemo(
-    () => ['following-feed', userId, refreshNonce] as const,
-    [userId, refreshNonce]
+    () => ['following-feed', userId] as const,
+    [userId]
   );
 
   // Fetch feed directly — no count gate, single RPC call
@@ -131,7 +186,7 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
     staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnMount: true,
     refetchOnReconnect: false,
     structuralSharing: true,
   });
@@ -175,19 +230,14 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
     }
   };
 
-  // Pull-to-refresh must behave like reopening Home: throw away old cursor
-  // pages and fetch page 1 with cursor=null so seen-filtered posts can rotate out.
-  const refresh = async (): Promise<number> => {
+  const refresh = async (seenPostIds: string[] = [], sinceTime?: string | null): Promise<number> => {
     if (!userId) return 0;
-    // Fresh fetch of page 1 with no cursor — restores 17:08 behavior.
-    const firstPage = await fetchFeedPage(undefined);
-    const nextNonce = refreshNonce + 1;
-    const newKey = ['following-feed', userId, nextNonce] as const;
-    queryClient.setQueryData(newKey, {
+    preloadedRef.current = false;
+    const firstPage = await refreshFeedPage(seenPostIds, sinceTime);
+    queryClient.setQueryData(feedQueryKey, {
       pages: [firstPage],
       pageParams: [undefined],
     });
-    setRefreshNonce(nextNonce);
     return firstPage.posts.length;
   };
 
