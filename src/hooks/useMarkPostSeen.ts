@@ -40,11 +40,12 @@ export const markPostsSeenImmediate = async (userId: string, postIds: string[]) 
  */
 export const useMarkPostSeen = (userId: string | undefined) => {
   const pendingRef = useRef<Set<string>>(new Set());
+  const seenInSessionRef = useRef<Set<string>>(new Set());
   const viewTimers = useRef<Map<string, number>>(new Map());
   const flushing = useRef(false);
 
   const getPendingSeenPostIds = useCallback(() => {
-    return Array.from(pendingRef.current);
+    return Array.from(new Set([...seenInSessionRef.current, ...pendingRef.current]));
   }, []);
 
   // Flush pending seen posts to DB
@@ -96,6 +97,7 @@ export const useMarkPostSeen = (userId: string | undefined) => {
               if (!viewTimers.current.has(postId)) {
                 viewTimers.current.set(postId, window.setTimeout(() => {
                   pendingRef.current.add(postId);
+                  seenInSessionRef.current.add(postId);
                   viewTimers.current.delete(postId);
                 }, MIN_VIEW_TIME));
               }
