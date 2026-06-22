@@ -36,6 +36,7 @@ const Index = () => {
     loading: followingLoading,
     loadMore,
     hasMore,
+    prependNewer,
   } = useFollowingFeed();
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -140,8 +141,15 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
-  }, [queryClient, showDemoFeed]);
+    if (showDemoFeed) {
+      await queryClient.invalidateQueries({ queryKey: ["posts"] });
+      return;
+    }
+    // Prepend-only refresh: keeps existing posts in place, adds newer ones on top.
+    await prependNewer();
+    // Scroll to top so the user sees what (if anything) arrived.
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [queryClient, showDemoFeed, prependNewer]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
