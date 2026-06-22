@@ -146,8 +146,7 @@ const Index = () => {
       return;
     }
     const pendingSeenPostIds = getPendingSeenPostIds();
-    const topPostTime = allPosts[0]?.timestamp?.toISOString?.() ?? null;
-    await refreshFollowingFeed(pendingSeenPostIds, topPostTime);
+    await refreshFollowingFeed(pendingSeenPostIds);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [allPosts, getPendingSeenPostIds, queryClient, showDemoFeed, refreshFollowingFeed]);
 
