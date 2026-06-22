@@ -148,7 +148,7 @@ const Index = () => {
     const pendingSeenPostIds = getPendingSeenPostIds();
     await refreshFollowingFeed(pendingSeenPostIds);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [allPosts, getPendingSeenPostIds, queryClient, showDemoFeed, refreshFollowingFeed]);
+  }, [getPendingSeenPostIds, queryClient, showDemoFeed, refreshFollowingFeed]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
