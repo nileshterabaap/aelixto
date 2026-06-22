@@ -39,7 +39,12 @@ interface UseFollowingFeedResult {
 }
 
 const fetchFeedPage = async (cursor?: string) => {
-  const { data, error } = await supabase.rpc('get_following_feed', {
+  const rpc = supabase.rpc as unknown as (
+    fn: 'get_following_feed',
+    args: { limit_count: number; cursor: string | null }
+  ) => Promise<{ data: any[] | null; error: Error | null }>;
+
+  const { data, error } = await rpc('get_following_feed', {
     limit_count: 20,
     cursor: cursor || null,
   });
