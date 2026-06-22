@@ -6,18 +6,78 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+type Sizing = { media_kind: string | null; aspect_ratio: number | null; suggested_height: number | null };
+
+function clampAR(ar: number | null | undefined): number | null {
+  if (!ar || !isFinite(ar) || ar <= 0) return null;
+  // Clamp to sane bounds (between ~9:21 and ~21:9)
+  const clamped = Math.min(2.4, Math.max(0.42, ar));
+  return Math.round(clamped * 10000) / 10000;
+}
+
+function suggestedHeightForText(text: string | null | undefined, base = 220): number {
+  const len = (text || '').trim().length;
+  // Approx 36 chars/line on mobile, ~22px per line. Avatar + actions ~base.
+  const lines = Math.min(18, Math.max(1, Math.ceil(len / 36)));
+  return Math.min(640, Math.max(200, base + lines * 22));
+}
+
+function classifyReddit(post: Record<string, unknown> | null, fallbackText: string): Sizing {
+  if (!post) {
+    return { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(fallbackText, 280) };
+  }
+  const hint = typeof post.post_hint === 'string' ? post.post_hint.toLowerCase() : '';
+  const isVideo = post.is_video === true || hint === 'hosted:video' || hint === 'rich:video';
+  const isImage = hint === 'image' || hint === 'link' && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(String(post.url || ''));
+  const isGallery = post.is_gallery === true || hint === 'gallery';
+  const isSelf = post.is_self === true || hint === 'self';
+
+  const srcW = readNum(post, ['preview', 'images', 0, 'source', 'width'])
+    ?? readNum(post, ['media', 'reddit_video', 'width'])
+    ?? null;
+  const srcH = readNum(post, ['preview', 'images', 0, 'source', 'height'])
+    ?? readNum(post, ['media', 'reddit_video', 'height'])
+    ?? null;
+  const ar = clampAR(srcW && srcH ? srcW / srcH : null);
+
+  if (isVideo) return { media_kind: 'video', aspect_ratio: ar ?? 9 / 16, suggested_height: null };
+  if (isGallery) return { media_kind: 'gallery', aspect_ratio: ar ?? 1, suggested_height: null };
+  if (isImage) return { media_kind: 'image', aspect_ratio: ar ?? 4 / 5, suggested_height: null };
+  if (isSelf) {
+    const text = typeof post.selftext === 'string' ? post.selftext : fallbackText;
+    return { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(text, 280) };
+  }
+  // Link/article post → compact card
+  return { media_kind: 'article', aspect_ratio: ar ?? 16 / 9, suggested_height: 360 };
+}
+
+function readNum(obj: unknown, path: Array<string | number>): number | null {
+  let cur: unknown = obj;
+  for (const k of path) {
+    if (typeof k === 'number') {
+      if (!Array.isArray(cur)) return null;
+      cur = cur[k];
+    } else {
+      if (!cur || typeof cur !== 'object') return null;
+      cur = (cur as Record<string, unknown>)[k];
+    }
+  }
+  return typeof cur === 'number' && isFinite(cur) ? cur : null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { postId, url, platform } = await req.json();
-    
-    console.log(`[fetch-post-preview] Processing postId=${postId}, platform=${platform}, url=${url}`);
+    const { postId, url, platform, previewOnly } = await req.json();
+    const isPreviewOnly = !!previewOnly || !postId;
 
-    if (!postId || !url) {
-      return new Response(JSON.stringify({ error: 'Missing postId or url' }), {
+    console.log(`[fetch-post-preview] Processing postId=${postId ?? '(preview)'}, platform=${platform}, url=${url}`);
+
+    if (!url) {
+      return new Response(JSON.stringify({ error: 'Missing url' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -25,6 +85,13 @@ serve(async (req) => {
 
     let thumbnailUrl: string | null = null;
     let previewText: string | null = null;
+    let previewTitle: string | null = null;
+    // Smart-sizing intel captured per branch so the card can render at the
+    // right height from the first paint instead of guessing a fixed value.
+    let sizing: Sizing = { media_kind: null, aspect_ratio: null, suggested_height: null };
+    let oembedThumbW: number | null = null;
+    let oembedThumbH: number | null = null;
+    let redditPostData: Record<string, unknown> | null = null;
 
     // YouTube special handling - reliable thumbnails
     if (platform === 'youtube') {
@@ -32,6 +99,7 @@ serve(async (req) => {
       if (videoId) {
         thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
       }
+      sizing = { media_kind: 'video', aspect_ratio: 16 / 9, suggested_height: null };
     }
     // Instagram - use official oEmbed API with Meta token
     else if (platform === 'instagram') {
@@ -43,6 +111,10 @@ serve(async (req) => {
       if (oembedData?.title) {
         previewText = oembedData.title;
       }
+      oembedThumbW = oembedData?.thumbnail_width ?? null;
+      oembedThumbH = oembedData?.thumbnail_height ?? null;
+      const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : 1;
+      sizing = { media_kind: 'image', aspect_ratio: clampAR(ar), suggested_height: null };
     }
     // Facebook - use official oEmbed API with Meta token
     else if (platform === 'facebook') {
@@ -50,36 +122,136 @@ serve(async (req) => {
       if (oembedData?.thumbnail_url) {
         thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
       }
+      // /reel/ → 9:16 vertical, /videos/ → 16:9, else 4:5 portrait photo card
+      const isReel = /\/reel\//i.test(url);
+      const isVideo = /\/videos?\//i.test(url);
+      sizing = {
+        media_kind: 'video',
+        aspect_ratio: isReel ? 9 / 16 : (isVideo ? 16 / 9 : 4 / 5),
+        suggested_height: null,
+      };
     }
     // Reddit special handling
     else if (platform === 'reddit') {
-      thumbnailUrl = await fetchRedditThumbnail(url);
+      const redditData = await fetchRedditPreview(url);
+      redditPostData = redditData.post_data ?? null;
+      thumbnailUrl = redditData.thumbnail_url;
+      previewTitle = redditData.title;
+      previewText = redditData.description || redditData.title;
+      sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
     }
-    // Generic scraping for other platforms
+    // Article handling — try Medium RSS first (because Medium blocks the
+    // normal HTML fetch for some posts), then fall back to the universal
+    // metadata scraper that works on any website.
+    else if (platform === 'article' || platform === 'medium') {
+      const mediumData = await fetchMediumRssPreview(url);
+      if (mediumData && mediumData.image) {
+        previewTitle = mediumData.title;
+        thumbnailUrl = mediumData.image;
+        previewText = mediumData.description || mediumData.title;
+      } else {
+        const ogData = await scrapeOgData(url);
+        previewTitle = (mediumData?.title) || ogData.title;
+        thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
+        previewText = (mediumData?.description) || ogData.description || ogData.title;
+        sizing.aspect_ratio = clampAR(ogData.imageWidth && ogData.imageHeight ? ogData.imageWidth / ogData.imageHeight : null);
+      }
+      sizing.media_kind = 'article';
+      if (!sizing.aspect_ratio) sizing.aspect_ratio = 16 / 9;
+    }
+    // TikTok - use official oEmbed (no auth required) and store permanently
+    else if (platform === 'tiktok') {
+      const tiktokData = await fetchTikTokOembed(url);
+      if (tiktokData?.thumbnail_url) {
+        thumbnailUrl = await storeThumbnailPermanently(postId, tiktokData.thumbnail_url);
+      }
+      if (tiktokData?.title) {
+        previewText = tiktokData.title;
+      }
+      const w = tiktokData?.thumbnail_width ?? null;
+      const h = tiktokData?.thumbnail_height ?? null;
+      const ar = w && h ? w / h : 9 / 16;
+      sizing = { media_kind: 'video', aspect_ratio: clampAR(ar), suggested_height: null };
+      // Fallback to OG scrape if oEmbed didn't yield a thumbnail
+      if (!thumbnailUrl) {
+        const ogData = await scrapeOgData(url);
+        if (ogData.image) {
+          thumbnailUrl = await storeThumbnailPermanently(postId, ogData.image);
+        }
+        if (!previewText) previewText = ogData.description || ogData.title;
+      }
+    }
+    // Generic scraping for other platforms / unclassified URLs
     else {
-      const ogData = await scrapeOgData(url);
-      thumbnailUrl = ogData.image;
+      // Threads serves OG metadata only to crawler UAs; use facebookexternalhit.
+      const isThreads = platform === 'threads' || /(?:^|\.)threads\.(?:net|com)\//i.test(url);
+      const ogData = isThreads
+        ? await scrapeOgData(url, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)')
+        : await scrapeOgData(url);
+      thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
       previewText = ogData.description || ogData.title;
+      if (ogData.title) previewTitle = ogData.title;
+
+      // For Threads: og:image is almost always the author's profile picture
+      // (cdninstagram.com/.../profile_pic). That isn't a real post preview —
+      // strip it so the typographic text card renders the post copy instead,
+      // matching the X/Reddit behavior for text-only posts.
+      if (isThreads && thumbnailUrl && isThreadsProfilePicture(thumbnailUrl)) {
+        thumbnailUrl = null;
+      }
+
+      // Classify the generic / Threads / X / etc. branch
+      const hasVideo = ogData.hasVideo;
+      const dims = (ogData.videoWidth && ogData.videoHeight)
+        ? { w: ogData.videoWidth, h: ogData.videoHeight }
+        : (ogData.imageWidth && ogData.imageHeight)
+          ? { w: ogData.imageWidth, h: ogData.imageHeight }
+          : null;
+      const ar = dims ? clampAR(dims.w / dims.h) : null;
+
+      if (isThreads && !thumbnailUrl) {
+        sizing = { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(previewText) };
+      } else if (hasVideo) {
+        sizing = { media_kind: 'video', aspect_ratio: ar ?? 16 / 9, suggested_height: null };
+      } else if (thumbnailUrl) {
+        sizing = { media_kind: 'image', aspect_ratio: ar ?? 4 / 5, suggested_height: null };
+      } else {
+        sizing = { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(previewText) };
+      }
     }
 
-    // Update database
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Update database (skipped in preview-only mode used before the post exists)
+    if (!isPreviewOnly) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { error: updateError } = await supabase
-      .from('posts')
-      .update({ thumbnail_url: thumbnailUrl, preview_text: previewText })
-      .eq('id', postId);
+      const updatePayload: Record<string, string | number | null> = {
+        thumbnail_url: thumbnailUrl,
+        preview_image_url: thumbnailUrl,
+        preview_text: previewText,
+        media_kind: sizing.media_kind,
+        aspect_ratio: sizing.aspect_ratio,
+        suggested_height: sizing.suggested_height,
+      };
+      if (previewTitle) {
+        updatePayload.title = previewTitle;
+        updatePayload.preview_title = previewTitle;
+      }
+      const { error: updateError } = await supabase
+        .from('posts')
+        .update(updatePayload)
+        .eq('id', postId);
 
-    if (updateError) {
-      console.error('[fetch-post-preview] DB update error:', updateError);
-    } else {
-      console.log(`[fetch-post-preview] Updated post ${postId} with thumbnail: ${thumbnailUrl}`);
+      if (updateError) {
+        console.error('[fetch-post-preview] DB update error:', updateError);
+      } else {
+        console.log(`[fetch-post-preview] Updated post ${postId} with thumbnail: ${thumbnailUrl}`);
+      }
     }
 
     return new Response(
-      JSON.stringify({ thumbnail_url: thumbnailUrl, preview_text: previewText }),
+      JSON.stringify({ thumbnail_url: thumbnailUrl, title: previewTitle, preview_text: previewText }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
@@ -100,7 +272,7 @@ function extractYouTubeId(url: string): string | null {
 }
 
 // Fetch Instagram thumbnail using official oEmbed API
-async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null } | null> {
+async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null; thumbnail_width: number | null; thumbnail_height: number | null } | null> {
   const metaToken = Deno.env.get('META_APP_TOKEN');
   
   if (!metaToken) {
@@ -129,7 +301,9 @@ async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: strin
 
     return {
       thumbnail_url: data.thumbnail_url || null,
-      title: data.title || data.author_name || null
+      title: data.title || data.author_name || null,
+      thumbnail_width: typeof data.thumbnail_width === 'number' ? data.thumbnail_width : null,
+      thumbnail_height: typeof data.thumbnail_height === 'number' ? data.thumbnail_height : null,
     };
   } catch (error) {
     console.error('[fetch-post-preview] Instagram oEmbed error:', error);
@@ -242,24 +416,311 @@ async function storeThumbnailPermanently(postId: string, imageUrl: string): Prom
   }
 }
 
-async function fetchRedditThumbnail(url: string): Promise<string | null> {
+async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string | null; title: string | null; description: string | null; post_data?: Record<string, unknown> | null }> {
+  const canonicalUrl = await resolveRedditCanonicalUrl(url);
+  const oembedData = await fetchRedditOembed(canonicalUrl || url);
+
   try {
-    const jsonUrl = url.replace(/\/$/, '') + '.json';
-    const res = await fetch(jsonUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-    });
+    const res = await fetchRedditJson(canonicalUrl || url);
     
     if (res.ok) {
       const json = await res.json();
       const post = json[0]?.data?.children?.[0]?.data;
-      return post?.thumbnail?.startsWith('http') ? post.thumbnail : null;
+      const thumbnail = extractRedditMediaThumbnail(post);
+      if (thumbnail || post?.title) {
+        return {
+          thumbnail_url: thumbnail,
+          title: typeof post?.title === 'string' ? post.title : oembedData.title,
+          description: typeof post?.selftext === 'string' && post.selftext.trim() ? post.selftext : oembedData.description,
+          post_data: post ?? null,
+        };
+      }
     }
   } catch (e) {
     console.log('[fetch-post-preview] Reddit JSON fetch failed');
   }
   
-  const ogData = await scrapeOgData(url);
-  return ogData.image;
+  const ogData = await scrapeOgData(canonicalUrl || url);
+  return {
+    thumbnail_url: ogData.image && !isMisleadingRedditThumbnail(ogData.image) ? ogData.image : null,
+    title: oembedData.title || ogData.title,
+    description: oembedData.description || ogData.description,
+    post_data: null,
+  };
+}
+
+async function resolveRedditCanonicalUrl(url: string): Promise<string | null> {
+  try {
+    const parsed = new URL(url);
+    if (!/(^|\.)reddit\.com$/i.test(parsed.hostname)) {
+      return url;
+    }
+    // Only short-share URLs need to be resolved to their canonical /comments/ form.
+    if (!/^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(parsed.pathname)) {
+      return url;
+    }
+    const accessToken = await getRedditInstalledClientToken();
+    if (!accessToken) return null;
+
+    const res = await fetch(`https://oauth.reddit.com${parsed.pathname}${parsed.search}`, {
+      method: 'GET',
+      redirect: 'manual',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'User-Agent': 'Aelixto/1.0',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+    const location = res.headers.get('location');
+    if (location && /\/comments\/[a-z0-9_]+/i.test(location)) return location;
+    const body = await res.text();
+    const bodyRedirect = body.match(/https:\/\/www\.reddit\.com\/(?:r|user)\/[^"'<>\s]+\/comments\/[a-z0-9_]+[^"'<>\s]*/i)?.[0];
+    if (bodyRedirect) return bodyRedirect.replace(/&amp;/g, '&');
+    const finalUrl = res.url || '';
+    if (/\/comments\/[a-z0-9_]+/i.test(finalUrl)) return finalUrl;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function getRedditInstalledClientToken(): Promise<string | null> {
+  try {
+    const res = await fetch('https://www.reddit.com/api/v1/access_token', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${btoa('6N9uN0krSDE-ig:')}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Aelixto/1.0',
+      },
+      body: new URLSearchParams({
+        grant_type: 'https://oauth.reddit.com/grants/installed_client',
+        device_id: 'DO_NOT_TRACK_THIS_DEVICE',
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data?.access_token === 'string' ? data.access_token : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchRedditOembed(url: string): Promise<{ title: string | null; description: string | null }> {
+  try {
+    const res = await fetch(`https://www.reddit.com/oembed?url=${encodeURIComponent(url)}`, {
+      headers: { 'User-Agent': 'Aelixto/1.0', 'Accept': 'application/json' },
+    });
+    if (!res.ok) return { title: null, description: null };
+    const data = await res.json();
+    return {
+      title: typeof data.title === 'string' ? decodeHtmlEntities(data.title) : null,
+      description: typeof data.author_name === 'string' ? `Posted by u/${data.author_name}` : null,
+    };
+  } catch {
+    return { title: null, description: null };
+  }
+}
+
+async function fetchRedditJson(url: string): Promise<Response> {
+  const parsed = new URL(url);
+  const jsonPath = parsed.pathname.replace(/\/$/, '') + '.json';
+  const accessToken = await getRedditInstalledClientToken();
+
+  if (accessToken) {
+    const oauthRes = await fetch(`https://oauth.reddit.com${jsonPath}`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'User-Agent': 'Aelixto/1.0',
+        'Accept': 'application/json',
+      },
+    });
+    if (oauthRes.ok) return oauthRes;
+  }
+
+  const oldRedditUrl = `https://old.reddit.com${jsonPath}`;
+  return fetch(oldRedditUrl, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': 'application/json',
+    },
+  });
+}
+
+// TikTok oEmbed — public endpoint, no auth, returns thumbnail_url + title
+async function fetchTikTokOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null; thumbnail_width: number | null; thumbnail_height: number | null } | null> {
+  try {
+    // Normalize: strip query/tracking params, follow short links (vm.tiktok.com / vt.tiktok.com)
+    let target = url.trim();
+    if (/^https?:\/\/(vm|vt)\.tiktok\.com\//i.test(target)) {
+      try {
+        const head = await fetch(target, {
+          method: 'GET',
+          redirect: 'follow',
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        });
+        if (head.url) target = head.url.split('?')[0];
+      } catch { /* keep original */ }
+    }
+    const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(target)}`;
+    console.log('[fetch-post-preview] Fetching TikTok oEmbed:', oembedUrl);
+    const res = await fetch(oembedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+      },
+    });
+    if (!res.ok) {
+      console.error(`[fetch-post-preview] TikTok oEmbed failed: ${res.status}`);
+      return null;
+    }
+    const data = await res.json();
+    return {
+      thumbnail_url: data.thumbnail_url || null,
+      title: data.title || data.author_name || null,
+      thumbnail_width: typeof data.thumbnail_width === 'number' ? data.thumbnail_width : null,
+      thumbnail_height: typeof data.thumbnail_height === 'number' ? data.thumbnail_height : null,
+    };
+  } catch (e) {
+    console.error('[fetch-post-preview] TikTok oEmbed error:', e);
+    return null;
+  }
+}
+
+function decodeRedditUrl(url?: string | null): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const decoded = decodeHtmlEntities(url);
+  return /^https?:\/\//i.test(decoded) ? decoded : null;
+}
+
+function readNestedString(value: unknown, path: Array<string | number>): string | null {
+  let current: unknown = value;
+  for (const key of path) {
+    if (typeof key === 'number') {
+      if (!Array.isArray(current)) return null;
+      current = current[key];
+    } else {
+      if (!current || typeof current !== 'object') return null;
+      current = (current as Record<string, unknown>)[key];
+    }
+  }
+  return typeof current === 'string' ? current : null;
+}
+
+function extractRedditMediaThumbnail(post: Record<string, unknown> | null | undefined): string | null {
+  if (!post) return null;
+
+  const preview = decodeRedditUrl(readNestedString(post, ['preview', 'images', 0, 'source', 'url']));
+  if (preview) return preview;
+
+  const mediaId = readNestedString(post, ['gallery_data', 'items', 0, 'media_id']);
+  const galleryImage = mediaId ? readNestedString(post, ['media_metadata', mediaId, 's', 'u']) : null;
+  const galleryThumb = decodeRedditUrl(galleryImage);
+  if (galleryThumb) return galleryThumb;
+
+  const oembedThumb = decodeRedditUrl(readNestedString(post, ['secure_media', 'oembed', 'thumbnail_url']))
+    || decodeRedditUrl(readNestedString(post, ['media', 'oembed', 'thumbnail_url']));
+  if (oembedThumb) return oembedThumb;
+
+  const urlThumb = decodeRedditUrl(
+    readNestedString(post, ['url_overridden_by_dest']) || readNestedString(post, ['url'])
+  );
+  if (urlThumb && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(urlThumb)) return urlThumb;
+
+  const thumbnail = decodeRedditUrl(readNestedString(post, ['thumbnail']));
+  if (thumbnail && !/(default|self|nsfw|spoiler)$/i.test(thumbnail)) return thumbnail;
+
+  return null;
+}
+
+function isMisleadingRedditThumbnail(url: string): boolean {
+  const lower = url.toLowerCase();
+  return (
+    lower.includes('images.unsplash.com') ||
+    lower.includes('source.unsplash.com') ||
+    lower.includes('redditstatic.com') ||
+    lower.includes('share.redd.it/preview/post')
+  );
+}
+
+function isGenericPlaceholderImage(url: string): boolean {
+  const lower = url.toLowerCase();
+  return lower.includes('images.unsplash.com') || lower.includes('source.unsplash.com');
+}
+
+function stripHtml(text: string): string {
+  return decodeHtmlEntities(text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
+}
+
+function extractXmlTag(xml: string, tag: string): string | null {
+  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const cdata = xml.match(new RegExp(`<${escaped}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${escaped}>`, 'i'));
+  if (cdata?.[1]) return decodeHtmlEntities(cdata[1].trim());
+  const plain = xml.match(new RegExp(`<${escaped}[^>]*>([\\s\\S]*?)<\\/${escaped}>`, 'i'));
+  return plain?.[1] ? decodeHtmlEntities(plain[1].trim()) : null;
+}
+
+function getMediumFeedUrl(targetUrl: string): { feedUrl: string; postId: string | null; slug: string | null } | null {
+  try {
+    const parsed = new URL(targetUrl);
+    const host = parsed.hostname.toLowerCase();
+    const postId = parsed.pathname.match(/(?:-|\/p\/)([a-f0-9]{10,})(?:[/?#]|$)/i)?.[1] || null;
+    const lastSegment = parsed.pathname.split('/').filter(Boolean).pop() || '';
+    const slug = lastSegment.replace(/-[a-f0-9]{10,}$/i, '').toLowerCase() || null;
+
+    if (host === 'medium.com' || host === 'www.medium.com') {
+      const author = parsed.pathname.match(/^\/@([^/]+)/)?.[1];
+      return author ? { feedUrl: `https://medium.com/feed/@${author}`, postId, slug } : null;
+    }
+
+    if (host.endsWith('.medium.com')) {
+      return { feedUrl: `https://${host}/feed`, postId, slug };
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+async function fetchMediumRssPreview(url: string): Promise<{ title: string; image: string | null; description: string | null } | null> {
+  const info = getMediumFeedUrl(url);
+  if (!info) return null;
+
+  try {
+    const response = await fetch(info.feedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/rss+xml,text/xml;q=0.9,*/*;q=0.8',
+      },
+    });
+    if (!response.ok) return null;
+
+    const xml = await response.text();
+    const items = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
+    const item = items.find((entry) => {
+      const link = extractXmlTag(entry, 'link') || '';
+      const guid = extractXmlTag(entry, 'guid') || '';
+      const haystack = `${link} ${guid} ${entry}`.toLowerCase();
+      return (!!info.postId && haystack.includes(info.postId.toLowerCase())) || (!!info.slug && haystack.includes(info.slug));
+    });
+    if (!item) return null;
+
+    const title = extractXmlTag(item, 'title');
+    const content = extractXmlTag(item, 'content:encoded') || extractXmlTag(item, 'description') || '';
+    const subtitle = content.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1];
+    const firstParagraph = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i)?.[1];
+    const image = content.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] || null;
+
+    if (!title) return null;
+    return {
+      title: stripHtml(title),
+      image: image ? decodeHtmlEntities(image) : null,
+      description: subtitle ? stripHtml(subtitle) : (firstParagraph ? stripHtml(firstParagraph) : null),
+    };
+  } catch (error) {
+    console.error('[fetch-post-preview] Medium RSS error:', error);
+    return null;
+  }
 }
 
 function decodeHtmlEntities(text: string): string {
@@ -273,37 +734,230 @@ function decodeHtmlEntities(text: string): string {
     .replace(/&nbsp;/g, ' ');
 }
 
-async function scrapeOgData(url: string): Promise<{ image: string | null; title: string | null; description: string | null }> {
+async function scrapeOgData(url: string, userAgent?: string): Promise<{ image: string | null; title: string | null; description: string | null; imageWidth: number | null; imageHeight: number | null; videoWidth: number | null; videoHeight: number | null; hasVideo: boolean }> {
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent':
+          userAgent ||
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
       },
       redirect: 'follow',
     });
 
     if (!response.ok) {
-      return { image: null, title: null, description: null };
+      return { image: null, title: null, description: null, imageWidth: null, imageHeight: null, videoWidth: null, videoHeight: null, hasVideo: false };
     }
 
     const html = await response.text();
-
-    const ogImageMatch = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
-                         html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
-    const twitterImageMatch = html.match(/<meta[^>]*name=["']twitter:image["'][^>]*content=["']([^"']+)["']/i);
-    
-    const image = ogImageMatch?.[1] ? decodeHtmlEntities(ogImageMatch[1]) : 
-                  (twitterImageMatch?.[1] ? decodeHtmlEntities(twitterImageMatch[1]) : null);
-
-    const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
-    const title = ogTitleMatch?.[1] ? decodeHtmlEntities(ogTitleMatch[1]) : null;
-
-    const ogDescMatch = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
-    const description = ogDescMatch?.[1] ? decodeHtmlEntities(ogDescMatch[1]) : null;
-
-    return { image, title, description };
+    const meta = extractArticleMetadata(html, response.url || url);
+    const sizing = extractSizingFromHtml(html);
+    return { ...meta, ...sizing };
   } catch (error) {
     console.error('[fetch-post-preview] Scraping error:', error);
-    return { image: null, title: null, description: null };
+    return { image: null, title: null, description: null, imageWidth: null, imageHeight: null, videoWidth: null, videoHeight: null, hasVideo: false };
+  }
+}
+
+function extractSizingFromHtml(html: string): { imageWidth: number | null; imageHeight: number | null; videoWidth: number | null; videoHeight: number | null; hasVideo: boolean } {
+  const tolerantMeta = (want: string): string | null => {
+    const w = want.toLowerCase();
+    const tagRegex = /<meta\b[^>]*>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = tagRegex.exec(html)) !== null) {
+      const tag = m[0];
+      const p = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
+      if (!p || p[2].toLowerCase() !== w) continue;
+      const c =
+        tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
+        tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
+        tag.match(/\scontent\s*=\s*([^\s>]+)/i);
+      if (c?.[1]) return decodeHtmlEntities(c[1]).trim();
+    }
+    return null;
+  };
+  const metaNum = (name: string): number | null => {
+    const v = tolerantMeta(name);
+    const n = v ? parseInt(v, 10) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  const hasVideo = !!tolerantMeta('og:video')
+    || !!tolerantMeta('og:video:secure_url')
+    || !!tolerantMeta('og:video:url')
+    || (tolerantMeta('twitter:card')?.toLowerCase() === 'player');
+  return {
+    imageWidth: metaNum('og:image:width'),
+    imageHeight: metaNum('og:image:height'),
+    videoWidth: metaNum('og:video:width'),
+    videoHeight: metaNum('og:video:height'),
+    hasVideo,
+  };
+}
+
+function isThreadsProfilePicture(url: string): boolean {
+  const lower = url.toLowerCase();
+  if (!lower) return false;
+  // Threads profile pictures live on cdninstagram.com under /v/... with
+  // a profile_pic encode tag. Other Threads media (photos/videos) live
+  // under different paths or scontent-*.cdninstagram.com/o1/v/t2/.
+  if ((lower.includes('cdninstagram.com/v/') || lower.includes('fbcdn.net/v/')) && lower.includes('profile_pic')) return true;
+  if (lower.includes('/t51.82787-19/')) return true;
+  if (lower.includes('stp=dst-jpg') && lower.includes('profile_pic')) return true;
+  try {
+    const parsed = new URL(url);
+    const efg = parsed.searchParams.get('efg');
+    if (efg) {
+      const decoded = atob(efg.replace(/-/g, '+').replace(/_/g, '/'));
+      if (decoded.toLowerCase().includes('profile_pic')) return true;
+    }
+  } catch { /* ignore */ }
+  return false;
+}
+
+/**
+ * Universal article metadata extractor. Works across any website by trying
+ * (in order): Open Graph, Twitter Cards, JSON-LD structured data, the first
+ * <h1> in the document, and the first reasonable <img> inside <article>/<main>
+ * or the page body. Resolves relative URLs against the page's final URL.
+ */
+export function extractArticleMetadata(
+  html: string,
+  baseUrl: string
+): { image: string | null; title: string | null; description: string | null } {
+  type JsonLdValue = string | { url?: string; '@id'?: string } | Array<string | { url?: string; '@id'?: string }> | null | undefined;
+  type JsonLdNode = Record<string, JsonLdValue>;
+
+  const meta = (name: string): string | null => {
+    const want = name.toLowerCase();
+    const tagRegex = /<meta\b[^>]*>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = tagRegex.exec(html)) !== null) {
+      const tag = m[0];
+      const propMatch = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
+      if (!propMatch || propMatch[2].toLowerCase() !== want) continue;
+      const contentMatch =
+        tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
+        tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
+        tag.match(/\scontent\s*=\s*([^\s>]+)/i);
+      if (contentMatch?.[1]) return decodeHtmlEntities(contentMatch[1]).trim();
+    }
+    return null;
+  };
+
+  // --- JSON-LD ---
+  let jsonLdTitle: string | null = null;
+  let jsonLdImage: string | null = null;
+  let jsonLdDesc: string | null = null;
+  const ldBlocks = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+  for (const block of ldBlocks) {
+    const inner = block.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '').trim();
+    if (!inner) continue;
+    try {
+      const parsed = JSON.parse(inner) as JsonLdNode | JsonLdNode[];
+      const graph = !Array.isArray(parsed) && Array.isArray(parsed['@graph']) ? parsed['@graph'] : null;
+      const nodes: JsonLdNode[] = Array.isArray(parsed) ? parsed : (graph as JsonLdNode[] | null) || [parsed];
+      for (const node of nodes) {
+        if (!node || typeof node !== 'object') continue;
+        const t = node.headline || node.name;
+        const d = node.description;
+        let img = node.image || node.thumbnailUrl || node.thumbnail;
+        if (Array.isArray(img)) img = img[0];
+        if (img && typeof img === 'object') img = img.url || img['@id'] || null;
+        if (!jsonLdTitle && typeof t === 'string') jsonLdTitle = t.trim();
+        if (!jsonLdDesc && typeof d === 'string') jsonLdDesc = d.trim();
+        if (!jsonLdImage && typeof img === 'string') jsonLdImage = img.trim();
+        if (jsonLdTitle && jsonLdImage) break;
+      }
+    } catch { /* ignore malformed JSON-LD */ }
+    if (jsonLdTitle && jsonLdImage) break;
+  }
+
+  // --- Title ---
+  const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
+  const h1Tag = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
+  const title =
+    meta('og:title') ||
+    meta('twitter:title') ||
+    jsonLdTitle ||
+    (h1Tag ? decodeHtmlEntities(h1Tag.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) : null) ||
+    (titleTag ? decodeHtmlEntities(titleTag.trim()) : null);
+
+  // --- Description ---
+  const description =
+    meta('og:description') ||
+    meta('twitter:description') ||
+    meta('description') ||
+    jsonLdDesc;
+
+  // --- Image ---
+  let image =
+    meta('og:image') ||
+    meta('og:image:secure_url') ||
+    meta('og:image:url') ||
+    meta('twitter:image') ||
+    meta('twitter:image:src') ||
+    jsonLdImage ||
+    findFirstContentImage(html);
+
+  if (image) {
+    image = resolveUrl(image, baseUrl);
+    if (image && !isLikelyRealContentImage(image)) image = findFirstContentImage(html);
+    if (image) image = resolveUrl(image, baseUrl);
+  }
+
+  return { image: image || null, title: title || null, description: description || null };
+}
+
+function findFirstContentImage(html: string): string | null {
+  // Prefer images inside <article> / <main>; fall back to body.
+  const scopes: string[] = [];
+  const articleMatch = html.match(/<article[\s\S]*?<\/article>/i);
+  if (articleMatch) scopes.push(articleMatch[0]);
+  const mainMatch = html.match(/<main[\s\S]*?<\/main>/i);
+  if (mainMatch) scopes.push(mainMatch[0]);
+  scopes.push(html);
+
+  for (const scope of scopes) {
+    const imgRegex = /<img[^>]+>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = imgRegex.exec(scope)) !== null) {
+      const tag = m[0];
+      const src =
+        tag.match(/\s(?:data-src|data-original|data-lazy-src|data-srcset|srcset)=["']([^"']+)["']/i)?.[1] ||
+        tag.match(/\ssrc=["']([^"']+)["']/i)?.[1];
+      if (!src) continue;
+      // srcset → take first URL
+      const candidate = decodeHtmlEntities(src.split(',')[0].trim().split(/\s+/)[0]);
+      if (isLikelyRealContentImage(candidate)) return candidate;
+    }
+  }
+  return null;
+}
+
+function isLikelyRealContentImage(url: string): boolean {
+  if (!url) return false;
+  const u = url.trim();
+  if (!u || u.startsWith('data:')) return false;
+  if (/\.svg(\?|#|$)/i.test(u)) return false;
+  const lower = u.toLowerCase();
+  const blockedHints = [
+    'sprite', 'icon', 'favicon', 'logo', 'avatar', 'profile-photo',
+    'blank.gif', 'spacer.gif', 'pixel.gif', '1x1', 'tracking', 'analytics',
+    'badge', 'emoji',
+  ];
+  if (blockedHints.some((h) => lower.includes(h))) return false;
+  // Reject tiny dimensions hinted in URL (?w=16, =32x32)
+  if (/[?&=_/-](?:w|width)=(?:8|16|24|32|48|64)\b/i.test(u)) return false;
+  if (/(^|[/_-])(?:16|24|32|48|64)x(?:16|24|32|48|64)([._/]|$)/i.test(u)) return false;
+  return true;
+}
+
+function resolveUrl(maybeRelative: string, baseUrl: string): string | null {
+  try {
+    return new URL(maybeRelative, baseUrl).toString();
+  } catch {
+    return null;
   }
 }

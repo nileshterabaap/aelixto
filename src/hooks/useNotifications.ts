@@ -1,18 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
-import { useEffect } from "react";
 
 export interface Notification {
   id: string;
   recipient_id: string;
   actor_id: string;
-  type: 'like' | 'comment' | 'repost' | 'follow' | 'report_outcome';
+  type: 'like' | 'comment' | 'repost' | 'follow' | 'follow_request' | 'report_outcome';
   post_id: string | null;
   comment_id: string | null;
   is_read: boolean;
   created_at: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
   actor?: {
     username: string;
     display_name: string | null;
@@ -26,7 +25,6 @@ export interface Notification {
 
 export const useNotificationCount = () => {
   const { user } = useSession();
-  const queryClient = useQueryClient();
 
   const { data: count = 0, isLoading } = useQuery({
     queryKey: ["notification-count", user?.id],
@@ -47,35 +45,9 @@ export const useNotificationCount = () => {
       return count || 0;
     },
     enabled: !!user?.id,
-    staleTime: 30000, // 30 seconds
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
-
-  // Subscribe to realtime notifications
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const channel = supabase
-      .channel(`notifications-${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `recipient_id=eq.${user.id}`,
-        },
-        () => {
-          // Invalidate the count query when notifications change
-          queryClient.invalidateQueries({ queryKey: ["notification-count", user.id] });
-          queryClient.invalidateQueries({ queryKey: ["notifications", user.id] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id, queryClient]);
 
   return { count, isLoading };
 };
@@ -83,9 +55,24 @@ export const useNotificationCount = () => {
 export const useNotifications = () => {
   const { user } = useSession();
   const queryClient = useQueryClient();
+  const cacheKey = user?.id ? `aelixto-notifications-${user.id}` : null;
+
+  const readCache = (): Notification[] => {
+    if (!cacheKey || typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem(cacheKey);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
 
   const { data: notifications = [], isLoading } = useQuery({
     queryKey: ["notifications", user?.id],
+    initialData: readCache,
+    initialDataUpdatedAt: 0,
     queryFn: async () => {
       if (!user?.id) return [];
       
@@ -131,13 +118,25 @@ export const useNotifications = () => {
       const postMap = new Map<string, { id: string; title: string | null; thumbnail_url: string | null }>();
       posts?.forEach(p => postMap.set(p.id, p));
       
-      return data.map(notification => ({
+      const result = data.map(notification => ({
         ...notification,
         actor: profileMap.get(notification.actor_id),
         post: notification.post_id ? postMap.get(notification.post_id) : undefined,
       })) as Notification[];
+
+      if (cacheKey) {
+        try {
+          window.localStorage.setItem(cacheKey, JSON.stringify(result.slice(0, 50)));
+        } catch {
+          /* quota exceeded - ignore */
+        }
+      }
+
+      return result;
     },
     enabled: !!user?.id,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // Mark all as read mutation

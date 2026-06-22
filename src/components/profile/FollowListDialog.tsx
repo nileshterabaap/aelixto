@@ -6,6 +6,20 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Lock } from "lucide-react";
+import { useSession } from "@/hooks/useSession";
+
+export type FollowVisibility = "everyone" | "followers" | "no_one";
+
+export function getFollowVisibility(
+  settings: Record<string, any> | null | undefined,
+  type: "followers" | "following",
+): FollowVisibility {
+  const key = type === "followers" ? "who_can_see_followers" : "who_can_see_following";
+  const v = settings?.[key];
+  if (v === "everyone" || v === "followers" || v === "no_one") return v;
+  return settings?.is_private ? "followers" : "everyone";
+}
 
 interface FollowUser {
   user_id: string;
@@ -23,14 +37,61 @@ interface FollowListDialogProps {
 
 export function FollowListDialog({ open, onOpenChange, userId, type }: FollowListDialogProps) {
   const navigate = useNavigate();
+  const { user } = useSession();
   const [users, setUsers] = useState<FollowUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [blocked, setBlocked] = useState(false);
+  const [blockedReason, setBlockedReason] = useState<string>("");
 
   const fetchUsers = useCallback(async () => {
     if (!userId || !open) return;
     setLoading(true);
+    setBlocked(false);
+    setBlockedReason("");
 
     try {
+      // Visibility gate
+      const { data: targetProfile } = await supabase
+        .from("profiles")
+        .select("settings, username")
+        .eq("user_id", userId)
+        .single();
+      const vis = getFollowVisibility((targetProfile?.settings as any) || null, type);
+      const isMe = !!user && user.id === userId;
+
+      if (!isMe) {
+        if (vis === "no_one") {
+          setBlocked(true);
+          setBlockedReason(
+            `@${targetProfile?.username || "this user"} has hidden their ${type}.`,
+          );
+          setUsers([]);
+          return;
+        }
+        if (vis === "followers") {
+          if (!user) {
+            setBlocked(true);
+            setBlockedReason(`Only followers can see this list.`);
+            setUsers([]);
+            return;
+          }
+          const { data: rel } = await supabase
+            .from("follows")
+            .select("id")
+            .eq("follower_id", user.id)
+            .eq("following_id", userId)
+            .maybeSingle();
+          if (!rel) {
+            setBlocked(true);
+            setBlockedReason(
+              `Only @${targetProfile?.username || "this user"}'s followers can see this list.`,
+            );
+            setUsers([]);
+            return;
+          }
+        }
+      }
+
       if (type === "followers") {
         // People who follow this user
         const { data, error } = await supabase
@@ -75,7 +136,7 @@ export function FollowListDialog({ open, onOpenChange, userId, type }: FollowLis
     } finally {
       setLoading(false);
     }
-  }, [userId, type, open]);
+  }, [userId, type, open, user]);
 
   useEffect(() => {
     if (open) fetchUsers();
@@ -106,6 +167,14 @@ export function FollowListDialog({ open, onOpenChange, userId, type }: FollowLis
                   </div>
                 </div>
               ))}
+            </div>
+          ) : blocked ? (
+            <div className="p-10 flex flex-col items-center text-center gap-3">
+              <div className="h-14 w-14 rounded-full border-2 border-foreground flex items-center justify-center">
+                <Lock className="h-6 w-6" />
+              </div>
+              <p className="text-sm font-semibold">This list is private</p>
+              <p className="text-xs text-muted-foreground">{blockedReason}</p>
             </div>
           ) : users.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground text-sm">

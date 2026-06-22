@@ -62,7 +62,7 @@ export const SkeletonGate = ({
     if (!el) return;
 
     // Platforms that use SDK to replace blockquote → iframe (must wait for iframe)
-    const needsIframe = platform === 'instagram' || platform === 'facebook' || platform === 'threads';
+    const needsIframe = platform === 'instagram' || platform === 'facebook' || platform === 'threads' || platform === 'reddit';
 
     const check = () => {
       const iframes = el.querySelectorAll('iframe');

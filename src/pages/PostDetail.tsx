@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
 import type { Post } from "@/data/demoData";
+import { AuthCTABar } from "@/components/AuthCTABar";
 
 interface SupabasePost {
   id: string;
@@ -140,9 +141,10 @@ const PostDetail = () => {
         </div>
       </div>
 
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main className={`mx-auto max-w-2xl px-4 py-6 ${!userId ? "pb-32" : ""}`}>
         <HydratedFeedPost post={post} userId={userId} startHydrated />
       </main>
+      {!userId && <AuthCTABar />}
     </div>
   );
 };

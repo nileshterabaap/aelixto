@@ -93,10 +93,25 @@ const decodeHtmlEntities = (text: string): string => {
 
 // Extract meta tag content
 const extractMetaContent = (html: string, property: string, attr = 'property'): string | null => {
-  const regex = new RegExp(`<meta\\s+${attr}=["']${property}["']\\s+content=["']([^"']+)["']`, 'i');
-  const reverseRegex = new RegExp(`<meta\\s+content=["']([^"']+)["']\\s+${attr}=["']${property}["']`, 'i');
-  const match = html.match(regex) || html.match(reverseRegex);
-  return match ? decodeHtmlEntities(match[1]) : null;
+  // Tolerant parser: iterate every <meta ...> tag and match attributes in any order,
+  // with any extra attributes in between (data-*, id, class, charset, etc.).
+  const want = property.toLowerCase();
+  const wantAttrs = attr === 'name' ? ['name'] : ['property', 'name', 'itemprop'];
+  const tagRegex = /<meta\b[^>]*>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = tagRegex.exec(html)) !== null) {
+    const tag = m[0];
+    const propMatch = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
+    if (!propMatch) continue;
+    if (!wantAttrs.includes(propMatch[1].toLowerCase())) continue;
+    if (propMatch[2].toLowerCase() !== want) continue;
+    const contentMatch =
+      tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
+      tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
+      tag.match(/\scontent\s*=\s*([^\s>]+)/i);
+    if (contentMatch?.[1]) return decodeHtmlEntities(contentMatch[1]).trim();
+  }
+  return null;
 };
 
 // Extract title - prioritize actual article H1
@@ -122,10 +137,42 @@ const extractTitle = (html: string): string => {
   return titleMatch ? titleMatch[1] : '';
 };
 
-// Extract first image from content
+// Heuristic: skip icons, logos, trackers, tiny sprites
+const isLikelyRealContentImage = (url: string): boolean => {
+  if (!url) return false;
+  const u = url.trim();
+  if (!u || u.startsWith('data:')) return false;
+  if (/\.svg(\?|#|$)/i.test(u)) return false;
+  const lower = u.toLowerCase();
+  const blocked = ['sprite','icon','favicon','logo','avatar','profile-photo','blank.gif','spacer.gif','pixel.gif','1x1','tracking','analytics','badge','emoji'];
+  if (blocked.some((h) => lower.includes(h))) return false;
+  if (/[?&=_/-](?:w|width)=(?:8|16|24|32|48|64)\b/i.test(u)) return false;
+  return true;
+};
+
+// Extract first real content image from HTML (article/main first, then any img)
 const extractFirstContentImage = (html: string): string | null => {
-  const imgMatch = html.match(/<img[^>]+src=["']([^"']+)["']/i);
-  return imgMatch ? imgMatch[1] : null;
+  const scopes: string[] = [];
+  const articleMatch = html.match(/<article[\s\S]*?<\/article>/i);
+  if (articleMatch) scopes.push(articleMatch[0]);
+  const mainMatch = html.match(/<main[\s\S]*?<\/main>/i);
+  if (mainMatch) scopes.push(mainMatch[0]);
+  scopes.push(html);
+  for (const scope of scopes) {
+    const imgRegex = /<img\b[^>]+>/gi;
+    let m: RegExpExecArray | null;
+    while ((m = imgRegex.exec(scope)) !== null) {
+      const tag = m[0];
+      const src =
+        tag.match(/\s(?:data-src|data-original|data-lazy-src)\s*=\s*["']([^"']+)["']/i)?.[1] ||
+        tag.match(/\s(?:srcset|data-srcset)\s*=\s*["']([^"']+)["']/i)?.[1] ||
+        tag.match(/\ssrc\s*=\s*["']([^"']+)["']/i)?.[1];
+      if (!src) continue;
+      const candidate = decodeHtmlEntities(src.split(',')[0].trim().split(/\s+/)[0]);
+      if (isLikelyRealContentImage(candidate)) return candidate;
+    }
+  }
+  return null;
 };
 
 // Extract first few sentences from content
@@ -429,9 +476,9 @@ serve(async (req) => {
         }
       }
     } else {
-      // For non-Quora sites, use standard fetch
-      const standardHeaders = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+      // For non-Quora sites, try a UA fallback chain to bypass anti-bot protections (Cloudflare, etc.)
+      const buildHeaders = (ua: string) => ({
+        'User-Agent': ua,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
@@ -441,20 +488,101 @@ serve(async (req) => {
         'Sec-Fetch-Mode': 'navigate',
         'Sec-Fetch-Site': 'none',
         'Cache-Control': 'max-age=0',
-      };
-      
-      const response = await fetch(targetUrl, {
-        headers: standardHeaders,
-        redirect: 'follow',
       });
 
-      if (!response.ok) {
-        console.log('[unfurl-article] HTTP error:', response.status);
-        throw new Error(`HTTP error! status: ${response.status}`);
+      const uaChain = [
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
+        'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+        'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+      ];
+
+      let okResp: Response | null = null;
+      for (const ua of uaChain) {
+        try {
+          const r = await fetch(targetUrl, { headers: buildHeaders(ua), redirect: 'follow' });
+          console.log('[unfurl-article] UA', ua, '->', r.status);
+          if (r.ok) { okResp = r; break; }
+        } catch (e) {
+          console.log('[unfurl-article] UA error:', ua, e instanceof Error ? e.message : String(e));
+        }
       }
 
-      html = await response.text();
-      resolvedUrl = response.url;
+      if (!okResp) {
+        // Last-resort proxy fallback
+        try {
+          const jina = await fetch(`https://r.jina.ai/${targetUrl}`, {
+            headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,*/*' },
+            redirect: 'follow',
+          });
+          if (jina.ok) { okResp = jina; resolvedUrl = targetUrl; console.log('[unfurl-article] Jina proxy succeeded'); }
+        } catch (e) {
+          console.log('[unfurl-article] Jina proxy failed:', e instanceof Error ? e.message : String(e));
+        }
+      }
+
+      // Final fallback: Firecrawl (bypasses Cloudflare / anti-bot challenges)
+      if (!okResp) {
+        const fcKey = Deno.env.get('FIRECRAWL_API_KEY');
+        if (fcKey) {
+          try {
+            console.log('[unfurl-article] Trying Firecrawl fallback');
+            const fc = await fetch('https://api.firecrawl.dev/v2/scrape', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${fcKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                url: targetUrl,
+                formats: ['html'],
+                onlyMainContent: false,
+              }),
+            });
+            if (fc.ok) {
+              const data = await fc.json();
+              const payload = data?.data || data || {};
+              const md = payload.metadata || {};
+              const fcHtml: string = payload.html || '';
+              const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+              const title = md.ogTitle || md.title || '';
+              const desc = md.ogDescription || md.description || '';
+              const image = md.ogImage || md['og:image'] || md.image || '';
+              const author = md.author || md.ogAuthor || '';
+              const site = md.ogSiteName || md['og:site_name'] || '';
+              const synth = `<html><head>
+                ${title ? `<title>${esc(title)}</title>` : ''}
+                ${title ? `<meta property="og:title" content="${esc(title)}">` : ''}
+                ${desc ? `<meta property="og:description" content="${esc(desc)}">` : ''}
+                ${desc ? `<meta name="description" content="${esc(desc)}">` : ''}
+                ${image ? `<meta property="og:image" content="${esc(image)}">` : ''}
+                ${image ? `<meta name="twitter:image" content="${esc(image)}">` : ''}
+                ${site ? `<meta property="og:site_name" content="${esc(site)}">` : ''}
+                ${author ? `<meta name="author" content="${esc(author)}">` : ''}
+                <meta property="og:url" content="${esc(md.sourceURL || targetUrl)}">
+                <base href="${esc(md.sourceURL || targetUrl)}">
+              </head><body>${fcHtml}</body></html>`;
+              if (title || image || fcHtml) {
+                okResp = new Response(synth, { status: 200, headers: { 'Content-Type': 'text/html' } });
+                resolvedUrl = md.sourceURL || targetUrl;
+                console.log('[unfurl-article] Success with Firecrawl. title:', title?.slice(0,80), 'image:', !!image);
+              }
+            } else {
+              console.log('[unfurl-article] Firecrawl failed:', fc.status);
+            }
+          } catch (e) {
+            console.log('[unfurl-article] Firecrawl error:', e instanceof Error ? e.message : String(e));
+          }
+        }
+      }
+
+      if (!okResp) {
+        console.log('[unfurl-article] All fetch strategies failed');
+        throw new Error('HTTP error! All fetch strategies failed');
+      }
+
+      html = await okResp.text();
+      resolvedUrl = okResp.url || resolvedUrl;
     }
 
     // Extract metadata
@@ -515,24 +643,24 @@ serve(async (req) => {
     let faviconHref: string | null = null;
     
     // Try multiple favicon patterns in order of preference
-    const faviconPatterns = [
-      // Standard icon with href attribute first
-      /<link[^>]*rel=["'](?:icon|shortcut icon)["'][^>]*href=["']([^"']+)["']/i,
-      // Reverse order (href before rel)
-      /<link[^>]*href=["']([^"']+)["'][^>]*rel=["'](?:icon|shortcut icon)["']/i,
-      // Apple touch icon as fallback
-      /<link[^>]*rel=["']apple-touch-icon["'][^>]*href=["']([^"']+)["']/i,
-      /<link[^>]*href=["']([^"']+)["'][^>]*rel=["']apple-touch-icon["']/i,
-    ];
-    
-    for (const pattern of faviconPatterns) {
-      const match = html.match(pattern);
-      if (match && match[1]) {
-        faviconHref = match[1];
-        break;
+    const wantedRels = ['icon', 'shortcut icon', 'apple-touch-icon', 'apple-touch-icon-precomposed'];
+    const linkRegex = /<link\b[^>]*>/gi;
+    let lm: RegExpExecArray | null;
+    const iconCandidates: { rel: string; href: string }[] = [];
+    while ((lm = linkRegex.exec(html)) !== null) {
+      const tag = lm[0];
+      const relMatch = tag.match(/\srel\s*=\s*["']([^"']+)["']/i);
+      const hrefMatch = tag.match(/\shref\s*=\s*["']([^"']+)["']/i);
+      if (!relMatch || !hrefMatch) continue;
+      const rel = relMatch[1].toLowerCase().trim();
+      if (wantedRels.some((r) => rel.split(/\s+/).includes(r) || rel === r)) {
+        iconCandidates.push({ rel, href: hrefMatch[1] });
       }
     }
-    
+    // Prefer "icon" over apple-touch-icon
+    const preferred = iconCandidates.find((c) => c.rel.includes('icon') && !c.rel.includes('apple')) || iconCandidates[0];
+    if (preferred) faviconHref = preferred.href;
+
     // Fallback to /favicon.ico if nothing found
     if (!faviconHref) faviconHref = '/favicon.ico';
     

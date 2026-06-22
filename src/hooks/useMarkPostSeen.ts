@@ -2,8 +2,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 const BATCH_INTERVAL = 3000; // flush every 3s
-const VISIBILITY_THRESHOLD = 0.5; // 50% visible
-const MIN_VIEW_TIME = 1500; // 1.5s minimum viewing time
+const VISIBILITY_THRESHOLD = 0.5;
+const DWELL_TIME_MS = 1500;
 
 /**
  * Mark a single post as seen immediately (fire-and-forget).
@@ -40,8 +40,29 @@ export const markPostsSeenImmediate = async (userId: string, postIds: string[]) 
  */
 export const useMarkPostSeen = (userId: string | undefined) => {
   const pendingRef = useRef<Set<string>>(new Set());
-  const viewTimers = useRef<Map<string, number>>(new Map());
+  const observersRef = useRef<Map<string, IntersectionObserver>>(new Map());
+  const visibleSinceRef = useRef<Map<string, number>>(new Map());
+  const dwellTimersRef = useRef<Map<string, number>>(new Map());
+  // Posts currently at least 50% visible, so refresh can include items that
+  // already satisfied the 1.5s dwell but have not reached the batch flush yet.
+  const visibleRef = useRef<Set<string>>(new Set());
   const flushing = useRef(false);
+
+  const clearPostTracking = useCallback((postId: string) => {
+    const observer = observersRef.current.get(postId);
+    if (observer) {
+      observer.disconnect();
+      observersRef.current.delete(postId);
+    }
+
+    visibleRef.current.delete(postId);
+    visibleSinceRef.current.delete(postId);
+    const timer = dwellTimersRef.current.get(postId);
+    if (timer) {
+      window.clearTimeout(timer);
+      dwellTimersRef.current.delete(postId);
+    }
+  }, []);
 
   // Flush pending seen posts to DB
   const flush = useCallback(async () => {
@@ -63,10 +84,43 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     }
   }, [userId]);
 
+  // Force-flush: include currently-visible posts and await DB write.
+  // Used by pull-to-refresh so anything the user actually saw disappears next load.
+  const flushNow = useCallback(async () => {
+    if (!userId) return;
+    const now = Date.now();
+    visibleRef.current.forEach((id) => {
+      const visibleSince = visibleSinceRef.current.get(id);
+      if (visibleSince && now - visibleSince >= DWELL_TIME_MS) {
+        pendingRef.current.add(id);
+      }
+    });
+    if (pendingRef.current.size === 0) return;
+    // Wait for any in-flight flush to finish
+    while (flushing.current) {
+      await new Promise((r) => setTimeout(r, 30));
+    }
+    flushing.current = true;
+    const postIds = Array.from(pendingRef.current);
+    pendingRef.current.clear();
+    try {
+      const rows = postIds.map((post_id) => ({ user_id: userId, post_id }));
+      await supabase.from('post_seen').upsert(rows, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
+    } catch {
+      postIds.forEach((id) => pendingRef.current.add(id));
+    } finally {
+      flushing.current = false;
+    }
+  }, [userId]);
+
   // Periodic flush
   useEffect(() => {
     if (!userId) return;
     const interval = setInterval(flush, BATCH_INTERVAL);
+    const observers = observersRef.current;
+    const dwellTimers = dwellTimersRef.current;
+    const visiblePosts = visibleRef.current;
+    const visibleSince = visibleSinceRef.current;
     // Flush on page hide (tab switch, navigate away)
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') flush();
@@ -75,44 +129,60 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     return () => {
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      observers.forEach((observer) => observer.disconnect());
+      observers.clear();
+      dwellTimers.forEach((timer) => window.clearTimeout(timer));
+      dwellTimers.clear();
+      visiblePosts.clear();
+      visibleSince.clear();
       flush(); // flush remaining on unmount
     };
   }, [userId, flush]);
 
-  // Returns an IntersectionObserver callback ref for a post element
-  const observePost = useCallback(
-    (postId: string) => {
-      return (el: HTMLDivElement | null) => {
-        if (!el || !userId) return;
+  const setObservedPostElement = useCallback(
+    (postId: string, el: HTMLDivElement | null) => {
+      clearPostTracking(postId);
 
-        const observer = new IntersectionObserver(
-          ([entry]) => {
-            if (entry.isIntersecting) {
-              // Start timer when post becomes visible
-              if (!viewTimers.current.has(postId)) {
-                viewTimers.current.set(postId, window.setTimeout(() => {
-                  pendingRef.current.add(postId);
-                  viewTimers.current.delete(postId);
-                }, MIN_VIEW_TIME));
+      if (!el || !userId) return;
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting && entry.intersectionRatio >= VISIBILITY_THRESHOLD) {
+            visibleRef.current.add(postId);
+            if (dwellTimersRef.current.has(postId)) return;
+            visibleSinceRef.current.set(postId, Date.now());
+            const timer = window.setTimeout(() => {
+              if (visibleRef.current.has(postId)) {
+                pendingRef.current.add(postId);
+                const obs = observersRef.current.get(postId);
+                if (obs) {
+                  obs.disconnect();
+                  observersRef.current.delete(postId);
+                }
+                visibleRef.current.delete(postId);
+                visibleSinceRef.current.delete(postId);
+                dwellTimersRef.current.delete(postId);
               }
-            } else {
-              // Cancel timer if post scrolls out before min time
-              const timer = viewTimers.current.get(postId);
-              if (timer) {
-                clearTimeout(timer);
-                viewTimers.current.delete(postId);
-              }
+            }, DWELL_TIME_MS);
+            dwellTimersRef.current.set(postId, timer);
+          } else {
+            visibleRef.current.delete(postId);
+            visibleSinceRef.current.delete(postId);
+            const timer = dwellTimersRef.current.get(postId);
+            if (timer) {
+              window.clearTimeout(timer);
+              dwellTimersRef.current.delete(postId);
             }
-          },
-          { threshold: VISIBILITY_THRESHOLD }
-        );
+          }
+        },
+        { threshold: [VISIBILITY_THRESHOLD] }
+      );
 
-        observer.observe(el);
-        (el as any).__seenObserver = observer;
-      };
+      observersRef.current.set(postId, observer);
+      observer.observe(el);
     },
-    [userId]
+    [clearPostTracking, userId]
   );
 
-  return { observePost };
+  return { setObservedPostElement, flushNow };
 };

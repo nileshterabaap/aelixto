@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
+import { TextCardThumbnail } from "@/components/TextCardThumbnail";
+import { getThumbnailText } from "@/lib/getThumbnailText";
 import InstagramIcon from "@/assets/platforms/instagram.svg";
 import FacebookIcon from "@/assets/platforms/facebook.svg";
 import YoutubeIcon from "@/assets/platforms/youtube.svg";
@@ -23,8 +25,10 @@ import { PlatformPostViewer } from "./PlatformPostViewer";
 function PostCard({ post, onClick }: { 
   post: PlatformPost; 
   onClick: () => void;
+  eager?: boolean;
 }) {
   const [imageError, setImageError] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   
   // YouTube uses 16:9, all others use 3:4 portrait
   const getAspectRatio = () => post.platform === "youtube" ? "aspect-video" : "aspect-[3/4]";
@@ -71,17 +75,54 @@ function PostCard({ post, onClick }: {
   const rawThumb = getPostThumb(post);
   const src = imageError ? null : maybeProxy(rawThumb, 480);
   const Icon = getPlatformIcon();
+  const platform = (post.platform || "").toLowerCase();
+  // Prefer the post's own text/title as the thumbnail. Only fall back to the
+  // author's profile avatar when the post has no usable copy at all (and even
+  // then, never for Reddit — Reddit uses the branded logo card).
+
+  // Smart playable detection: only show the play overlay when we can
+  // confidently say this post is a video. media_type alone is unreliable
+  // because many platforms (X, Reddit, Threads, LinkedIn, etc.) default
+  // image/text posts to "video" when scraped from their iframe wrappers.
+  const isPlayable = (() => {
+    const url = (post.media_url || "").toLowerCase();
+    const mt = (post.media_type || "").toLowerCase();
+    const thumb = (rawThumb || "").toLowerCase();
+    // Native video platforms — always playable
+    if (platform === "youtube" || platform === "tiktok" || platform === "spotify") return true;
+    // Direct video file
+    if (/\.(mp4|mov|webm|m4v|m3u8)(\?|$)/i.test(url)) return true;
+    // URL path hints that strongly imply video content
+    if (/\/(video|videos|reel|reels|shorts|watch|clip|clips)\//.test(url)) return true;
+    if (/\/v\//.test(url) && (platform === "facebook" || platform === "instagram")) return true;
+    // Thumbnail URL hints — twitter/X video posters live at amplify_video_thumb /
+    // ext_tw_video_thumb / tweet_video_thumb. Reddit videos use v.redd.it posters.
+    if (/video_thumb|amplify_video|ext_tw_video|tweet_video|v\.redd\.it/.test(thumb)) return true;
+    // Only trust media_type === 'video' for platforms where it's reliable
+    if (mt === "video" && (platform === "facebook" || platform === "instagram")) return true;
+    return false;
+  })();
 
   // Show platform-branded fallback when no thumbnail or image error
   if (!src || src === "/placeholder.svg") {
+    const textSource = getThumbnailText(post);
+    const useProfileFallback =
+      !textSource && ["threads", "x", "twitter"].includes(platform);
+    const aspect = getAspectRatio();
     return (
       <button
         onClick={onClick}
-        className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} ${getPlatformGradient()} flex items-center justify-center`}
+        className={`relative overflow-hidden rounded-2xl ${aspect} block w-full bg-muted/70`}
       >
-        {Icon && (
-          <img src={Icon} alt="" className="w-12 h-12 opacity-60 invert" />
-        )}
+        <TextCardThumbnail
+          platform={post.platform}
+          text={textSource}
+          username={post.profile_username}
+          displayName={post.profile_display_name}
+          profileAvatarUrl={post.profile_avatar_url}
+          preferProfile={useProfileFallback}
+          aspect={aspect}
+        />
       </button>
     );
   }
@@ -89,18 +130,26 @@ function PostCard({ post, onClick }: {
   return (
     <button
       onClick={onClick}
-      className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} bg-muted/50 group`}
+      className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} block w-full bg-muted/70 group`}
     >
+      {!imageLoaded && (
+        <div
+          className="absolute inset-0 bg-muted/70 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/40 before:to-transparent before:animate-shimmer"
+          style={{ backgroundSize: "1000px 100%" }}
+        />
+      )}
       <img
         src={src}
         alt=""
         onError={() => setImageError(true)}
-        className="w-full h-full object-cover"
-        loading="lazy"
+        onLoad={() => setImageLoaded(true)}
+        className={`relative w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
+        loading="eager"
+        decoding="async"
       />
 
       {/* Play button overlay for videos */}
-      {post.media_type === "video" && (
+      {isPlayable && (
         <div className="absolute inset-0 grid place-items-center pointer-events-none">
           <div className="w-12 h-12 rounded-full bg-black/50 backdrop-blur-sm grid place-items-center">
             <div className="w-0 h-0 border-l-[14px] border-l-white border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent ml-1" />
@@ -130,6 +179,7 @@ export const ProfilePlatformGrid = ({
   );
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedPostIndex, setSelectedPostIndex] = useState<number>(-1);
   const location = useLocation();
 
   // Close the viewer when the route/location changes (e.g. user taps a nav button)
@@ -157,8 +207,9 @@ export const ProfilePlatformGrid = ({
     }
   };
 
-  const handlePostClick = (postId: string) => {
+  const handlePostClick = (postId: string, postIndex: number) => {
     setSelectedPostId(postId);
+    setSelectedPostIndex(postIndex);
     setViewerOpen(true);
   };
 
@@ -228,21 +279,12 @@ export const ProfilePlatformGrid = ({
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-6">
                 {items.map((post, idx) => (
-                  <motion.div
-                    key={`${activeTab}-${post.id}`}
-                    initial={{ opacity: 0, scale: 0.96 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{
-                      duration: 0.35,
-                      delay: Math.min(idx, 8) * 0.035,
-                      ease: [0.22, 1, 0.36, 1],
-                    }}
-                  >
+                  <div key={`${activeTab}-${post.id}`}>
                     <PostCard
                       post={post}
-                      onClick={() => handlePostClick(post.id)}
+                      onClick={() => handlePostClick(post.id, idx)}
                     />
-                  </motion.div>
+                  </div>
                 ))}
               </div>
             )}
@@ -266,7 +308,10 @@ export const ProfilePlatformGrid = ({
       {viewerOpen && selectedPostId && (
         <PlatformPostViewer
           userId={userId}
+          posts={items}
+          loading={loading}
           initialPostId={selectedPostId}
+          initialPostIndex={selectedPostIndex}
           tabs={tabs}
           activeTab={activeTab}
           onClose={closeViewer}
