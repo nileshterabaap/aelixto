@@ -217,7 +217,13 @@ const Index = () => {
       <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
         <div className="min-h-screen bg-background pb-20">
           <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
-          <main className="mx-auto max-w-2xl px-4 py-6" />
+          <main className="mx-auto max-w-2xl px-4 py-6">
+            <div className="space-y-4">
+              {[...Array(3)].map((_, i) => (
+                <PostSkeleton key={i} />
+              ))}
+            </div>
+          </main>
           <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
         </div>
       </SwipeableView>
