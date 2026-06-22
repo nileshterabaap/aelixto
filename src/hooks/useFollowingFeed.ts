@@ -107,14 +107,55 @@ const fetchFeedPage = async (cursor?: string) => {
   return { posts: mappedPosts, nextCursor };
 };
 
-const markSeenBeforeRefresh = async (userId: string, seenPostIds: string[] = []) => {
+const refreshFeedPage = async (seenPostIds: string[] = []) => {
   const uniqueIds = Array.from(new Set(seenPostIds)).filter(Boolean);
-  if (uniqueIds.length === 0) return;
+  const rpc = supabase.rpc as unknown as (
+    fn: 'refresh_following_feed',
+    args: { limit_count: number; seen_post_ids: string[] }
+  ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
 
-  const rows = uniqueIds.map((post_id) => ({ user_id: userId, post_id }));
-  await supabase
-    .from('post_seen')
-    .upsert(rows, { onConflict: 'user_id,post_id', ignoreDuplicates: true });
+  const { data, error } = await rpc('refresh_following_feed', {
+    limit_count: PAGE_SIZE,
+    seen_post_ids: uniqueIds,
+  });
+
+  if (error) throw error;
+
+  if (!data || data.length === 0) {
+    return { posts: [], nextCursor: undefined };
+  }
+
+  const mappedPosts: FeedPost[] = data.map((item) => ({
+    id: item.id,
+    user_id: item.user_id,
+    content: item.content,
+    created_at: item.created_at,
+    likes_count: item.likes_count,
+    saves_count: item.saves_count,
+    comments_count: item.comments_count,
+    reposts_count: item.reposts_count,
+    media_type: item.media_type,
+    media_url: item.media_url,
+    platform: item.platform,
+    embed_html: item.embed_html,
+    thumbnail_url: item.thumbnail_url,
+    title: item.title,
+    is_public: item.is_public,
+    is_repost: item.is_repost,
+    reposted_by_user_id: item.reposted_by_user_id,
+    reposted_by_username: item.reposted_by_username,
+    reposted_at: item.reposted_at,
+    profiles: {
+      username: item.profile_username,
+      display_name: item.profile_display_name,
+      avatar_url: item.profile_avatar_url,
+    },
+  }));
+
+  const last = mappedPosts[mappedPosts.length - 1];
+  const nextCursor = data.length < PAGE_SIZE ? undefined : last?.reposted_at ?? last?.created_at ?? undefined;
+
+  return { posts: mappedPosts, nextCursor };
 };
 
 export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
@@ -189,8 +230,7 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
   const refresh = async (seenPostIds: string[] = []): Promise<number> => {
     if (!userId) return 0;
     preloadedRef.current = false;
-    await markSeenBeforeRefresh(userId, seenPostIds);
-    const firstPage = await fetchFeedPage(undefined);
+    const firstPage = await refreshFeedPage(seenPostIds);
     queryClient.setQueryData(feedQueryKey, {
       pages: [firstPage],
       pageParams: [undefined],
