@@ -43,6 +43,10 @@ export const useMarkPostSeen = (userId: string | undefined) => {
   const viewTimers = useRef<Map<string, number>>(new Map());
   const flushing = useRef(false);
 
+  const getPendingSeenPostIds = useCallback(() => {
+    return Array.from(pendingRef.current);
+  }, []);
+
   // Flush pending seen posts to DB
   const flush = useCallback(async () => {
     if (!userId || pendingRef.current.size === 0 || flushing.current) return;
@@ -114,5 +118,5 @@ export const useMarkPostSeen = (userId: string | undefined) => {
     [userId]
   );
 
-  return { observePost };
+  return { observePost, getPendingSeenPostIds };
 };

@@ -39,5 +39,5 @@ export const localStoragePersister = createSyncStoragePersister({
 export const persistOptions = {
   persister: localStoragePersister,
   maxAge: MAX_AGE,
-  buster: 'v8-user-keyed-feed-refresh', // Clear old unkeyed feed caches that blocked refresh after reloads
+  buster: 'v9-atomic-feed-refresh-v3', // Clear stale feed caches from earlier refresh/cursor implementations
 };
