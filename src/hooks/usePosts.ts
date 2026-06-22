@@ -22,9 +22,7 @@ export interface Post {
   profiles: {
     username: string;
     avatar_url: string | null;
-    settings?: {
-      hide_likes?: boolean;
-    } | null;
+    settings?: any;
   } | null;
 }
 
