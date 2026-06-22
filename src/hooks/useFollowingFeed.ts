@@ -2,7 +2,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo, useState } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 
 interface FeedPost {
   id: string;
@@ -164,10 +164,9 @@ const refreshFeedPage = async (seenPostIds: string[] = [], sinceTime?: string | 
 export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
   const queryClient = useQueryClient();
-  const [refreshNonce, setRefreshNonce] = useState<number>(0);
   const feedQueryKey = useMemo(
-    () => ['following-feed', userId, refreshNonce] as const,
-    [userId, refreshNonce]
+    () => ['following-feed', userId] as const,
+    [userId]
   );
 
   // Fetch feed directly — no count gate, single RPC call
@@ -187,7 +186,7 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
     staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnMount: true,
     refetchOnReconnect: false,
     structuralSharing: true,
   });
@@ -233,14 +232,12 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
 
   const refresh = async (seenPostIds: string[] = [], sinceTime?: string | null): Promise<number> => {
     if (!userId) return 0;
+    preloadedRef.current = false;
     const firstPage = await refreshFeedPage(seenPostIds, sinceTime);
-    const nextNonce = refreshNonce + 1;
-    const newKey = ['following-feed', userId, nextNonce] as const;
-    queryClient.setQueryData(newKey, {
+    queryClient.setQueryData(feedQueryKey, {
       pages: [firstPage],
       pageParams: [undefined],
     });
-    setRefreshNonce(nextNonce);
     return firstPage.posts.length;
   };
 

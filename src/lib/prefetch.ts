@@ -40,7 +40,7 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
   await queryClient.prefetchInfiniteQuery({
     queryKey: ['following-feed', session.user.id],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_following_feed_v2', {
+      const { data, error } = await supabase.rpc('get_following_feed_v3', {
         limit_count: 20,
         cursor_key: null,
       });

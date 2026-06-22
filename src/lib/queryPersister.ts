@@ -17,8 +17,7 @@ export const localStoragePersister = createSyncStoragePersister({
         queries: data.clientState.queries.filter((query) => {
           // Only persist feed and profile data, not session
           const key = query.queryKey[0];
-          return key === 'following-feed' ||
-                 key === 'profile' || 
+          return key === 'profile' || 
                  key === 'discover-posts' ||
                  key === 'posts' ||
                  key === 'user-profile' ||
@@ -39,5 +38,5 @@ export const localStoragePersister = createSyncStoragePersister({
 export const persistOptions = {
   persister: localStoragePersister,
   maxAge: MAX_AGE,
-  buster: 'v9-atomic-feed-refresh-v3', // Clear stale feed caches from earlier refresh/cursor implementations
+  buster: 'v10-feed-not-persisted', // Feed is seen-filtered and must refresh per session
 };
