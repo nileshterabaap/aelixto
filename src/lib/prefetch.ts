@@ -19,11 +19,11 @@ export const prefetchSession = async (queryClient: QueryClient) => {
 };
 
 export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
+  // Only prefetch if not already in cache
+  if (queryClient.getQueryData(['following-feed'])) return;
+  
   const session = queryClient.getQueryData(['session']) as { user: { id: string } | null } | undefined;
   if (!session?.user) return;
-
-  // Only prefetch if not already in cache for this specific signed-in user
-  if (queryClient.getQueryData(['following-feed', session.user.id])) return;
 
   // Prefetch following count first
   await queryClient.prefetchQuery({
@@ -38,11 +38,10 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
 
   // Then prefetch first page of feed
   await queryClient.prefetchInfiniteQuery({
-    queryKey: ['following-feed', session.user.id],
+    queryKey: ['following-feed'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_following_feed_v2', {
-        limit_count: 20,
-        cursor_key: null,
+      const { data, error } = await supabase.rpc('get_following_feed', {
+        limit_count: 10,
       });
       if (error) throw error;
       
@@ -64,7 +63,6 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
         is_repost: item.is_repost,
         reposted_by_user_id: item.reposted_by_user_id,
         reposted_by_username: item.reposted_by_username,
-        feed_cursor: item.feed_cursor,
         profiles: {
           username: item.profile_username,
           display_name: item.profile_display_name,
@@ -77,7 +75,7 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
       
       return {
         posts: mappedPosts,
-        nextCursor: mappedPosts.length === 20 ? mappedPosts[mappedPosts.length - 1].feed_cursor : undefined,
+        nextCursor: mappedPosts.length === 10 ? mappedPosts[mappedPosts.length - 1].created_at : undefined,
       };
     },
     initialPageParam: undefined,

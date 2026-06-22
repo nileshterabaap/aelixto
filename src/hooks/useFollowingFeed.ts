@@ -96,7 +96,7 @@ const fetchFeedPage = async (cursor?: string) => {
   return { posts: mappedPosts, nextCursor };
 };
 
-export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
+export const useFollowingFeed = (): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
 
   // Fetch feed directly — no count gate, single RPC call
@@ -108,11 +108,10 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['following-feed', userId],
+    queryKey: ['following-feed'],
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    enabled: Boolean(userId),
     staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -163,11 +162,11 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   return {
     items,
-    empty: Boolean(userId) && !feedLoading && items.length === 0,
-    loading: Boolean(userId) && feedLoading,
+    empty: !feedLoading && items.length === 0,
+    loading: feedLoading,
     error: feedError?.message ?? null,
     loadMore,
-    hasMore: Boolean(userId) && (hasNextPage ?? false),
+    hasMore: hasNextPage ?? false,
   };
 };
 

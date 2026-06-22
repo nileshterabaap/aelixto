@@ -39,5 +39,5 @@ export const localStoragePersister = createSyncStoragePersister({
 export const persistOptions = {
   persister: localStoragePersister,
   maxAge: MAX_AGE,
-  buster: 'v2-feed-auth-key', // Clears stale anonymous/empty feed cache from older builds
+  buster: 'v1', // Change this to invalidate all cached data
 };
