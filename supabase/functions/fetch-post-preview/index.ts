@@ -65,35 +65,18 @@ function readNum(obj: unknown, path: Array<string | number>): number | null {
   return typeof cur === 'number' && isFinite(cur) ? cur : null;
 }
 
-function isJunkRedditThumbnail(url: string | null | undefined): boolean {
-  if (!url) return false;
-  const lower = url.toLowerCase();
-  return (
-    lower.includes("redditstatic.com") ||
-    lower.includes("/snoo") ||
-    lower.includes("snoo.png") ||
-    lower.includes("snoo-") ||
-    lower.includes("default-avatar") ||
-    lower.includes("share.redd.it/preview/post") ||
-    lower.includes("/brand") ||
-    lower.includes("/icon") ||
-    lower.includes("favicon")
-  );
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { postId, url, platform, previewOnly } = await req.json();
-    const skipDbWrite = previewOnly === true || !postId;
+    const { postId, url, platform } = await req.json();
+    
+    console.log(`[fetch-post-preview] Processing postId=${postId}, platform=${platform}, url=${url}`);
 
-    console.log(`[fetch-post-preview] Processing postId=${postId}, platform=${platform}, url=${url}, previewOnly=${!!previewOnly}`);
-
-    if (!url) {
-      return new Response(JSON.stringify({ error: 'Missing url' }), {
+    if (!postId || !url) {
+      return new Response(JSON.stringify({ error: 'Missing postId or url' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -152,9 +135,6 @@ serve(async (req) => {
       const redditData = await fetchRedditPreview(url);
       redditPostData = redditData.post_data ?? null;
       thumbnailUrl = redditData.thumbnail_url;
-      if (isJunkRedditThumbnail(thumbnailUrl)) {
-        thumbnailUrl = null;
-      }
       previewTitle = redditData.title;
       previewText = redditData.description || redditData.title;
       sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
@@ -237,20 +217,6 @@ serve(async (req) => {
       } else {
         sizing = { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(previewText) };
       }
-    }
-
-    if (skipDbWrite) {
-      return new Response(
-        JSON.stringify({
-          thumbnail_url: thumbnailUrl,
-          title: previewTitle,
-          preview_text: previewText,
-          media_kind: sizing.media_kind,
-          aspect_ratio: sizing.aspect_ratio,
-          suggested_height: sizing.suggested_height,
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
 
     // Update database

@@ -232,14 +232,14 @@ const NotificationItem = ({
                     disabled={reqBusy !== null}
                     className="text-xs font-medium px-3 py-1.5 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition disabled:opacity-50"
                   >
-                    {reqBusy === "approve" ? "…" : "Alright"}
+                    {reqBusy === "approve" ? "Approving…" : "Approve"}
                   </button>
                   <button
                     onClick={handleDeclineFollow}
                     disabled={reqBusy !== null}
                     className="text-xs font-medium px-3 py-1.5 rounded-full bg-muted hover:bg-muted/70 transition disabled:opacity-50"
                   >
-                    {reqBusy === "decline" ? "…" : "Sorry"}
+                    {reqBusy === "decline" ? "Declining…" : "Decline"}
                   </button>
                 </>
               )}
