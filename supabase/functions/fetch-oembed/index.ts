@@ -23,6 +23,8 @@ const PLATFORM_DOMAINS: Record<string, string[]> = {
 const ARTICLE_DOMAINS = [
   'medium.com', 'substack.com', 'ghost.io', 'wordpress.com',
   'hashnode.com', 'dev.to', 'mirror.xyz', 'blogger.com',
+  'wikipedia.org', 'wikimedia.org', 'fandom.com',
+  'notion.site', 'bearblog.dev', 'tumblr.com',
 ];
 
 function classifyPlatform(url: string): string {

@@ -1,6 +1,8 @@
 import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
+import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
 import type { Post } from '@/data/demoData';
+import { supabase } from '@/integrations/supabase/client';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
@@ -8,6 +10,7 @@ import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
+import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -39,6 +42,15 @@ const rememberHydratedPost = (postId: string) => {
       hydratedPostIds.delete(oldestPostId);
     }
   }
+};
+
+// Session-scoped guard to avoid spamming the validator for the same post
+const validationRequested = new Set<string>();
+const requestSourceValidation = (postId: string) => {
+  if (!postId || validationRequested.has(postId)) return;
+  validationRequested.add(postId);
+  // Fire-and-forget; server side enforces the 2-strike gate before any deletion
+  supabase.functions.invoke('validate-post-source', { body: { postId } }).catch(() => {});
 };
 
 const getYouTubeVideoId = (url: string) => {
@@ -121,6 +133,10 @@ export const HydratedEmbed = memo(({
     { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: true }
   );
 
+  // Track click-throughs to the original platform (iframe focus or anchor clicks).
+  // Awards +1 engagement score to the author on top of the impression score.
+  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost);
+
   const forceTwitterRenderer =
     r.kind === 'raw' &&
     !!mediaUrl &&
@@ -141,7 +157,12 @@ export const HydratedEmbed = memo(({
 
   const handleRawEmbedError = useCallback(() => {
     setRawEmbedFailed(true);
-  }, []);
+    requestSourceValidation(post.id);
+  }, [post.id]);
+
+  const handleOriginalVisit = useCallback(() => {
+    markOriginalVisit(post.id);
+  }, [post.id]);
   
   // For YouTube, prefer their thumbnail
   const effectiveThumbnail = post.platform === 'youtube' && r.url 
@@ -203,25 +224,29 @@ export const HydratedEmbed = memo(({
 
         {/* YouTube video */}
         {r.kind === 'video' && post.platform === 'youtube' && r.url && (
-          <div className={`w-full bg-black ${aspectClass}`}>
-            <iframe
-              className="w-full h-full"
-              src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=0&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
-              title="YouTube video player"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          </div>
+          <ImageViewTracker postId={post.id}>
+            <div className={`w-full bg-black ${aspectClass}`}>
+              <iframe
+                className="w-full h-full"
+                src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=0&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
+                title="YouTube video player"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            </div>
+          </ImageViewTracker>
         )}
         
         {/* Non-YouTube video */}
         {r.kind === 'video' && post.platform !== 'youtube' && r.url && (
-          <video 
-            src={r.url} 
-            className="w-full h-auto" 
-            controls 
-            playsInline
-          />
+          <ImageViewTracker postId={post.id}>
+            <video 
+              src={r.url} 
+              className="w-full h-auto" 
+              controls 
+              playsInline
+            />
+          </ImageViewTracker>
         )}
         
         {/* Image content */}
@@ -257,7 +282,7 @@ export const HydratedEmbed = memo(({
         {/* Raw embed HTML (Instagram, Facebook, Spotify) */}
         {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && r.html && !rawEmbedFailed && (
           <ImageViewTracker postId={post.id}>
-            <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} />
+            <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} onOriginalVisit={handleOriginalVisit} />
           </ImageViewTracker>
         )}
 
@@ -278,7 +303,17 @@ export const HydratedEmbed = memo(({
         {/* Reddit embed */}
         {r.kind === 'reddit' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <RedditEmbed url={r.url} />
+            <RedditEmbed
+              url={r.url}
+              title={post.title}
+              thumbnailUrl={effectiveThumbnail}
+              description={(post as any).preview_text || (post as any).previewText || undefined}
+              authorAvatar={(post as any).author?.avatar || (post as any).profiles?.avatar_url || null}
+              postId={post.id}
+              mediaKind={(post as any).media_kind ?? null}
+              aspectRatio={(post as any).aspect_ratio ?? null}
+              suggestedHeight={(post as any).suggested_height ?? null}
+            />
           </ImageViewTracker>
         )}
         
@@ -292,7 +327,7 @@ export const HydratedEmbed = memo(({
         {/* Article embed */}
         {r.kind === 'article' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <ArticleEmbed url={r.url} />
+            <ArticleEmbed url={r.url} postId={post.id} platform={post.platform} />
           </ImageViewTracker>
         )}
         

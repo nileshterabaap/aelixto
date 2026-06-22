@@ -25,6 +25,7 @@ All colors MUST be HSL.
 
     --muted: 0 0% 96%;
     --muted-foreground: 0 0% 45%;
+    --profile-cover: 0 0% 24%;
 
     --accent: 0 0% 96%;
     --accent-foreground: 0 0% 0%;
@@ -44,6 +45,18 @@ All colors MUST be HSL.
     --brand-orange: 22 100% 51%;
     --brand-blue: 213 100% 50%;
     --shadow-soft: 0 0% 0% / 0.15;
+
+    --thumb-gradient-instagram: linear-gradient(135deg, hsl(262 83% 45%), hsl(330 81% 52%), hsl(25 95% 53%));
+    --thumb-gradient-youtube: linear-gradient(135deg, hsl(0 82% 35%), hsl(0 84% 52%));
+    --thumb-gradient-dark: linear-gradient(135deg, hsl(0 0% 7%), hsl(0 0% 0%));
+    --thumb-gradient-spotify: linear-gradient(135deg, hsl(142 76% 24%), hsl(142 70% 45%));
+    --thumb-gradient-facebook: linear-gradient(135deg, hsl(221 83% 40%), hsl(217 91% 60%));
+    --thumb-gradient-linkedin: linear-gradient(135deg, hsl(208 90% 35%), hsl(204 74% 49%));
+    --thumb-gradient-reddit: linear-gradient(135deg, hsl(16 100% 35%), hsl(16 100% 50%));
+    --thumb-gradient-pinterest: linear-gradient(135deg, hsl(0 74% 32%), hsl(0 72% 48%));
+    --thumb-gradient-quora: linear-gradient(135deg, hsl(0 74% 24%), hsl(0 69% 40%));
+    --thumb-gradient-article: linear-gradient(135deg, hsl(158 64% 26%), hsl(173 80% 36%));
+    --thumb-gradient-external: linear-gradient(135deg, hsl(215 25% 27%), hsl(215 16% 47%));
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -132,6 +145,28 @@ span[data-pin-href] button {
   max-width: 100%;
 }
 
+/* Premium post card styling — soft hairline border + subtle elevation */
+.post-card {
+  border-radius: 1.25rem;
+  border: 1px solid hsl(220 13% 91%);
+  background-color: hsl(var(--card));
+  box-shadow:
+    0 1px 2px hsl(220 40% 12% / 0.04),
+    0 4px 16px -6px hsl(220 40% 12% / 0.06);
+  overflow: hidden;
+  transition: box-shadow 200ms ease, border-color 200ms ease, transform 200ms ease;
+}
+.post-card:hover {
+  border-color: hsl(220 13% 86%);
+  box-shadow:
+    0 1px 2px hsl(220 40% 12% / 0.05),
+    0 10px 28px -10px hsl(220 40% 12% / 0.10);
+}
+
+.profile-cover-fallback {
+  background-color: hsl(var(--profile-cover));
+}
+
 /* Instagram embed styles */
 .embed-container .instagram-media,
 .embed-container iframe[src*="instagram.com"] {
@@ -218,4 +253,10 @@ a:active:not(:disabled) {
    touch events which causes 1-2s scroll input delay on mobile */
 .scroll-freezing-iframes iframe {
   pointer-events: none !important;
+}
+
+/* Disable the browser's native pull-to-refresh so our in-app PullToRefresh
+   component owns the gesture on every page (especially short empty states). */
+html, body {
+  overscroll-behavior-y: none;
 }

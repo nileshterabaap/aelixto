@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RedditPostEmbed } from "./RedditPostEmbed";
+import RedditEmbed from "@/components/embeds/RedditEmbed";
 import { ArticleContentEmbed } from "./ArticleContentEmbed";
 import { LinkPreviewCard } from "./LinkPreviewCard";
 
 interface ArticleEmbedProps {
   url: string;
   onFaviconLoaded?: (favicon: string) => void;
+  postId?: string;
+  platform?: string | null;
 }
 
 interface UnfurlResult {
@@ -63,7 +65,7 @@ const resolveRenderer = (url: string): 'reddit' | 'quora' | 'article' => {
   return 'article';
 };
 
-export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
+export const ArticleEmbed = ({ url, onFaviconLoaded, postId, platform }: ArticleEmbedProps) => {
   const [data, setData] = useState<UnfurlResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -91,7 +93,9 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
           console.error('[ArticleEmbed] Error:', fetchError);
         }
 
-        let unfurledData = result as UnfurlResult | null;
+        let unfurledData = result && (result as UnfurlResult).meta
+          ? (result as UnfurlResult)
+          : null;
 
         // If unfurl failed or returned a poor title (just the domain), enhance with OG data
         const titleLooksLikeDomain = unfurledData?.meta?.title && (
@@ -111,13 +115,15 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
               const ogTitle = ogData.meta?.title || ogData.title;
               const ogImage = ogData.meta?.image || ogData.image;
               const ogDescription = ogData.meta?.description || ogData.description;
+              const ogFinalUrl = ogData.meta?.finalUrl || ogData.finalUrl || cleanedUrl;
+              const ogType = ogData.og_type || ogData.meta?.og_type;
               
               if (!unfurledData) {
-                let domain = cleanedUrl;
-                try { domain = new URL(cleanedUrl).hostname; } catch {}
+                let domain = ogFinalUrl;
+                try { domain = new URL(ogFinalUrl).hostname; } catch {}
                 unfurledData = {
-                  kind: 'generic-article',
-                  resolvedUrl: cleanedUrl,
+                  kind: ogType === 'article' ? 'medium-article' : 'generic-article',
+                  resolvedUrl: ogFinalUrl,
                   site: { name: domain.replace('www.', ''), domain, favicon: '' },
                   meta: { title: ogTitle || domain, description: ogDescription || '', image: ogImage || null, publishedTime: null },
                   content: { html: '' },
@@ -199,9 +205,12 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
   // Reddit posts - use official Reddit embed (no fallback card)
   if (rendererType === 'reddit' && data.kind === 'reddit-post') {
     return (
-      <div data-embed-status="ready">
-        <RedditPostEmbed url={data.resolvedUrl} data={data} />
-      </div>
+      <RedditEmbed
+        url={data.resolvedUrl}
+        title={data.meta.title}
+        thumbnailUrl={data.meta.image}
+        description={data.meta.description}
+      />
     );
   }
 
@@ -225,7 +234,7 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
   // Everything else - rich article card
   return (
     <div data-embed-status="ready">
-      <ArticleContentEmbed data={data} />
+      <ArticleContentEmbed data={data} postId={postId} platform={platform} />
     </div>
   );
 };
