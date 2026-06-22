@@ -76,7 +76,6 @@ const Index = () => {
     items: followingPosts,
     empty: followingEmpty,
     loading: followingLoading,
-    refresh: refreshFollowingFeed,
     loadMore,
     hasMore,
   } = useFollowingFeed(user?.id);
