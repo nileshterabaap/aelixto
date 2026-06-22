@@ -85,14 +85,15 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           }
         }
       } else if (linkUrl.includes("reddit.com") || linkUrl.includes("redd.it")) {
-        console.log('[CreatePostDialog] Fetching Reddit preview via fetch-post-preview (previewOnly)');
+        console.log('[CreatePostDialog] Fetching Reddit thumbnail via edge function');
         try {
-          const { data: previewData, error } = await supabase.functions.invoke('fetch-post-preview', {
-            body: { url: linkUrl, platform: 'reddit', previewOnly: true }
+          const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
+            body: { url: linkUrl }
           });
-          if (!error && previewData) {
-            videoTitle = previewData.title || "";
-            thumbnail = previewData.thumbnail_url || "";
+          if (!error && ogData) {
+            videoTitle = ogData.title || "";
+            thumbnail = ogData.image || "";
+            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
           }
         } catch (error) {
           console.error('[CreatePostDialog] Reddit fetch failed:', error);

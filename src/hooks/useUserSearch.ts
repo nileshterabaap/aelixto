@@ -8,8 +8,6 @@ export interface SearchResult {
   display_name: string | null;
   avatar_url: string | null;
   is_following: boolean;
-  is_requested?: boolean;
-  follows_me?: boolean;
 }
 
 export const useUserSearch = (query: string, enabled: boolean = true) => {
