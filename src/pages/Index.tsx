@@ -25,7 +25,7 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
+  const { observePost } = useMarkPostSeen(user?.id);
 
   // Check if the user follows anyone (to differentiate empty state)
   const { data: followingCount } = useQuery({
@@ -180,34 +180,12 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark only posts the user actually saw, then clear any persisted/stale
-    // feed cache so refresh always asks the backend for the latest eligible feed.
-    try {
-      await flushNow();
-    } catch {
-      // best-effort — proceed with reload regardless
-    }
-
-    await Promise.all([
-      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
-    ]);
-
-    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
-
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
-    ]);
-
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    // Show the spinner spinning briefly before triggering a hard reload
+    await new Promise((resolve) => setTimeout(resolve, 600));
     window.location.reload();
+    // Keep the promise pending so the spinner stays visible until the page unloads
     await new Promise(() => {});
-  }, [flushNow, queryClient, user?.id]);
+  }, []);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
@@ -239,13 +217,7 @@ const Index = () => {
       <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
         <div className="min-h-screen bg-background pb-20">
           <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
-          <main className="mx-auto max-w-2xl px-4 py-6">
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
-                <PostSkeleton key={i} />
-              ))}
-            </div>
-          </main>
+          <main className="mx-auto max-w-2xl px-4 py-6" />
           <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
         </div>
       </SwipeableView>
@@ -262,9 +234,9 @@ const Index = () => {
           {!showDemoFeed && followingEmpty ? (
             followingCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <h3 className="text-lg font-semibold">Nothing here yet 👀</h3>
+                <h3 className="text-lg font-semibold">Your feed is empty</h3>
                 <p className="text-sm text-muted-foreground mt-1 mb-4">
-                  No algorithm should decide your feed.. only your follows do.
+                  Follow people to see their posts here.
                 </p>
                 <Link to="/discover" className="text-sm font-medium text-primary">
                   Discover people to follow
@@ -294,9 +266,7 @@ const Index = () => {
                   key={post.id} 
                   ref={(el) => {
                     registerItem(post.id)(el);
-                    if (!showDemoFeed) {
-                      setObservedPostElement(post.id, el as HTMLDivElement | null);
-                    }
+                    if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
                     if (index === prefetchTriggerIndex) {
                       prefetchSentinelRef.current = el;
                     }
