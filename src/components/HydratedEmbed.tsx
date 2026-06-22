@@ -1,6 +1,5 @@
 import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
-import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
 import type { Post } from '@/data/demoData';
 import { supabase } from '@/integrations/supabase/client';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
@@ -132,10 +131,6 @@ export const HydratedEmbed = memo(({
     { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: true }
   );
 
-  // Track click-throughs to the original platform (iframe focus or anchor clicks).
-  // Awards +1 engagement score to the author on top of the impression score.
-  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate);
-
   const forceTwitterRenderer =
     r.kind === 'raw' &&
     !!mediaUrl &&
@@ -219,29 +214,25 @@ export const HydratedEmbed = memo(({
 
         {/* YouTube video */}
         {r.kind === 'video' && post.platform === 'youtube' && r.url && (
-          <ImageViewTracker postId={post.id}>
-            <div className={`w-full bg-black ${aspectClass}`}>
-              <iframe
-                className="w-full h-full"
-                src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=0&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
-                title="YouTube video player"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-              />
-            </div>
-          </ImageViewTracker>
+          <div className={`w-full bg-black ${aspectClass}`}>
+            <iframe
+              className="w-full h-full"
+              src={`https://www.youtube.com/embed/${getYouTubeVideoId(r.url)}?autoplay=0&playsinline=1&rel=0&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
+              title="YouTube video player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          </div>
         )}
         
         {/* Non-YouTube video */}
         {r.kind === 'video' && post.platform !== 'youtube' && r.url && (
-          <ImageViewTracker postId={post.id}>
-            <video 
-              src={r.url} 
-              className="w-full h-auto" 
-              controls 
-              playsInline
-            />
-          </ImageViewTracker>
+          <video 
+            src={r.url} 
+            className="w-full h-auto" 
+            controls 
+            playsInline
+          />
         )}
         
         {/* Image content */}
@@ -305,9 +296,6 @@ export const HydratedEmbed = memo(({
               description={(post as any).preview_text || (post as any).previewText || undefined}
               authorAvatar={(post as any).author?.avatar || (post as any).profiles?.avatar_url || null}
               postId={post.id}
-              mediaKind={(post as any).media_kind ?? null}
-              aspectRatio={(post as any).aspect_ratio ?? null}
-              suggestedHeight={(post as any).suggested_height ?? null}
             />
           </ImageViewTracker>
         )}
@@ -322,7 +310,7 @@ export const HydratedEmbed = memo(({
         {/* Article embed */}
         {r.kind === 'article' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <ArticleEmbed url={r.url} postId={post.id} platform={post.platform} />
+            <ArticleEmbed url={r.url} />
           </ImageViewTracker>
         )}
         

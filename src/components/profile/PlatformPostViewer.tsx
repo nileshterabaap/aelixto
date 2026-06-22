@@ -99,17 +99,6 @@ export const PlatformPostViewer = ({
   const [contentReady, setContentReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  // Persist scroll-locked state across effect re-runs. Without this, if
-  // `posts`/`profileData`/etc change after the user has already started
-  // scrolling, the anchoring effect re-runs with userScrolled=false and
-  // re-grabs the scroll position — producing the "treadmill" feel where
-  // the page keeps snapping back as you scroll.
-  const userScrolledRef = useRef(false);
-  // Reset the lock only when the viewer is opened to a new target post
-  // (e.g. user tapped a different grid item).
-  useEffect(() => {
-    userScrolledRef.current = false;
-  }, [initialPostId]);
   const initialIdx = useMemo(
     () => {
       if (initialPostIndex >= 0 && initialPostIndex < posts.length) {
@@ -147,11 +136,11 @@ export const PlatformPostViewer = ({
     const container = scrollContainerRef.current;
     if (!container) return;
 
+    let userScrolled = false;
     let cancelled = false;
-    let lastScrollTop = container.scrollTop;
 
     const anchor = () => {
-      if (cancelled || userScrolledRef.current) return;
+      if (cancelled || userScrolled) return;
       const target = postRefs.current.get(targetPostId);
       if (!target) return;
       const targetRect = target.getBoundingClientRect();
@@ -162,7 +151,6 @@ export const PlatformPostViewer = ({
       const clamped = Math.max(0, Math.min(desired, maxScroll));
       if (Math.abs(container.scrollTop - clamped) > 1) {
         container.scrollTop = clamped;
-        lastScrollTop = clamped;
       }
     };
 
@@ -177,14 +165,14 @@ export const PlatformPostViewer = ({
     // after this effect runs) plus the inner scroll-content so any embed
     // hydration above the target re-anchors us to the right post.
     const ro = new ResizeObserver(() => {
-      if (userScrolledRef.current) return;
+      if (userScrolled) return;
       requestAnimationFrame(anchor);
     });
     postRefs.current.forEach((el) => ro.observe(el));
     // Observe new posts as they mount, and re-anchor on any DOM mutation
     // (embeds inject iframes/images that change height long after mount).
     const mo = new MutationObserver(() => {
-      if (userScrolledRef.current) return;
+      if (userScrolled) return;
       postRefs.current.forEach((el) => {
         try { ro.observe(el); } catch { /* already observed */ }
       });
@@ -193,7 +181,7 @@ export const PlatformPostViewer = ({
     mo.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class", "height"] });
     // Iframe load events are the strongest signal for embed height changes.
     const onAnyLoad = (e: Event) => {
-      if (userScrolledRef.current) return;
+      if (userScrolled) return;
       const t = e.target as HTMLElement | null;
       if (!t) return;
       if (t.tagName === "IFRAME" || t.tagName === "IMG") {
@@ -203,28 +191,13 @@ export const PlatformPostViewer = ({
     container.addEventListener("load", onAnyLoad, true);
 
     const markScrolled = () => {
-      userScrolledRef.current = true;
+      userScrolled = true;
       ro.disconnect();
       mo.disconnect();
     };
     container.addEventListener("wheel", markScrolled, { passive: true });
     container.addEventListener("touchmove", markScrolled, { passive: true });
     container.addEventListener("pointerdown", markScrolled, { passive: true });
-    container.addEventListener("touchstart", markScrolled, { passive: true });
-    container.addEventListener("keydown", markScrolled, { passive: true });
-    // Last-resort: any genuine scroll delta the observers didn't catch
-    // (momentum, scrollbar drag, programmatic-but-user-initiated) trips
-    // the lock so anchoring can never fight the user.
-    const onScroll = () => {
-      if (userScrolledRef.current) return;
-      const delta = Math.abs(container.scrollTop - lastScrollTop);
-      // Ignore tiny sub-pixel adjustments from our own anchor() writes.
-      if (delta > 8) {
-        markScrolled();
-      }
-      lastScrollTop = container.scrollTop;
-    };
-    container.addEventListener("scroll", onScroll, { passive: true });
 
     // Safety: stop anchoring after 12s — long enough for slow embeds to
     // finish hydrating, short enough to never feel sticky.
@@ -232,7 +205,7 @@ export const PlatformPostViewer = ({
       cancelled = true;
       ro.disconnect();
       mo.disconnect();
-    }, 4000);
+    }, 12000);
 
     return () => {
       cancelled = true;
@@ -242,9 +215,6 @@ export const PlatformPostViewer = ({
       container.removeEventListener("wheel", markScrolled);
       container.removeEventListener("touchmove", markScrolled);
       container.removeEventListener("pointerdown", markScrolled);
-      container.removeEventListener("touchstart", markScrolled);
-      container.removeEventListener("keydown", markScrolled);
-      container.removeEventListener("scroll", onScroll);
       container.removeEventListener("load", onAnyLoad, true);
     };
   }, [portalReady, contentReady, targetPostId, posts, initialIdx, activeTab, profileData]);

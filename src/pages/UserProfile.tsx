@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { formatCompactCount } from "@/lib/formatCount";
-import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
+import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,7 +31,6 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const navigate = useNavigate();
   const { user } = useSession();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
   const [followListOpen, setFollowListOpen] = useState(false);
 
@@ -55,7 +53,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
     },
   });
 
-  const { isFollowing, isRequested, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
+  const { isFollowing, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
@@ -288,7 +286,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           {(profile.settings as { aelix_score_enabled?: boolean })?.aelix_score_enabled && (
             <div className="flex justify-center mt-4 mb-4">
               <div className="border-2 border-foreground rounded-[16px] px-10 py-2">
-                <div className="text-2xl font-bold text-center leading-none mb-0.5">{formatCompactCount(profile.aelix_score)}</div>
+                <div className="text-2xl font-bold text-center leading-none mb-0.5">{profile.aelix_score.toLocaleString()}</div>
                 <div className="text-[9px] font-bold text-center tracking-[0.15em] uppercase">Aelix Score</div>
               </div>
             </div>
@@ -339,14 +337,14 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             <div className="flex gap-3 mb-6">
               <Button 
                 disabled={followLoading}
-                onClick={() => ((isFollowing || isRequested) ? unfollow() : follow())}
+                onClick={() => (isFollowing ? unfollow() : follow())}
                 className={`flex-1 rounded-full py-4 text-sm font-bold border-2 ${
-                  (isFollowing || isRequested)
+                  isFollowing 
                     ? 'bg-foreground text-background hover:bg-foreground/90' 
                     : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
               >
-                {isFollowing ? 'Following' : isRequested ? 'Requested' : 'Follow'}
+                {isFollowing ? 'Following' : 'Follow'}
               </Button>
               <Button
                 disabled={conversationLoading}
@@ -409,7 +407,11 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
       </div>
       ) : null}
 
-      {user ? null : <AuthCTABar />}
+      {user ? (
+        <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
+      ) : (
+        <AuthCTABar />
+      )}
 
       <CreatePostDialog 
         open={isCreateDialogOpen} 

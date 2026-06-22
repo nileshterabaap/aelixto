@@ -171,32 +171,25 @@ export async function processPost(
     return { verdict, deleted: false };
   }
 
-  // verdict === "removed" — notify the author immediately on first detection.
-  // We keep the post; the user decides whether to delete it from the notification.
+  // verdict === "removed" — 2-strike gate with 6h minimum gap
+  const firstSeen = post.broken_first_seen_at ? new Date(post.broken_first_seen_at).getTime() : 0;
+  const gapMs = Date.now() - firstSeen;
   const newCount = post.broken_check_count + 1;
-  await supabase.from("posts").update({
-    last_validated_at: now,
-    broken_check_count: newCount,
-    broken_first_seen_at: post.broken_first_seen_at ?? now,
-  }).eq("id", post.id);
 
-  if (newCount > 1) return { verdict, deleted: false };
+  if (newCount < 2 || gapMs < 6 * 60 * 60 * 1000) {
+    await supabase.from("posts").update({
+      last_validated_at: now,
+      broken_check_count: newCount,
+      broken_first_seen_at: post.broken_first_seen_at ?? now,
+    }).eq("id", post.id);
+    return { verdict, deleted: false };
+  }
 
-  const { data: existing } = await supabase
-    .from("notifications")
-    .select("id")
-    .eq("recipient_id", post.user_id)
-    .eq("type", "report_outcome")
-    .eq("post_id", post.id)
-    .limit(1)
-    .maybeSingle();
-  if (existing) return { verdict, deleted: false };
-
+  // Confirmed removed — notify author and delete the post
   await supabase.from("notifications").insert({
     recipient_id: post.user_id,
     actor_id: post.user_id, // notifications.actor_id is NOT NULL; self-actor is fine for system notices
     type: "report_outcome",
-    post_id: post.id,
     metadata: {
       kind: "source_removed",
       platform: post.platform,
@@ -208,7 +201,9 @@ export async function processPost(
       },
     },
   });
-  return { verdict, deleted: false };
+
+  await supabase.from("posts").delete().eq("id", post.id);
+  return { verdict, deleted: true };
 }
 
 serve(async (req) => {

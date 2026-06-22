@@ -1,5 +1,5 @@
 import { Header } from "@/components/Header";
-import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
+import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Search, X } from "lucide-react";
@@ -40,7 +40,6 @@ const saveHistory = (items: VisitedProfile[]) => {
 const Discover = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const [searchQuery, setSearchQuery] = useState("");
   const { results, loading, hasMore, loadMore } = useUserSearch(searchQuery, true);
   const [history, setHistory] = useState<VisitedProfile[]>(() => loadHistory());
@@ -210,6 +209,7 @@ const Discover = () => {
         </main>
       </PullToRefresh>
 
+      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
       <CreatePostDialog 
         open={isCreateDialogOpen} 

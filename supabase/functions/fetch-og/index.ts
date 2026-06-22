@@ -115,18 +115,13 @@ function extractArticleMetadata(
   baseUrl: string
 ): { image: string | null; title: string | null; description: string | null } {
   const meta = (name: string): string | null => {
-    const want = name.toLowerCase();
-    const tagRegex = /<meta\b[^>]*>/gi;
-    let m: RegExpExecArray | null;
-    while ((m = tagRegex.exec(html)) !== null) {
-      const tag = m[0];
-      const propMatch = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
-      if (!propMatch || propMatch[2].toLowerCase() !== want) continue;
-      const contentMatch =
-        tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
-        tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
-        tag.match(/\scontent\s*=\s*([^\s>]+)/i);
-      if (contentMatch?.[1]) return decodeHtmlEntities(contentMatch[1]).trim();
+    const patterns = [
+      new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]+content=["']([^"']+)["']`, 'i'),
+      new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${name}["']`, 'i'),
+    ];
+    for (const p of patterns) {
+      const m = html.match(p);
+      if (m?.[1]) return decodeHtmlEntities(m[1]).trim();
     }
     return null;
   };
@@ -508,102 +503,21 @@ serve(async (req) => {
     }
 
     // Fetch the HTML with better headers to avoid 403 blocks
-    const buildHeaders = (ua: string) => ({
-      'User-Agent': ua,
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'Connection': 'keep-alive',
-      'Upgrade-Insecure-Requests': '1',
-      'Sec-Fetch-Dest': 'document',
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'none',
-      'Cache-Control': 'max-age=0',
-    });
-
-    const fallbackUAs = [
-      'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-      'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
-      'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    ];
-
-    let response: Response | null = null;
-    for (const ua of fallbackUAs) {
-      try {
-        const r = await fetch(targetUrl, { headers: buildHeaders(ua), redirect: 'follow' });
-        if (r.ok) { response = r; console.log('[fetch-og] Success with UA:', ua); break; }
-        console.log('[fetch-og] UA failed:', ua, r.status);
-        response = r;
-      } catch (e) {
-        console.log('[fetch-og] UA error:', ua, e instanceof Error ? e.message : String(e));
-      }
-    }
-
-    // Last-resort: r.jina.ai proxy (returns markdown but contains title/image refs)
-    if (!response || !response.ok) {
-      try {
-        const jina = await fetch(`https://r.jina.ai/${targetUrl}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,*/*' },
-          redirect: 'follow',
-        });
-        if (jina.ok) { response = jina; console.log('[fetch-og] Success with r.jina.ai proxy'); }
-      } catch (e) {
-        console.log('[fetch-og] Jina proxy failed:', e instanceof Error ? e.message : String(e));
-      }
-    }
-
-    // Final fallback: Firecrawl (bypasses Cloudflare / anti-bot challenges)
-    if (!response || !response.ok) {
-      const fcKey = Deno.env.get('FIRECRAWL_API_KEY');
-      if (fcKey) {
-        try {
-          console.log('[fetch-og] Trying Firecrawl fallback');
-          const fc = await fetch('https://api.firecrawl.dev/v2/scrape', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${fcKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              url: targetUrl,
-              formats: ['html'],
-              onlyMainContent: false,
-            }),
-          });
-          if (fc.ok) {
-            const data = await fc.json();
-            const payload = data?.data || data || {};
-            const md = payload.metadata || {};
-            const title = md.ogTitle || md.title || '';
-            const desc = md.ogDescription || md.description || '';
-            const image = md.ogImage || md['og:image'] || md.image || '';
-            const ogType = md.ogType || md['og:type'] || null;
-            const finalUrl = md.sourceURL || md.url || targetUrl;
-            if (title || image) {
-              console.log('[fetch-og] Firecrawl direct return. title:', title?.slice(0,80), 'image:', image?.slice(0,120));
-              return new Response(
-                JSON.stringify({ title: title || null, image: image || null, description: desc || null, finalUrl, og_type: ogType }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-              );
-            }
-          } else {
-            console.log('[fetch-og] Firecrawl failed:', fc.status);
-          }
-        } catch (e) {
-          console.log('[fetch-og] Firecrawl error:', e instanceof Error ? e.message : String(e));
-        }
-      }
-    }
-
-    if (!response) {
-      response = await fetch(targetUrl, {
+    const response = await fetch(targetUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0',
       },
       redirect: 'follow',
     });
-    }
 
     if (!response.ok) {
       // If blocked (403/401), return platform-specific placeholders
@@ -643,18 +557,13 @@ serve(async (req) => {
     const finalUrl = response.url;
 
     const extractMeta = (propName: string): string | null => {
-      const want = propName.toLowerCase();
-      const tagRegex = /<meta\b[^>]*>/gi;
-      let m: RegExpExecArray | null;
-      while ((m = tagRegex.exec(html)) !== null) {
-        const tag = m[0];
-        const propMatch = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
-        if (!propMatch || propMatch[2].toLowerCase() !== want) continue;
-        const contentMatch =
-          tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
-          tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
-          tag.match(/\scontent\s*=\s*([^\s>]+)/i);
-        if (contentMatch?.[1]) return decodeHtmlEntities(contentMatch[1]).trim();
+      const patterns = [
+        new RegExp(`<meta[^>]+(?:property|name)=["']${propName}["'][^>]+content=["']([^"']+)["']`, 'i'),
+        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${propName}["']`, 'i'),
+      ];
+      for (const pattern of patterns) {
+        const match = html.match(pattern);
+        if (match) return decodeHtmlEntities(match[1]);
       }
       return null;
     };
