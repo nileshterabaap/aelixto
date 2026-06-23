@@ -167,6 +167,18 @@ span[data-pin-href] button {
   background-color: hsl(var(--profile-cover));
 }
 
+/* Premium glass translucent feed-post card */
+.glass-post-card {
+  background: hsl(0 0% 100% / 0.55);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 1px solid hsl(0 0% 100% / 0.6);
+  box-shadow:
+    0 1px 0 hsl(0 0% 100% / 0.7) inset,
+    0 10px 30px -12px hsl(220 40% 12% / 0.12),
+    0 2px 8px -2px hsl(220 40% 12% / 0.06);
+}
+
 /* Instagram embed styles */
 .embed-container .instagram-media,
 .embed-container iframe[src*="instagram.com"] {
