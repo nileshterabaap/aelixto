@@ -1,5 +1,4 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
 import { useRef, useEffect, useMemo } from 'react';
@@ -20,7 +19,6 @@ interface FeedPost {
   thumbnail_url: string | null;
   title: string | null;
   is_public: boolean;
-  feed_cursor?: string | null;
   is_repost?: boolean;
   reposted_by_user_id?: string | null;
   reposted_by_username?: string | null;
@@ -38,7 +36,6 @@ interface UseFollowingFeedResult {
   error: string | null;
   loadMore: () => void;
   hasMore: boolean;
-  prependNewer: () => Promise<number>;
 }
 
 interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
@@ -51,13 +48,13 @@ const PAGE_SIZE = 20;
 
 const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
-    fn: 'get_following_feed_v2',
-    args: { limit_count: number; cursor_key: string | null }
+    fn: 'get_following_feed',
+    args: { limit_count: number; cursor: string | null }
   ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
 
-  const { data, error } = await rpc('get_following_feed_v2', {
+  const { data, error } = await rpc('get_following_feed', {
     limit_count: PAGE_SIZE,
-    cursor_key: cursor || null,
+    cursor: cursor || null,
   });
 
   if (error) throw error;
@@ -83,7 +80,6 @@ const fetchFeedPage = async (cursor?: string) => {
     thumbnail_url: item.thumbnail_url,
     title: item.title,
     is_public: item.is_public,
-    feed_cursor: item.feed_cursor,
     is_repost: item.is_repost,
     reposted_by_user_id: item.reposted_by_user_id,
     reposted_by_username: item.reposted_by_username,
@@ -94,14 +90,13 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  const nextCursor = data.length < PAGE_SIZE ? undefined : mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
+  const nextCursor = data.length < PAGE_SIZE ? undefined : mappedPosts[mappedPosts.length - 1]?.created_at ?? undefined;
 
   return { posts: mappedPosts, nextCursor };
 };
 
 export const useFollowingFeed = (): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
-  const queryClient = useQueryClient();
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -119,8 +114,6 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: false,
     structuralSharing: true,
   });
 
@@ -163,40 +156,6 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     }
   };
 
-  // Pull-to-refresh: fetch fresh first page, prepend only posts not already
-  // in the cache. Existing (possibly already-seen) posts stay on screen.
-  const prependNewer = async (): Promise<number> => {
-    const fresh = await fetchFeedPage(undefined);
-    if (!fresh.posts.length) return 0;
-
-    let added = 0;
-    queryClient.setQueryData<any>(['following-feed'], (old: any) => {
-      if (!old || !old.pages?.length) {
-        return {
-          pages: [{ posts: fresh.posts, nextCursor: fresh.nextCursor }],
-          pageParams: [undefined],
-        };
-      }
-      const existingIds = new Set<string>(
-        old.pages.flatMap((p: any) => p.posts.map((post: FeedPost) => post.id))
-      );
-      const newPosts = fresh.posts.filter((p) => !existingIds.has(p.id));
-      added = newPosts.length;
-      if (added === 0) return old;
-
-      const firstPage = old.pages[0];
-      const mergedFirst = {
-        ...firstPage,
-        posts: [...newPosts, ...firstPage.posts],
-      };
-      return {
-        ...old,
-        pages: [mergedFirst, ...old.pages.slice(1)],
-      };
-    });
-    return added;
-  };
-
   return {
     items,
     empty: !feedLoading && items.length === 0,
@@ -204,7 +163,6 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     error: feedError?.message ?? null,
     loadMore,
     hasMore: hasNextPage ?? false,
-    prependNewer,
   };
 };
 
