@@ -42,8 +42,8 @@ const PAGE_SIZE = 20;
 const fetchFeedPage = async (cursor?: string) => {
   const { data, error } = await supabase.rpc('get_following_feed', {
     limit_count: PAGE_SIZE,
-    cursor: cursor || null,
-  });
+    cursor_key: cursor || null,
+  } as any);
 
   if (error) throw error;
 
@@ -78,7 +78,8 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  const nextCursor = data.length < PAGE_SIZE ? undefined : mappedPosts[mappedPosts.length - 1]?.created_at;
+  const lastRow: any = data[data.length - 1];
+  const nextCursor = data.length < PAGE_SIZE ? undefined : (lastRow?.feed_cursor as string | undefined);
 
   return { posts: mappedPosts, nextCursor };
 };
