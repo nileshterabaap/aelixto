@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { CheckCircle2, RefreshCw } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
@@ -77,10 +77,8 @@ const Index = () => {
     empty: followingEmpty,
     loading: followingLoading,
     loadMore,
-    refresh: refreshFollowingFeed,
     hasMore,
     reachedEnd,
-    error: followingError,
   } = useFollowingFeed(user?.id);
 
   const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
@@ -212,28 +210,25 @@ const Index = () => {
     }
 
     await Promise.all([
-      refreshFollowingFeed(),
+      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
+      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
+    ]);
+
+    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
+    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
       queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
       queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
     ]);
-  }, [flushNow, queryClient, refreshFollowingFeed, user?.id]);
 
-  useEffect(() => {
-    if (!user?.id || showDemoFeed) return;
-    const refreshHomeFeed = () => {
-      void handleRefresh();
-    };
-    window.addEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
-    return () => window.removeEventListener('aelixto:refresh-home-feed', refreshHomeFeed);
-  }, [handleRefresh, showDemoFeed, user?.id]);
-
-  useEffect(() => {
-    if (!user?.id || !followingLoading || allPosts.length > 0) return;
-    const retry = window.setTimeout(() => {
-      void refreshFollowingFeed();
-    }, 7000);
-    return () => window.clearTimeout(retry);
-  }, [allPosts.length, followingLoading, refreshFollowingFeed, user?.id]);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    window.location.reload();
+    await new Promise(() => {});
+  }, [flushNow, queryClient, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
@@ -256,9 +251,9 @@ const Index = () => {
     return () => observer.disconnect();
   }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
-  // Only show skeleton on truly empty first load - prevent flicker.
+  // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
-  const shouldShowSkeleton = allPosts.length === 0 && (sessionLoading || loading);
+  const shouldShowSkeleton = !hasRenderedOnce.current && (sessionLoading || loading) && allPosts.length === 0;
 
   if (shouldShowSkeleton) {
     return (
@@ -284,27 +279,11 @@ const Index = () => {
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
-            {!showDemoFeed && followingError && allPosts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <h3 className="text-lg font-semibold">Feed couldn’t load</h3>
-                <p className="text-sm text-muted-foreground mt-1 mb-4">
-                  Pull to refresh or tap retry.
-                </p>
-                <button
-                  onClick={() => void refreshFollowingFeed()}
-                  className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-semibold active:scale-95 transition-transform"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Retry
-                </button>
-              </div>
-            ) : !showDemoFeed && followingEmpty ? (
+          {!showDemoFeed && followingEmpty ? (
             followingCount === undefined || followingHasAnyPosts === undefined ? (
-              <div className="space-y-4">
-                {[...Array(2)].map((_, i) => (
-                  <PostSkeleton key={i} />
-                ))}
-              </div>
+              // Empty-state classifier queries haven't resolved yet —
+              // render nothing to avoid a flash of the wrong message.
+              <div className="py-16" />
             ) : followingCount === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <h3 className="text-lg font-semibold">Nothing here yet 👀</h3>
@@ -315,7 +294,7 @@ const Index = () => {
                   Discover people to follow
                 </Link>
               </div>
-            ) : followingHasAnyPosts ? (
+            ) : followingHasAnyPosts && reachedEnd ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                 <h3 className="text-lg font-semibold">You're all caught up</h3>
@@ -323,6 +302,8 @@ const Index = () => {
                   You've seen all recent posts from people you follow.
                 </p>
               </div>
+            ) : followingHasAnyPosts ? (
+              <div className="py-16" />
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
