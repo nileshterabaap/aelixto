@@ -205,7 +205,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     loadMore,
     refresh,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
-    reachedEnd: Boolean(userId) && reachedEnd,
+    reachedEnd: Boolean(userId) && Boolean(reachedEnd),
   };
 };
 
