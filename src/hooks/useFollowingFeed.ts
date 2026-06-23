@@ -188,9 +188,9 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   const refresh = useCallback(async () => {
     preloadedRef.current = false;
-    await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
+    await queryClient.cancelQueries({ queryKey: ['following-feed'] });
     return await refetch();
-  }, [queryClient, refetch, userId]);
+  }, [queryClient, refetch]);
 
   const hasReceivedPage = data !== undefined;
   const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
