@@ -3,9 +3,11 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 
-const invalidatePosts = (queryClient: ReturnType<typeof useQueryClient>) => {
+const invalidatePosts = (queryClient: ReturnType<typeof useQueryClient>, includeFeed = false) => {
   queryClient.invalidateQueries({ queryKey: ["posts"] });
-  queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+  if (includeFeed) {
+    queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+  }
   queryClient.invalidateQueries({ queryKey: ["platform-posts"] });
   queryClient.invalidateQueries({ queryKey: ["user-platform-tabs"] });
   queryClient.invalidateQueries({ queryKey: ["user-profile"] });
@@ -47,10 +49,14 @@ export const useRealtimeInvalidations = () => {
         { event: "*", schema: "public", table: "notifications", filter: `recipient_id=eq.${user.id}` },
         invalidateNotifications,
       )
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, () => invalidatePosts(queryClient))
+      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, (payload) => {
+        invalidatePosts(queryClient, payload.eventType === "INSERT" || payload.eventType === "DELETE");
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "likes" }, () => invalidatePosts(queryClient))
       .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, () => invalidatePosts(queryClient))
-      .on("postgres_changes", { event: "*", schema: "public", table: "reposts" }, () => invalidatePosts(queryClient))
+      .on("postgres_changes", { event: "*", schema: "public", table: "reposts" }, (payload) => {
+        invalidatePosts(queryClient, payload.eventType === "INSERT" || payload.eventType === "DELETE");
+      })
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "saves", filter: `user_id=eq.${user.id}` },
