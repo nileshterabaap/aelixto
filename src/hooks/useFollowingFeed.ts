@@ -1,8 +1,7 @@
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
 
 interface FeedPost {
   id: string;
@@ -19,11 +18,17 @@ interface FeedPost {
   embed_html: string | null;
   thumbnail_url: string | null;
   title: string | null;
+  preview_text?: string | null;
+  preview_title?: string | null;
+  preview_image_url?: string | null;
+  media_kind?: string | null;
+  aspect_ratio?: number | null;
+  suggested_height?: number | null;
   is_public: boolean;
+  feed_cursor?: string | null;
   is_repost?: boolean;
   reposted_by_user_id?: string | null;
   reposted_by_username?: string | null;
-  reposted_at?: string | null;
   profiles?: {
     username: string;
     display_name: string | null;
@@ -37,34 +42,27 @@ interface UseFollowingFeedResult {
   loading: boolean;
   error: string | null;
   loadMore: () => void;
+  refresh: () => Promise<unknown>;
   hasMore: boolean;
-  refresh: (seenPostIds?: string[]) => Promise<number>;
+  reachedEnd: boolean;
 }
 
 interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
-  media_kind?: string | null;
-  aspect_ratio?: number | null;
-  suggested_height?: number | null;
-  preview_text?: string | null;
-  preview_title?: string | null;
-  preview_image_url?: string | null;
-  profile_id?: string | null;
   profile_username: string;
   profile_display_name: string | null;
   profile_avatar_url: string | null;
 }
 
 const PAGE_SIZE = 20;
-
 const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
-    fn: 'get_following_feed',
-    args: { limit_count: number; cursor: string | null }
+    fn: 'get_following_feed_v2',
+    args: { limit_count: number; cursor_key: string | null }
   ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
 
-  const { data, error } = await rpc('get_following_feed', {
+  const { data, error } = await rpc('get_following_feed_v2', {
     limit_count: PAGE_SIZE,
-    cursor: cursor || null,
+    cursor_key: cursor || null,
   });
 
   if (error) throw error;
@@ -89,11 +87,17 @@ const fetchFeedPage = async (cursor?: string) => {
     embed_html: item.embed_html,
     thumbnail_url: item.thumbnail_url,
     title: item.title,
+    preview_text: item.preview_text,
+    preview_title: item.preview_title,
+    preview_image_url: item.preview_image_url,
+    media_kind: item.media_kind ?? null,
+    aspect_ratio: item.aspect_ratio ?? null,
+    suggested_height: item.suggested_height ?? null,
     is_public: item.is_public,
+    feed_cursor: item.feed_cursor,
     is_repost: item.is_repost,
     reposted_by_user_id: item.reposted_by_user_id,
     reposted_by_username: item.reposted_by_username,
-    reposted_at: item.reposted_at,
     profiles: {
       username: item.profile_username,
       display_name: item.profile_display_name,
@@ -101,81 +105,33 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  const last = mappedPosts[mappedPosts.length - 1];
-  const nextCursor = data.length < PAGE_SIZE ? undefined : last?.reposted_at ?? last?.created_at ?? undefined;
+  // Only end pagination when the server returns zero rows. Returning fewer
+  // than PAGE_SIZE can still mean more posts exist beyond this cursor band
+  // (mark-as-seen filtering, tier transitions, etc.), so we always keep
+  // a cursor as long as we got at least one row. The next call may return
+  // 0 rows — that's the true end-of-feed signal.
+  const lastCursor = mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
+  const nextCursor = mappedPosts.length === 0 ? undefined : lastCursor;
 
   return { posts: mappedPosts, nextCursor };
 };
 
-const refreshFeedPage = async (seenPostIds: string[] = []) => {
-  const uniqueIds = Array.from(new Set(seenPostIds)).filter(Boolean);
-  const rpc = supabase.rpc as unknown as (
-    fn: 'refresh_following_feed',
-    args: { limit_count: number; seen_post_ids: string[] }
-  ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
-
-  const { data, error } = await rpc('refresh_following_feed', {
-    limit_count: PAGE_SIZE,
-    seen_post_ids: uniqueIds,
-  });
-
-  if (error) throw error;
-
-  if (!data || data.length === 0) {
-    return { posts: [], nextCursor: undefined };
-  }
-
-  const mappedPosts: FeedPost[] = data.map((item) => ({
-    id: item.id,
-    user_id: item.user_id,
-    content: item.content,
-    created_at: item.created_at,
-    likes_count: item.likes_count,
-    saves_count: item.saves_count,
-    comments_count: item.comments_count,
-    reposts_count: item.reposts_count,
-    media_type: item.media_type,
-    media_url: item.media_url,
-    platform: item.platform,
-    embed_html: item.embed_html,
-    thumbnail_url: item.thumbnail_url,
-    title: item.title,
-    is_public: item.is_public,
-    is_repost: item.is_repost,
-    reposted_by_user_id: item.reposted_by_user_id,
-    reposted_by_username: item.reposted_by_username,
-    reposted_at: item.reposted_at,
-    profiles: {
-      username: item.profile_username,
-      display_name: item.profile_display_name,
-      avatar_url: item.profile_avatar_url,
-    },
-  }));
-
-  const last = mappedPosts[mappedPosts.length - 1];
-  const nextCursor = data.length < PAGE_SIZE ? undefined : last?.reposted_at ?? last?.created_at ?? undefined;
-
-  return { posts: mappedPosts, nextCursor };
-};
-
-export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
+export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
   const queryClient = useQueryClient();
-  const feedQueryKey = useMemo(
-    () => ['following-feed', userId] as const,
-    [userId]
-  );
 
   // Fetch feed directly — no count gate, single RPC call
   const {
     data,
     isLoading: feedLoading,
+    isFetching,
     error: feedError,
     fetchNextPage,
+    refetch,
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: feedQueryKey,
+    queryKey: ['following-feed', userId],
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -183,14 +139,20 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
     staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: true,
-    refetchOnReconnect: false,
+    refetchOnMount: 'always', // refresh on mount/page reload so an empty first paint cannot stick
+    refetchOnReconnect: true,
+    retry: 2,
     structuralSharing: true,
   });
 
   // Flatten all pages into single array - stable reference
   const items = useMemo(
     () => data?.pages.flatMap((page) => page.posts) ?? [],
+    [data?.pages]
+  );
+
+  const reachedEnd = useMemo(
+    () => data?.pages.some((page) => page.posts.length === 0) ?? false,
     [data?.pages]
   );
 
@@ -209,8 +171,9 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
 
   // Preload new pages as they arrive
   useEffect(() => {
-    if (data?.pages && data.pages.length > 1) {
-      const latestPage = data.pages[data.pages.length - 1];
+    const pages = data?.pages;
+    if (pages && pages.length > 1) {
+      const latestPage = pages[pages.length - 1];
       if (latestPage.posts.length > 0) {
         preloadAllFeedImages(latestPage.posts.map(post => ({
           profiles: { avatar_url: post.profiles?.avatar_url },
@@ -219,7 +182,7 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
         })));
       }
     }
-  }, [data?.pages?.length]);
+  }, [data?.pages]);
 
   const loadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -227,25 +190,24 @@ export const useFollowingFeed = (userId?: string): UseFollowingFeedResult => {
     }
   };
 
-  const refresh = async (seenPostIds: string[] = []): Promise<number> => {
-    if (!userId) return 0;
+  const refresh = useCallback(async () => {
     preloadedRef.current = false;
-    const firstPage = await refreshFeedPage(seenPostIds);
-    queryClient.setQueryData(feedQueryKey, {
-      pages: [firstPage],
-      pageParams: [undefined],
-    });
-    return firstPage.posts.length;
-  };
+    await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
+    return await refetch();
+  }, [queryClient, refetch, userId]);
+
+  const hasReceivedPage = data !== undefined;
+  const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
 
   return {
     items,
-    empty: !feedLoading && items.length === 0,
-    loading: feedLoading,
+    empty: Boolean(userId) && hasReceivedPage && !initialFeedPending && items.length === 0,
+    loading: initialFeedPending,
     error: feedError?.message ?? null,
     loadMore,
-    hasMore: hasNextPage ?? false,
     refresh,
+    hasMore: Boolean(userId) && (hasNextPage ?? false),
+    reachedEnd: Boolean(userId) && reachedEnd,
   };
 };
 
