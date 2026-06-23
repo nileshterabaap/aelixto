@@ -10,6 +10,7 @@ interface PullToRefreshProps {
 const THRESHOLD = 55;
 const MAX_PULL = 100;
 const LOADING_REST = 45;
+const MIN_REFRESH_MS = 700;
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -85,9 +86,14 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
         setRefreshing(true);
 
         void (async () => {
+          const startedAt = Date.now();
           try {
             await onRefresh();
           } finally {
+            const remaining = MIN_REFRESH_MS - (Date.now() - startedAt);
+            if (remaining > 0) {
+              await new Promise((resolve) => window.setTimeout(resolve, remaining));
+            }
             setRefreshing(false);
             animate(pullY, 0, { type: "spring", stiffness: 250, damping: 28 });
           }
