@@ -37,7 +37,6 @@ import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
-import { getPostThumb } from "@/lib/getPostThumb";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
@@ -439,15 +438,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setIsHydrated(true);
   }, []);
 
-  // Derive thumbnail: filter misleading Reddit placeholders, then derive from URL
-  const effectiveThumbnail = getPostThumb({
-    platform: post.platform,
-    thumbnailUrl,
-    thumbnail_url: (post as any).thumbnail_url,
-    mediaUrl: mediaUrl,
-    media_url: (post as any).media_url,
-    author_avatar_url: post.author?.avatar,
-  }) || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
+  // Derive thumbnail: prefer stored, then derive from URL
+  const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
   const showCard = isTextOnly || embedState === 'ready' || embedState === 'error';
 
@@ -478,7 +470,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           transition: 'opacity 250ms ease-in-out, filter 400ms ease-out',
         }}
       >
-    <Card className="post-card border-0 shadow-none">
+    <Card className="glass-post-card overflow-hidden rounded-[2rem]">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
         <div className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
@@ -518,7 +510,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-background z-[100]">
+              <DropdownMenuContent align="end" className="bg-background z-50">
                 <DropdownMenuItem
                   onClick={() => deletePost()}
                   disabled={isDeleting}
@@ -540,16 +532,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       </div>
 
-      {/* Caption — Instagram captions intentionally hidden (media-only) */}
-      {(() => {
-        const captionText =
-          detectedPlatform === 'instagram' ? '' : (post.content?.trim() || '');
-        return captionText ? (
-          <div className="px-5 pb-3">
-            <CollapsibleCaption content={captionText} />
-          </div>
-        ) : null;
-      })()}
+      {/* Caption */}
+      {detectedPlatform !== 'instagram' && post.content?.trim() && (
+        <div className="px-5 pb-3">
+          <CollapsibleCaption content={post.content} />
+        </div>
+      )}
 
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}

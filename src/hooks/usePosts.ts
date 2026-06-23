@@ -83,13 +83,21 @@ export const useCreatePost = () => {
           embed_html: newPost.embed_html || null,
           thumbnail_url: newPost.thumbnail_url || null,
         })
-        .select()
+        .select(`
+          *,
+          profiles!posts_user_id_fkey (
+            username,
+            display_name,
+            avatar_url,
+            settings
+          )
+        `)
         .single();
 
       if (error) throw error;
       return data;
     },
-    onSuccess: async () => {
+    onSuccess: async (createdPost: any) => {
       await queryClient.cancelQueries({ queryKey: ["posts"] });
       await queryClient.cancelQueries({ queryKey: ["following-feed"] });
       await queryClient.cancelQueries({ queryKey: ["platform-posts"] });
@@ -97,7 +105,6 @@ export const useCreatePost = () => {
       await queryClient.cancelQueries({ queryKey: ["user-posts"] });
 
       queryClient.removeQueries({ queryKey: ["posts"] });
-      queryClient.removeQueries({ queryKey: ["following-feed"] });
       queryClient.removeQueries({ queryKey: ["platform-posts"] });
       queryClient.removeQueries({ queryKey: ["user-platform-tabs"] });
       queryClient.removeQueries({ queryKey: ["user-posts"] });

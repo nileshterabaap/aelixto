@@ -266,7 +266,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   // This does not touch Reddit or any other renderer.
   if (EMBED_FEATURE_FLAGS.quora_preview && isQuoraUrl) {
     return (
-      <Card className="post-card border-0 shadow-none">
+      <Card className="glass-post-card overflow-hidden rounded-[2rem]">
         <div className="p-5">
           {/* Author Info */}
           <div className="flex items-center gap-3 mb-4">
@@ -298,7 +298,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                     <MoreVertical className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-background z-[100]">
+                <DropdownMenuContent align="end" className="bg-background z-50">
                   <DropdownMenuItem
                     onClick={() => deletePost()}
                     disabled={isDeleting}
@@ -320,7 +320,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
 
           {/* Caption with see more/less */}
-          {post.content && (
+          {detectedPlatform !== 'instagram' && post.content && (
             <CollapsibleCaption content={post.content} />
           )}
 
@@ -417,7 +417,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const r = resolveRenderer(post);
 
   return (
-    <Card className="post-card border-0 shadow-none">
+    <Card className="glass-post-card overflow-hidden rounded-[2rem]">
       <div className="p-5">
         {/* Repost Indicator */}
         {post.isRepost && post.repostedByUsername && (
@@ -457,7 +457,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                     <MoreVertical className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-background z-[100]">
+                <DropdownMenuContent align="end" className="bg-background z-50">
                   <DropdownMenuItem
                     onClick={() => deletePost()}
                     disabled={isDeleting}
@@ -479,7 +479,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         </div>
 
         {/* Caption with see more/less */}
-        {post.content && (
+        {detectedPlatform !== 'instagram' && post.content && (
           <CollapsibleCaption content={post.content} />
         )}
 
@@ -531,14 +531,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <RedditEmbed
-                    url={r.url}
-                    title={previewTitle || post.title}
-                    thumbnailUrl={thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform)}
-                    description={previewText}
-                    authorAvatar={post.author?.avatar || null}
-                    postId={post.id}
-                  />
+                  <RedditEmbed url={r.url} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -549,14 +542,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <RedditEmbed
-                  url={r.url}
-                  title={previewTitle || post.title}
-                  thumbnailUrl={thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform)}
-                  description={previewText}
-                  authorAvatar={post.author?.avatar || null}
-                  postId={post.id}
-                />
+                <RedditEmbed url={r.url} />
               </LazyEmbed>
             )}
             {r.kind === 'twitter' && post.isRealPost && (
@@ -615,7 +601,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 autoLoad={false}
               >
                 <ImageViewTracker postId={post.id}>
-                  <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} postId={post.id} platform={post.platform} />
+                  <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -628,7 +614,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
                 autoLoad={false}
               >
-                <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} postId={post.id} platform={post.platform} />
+                <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
               </LazyEmbed>
             )}
             {r.kind === 'universal' && !isFacebookUnavailable && post.isRealPost && (
