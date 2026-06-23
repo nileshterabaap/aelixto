@@ -25,6 +25,7 @@ interface FeedPost {
   aspect_ratio?: number | null;
   suggested_height?: number | null;
   is_public: boolean;
+  feed_cursor?: string | null;
   is_repost?: boolean;
   reposted_by_user_id?: string | null;
   reposted_by_username?: string | null;
@@ -55,13 +56,13 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
 const PAGE_SIZE = 20;
 const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
-    fn: 'get_following_feed',
-    args: { limit_count: number; cursor: string | null }
+    fn: 'get_following_feed_v2',
+    args: { limit_count: number; cursor_key: string | null }
   ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
 
-  const { data, error } = await rpc('get_following_feed', {
+  const { data, error } = await rpc('get_following_feed_v2', {
     limit_count: PAGE_SIZE,
-    cursor: cursor || null,
+    cursor_key: cursor || null,
   });
 
   if (error) throw error;
@@ -93,6 +94,7 @@ const fetchFeedPage = async (cursor?: string) => {
     aspect_ratio: item.aspect_ratio ?? null,
     suggested_height: item.suggested_height ?? null,
     is_public: item.is_public,
+    feed_cursor: item.feed_cursor,
     is_repost: item.is_repost,
     reposted_by_user_id: item.reposted_by_user_id,
     reposted_by_username: item.reposted_by_username,
@@ -103,11 +105,13 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  // Cursor = created_at of last row. End when fewer than PAGE_SIZE returned.
-  const nextCursor =
-    mappedPosts.length < PAGE_SIZE
-      ? undefined
-      : mappedPosts[mappedPosts.length - 1]?.created_at;
+  // Only end pagination when the server returns zero rows. Returning fewer
+  // than PAGE_SIZE can still mean more posts exist beyond this cursor band
+  // (mark-as-seen filtering, tier transitions, etc.), so we always keep
+  // a cursor as long as we got at least one row. The next call may return
+  // 0 rows — that's the true end-of-feed signal.
+  const lastCursor = mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
+  const nextCursor = mappedPosts.length === 0 ? undefined : lastCursor;
 
   return { posts: mappedPosts, nextCursor };
 };
@@ -127,7 +131,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['following-feed'],
+    queryKey: ['following-feed', userId],
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
@@ -148,10 +152,8 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   );
 
   const reachedEnd = useMemo(
-    () =>
-      data?.pages.some((page) => page.posts.length === 0) ||
-      (data !== undefined && (hasNextPage === false)),
-    [data, hasNextPage]
+    () => data?.pages.some((page) => page.posts.length === 0) ?? false,
+    [data?.pages]
   );
 
   // Aggressively preload ALL thumbnails once on data arrival
@@ -190,9 +192,9 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   const refresh = useCallback(async () => {
     preloadedRef.current = false;
-    await queryClient.cancelQueries({ queryKey: ['following-feed'] });
+    await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
     return await refetch();
-  }, [queryClient, refetch]);
+  }, [queryClient, refetch, userId]);
 
   const hasReceivedPage = data !== undefined;
   const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
@@ -205,7 +207,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     loadMore,
     refresh,
     hasMore: Boolean(userId) && (hasNextPage ?? false),
-    reachedEnd: Boolean(userId) && Boolean(reachedEnd),
+    reachedEnd: Boolean(userId) && reachedEnd,
   };
 };
 
