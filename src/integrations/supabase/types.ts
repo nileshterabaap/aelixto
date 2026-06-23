@@ -1159,6 +1159,7 @@ export type Database = {
       get_following_feed: {
         Args: { cursor?: string; limit_count: number }
         Returns: {
+          aspect_ratio: number
           comments_count: number
           content: string
           created_at: string
@@ -1167,6 +1168,7 @@ export type Database = {
           is_public: boolean
           is_repost: boolean
           likes_count: number
+          media_kind: string
           media_type: string
           media_url: string
           platform: string
@@ -1175,13 +1177,12 @@ export type Database = {
           preview_title: string
           profile_avatar_url: string
           profile_display_name: string
-          profile_id: string
           profile_username: string
-          reposted_at: string
           reposted_by_user_id: string
           reposted_by_username: string
           reposts_count: number
           saves_count: number
+          suggested_height: number
           thumbnail_url: string
           title: string
           user_id: string
