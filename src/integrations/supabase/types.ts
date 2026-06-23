@@ -1276,6 +1276,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_unseen_following_feed_posts: { Args: never; Returns: boolean }
       is_conversation_participant: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
@@ -1300,6 +1301,41 @@ export type Database = {
       record_domain_classification: {
         Args: { _content_type: string; _domain: string }
         Returns: undefined
+      }
+      refresh_following_feed_v1: {
+        Args: { limit_count: number; seen_post_ids?: string[] }
+        Returns: {
+          aspect_ratio: number
+          comments_count: number
+          content: string
+          created_at: string
+          embed_html: string
+          feed_cursor: string
+          id: string
+          is_public: boolean
+          is_repost: boolean
+          likes_count: number
+          media_kind: string
+          media_type: string
+          media_url: string
+          platform: string
+          preview_image_url: string
+          preview_text: string
+          preview_title: string
+          profile_avatar_url: string
+          profile_display_name: string
+          profile_id: string
+          profile_username: string
+          reposted_at: string
+          reposted_by_user_id: string
+          reposted_by_username: string
+          reposts_count: number
+          saves_count: number
+          suggested_height: number
+          thumbnail_url: string
+          title: string
+          user_id: string
+        }[]
       }
       request_or_follow: { Args: { _target: string }; Returns: string }
       respond_to_follow_request: {

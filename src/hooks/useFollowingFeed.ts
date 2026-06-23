@@ -1,7 +1,8 @@
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
-import { useRef, useEffect, useMemo, useCallback } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 
 interface FeedPost {
   id: string;
@@ -18,12 +19,6 @@ interface FeedPost {
   embed_html: string | null;
   thumbnail_url: string | null;
   title: string | null;
-  preview_text?: string | null;
-  preview_title?: string | null;
-  preview_image_url?: string | null;
-  media_kind?: string | null;
-  aspect_ratio?: number | null;
-  suggested_height?: number | null;
   is_public: boolean;
   feed_cursor?: string | null;
   is_repost?: boolean;
@@ -42,9 +37,8 @@ interface UseFollowingFeedResult {
   loading: boolean;
   error: string | null;
   loadMore: () => void;
-  refresh: () => Promise<unknown>;
   hasMore: boolean;
-  reachedEnd: boolean;
+  prependNewer: () => Promise<number>;
 }
 
 interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
@@ -54,6 +48,7 @@ interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
 }
 
 const PAGE_SIZE = 20;
+
 const fetchFeedPage = async (cursor?: string) => {
   const rpc = supabase.rpc as unknown as (
     fn: 'get_following_feed_v2',
@@ -87,12 +82,6 @@ const fetchFeedPage = async (cursor?: string) => {
     embed_html: item.embed_html,
     thumbnail_url: item.thumbnail_url,
     title: item.title,
-    preview_text: item.preview_text,
-    preview_title: item.preview_title,
-    preview_image_url: item.preview_image_url,
-    media_kind: item.media_kind ?? null,
-    aspect_ratio: item.aspect_ratio ?? null,
-    suggested_height: item.suggested_height ?? null,
     is_public: item.is_public,
     feed_cursor: item.feed_cursor,
     is_repost: item.is_repost,
@@ -105,18 +94,12 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  // Only end pagination when the server returns zero rows. Returning fewer
-  // than PAGE_SIZE can still mean more posts exist beyond this cursor band
-  // (mark-as-seen filtering, tier transitions, etc.), so we always keep
-  // a cursor as long as we got at least one row. The next call may return
-  // 0 rows — that's the true end-of-feed signal.
-  const lastCursor = mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
-  const nextCursor = mappedPosts.length === 0 ? undefined : lastCursor;
+  const nextCursor = data.length < PAGE_SIZE ? undefined : mappedPosts[mappedPosts.length - 1]?.feed_cursor ?? undefined;
 
   return { posts: mappedPosts, nextCursor };
 };
 
-export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedResult => {
+export const useFollowingFeed = (): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
   const queryClient = useQueryClient();
 
@@ -124,35 +107,26 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   const {
     data,
     isLoading: feedLoading,
-    isFetching,
     error: feedError,
     fetchNextPage,
-    refetch,
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['following-feed', userId],
+    queryKey: ['following-feed'],
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    enabled: Boolean(userId),
     staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: 'always', // refresh on mount/page reload so an empty first paint cannot stick
-    refetchOnReconnect: true,
-    retry: 2,
+    refetchOnMount: false,
+    refetchOnReconnect: false,
     structuralSharing: true,
   });
 
   // Flatten all pages into single array - stable reference
   const items = useMemo(
     () => data?.pages.flatMap((page) => page.posts) ?? [],
-    [data?.pages]
-  );
-
-  const reachedEnd = useMemo(
-    () => data?.pages.some((page) => page.posts.length === 0) ?? false,
     [data?.pages]
   );
 
@@ -171,9 +145,8 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
 
   // Preload new pages as they arrive
   useEffect(() => {
-    const pages = data?.pages;
-    if (pages && pages.length > 1) {
-      const latestPage = pages[pages.length - 1];
+    if (data?.pages && data.pages.length > 1) {
+      const latestPage = data.pages[data.pages.length - 1];
       if (latestPage.posts.length > 0) {
         preloadAllFeedImages(latestPage.posts.map(post => ({
           profiles: { avatar_url: post.profiles?.avatar_url },
@@ -182,7 +155,7 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
         })));
       }
     }
-  }, [data?.pages]);
+  }, [data?.pages?.length]);
 
   const loadMore = () => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -190,24 +163,48 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
     }
   };
 
-  const refresh = useCallback(async () => {
-    preloadedRef.current = false;
-    await queryClient.cancelQueries({ queryKey: ['following-feed', userId] });
-    return await refetch();
-  }, [queryClient, refetch, userId]);
+  // Pull-to-refresh: fetch fresh first page, prepend only posts not already
+  // in the cache. Existing (possibly already-seen) posts stay on screen.
+  const prependNewer = async (): Promise<number> => {
+    const fresh = await fetchFeedPage(undefined);
+    if (!fresh.posts.length) return 0;
 
-  const hasReceivedPage = data !== undefined;
-  const initialFeedPending = Boolean(userId) && !feedError && items.length === 0 && (!hasReceivedPage || feedLoading || isFetching);
+    let added = 0;
+    queryClient.setQueryData<any>(['following-feed'], (old: any) => {
+      if (!old || !old.pages?.length) {
+        return {
+          pages: [{ posts: fresh.posts, nextCursor: fresh.nextCursor }],
+          pageParams: [undefined],
+        };
+      }
+      const existingIds = new Set<string>(
+        old.pages.flatMap((p: any) => p.posts.map((post: FeedPost) => post.id))
+      );
+      const newPosts = fresh.posts.filter((p) => !existingIds.has(p.id));
+      added = newPosts.length;
+      if (added === 0) return old;
+
+      const firstPage = old.pages[0];
+      const mergedFirst = {
+        ...firstPage,
+        posts: [...newPosts, ...firstPage.posts],
+      };
+      return {
+        ...old,
+        pages: [mergedFirst, ...old.pages.slice(1)],
+      };
+    });
+    return added;
+  };
 
   return {
     items,
-    empty: Boolean(userId) && hasReceivedPage && !initialFeedPending && items.length === 0,
-    loading: initialFeedPending,
+    empty: !feedLoading && items.length === 0,
+    loading: feedLoading,
     error: feedError?.message ?? null,
     loadMore,
-    refresh,
-    hasMore: Boolean(userId) && (hasNextPage ?? false),
-    reachedEnd: Boolean(userId) && reachedEnd,
+    hasMore: hasNextPage ?? false,
+    prependNewer,
   };
 };
 
