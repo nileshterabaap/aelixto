@@ -37,7 +37,9 @@ interface ProfileData {
 // changes), until the user starts scrolling themselves.
 
 function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { isRealPost: boolean; user_id: string; likes_count: number; comments_count: number } {
-  const postUserId = post.original_user_id || post.user_id;
+  // Ownership = the row's user_id (i.e. who owns this post/repost on this profile).
+  // Using original_user_id here would hide the Delete button on your own reposts.
+  const postUserId = post.user_id;
   return {
     id: post.id,
     user_id: postUserId,
