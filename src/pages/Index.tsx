@@ -25,7 +25,8 @@ const Index = () => {
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
   const { observePost } = useMarkPostSeen(user?.id);
-
+  
+  
   // Demo feed for signed-out users
   const { data: demoPostsData, isLoading: demoLoading } = usePosts();
 
@@ -72,9 +73,9 @@ const Index = () => {
         embed_html: post.embed_html,
         timestamp: new Date(post.created_at),
         saves: post.saves_count,
-        likes_count: post.likes_count || 0,
-        comments_count: post.comments_count || 0,
-        hide_likes: post.profiles?.settings?.hide_likes || false,
+        likes_count: (post as any).likes_count || 0,
+        comments_count: (post as any).comments_count || 0,
+        hide_likes: (post.profiles as any)?.settings?.hide_likes || false,
         isRealPost: true,
       }))
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
@@ -140,13 +141,7 @@ const Index = () => {
   }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    if (showDemoFeed) {
-      await queryClient.invalidateQueries({ queryKey: ["posts"] });
-      return;
-    }
-    // Invalidate following-feed so the same query key refetches from the RPC,
-    // server-side seen-filter removes seen posts, and unseen newer posts appear.
-    await queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+    await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
   }, [queryClient, showDemoFeed]);
 
   // Data-friendly invisible pagination: load the next page only when the

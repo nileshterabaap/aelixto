@@ -38,21 +38,9 @@ interface UseFollowingFeedResult {
   hasMore: boolean;
 }
 
-interface FeedRpcRow extends Omit<FeedPost, 'profiles'> {
-  profile_username: string;
-  profile_display_name: string | null;
-  profile_avatar_url: string | null;
-}
-
 const PAGE_SIZE = 20;
-
 const fetchFeedPage = async (cursor?: string) => {
-  const rpc = supabase.rpc as unknown as (
-    fn: 'get_following_feed',
-    args: { limit_count: number; cursor: string | null }
-  ) => Promise<{ data: FeedRpcRow[] | null; error: Error | null }>;
-
-  const { data, error } = await rpc('get_following_feed', {
+  const { data, error } = await supabase.rpc('get_following_feed', {
     limit_count: PAGE_SIZE,
     cursor: cursor || null,
   });
@@ -64,7 +52,7 @@ const fetchFeedPage = async (cursor?: string) => {
   }
 
   // Map RPC response to FeedPost format
-  const mappedPosts: FeedPost[] = data.map((item) => ({
+  const mappedPosts: FeedPost[] = data.map((item: any) => ({
     id: item.id,
     user_id: item.user_id,
     content: item.content,
@@ -90,7 +78,7 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  const nextCursor = data.length < PAGE_SIZE ? undefined : mappedPosts[mappedPosts.length - 1]?.created_at ?? undefined;
+  const nextCursor = data.length < PAGE_SIZE ? undefined : mappedPosts[mappedPosts.length - 1]?.created_at;
 
   return { posts: mappedPosts, nextCursor };
 };
@@ -114,6 +102,8 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
+    refetchOnMount: true, // refetch if stale on mount/page reload
+    refetchOnReconnect: true,
     structuralSharing: true,
   });
 
