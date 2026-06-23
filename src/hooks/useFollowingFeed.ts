@@ -148,8 +148,10 @@ export const useFollowingFeed = (userId: string | undefined): UseFollowingFeedRe
   );
 
   const reachedEnd = useMemo(
-    () => data?.pages.some((page) => page.posts.length === 0) ?? false,
-    [data?.pages]
+    () =>
+      data?.pages.some((page) => page.posts.length === 0) ||
+      (data !== undefined && (hasNextPage === false)),
+    [data, hasNextPage]
   );
 
   // Aggressively preload ALL thumbnails once on data arrival
