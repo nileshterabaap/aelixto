@@ -320,7 +320,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
 
           {/* Caption with see more/less */}
-          {post.content && (
+          {detectedPlatform !== 'instagram' && post.content && (
             <CollapsibleCaption content={post.content} />
           )}
 
@@ -479,7 +479,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         </div>
 
         {/* Caption with see more/less */}
-        {post.content && (
+        {detectedPlatform !== 'instagram' && post.content && (
           <CollapsibleCaption content={post.content} />
         )}
 
