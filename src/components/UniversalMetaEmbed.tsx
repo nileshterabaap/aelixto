@@ -717,6 +717,38 @@ export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
         );
       }
 
+      // LinkedIn iframe: crop bottom action bar (Like/Comment/Share) by
+      // extending iframe height beyond a clipped container — mirrors Instagram.
+      const isLinkedInIframe = embedHtml.includes('linkedin.com/embed');
+      if (isLinkedInIframe) {
+        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
+        const iframeSrc = srcMatch ? srcMatch[1] : '';
+
+        return (
+          <div
+            className="relative w-full overflow-hidden"
+            style={{ aspectRatio: '4 / 5', touchAction: 'pan-y' }}
+          >
+            <iframe
+              src={iframeSrc}
+              scrolling="no"
+              allowFullScreen
+              allow="encrypted-media; autoplay"
+              loading="lazy"
+              style={{
+                border: 'none',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: 'calc(100% + 120px)',
+                overflow: 'hidden',
+              }}
+            />
+          </div>
+        );
+      }
+
       // Threads iframe: render with onError fallback
       if (isThreadsIframe) {
         const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
