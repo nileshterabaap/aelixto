@@ -71,12 +71,20 @@ const Auth = () => {
     }
     setUsernameStatus("checking");
     const timer = setTimeout(async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("username", usernameValue.toLowerCase())
-        .maybeSingle();
-      setUsernameStatus(data ? "taken" : "available");
+      try {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("username", usernameValue.toLowerCase())
+          .maybeSingle();
+        if (error) {
+          setUsernameStatus("idle");
+          return;
+        }
+        setUsernameStatus(data ? "taken" : "available");
+      } catch {
+        setUsernameStatus("idle");
+      }
     }, 500);
     return () => clearTimeout(timer);
   }, [usernameValue]);
@@ -330,7 +338,7 @@ const Auth = () => {
     // Web flow.
     try {
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/auth`,
       });
       if (result.error) {
         console.error("Google sign-in error", result.error);
