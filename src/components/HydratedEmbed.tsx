@@ -148,7 +148,14 @@ export const HydratedEmbed = memo(({
   const forceUniversalRenderer =
     r.kind === 'raw' &&
     !!mediaUrl &&
-    (platformHint === 'threads' || platformHint === 'linkedin' || lowerUrl.includes('threads.net/') || lowerUrl.includes('threads.com/') || lowerUrl.includes('linkedin.com/'));
+    (platformHint === 'threads' ||
+      platformHint === 'linkedin' ||
+      platformHint === 'instagram' ||
+      lowerUrl.includes('threads.net/') ||
+      lowerUrl.includes('threads.com/') ||
+      lowerUrl.includes('linkedin.com/') ||
+      lowerUrl.includes('instagram.com/') ||
+      lowerUrl.includes('instagr.am/'));
 
   useEffect(() => {
     if (!shouldHydrate) return;
