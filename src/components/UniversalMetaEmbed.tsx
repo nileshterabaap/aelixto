@@ -157,6 +157,95 @@ const ThreadsIframeEmbed = ({
     </div>
   );
 };
+
+/**
+ * Instagram iframe that adapts its visible height per post.
+ *
+ * The IG embed iframe always renders a ~500px "Add a comment / footer" area
+ * at the bottom that we don't want to show. We crop it by sizing the
+ * container to the visible height (header + media + caption) and making the
+ * iframe itself 500px taller so the comment area falls outside the clipping
+ * container.
+ *
+ * Visible height comes from (in order):
+ *   1. `suggestedHeight` saved at create time (`measureEmbedHeight`)
+ *      — that value already represents the FULL iframe height including
+ *      the comment area, so we subtract `IG_COMMENT_TRIM` to get visible.
+ *   2. Live postMessage updates from instagram.com (also full height).
+ *   3. A reasonable default while we wait.
+ */
+const IG_COMMENT_TRIM = 500;
+const IG_MIN_VISIBLE = 320;
+const IG_MAX_VISIBLE = 1100;
+const IG_DEFAULT_VISIBLE = 560;
+
+const clampIgVisible = (h: number) =>
+  Math.min(IG_MAX_VISIBLE, Math.max(IG_MIN_VISIBLE, Math.round(h)));
+
+const InstagramIframeEmbed = ({
+  src,
+  postId,
+  suggestedHeight,
+}: {
+  src: string;
+  postId?: string | null;
+  suggestedHeight?: number | null;
+}) => {
+  const [visible, setVisible] = useState(() => {
+    if (suggestedHeight && suggestedHeight > IG_COMMENT_TRIM + IG_MIN_VISIBLE) {
+      return clampIgVisible(suggestedHeight - IG_COMMENT_TRIM);
+    }
+    return IG_DEFAULT_VISIBLE;
+  });
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const persistHeight = usePersistEmbedHeight(postId);
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      const iframeWindow = iframeRef.current?.contentWindow;
+      if (!iframeWindow || event.source !== iframeWindow) return;
+      const origin = event.origin || '';
+      if (!origin.includes('instagram.com') && !origin.includes('cdninstagram.com')) return;
+
+      const full = parseThreadsHeightFromMessage(event.data);
+      if (!full || full < IG_COMMENT_TRIM + IG_MIN_VISIBLE) return;
+
+      const nextVisible = clampIgVisible(full - IG_COMMENT_TRIM);
+      setVisible((prev) => (Math.abs(prev - nextVisible) > 4 ? nextVisible : prev));
+      // Persist the FULL iframe height so create-time and view-time stay
+      // consistent (both store full height; only render-time trims).
+      persistHeight(Math.round(full));
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  return (
+    <div
+      className="relative w-full overflow-hidden"
+      style={{ width: '100%', height: `${visible}px`, touchAction: 'pan-y' }}
+    >
+      <iframe
+        ref={iframeRef}
+        src={src}
+        scrolling="no"
+        allowFullScreen
+        allow="encrypted-media; autoplay"
+        loading="lazy"
+        style={{
+          border: 'none',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: `${visible + IG_COMMENT_TRIM}px`,
+          overflow: 'hidden',
+          display: 'block',
+        }}
+      />
+    </div>
+  );
+};
 /**
  * Facebook iframe that auto-sizes to its content height.
  * Falls back to a generous min-height, then listens for the Facebook
