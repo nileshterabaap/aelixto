@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -16,6 +16,7 @@ import {
 } from "@/lib/domainClassification";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
+import { measureEmbedHeight } from "@/lib/measureEmbedHeight";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -39,6 +40,10 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
   const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
+  // Height measured offscreen at create-time so the very first viewer
+  // (including the creator) opens the card at its real size — no blank space.
+  const measuredHeightRef = useRef<number | null>(null);
+  const measurePromiseRef = useRef<Promise<number | null> | null>(null);
 
   // Hydrate from existing draft when opening
   useEffect(() => {
@@ -237,6 +242,18 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       }
 
       setStep(2);
+
+      // Kick off offscreen measurement in the background. Works best for
+      // Threads + Facebook (they postMessage their rendered height). For
+      // other platforms this resolves null and the viewer-time persistence
+      // takes over on first scroll.
+      measuredHeightRef.current = null;
+      measurePromiseRef.current = measureEmbedHeight(linkUrl)
+        .then((h) => {
+          measuredHeightRef.current = h;
+          return h;
+        })
+        .catch(() => null);
     } finally {
       setIsLoadingPreview(false);
     }
@@ -342,6 +359,17 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     });
 
     setSubmitState("post");
+
+    // Give the offscreen measurement up to ~1.2s extra to settle, then
+    // post with whatever height we have (or null = fall back to defaults).
+    let suggestedHeight: number | null = measuredHeightRef.current;
+    if (suggestedHeight === null && measurePromiseRef.current) {
+      suggestedHeight = await Promise.race([
+        measurePromiseRef.current,
+        new Promise<number | null>((r) => window.setTimeout(() => r(null), 1200)),
+      ]);
+    }
+
     createPost.mutate({
       title: title.trim() || undefined,
       content: caption.trim() || "",
@@ -350,6 +378,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       platform: platform,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
+      suggested_height: suggestedHeight,
     }, {
       onSuccess: (created: any) => {
         incrementDailyCount();
