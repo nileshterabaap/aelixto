@@ -255,6 +255,8 @@ const FacebookIframeEmbed = ({
 
 interface UniversalMetaEmbedProps {
   url: string;
+  postId?: string | null;
+  suggestedHeight?: number | null;
 }
 
 // Cache resolved embeds to avoid re-processing when navigating between tabs/pages
@@ -493,7 +495,7 @@ const buildTikTokEmbed = (url: string): string | null => {
 };
 
 
-export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
+export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMetaEmbedProps) => {
   const cached = embedCache.get(url);
 
   const [embedHtml, setEmbedHtml] = useState<string | null>(cached?.embedHtml ?? null);
