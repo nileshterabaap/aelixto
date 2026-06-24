@@ -17,6 +17,7 @@ import {
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 import { measureEmbedHeight } from "@/lib/measureEmbedHeight";
+import { estimateEmbedHeight } from "@/lib/estimateEmbedHeight";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -368,6 +369,25 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
         measurePromiseRef.current,
         new Promise<number | null>((r) => window.setTimeout(() => r(null), 1200)),
       ]);
+    }
+
+    // Fallback: if the platform didn't broadcast a height (Instagram,
+    // TikTok, LinkedIn, Pinterest, etc.) compute a content-aware estimate
+    // from the data we already have (caption length, thumbnail, platform).
+    // This gives the very first viewer a card sized close to the real
+    // content instead of a generic 380px stub.
+    if (suggestedHeight === null) {
+      try {
+        suggestedHeight = estimateEmbedHeight({
+          platform,
+          url: linkUrl,
+          caption: caption,
+          title: title,
+          thumbnailUrl: thumbnailUrl,
+        });
+      } catch {
+        suggestedHeight = null;
+      }
     }
 
     createPost.mutate({
