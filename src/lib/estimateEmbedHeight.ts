@@ -101,8 +101,14 @@ export function estimateEmbedHeight(input: EstimateInput): number {
 
   const total = chrome.header + mediaHeight + textBlockHeight + chrome.footer;
 
+  // Instagram's official embed always appends a ~500px "Add a comment" area
+  // below the post. Our renderer crops it, but the persisted `suggested_height`
+  // represents the FULL iframe height (matching what `measureEmbedHeight`
+  // captures via postMessage). Add the trim so estimator + measurer agree.
+  const instagramExtra = platformKey === "instagram" ? 500 : 0;
+
   // Platform-specific clamps so we never produce something absurd.
   const min = 200;
-  const max = platformKey === "tiktok" ? 760 : 900;
-  return Math.max(min, Math.min(max, Math.round(total)));
+  const max = platformKey === "tiktok" ? 760 : platformKey === "instagram" ? 1400 : 900;
+  return Math.max(min, Math.min(max, Math.round(total + instagramExtra)));
 }
