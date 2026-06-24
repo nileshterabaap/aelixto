@@ -327,12 +327,26 @@ const Auth = () => {
       return;
     }
 
-    // Web flow — unchanged.
-    const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/`,
-    });
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    // Web flow.
+    try {
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (result.error) {
+        console.error("Google sign-in error", result.error);
+        toast({
+          title: "Google sign-in failed",
+          description: result.error.message || "Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (e) {
+      console.error("Google sign-in threw", e);
+      toast({
+        title: "Google sign-in failed",
+        description: (e as Error)?.message || "Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
