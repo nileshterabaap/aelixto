@@ -3,10 +3,11 @@ import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
+import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 
 const THREADS_MIN_HEIGHT = 260;
 const THREADS_MAX_HEIGHT = 1400;
-const THREADS_DEFAULT_HEIGHT = 520;
+const THREADS_DEFAULT_HEIGHT = 380;
 
 const clampThreadsHeight = (height: number) =>
   Math.min(THREADS_MAX_HEIGHT, Math.max(THREADS_MIN_HEIGHT, Math.round(height)));
@@ -67,15 +68,24 @@ const ThreadsIframeEmbed = ({
   src,
   expandedUrl,
   fallbackData,
+  postId,
+  suggestedHeight,
 }: {
   src: string;
   expandedUrl: string;
   fallbackData: { title?: string; image?: string; description?: string } | null;
+  postId?: string | null;
+  suggestedHeight?: number | null;
 }) => {
   const [failed, setFailed] = useState(false);
-  const [height, setHeight] = useState(THREADS_DEFAULT_HEIGHT);
+  const [height, setHeight] = useState(() =>
+    suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
+      ? Math.min(THREADS_MAX_HEIGHT, suggestedHeight)
+      : THREADS_DEFAULT_HEIGHT
+  );
   const [hasLoaded, setHasLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const persistHeight = usePersistEmbedHeight(postId);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -91,6 +101,7 @@ const ThreadsIframeEmbed = ({
 
       const clampedHeight = clampThreadsHeight(nextHeight);
       setHeight((prev) => (Math.abs(prev - clampedHeight) > 2 ? clampedHeight : prev));
+      persistHeight(clampedHeight);
     };
 
     window.addEventListener('message', handleMessage);
@@ -155,14 +166,21 @@ const FacebookIframeEmbed = ({
   html,
   expandedUrl,
   fallbackData,
+  postId,
+  suggestedHeight,
 }: {
   html: string;
   expandedUrl: string;
   fallbackData: { title?: string; image?: string; description?: string } | null;
+  postId?: string | null;
+  suggestedHeight?: number | null;
 }) => {
   const [failed, setFailed] = useState(false);
-  const [height, setHeight] = useState(520); // sensible default
+  const [height, setHeight] = useState(() =>
+    suggestedHeight && suggestedHeight >= 200 ? Math.min(1400, suggestedHeight) : 420
+  );
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const persistHeight = usePersistEmbedHeight(postId);
 
   const srcMatch = html.match(/src="([^"]+)"/);
   const iframeSrc = srcMatch ? srcMatch[1] : '';
@@ -176,6 +194,7 @@ const FacebookIframeEmbed = ({
           // Facebook plugin sends {"type":"resize","height":XXX}
           if (parsed?.type === 'resize' && typeof parsed.height === 'number' && parsed.height > 50) {
             setHeight(parsed.height);
+            persistHeight(parsed.height);
           }
         } catch {
           // not JSON, ignore
