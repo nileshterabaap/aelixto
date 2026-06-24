@@ -5,9 +5,9 @@ import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 
-const THREADS_MIN_HEIGHT = 260;
+const THREADS_MIN_HEIGHT = 220;
 const THREADS_MAX_HEIGHT = 1400;
-const THREADS_DEFAULT_HEIGHT = 380;
+const THREADS_DEFAULT_HEIGHT = 280;
 
 const clampThreadsHeight = (height: number) =>
   Math.min(THREADS_MAX_HEIGHT, Math.max(THREADS_MIN_HEIGHT, Math.round(height)));
@@ -462,21 +462,20 @@ const buildLinkedInEmbed = (url: string): string | null => {
   return null;
 };
 
-// Build Threads embed using the OFFICIAL blockquote markup.
+// Build Threads embed using direct iframe to the /embed page.
 //
-// Why not a direct <iframe src=".../embed">? The Threads /embed page does
-// NOT post resize messages by itself — the auto-fit handshake lives in the
-// parent-side `threads.net/embed.js` script, which creates the iframe from
-// the blockquote and resizes it via a private MessageChannel protocol.
-// Direct iframes therefore stay locked at their initial height and leave
-// the blank space we kept seeing under Threads posts.
+// Note: Threads' /embed page does NOT post resize messages, and their
+// official SDK (embed.js) doesn't reliably re-process blockquotes in SPAs
+// (no public process() API). The direct-iframe approach renders the actual
+// post content; we use a conservative default height + create-time
+// measurement + persistEmbedHeight to keep blank space minimal.
 const buildThreadsEmbed = (url: string): string | null => {
   try {
     const u = new URL(url);
     const postMatch = u.pathname.match(/\/@([^/]+)\/post\/([A-Za-z0-9_-]+)/);
     if (postMatch) {
-      const canonical = `https://www.threads.net${u.pathname.replace(/\/$/, '')}`;
-      return `<blockquote class="text-post-media" data-text-post-permalink="${canonical}" data-text-post-version="0" style="background:transparent;border:0;margin:0;padding:0;"><a href="${canonical}"></a></blockquote>`;
+      const embedSrc = `https://www.threads.net${u.pathname.replace(/\/$/, '')}/embed`;
+      return `<iframe src="${embedSrc}" style="border:0;width:100%;overflow:hidden;background:transparent;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
