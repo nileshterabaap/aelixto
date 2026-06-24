@@ -704,6 +704,8 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             html={sanitizedHtml}
             expandedUrl={expandedUrl}
             fallbackData={fallbackData}
+            postId={postId}
+            suggestedHeight={suggestedHeight}
           />
         );
       }
@@ -748,6 +750,8 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             src={iframeSrc}
             expandedUrl={expandedUrl}
             fallbackData={fallbackData}
+            postId={postId}
+            suggestedHeight={suggestedHeight}
           />
         );
       }
