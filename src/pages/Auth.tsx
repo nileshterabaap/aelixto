@@ -327,12 +327,26 @@ const Auth = () => {
       return;
     }
 
-    // Web flow — unchanged.
-    const { error } = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: `${window.location.origin}/`,
-    });
-    if (error) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+    // Web flow.
+    try {
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (result.error) {
+        console.error("Google sign-in error", result.error);
+        toast({
+          title: "Google sign-in failed",
+          description: result.error.message || "Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (e) {
+      console.error("Google sign-in threw", e);
+      toast({
+        title: "Google sign-in failed",
+        description: (e as Error)?.message || "Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -418,7 +432,7 @@ const Auth = () => {
                   id="username"
                   name="username"
                   type="text"
-                  placeholder="coolcreator"
+                  placeholder="Username"
                   value={usernameValue}
                   onChange={(e) => setUsernameValue(e.target.value.replace(/\s/g, ""))}
                 />
@@ -434,11 +448,11 @@ const Auth = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-email">Email</Label>
-                <Input id="signup-email" name="signup-email" type="email" placeholder="you@example.com" required />
+                <Input id="signup-email" name="signup-email" type="email" placeholder="Email" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-password">Password</Label>
-                <Input id="signup-password" name="signup-password" type="password" placeholder="••••••••" required minLength={6} />
+                <Input id="signup-password" name="signup-password" type="password" placeholder="Password" required minLength={6} />
               </div>
               <Button
                 type="submit"
@@ -481,7 +495,7 @@ const Auth = () => {
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  placeholder="you@example.com or @username"
+                  placeholder="Email or username"
                   value={signinIdentifier}
                   onChange={(e) => setSigninIdentifier(e.target.value)}
                   required
@@ -489,7 +503,7 @@ const Auth = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signin-password">Password</Label>
-                <Input id="signin-password" name="signin-password" type="password" placeholder="••••••••" required />
+                <Input id="signin-password" name="signin-password" type="password" placeholder="Password" required />
               </div>
               <Button
                 type="submit"
