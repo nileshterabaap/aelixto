@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { OgCardFallback } from "@/components/OgCardFallback";
 import { supabase } from "@/integrations/supabase/client";
 import redditIcon from "@/assets/platforms/reddit.svg";
+import { usePersistEmbedHeight } from "@/hooks/usePersistEmbedHeight";
 
 type RedditEmbedProps = {
   url: string;
@@ -169,6 +170,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const validThumb = !!effectiveThumb && !thumbBroken && !sameUrl(effectiveThumb, authorAvatar);
   const fallbackImage = validThumb ? effectiveThumb! : undefined;
   const embedSrc = useMemo(() => (resolvedUrl ? toRedditEmbedSrc(resolvedUrl) : null), [resolvedUrl]);
+  const persistHeight = usePersistEmbedHeight(postId);
 
   // Detect broken/blocked Reddit thumbnails (e.g. URLs that 403 or 404) so the
   // fallback card swaps to the author's profile picture instead of rendering a
@@ -288,11 +290,12 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
       if (typeof candidate === "number" && candidate > 0) {
         const clamped = Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, Math.ceil(candidate)));
         setIframeHeight(clamped);
+        persistHeight(clamped, aspectRatio ?? null);
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [embedSrc]);
+  }, [embedSrc, persistHeight, aspectRatio]);
 
   if (resolving || (!resolvedUrl && !failed)) {
     return <div data-embed-status="loading" className="w-full" style={{ minHeight: iframeHeight }} />;
