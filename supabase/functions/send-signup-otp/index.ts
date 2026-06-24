@@ -75,9 +75,11 @@ Deno.serve(async (req) => {
         const { data: list } = await supabase.auth.admin.listUsers()
         const existing = list?.users?.find((u) => (u.email || '').toLowerCase() === email)
         if (existing?.email_confirmed_at) {
+          // Return 200 with an error field so the client-side invoke() surfaces
+          // the message instead of a generic non-2xx error.
           return new Response(
-            JSON.stringify({ error: 'An account with this email already exists. Please sign in.' }),
-            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            JSON.stringify({ error: 'An account with this email already exists. Please sign in instead.' }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
         // Unconfirmed — update password and continue to send a new OTP
