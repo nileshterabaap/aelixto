@@ -1540,6 +1540,10 @@ export type Database = {
           username: string
         }[]
       }
+      update_post_dimensions: {
+        Args: { _aspect?: number; _height: number; _post_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
