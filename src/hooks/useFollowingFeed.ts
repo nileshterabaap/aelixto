@@ -19,6 +19,9 @@ interface FeedPost {
   thumbnail_url: string | null;
   title: string | null;
   is_public: boolean;
+  media_kind?: string | null;
+  aspect_ratio?: number | null;
+  suggested_height?: number | null;
   is_repost?: boolean;
   reposted_by_user_id?: string | null;
   reposted_by_username?: string | null;
@@ -68,6 +71,9 @@ const fetchFeedPage = async (cursor?: string) => {
     thumbnail_url: item.thumbnail_url,
     title: item.title,
     is_public: item.is_public,
+    media_kind: item.media_kind,
+    aspect_ratio: item.aspect_ratio,
+    suggested_height: item.suggested_height,
     is_repost: item.is_repost,
     reposted_by_user_id: item.reposted_by_user_id,
     reposted_by_username: item.reposted_by_username,
