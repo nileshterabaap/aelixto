@@ -1,6 +1,10 @@
 ---
 name: Embed Auto-Height Persistence
-description: Threads/Facebook/Reddit iframe embeds measure rendered height via postMessage and persist to posts.suggested_height via RPC so future loads snap to exact size
+description: Threads/Facebook embeds measure rendered height at CREATE-time (hidden offscreen iframe in CreatePostDialog) and again at view-time, persisted to posts.suggested_height so the very first viewer (including the creator) opens the card at its real size
 type: feature
 ---
-Threads, Facebook, and Reddit iframe embeds listen for the platform's postMessage resize events. When a real height arrives, `usePersistEmbedHeight(postId)` debounces a write to the `update_post_dimensions` RPC (security definer, authed users only, only writes if >5% delta or empty). On next load, `useFollowingFeed` passes `suggested_height` → `HydratedEmbed` → `UniversalMetaEmbed` → `ThreadsIframeEmbed/FacebookIframeEmbed/RedditEmbed`, which seed the iframe at the cached pixel height — eliminating blank space below short embeds. Instagram still uses fixed 3/5 aspect (Instagram iframes don't reliably postMessage). Defaults lowered: Threads 380px, Facebook 420px.
+Two-stage measurement:
+1. CREATE TIME — `measureEmbedHeight(url)` in `src/lib/measureEmbedHeight.ts` mounts a hidden 500px-wide iframe in `CreatePostDialog.handleLinkSubmit`, listens for the platform's postMessage resize (Threads + Facebook only), and the measured height is saved on insert via `useCreatePost` → `posts.suggested_height`. The Post button waits up to 1.2s extra for the measurement before submitting.
+2. VIEW TIME — Threads/Facebook/Reddit embeds also listen for postMessage at render and call `usePersistEmbedHeight(postId)` → `update_post_dimensions` RPC (security definer, >5% delta gate) as a self-healing fallback.
+
+`useFollowingFeed` passes `suggested_height` → `HydratedEmbed` → `UniversalMetaEmbed` → `ThreadsIframeEmbed`/`FacebookIframeEmbed`/`RedditEmbed`, which seed the iframe at the cached pixel height. Instagram still uses fixed 3/5 aspect (no reliable postMessage). Defaults: Threads 380px, Facebook 420px.
