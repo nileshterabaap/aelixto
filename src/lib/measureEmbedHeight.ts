@@ -9,7 +9,14 @@
  * Other platforms resolve null and fall back to the viewer-time persistence.
  */
 
-type PlatformKind = "threads" | "facebook" | null;
+type PlatformKind =
+  | "threads"
+  | "facebook"
+  | "instagram"
+  | "tiktok"
+  | "linkedin"
+  | "pinterest"
+  | null;
 
 const detect = (url: string): PlatformKind => {
   const u = url.toLowerCase();
@@ -20,6 +27,10 @@ const detect = (url: string): PlatformKind => {
     u.includes("fb.me")
   )
     return "facebook";
+  if (u.includes("instagram.com") || u.includes("instagr.am")) return "instagram";
+  if (u.includes("tiktok.com")) return "tiktok";
+  if (u.includes("linkedin.com")) return "linkedin";
+  if (u.includes("pinterest.com") || u.includes("pin.it")) return "pinterest";
   return null;
 };
 
@@ -52,6 +63,78 @@ const buildFacebookSrc = (url: string): string | null => {
   } catch {
     return null;
   }
+};
+
+const buildInstagramSrc = (url: string): string | null => {
+  try {
+    const u = new URL(url);
+    const path = u.pathname.replace(/\/$/, "");
+    if (!/\/(p|reel|reels|tv)\/[A-Za-z0-9_-]+/.test(path)) return null;
+    return `https://www.instagram.com${path}/embed/captioned/`;
+  } catch {
+    return null;
+  }
+};
+
+const buildTikTokSrc = (url: string): string | null => {
+  try {
+    const u = new URL(url);
+    const m = u.pathname.match(/\/@[^/]+\/video\/(\d+)/);
+    if (!m) return null;
+    return `https://www.tiktok.com/embed/v2/${m[1]}`;
+  } catch {
+    return null;
+  }
+};
+
+const buildLinkedInSrc = (url: string): string | null => {
+  try {
+    const u = new URL(url);
+    const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
+    if (feedMatch) {
+      return `https://www.linkedin.com/embed/feed/update/${feedMatch[1]}?collapsed=1`;
+    }
+    const postMatch = u.pathname.match(/\/posts\/[^/]+[_-](?:ugcPost|activity)-(\d+)-/);
+    if (postMatch) {
+      const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
+      const type = typeMatch ? typeMatch[1] : "ugcPost";
+      return `https://www.linkedin.com/embed/feed/update/urn:li:${type}:${postMatch[1]}?collapsed=1`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const buildPinterestSrc = (url: string): string | null => {
+  try {
+    const u = new URL(url);
+    const m = u.pathname.match(/\/pin\/(\d+)/);
+    if (!m) return null;
+    return `https://assets.pinterest.com/ext/embed.html?id=${m[1]}`;
+  } catch {
+    return null;
+  }
+};
+
+const buildSrc = (platform: Exclude<PlatformKind, null>, url: string): string | null => {
+  switch (platform) {
+    case "threads":   return buildThreadsSrc(url);
+    case "facebook":  return buildFacebookSrc(url);
+    case "instagram": return buildInstagramSrc(url);
+    case "tiktok":    return buildTikTokSrc(url);
+    case "linkedin":  return buildLinkedInSrc(url);
+    case "pinterest": return buildPinterestSrc(url);
+  }
+};
+
+const ORIGIN_MATCH: Record<Exclude<PlatformKind, null>, (origin: string) => boolean> = {
+  threads:   (o) => o.includes("threads.net") || o.includes("threads.com"),
+  facebook:  (o) => o.includes("facebook.com"),
+  instagram: (o) => o.includes("instagram.com") || o.includes("cdninstagram.com"),
+  tiktok:    (o) => o.includes("tiktok.com"),
+  linkedin:  (o) => o.includes("linkedin.com"),
+  pinterest: (o) => o.includes("pinterest.com") || o.includes("pinimg.com"),
 };
 
 const extractHeight = (data: unknown): number | null => {
@@ -94,8 +177,7 @@ export async function measureEmbedHeight(
   const platform = detect(url);
   if (!platform) return null;
 
-  const src =
-    platform === "threads" ? buildThreadsSrc(url) : buildFacebookSrc(url);
+  const src = buildSrc(platform, url);
   if (!src) return null;
 
   return new Promise((resolve) => {
@@ -127,11 +209,7 @@ export async function measureEmbedHeight(
     const onMessage = (event: MessageEvent) => {
       if (event.source !== iframe.contentWindow) return;
       const origin = event.origin || "";
-      const validOrigin =
-        (platform === "threads" &&
-          (origin.includes("threads.net") || origin.includes("threads.com"))) ||
-        (platform === "facebook" && origin.includes("facebook.com"));
-      if (!validOrigin) return;
+      if (!ORIGIN_MATCH[platform](origin)) return;
 
       const h = extractHeight(event.data);
       if (!h) return;
