@@ -38,15 +38,17 @@ export function usePersistEmbedHeight(postId: string | null | undefined) {
         const payload = pendingRef.current;
         if (!payload) return;
         lastSentByPost.set(postId, payload.height);
-        supabase
-          .rpc("update_post_dimensions" as any, {
-            _post_id: postId,
-            _height: payload.height,
-            _aspect: payload.aspect,
-          } as any)
-          .catch(() => {
+        void (async () => {
+          try {
+            await supabase.rpc("update_post_dimensions" as any, {
+              _post_id: postId,
+              _height: payload.height,
+              _aspect: payload.aspect,
+            } as any);
+          } catch {
             // Silent — if RPC unavailable or rate-limited, just skip.
-          });
+          }
+        })();
       }, 1200);
     },
     [postId]
