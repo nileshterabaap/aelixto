@@ -462,15 +462,21 @@ const buildLinkedInEmbed = (url: string): string | null => {
   return null;
 };
 
-// Build Threads embed HTML using direct iframe (reliable in SPAs, no SDK needed)
+// Build Threads embed using the OFFICIAL blockquote markup.
+//
+// Why not a direct <iframe src=".../embed">? The Threads /embed page does
+// NOT post resize messages by itself — the auto-fit handshake lives in the
+// parent-side `threads.net/embed.js` script, which creates the iframe from
+// the blockquote and resizes it via a private MessageChannel protocol.
+// Direct iframes therefore stay locked at their initial height and leave
+// the blank space we kept seeing under Threads posts.
 const buildThreadsEmbed = (url: string): string | null => {
   try {
     const u = new URL(url);
     const postMatch = u.pathname.match(/\/@([^/]+)\/post\/([A-Za-z0-9_-]+)/);
     if (postMatch) {
-      const cleanPath = u.pathname.replace(/\/$/, '');
-      const embedUrl = `https://www.threads.net${cleanPath}/embed`.replace('threads.com', 'threads.net');
-      return `<iframe src="${embedUrl}" style="border:none;position:absolute;top:0;left:0;right:0;width:100%;max-width:100%;height:600px;display:block;margin:0;padding:0;background:transparent;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+      const canonical = `https://www.threads.net${u.pathname.replace(/\/$/, '')}`;
+      return `<blockquote class="text-post-media" data-text-post-permalink="${canonical}" data-text-post-version="0" style="background:transparent;border:0;margin:0;padding:0;"><a href="${canonical}"></a></blockquote>`;
     }
   } catch {
     // Fall through
