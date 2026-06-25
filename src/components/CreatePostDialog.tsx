@@ -122,13 +122,30 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
         }
       } else if (linkUrl.includes("instagram.com") || linkUrl.includes("facebook.com") || linkUrl.includes("fb.watch") || linkUrl.includes("fb.me")) {
         const platform = linkUrl.includes("instagram.com") ? "instagram" : "facebook";
+        if (platform === "facebook") {
+          try {
+            const { data: previewData, error } = await supabase.functions.invoke('fetch-post-preview', {
+              body: { url: linkUrl, platform: 'facebook', previewOnly: true }
+            });
+            if (!error && previewData) {
+              videoTitle = previewData.title || "";
+              thumbnail = previewData.thumbnail_url || "";
+              const previewText = previewData.preview_text ? String(previewData.preview_text).trim() : "";
+              if (previewText && !/^view on |^facebook$/i.test(previewText)) {
+                fetchedPreviewTextRef.current = previewText.slice(0, 4000);
+              }
+            }
+          } catch (error) {
+            console.error('[CreatePostDialog] Facebook preview fetch failed:', error);
+          }
+        }
         try {
           const { data, error } = await supabase.functions.invoke('fetch-meta-thumbnail', {
             body: { url: linkUrl, platform }
           });
           if (!error && data) {
-            videoTitle = data.title || "";
-            thumbnail = data.thumbnail || "";
+            if (!videoTitle) videoTitle = data.title || "";
+            if (!thumbnail) thumbnail = data.thumbnail || "";
             if (platform === 'facebook' && !fetchedPreviewTextRef.current) {
               const fullCaption = extractOriginalCaptionFromSourceTitle({
                 title: data.title,
