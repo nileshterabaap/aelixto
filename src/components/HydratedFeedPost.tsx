@@ -38,6 +38,7 @@ import { resolveRenderer } from "@/lib/resolveRenderer";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
 import { getOriginalPostCaption } from "@/lib/originalCaption";
+import { supabase } from "@/integrations/supabase/client";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
@@ -45,6 +46,7 @@ const revealedPostsCache = new Set<string>();
 // Hydrate posts well ahead of the viewport so the next ~6–7 posts in the
 // feed are always ready to display the moment the user scrolls to them.
 const HYDRATION_ROOT_MARGIN = '4500px 0px';
+const facebookCaptionHydrationRequested = new Set<string>();
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -123,6 +125,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [displayLikeCount, setDisplayLikeCount] = useState<number>(Number((post as any).likes_count ?? (post as any).likes ?? 0));
   const [displayCommentCount] = useState<number>(Number((post as any).comments_count ?? (post as any).comments ?? 0));
   const [displayRepostCount, setDisplayRepostCount] = useState<number>(Number((post as any).reposts_count ?? (post as any).shares ?? 0));
+  const [hydratedSourceCaption, setHydratedSourceCaption] = useState("");
+  const [hydratedPreviewImageUrl, setHydratedPreviewImageUrl] = useState<string | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
 
@@ -380,7 +384,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   
   // Normalize field access
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
-  const previewImageUrl = (post as any).preview_image_url;
+  const previewImageUrl = hydratedPreviewImageUrl || (post as any).preview_image_url;
   const mediaUrl = post.mediaUrl || (post as any).media_url;
   
   // Detect platform
@@ -388,6 +392,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const isYouTubePost = detectedPlatform === 'youtube';
   const shouldRenderMediaTitle = isYouTubePost || r.kind === 'image' || r.kind === 'video';
   const platform = getPlatformIcon(detectedPlatform);
+  const originalPostCaption = useMemo(() => getOriginalPostCaption({
+    previewText: hydratedSourceCaption || (post as any).preview_text,
+    title: post.title,
+    userCaption: post.content,
+    platform: detectedPlatform,
+  }), [hydratedSourceCaption, post.content, post.title, detectedPlatform, (post as any).preview_text]);
   
   // Always call hooks unconditionally
   const postActionsResult = usePostActions(post.id, userId || '', {
@@ -420,6 +430,45 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setDisplayLikeCount(Number((post as any).likes_count ?? (post as any).likes ?? 0));
     setDisplayRepostCount(Number((post as any).reposts_count ?? (post as any).shares ?? 0));
   }, [post.id, (post as any).likes_count, (post as any).likes, (post as any).reposts_count, (post as any).shares]);
+
+  useEffect(() => {
+    setHydratedSourceCaption("");
+    setHydratedPreviewImageUrl(null);
+  }, [post.id]);
+
+  useEffect(() => {
+    const needsFacebookHydration =
+      detectedPlatform === 'facebook' &&
+      !!mediaUrl &&
+      (!originalPostCaption || (!thumbnailUrl && !previewImageUrl));
+    if (!needsFacebookHydration) return;
+    if (facebookCaptionHydrationRequested.has(post.id)) return;
+    facebookCaptionHydrationRequested.add(post.id);
+
+    supabase.functions
+      .invoke('fetch-post-preview', {
+        body: {
+          postId: post.isRealPost ? post.id : undefined,
+          url: mediaUrl,
+          platform: 'facebook',
+          previewOnly: !post.isRealPost,
+        },
+      })
+      .then(({ data }) => {
+        const recovered = getOriginalPostCaption({
+          previewText: data?.preview_text,
+          title: data?.title,
+          userCaption: post.content,
+          platform: 'facebook',
+        });
+        if (recovered) setHydratedSourceCaption(recovered);
+        const recoveredImage = data?.thumbnail_url || data?.preview_image_url;
+        if (recoveredImage && !thumbnailUrl && !previewImageUrl) setHydratedPreviewImageUrl(recoveredImage);
+      })
+      .catch(() => {
+        facebookCaptionHydrationRequested.delete(post.id);
+      });
+  }, [detectedPlatform, originalPostCaption, mediaUrl, post.id, post.isRealPost, post.content, thumbnailUrl, previewImageUrl]);
 
   const handleLikeClick = useCallback(() => {
     if (!canUseActions) return;
@@ -546,17 +595,11 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
 
       {(() => {
-        const previewText = getOriginalPostCaption({
-          previewText: (post as any).preview_text,
-          title: post.title,
-          userCaption: post.content,
-          platform: detectedPlatform,
-        });
-        if (!previewText) return null;
+        if (!originalPostCaption) return null;
         return (
           <div className="px-5 pb-3">
             <CollapsibleCaption
-              content={previewText}
+              content={originalPostCaption}
               className="text-sm text-muted-foreground"
             />
           </div>

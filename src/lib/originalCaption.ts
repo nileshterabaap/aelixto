@@ -17,8 +17,31 @@ const cleanFacebookTitleCaption = (value: string) => {
   return text;
 };
 
+const BOOTSTRAP_TAIL_MARKERS = [
+  'function envFlush',
+  'ServerJSQueue.add',
+  'requireLazy',
+  'Bootloader',
+  'DTSGInitialData',
+  'window.Env',
+  'ajaxpipe_token',
+  'enableBootload',
+  'bumpVultureJSHash',
+  'AsyncRequest',
+  'IntlQtEventFalcoEvent',
+];
+
+const stripPageBootstrapDumpTail = (value: string) => {
+  let earliest = -1;
+  for (const marker of BOOTSTRAP_TAIL_MARKERS) {
+    const idx = value.indexOf(marker);
+    if (idx >= 0 && (earliest === -1 || idx < earliest)) earliest = idx;
+  }
+  return earliest >= 0 ? value.slice(0, earliest).trim() : value;
+};
+
 const normalizeCaption = (value: string) =>
-  decodeHtmlEntities(value).replace(/\s+/g, ' ').trim();
+  stripPageBootstrapDumpTail(decodeHtmlEntities(value)).replace(/\s+/g, ' ').trim();
 
 const looksClipped = (value: string) => /(?:\.\.\.|…)\s*$/u.test(value.trim());
 
@@ -39,7 +62,7 @@ export const extractOriginalCaptionFromSourceTitle = ({
 };
 
 const isJunkSourceCaption = (value: string) => {
-  const text = value.trim();
+  const text = stripPageBootstrapDumpTail(decodeHtmlEntities(value)).trim();
   return (
     !text ||
     /^view (this post )?on /i.test(text) ||
@@ -57,20 +80,7 @@ const isJunkSourceCaption = (value: string) => {
 // and treat them as junk so they never render as a "source caption".
 const isPageBootstrapDump = (value: string) => {
   const text = value.slice(0, 4000);
-  const bootstrapMarkers = [
-    'requireLazy',
-    'Bootloader',
-    'ServerJSQueue',
-    'envFlush',
-    'ajaxpipe_token',
-    'enableBootload',
-    'window.Env',
-    'bumpVultureJSHash',
-    '"__rc"',
-    '"rds":{"m"',
-    'AsyncRequest',
-    'IntlQtEventFalcoEvent',
-  ];
+  const bootstrapMarkers = [...BOOTSTRAP_TAIL_MARKERS, 'ServerJSQueue', 'envFlush', '"__rc"', '"rds":{"m"'];
   let hits = 0;
   for (const marker of bootstrapMarkers) {
     if (text.includes(marker)) {
@@ -79,6 +89,7 @@ const isPageBootstrapDump = (value: string) => {
     }
   }
   // Long strings that are mostly braces / quotes / brackets are code, not prose.
+  if (stripPageBootstrapDumpTail(value).trim() !== value.trim()) return false;
   if (text.length > 120) {
     const codey = (text.match(/[{}\[\]"`]/g) || []).length;
     if (codey / text.length > 0.18) return true;
