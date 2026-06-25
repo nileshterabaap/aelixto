@@ -1,19 +1,8 @@
-Success probability: 82%.
+Success probability: 86%.
 
 Plan:
-1. Fix the random Facebook code showing as caption
-   - Add a small client-side caption sanitizer before `CollapsibleCaption` renders source captions.
-   - Treat Facebook bootstrap/script dumps like `window.requireLazy`, `ServerJSQueue`, `envFlush`, `ajaxpipe_token`, `Bootloader`, etc. as junk and render nothing for that original-caption block.
-   - Keep normal Facebook/Reddit/Threads source captions untouched.
-
-2. Prevent bad Facebook HTML from being saved/displayed as text
-   - Tighten Facebook preview/embed handling so raw Facebook page HTML/script output is never accepted as a source caption or visible fallback text.
-   - If an embed function returns page code instead of a real iframe/preview, ignore that text and let the existing Facebook embed/fallback path handle media.
-
-3. Remove Facebook bottom whitespace
-   - Adjust the Facebook iframe renderer to height-lock the wrapper itself, not only the iframe.
-   - Use the saved/measured height when available, listen for Facebook resize messages, and clamp image-post height more tightly so the action bar sits directly below the image.
-   - Do not change PTR, feed RPC, Aelix score, realtime invalidations, or mark-as-seen logic.
-
-4. Verify
-   - Check the feed on a mobile-sized viewport for the two shown cases: no code-like caption text above the Facebook post, and no large white gap below the Facebook image before Aelixto actions.
+1. Patch only the Facebook embed renderer in `UniversalMetaEmbed.tsx`.
+2. For non-video Facebook posts, put the height on the outer wrapper too — right now only the iframe has height, so the parent can still reserve extra space.
+3. Add an image-post crop/trim mode: keep the Facebook iframe at the measured/plugin height, but show only the media-height portion in the wrapper so the white plugin footer cannot create a giant blank gap.
+4. Ignore stale persisted Facebook heights that are clearly too tall for image posts, so old bad measurements stop reappearing.
+5. Do not touch PTR, feed ordering, Aelix score, seen logic, auth, or backend functions.
