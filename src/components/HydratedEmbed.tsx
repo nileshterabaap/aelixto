@@ -327,7 +327,11 @@ export const HydratedEmbed = memo(({
         {/* Pinterest embed */}
         {r.kind === 'pinterest' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <PinterestEmbed url={r.url} />
+            <PinterestEmbed
+              url={r.url}
+              postId={post.id}
+              suggestedHeight={(post as any).suggested_height ?? null}
+            />
           </ImageViewTracker>
         )}
         
