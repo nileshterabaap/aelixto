@@ -45,6 +45,12 @@ const revealedPostsCache = new Set<string>();
 // feed are always ready to display the moment the user scrolls to them.
 const HYDRATION_ROOT_MARGIN = '4500px 0px';
 
+const decodeHtmlEntities = (value: string) => {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = value;
+  return textarea.value;
+};
+
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
   userId?: string;
@@ -541,7 +547,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
 
       {(() => {
-        const previewText = ((post as any).preview_text || '').trim();
+        const previewText = decodeHtmlEntities(((post as any).preview_text || '').trim());
         const userCaption = (post.content || '').trim();
         if (!previewText || previewText === userCaption) return null;
         return (

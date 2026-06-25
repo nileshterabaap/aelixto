@@ -107,6 +107,12 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
+const decodeHtmlEntities = (value: string) => {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = value;
+  return textarea.value;
+};
+
 export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -487,10 +493,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             Threads / Reddit etc.). Always rendered below the user's caption
             and above the embed, with the same collapsible "... more" toggle. */}
         {previewText &&
-          previewText.trim() &&
-          previewText.trim() !== (post.content || '').trim() && (
+          decodeHtmlEntities(previewText.trim()) &&
+          decodeHtmlEntities(previewText.trim()) !== (post.content || '').trim() && (
           <CollapsibleCaption
-            content={previewText}
+            content={decodeHtmlEntities(previewText.trim())}
             className="text-sm mb-3 text-muted-foreground"
           />
         )}
