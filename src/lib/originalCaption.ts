@@ -89,6 +89,7 @@ const isPageBootstrapDump = (value: string) => {
     }
   }
   // Long strings that are mostly braces / quotes / brackets are code, not prose.
+  if (stripPageBootstrapDumpTail(value).trim() !== value.trim()) return false;
   if (text.length > 120) {
     const codey = (text.match(/[{}\[\]"`]/g) || []).length;
     if (codey / text.length > 0.18) return true;
