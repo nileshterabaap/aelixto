@@ -39,7 +39,7 @@ interface ProfileData {
 function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { isRealPost: boolean; user_id: string; likes_count: number; comments_count: number } {
   // Ownership = the row's user_id (i.e. who owns this post/repost on this profile).
   // Using original_user_id here would hide the Delete button on your own reposts.
-  const postUserId = post.user_id;
+  const postUserId = post.is_repost ? String((post as any).profile_owner_id || post.user_id) : post.user_id;
   return {
     id: post.id,
     user_id: postUserId,
@@ -62,6 +62,7 @@ function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { 
     saves: post.saves_count,
     likes_count: post.likes_count || 0,
     comments_count: 0,
+    isRepost: !!post.is_repost,
     isRealPost: true,
   } as any;
 }
@@ -394,6 +395,7 @@ export const PlatformPostViewer = ({
                   post={transformPost(post, profileData)}
                   userId={user?.id}
                   startHydrated={true}
+                  onDeleted={onClose}
                 />
               </motion.div>
             ))
