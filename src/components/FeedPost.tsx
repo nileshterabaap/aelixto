@@ -483,6 +483,18 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <CollapsibleCaption content={post.content} />
         )}
 
+        {/* Original post caption fetched from the source link (Facebook /
+            Threads / Reddit etc.). Always rendered below the user's caption
+            and above the embed, with the same collapsible "... more" toggle. */}
+        {previewText &&
+          previewText.trim() &&
+          previewText.trim() !== (post.content || '').trim() && (
+          <CollapsibleCaption
+            content={previewText}
+            className="text-sm mb-3 text-muted-foreground"
+          />
+        )}
+
         {/* Feature flag check - show disabled message if embed is disabled */}
         {!embedEnabled && (
           <div className="rounded-2xl border-2 border-border bg-muted/30 p-8 text-center mb-3">
