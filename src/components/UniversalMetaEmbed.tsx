@@ -272,15 +272,22 @@ const FacebookIframeEmbed = ({
   // Detect video vs static post — image posts get a tighter cap so there's
   // no large blank strip below the photo before our action bar.
   const isVideo = /\/(video\.php|reel|videos|watch)/i.test(iframeSrc) || /fb\.watch/i.test(iframeSrc);
-  const MAX_HEIGHT = isVideo ? 1400 : 720;
-  const DEFAULT_HEIGHT = isVideo ? 520 : 380;
+  const MAX_HEIGHT = isVideo ? 1400 : 640;
+  const DEFAULT_HEIGHT = isVideo ? 520 : 360;
   const MIN_HEIGHT = 160;
+  // For image posts, the Facebook plugin appends a reactions/like/share footer
+  // (~120-150px) that creates a large blank strip above Aelix's own action
+  // bar. Render the iframe at full measured height but clip the wrapper so
+  // only the media area shows.
+  const FB_FOOTER_TRIM = isVideo ? 0 : 130;
+  const MAX_TRUSTED_SUGGESTED = isVideo ? 1400 : 760;
 
-  const [height, setHeight] = useState(() =>
-    suggestedHeight && suggestedHeight >= MIN_HEIGHT
-      ? Math.min(MAX_HEIGHT, suggestedHeight)
-      : DEFAULT_HEIGHT
-  );
+  const [height, setHeight] = useState(() => {
+    if (suggestedHeight && suggestedHeight >= MIN_HEIGHT && suggestedHeight <= MAX_TRUSTED_SUGGESTED) {
+      return Math.min(MAX_HEIGHT, suggestedHeight);
+    }
+    return DEFAULT_HEIGHT;
+  });
 
   // Listen for Facebook's cross-origin resize messages. FB plugins post a
   // few different shapes (`{type:"resize",height}`, nested xdArbiter payloads,
@@ -328,7 +335,11 @@ const FacebookIframeEmbed = ({
   return (
     <div
       className="relative w-full overflow-hidden"
-      style={{ touchAction: 'pan-y' }}
+      style={{
+        touchAction: 'pan-y',
+        width: '100%',
+        height: `${Math.max(MIN_HEIGHT, height - FB_FOOTER_TRIM)}px`,
+      }}
     >
       <iframe
         ref={iframeRef}
@@ -340,6 +351,9 @@ const FacebookIframeEmbed = ({
         onError={() => setFailed(true)}
         style={{
           border: 'none',
+          position: 'absolute',
+          top: 0,
+          left: 0,
           width: '100%',
           height: `${height}px`,
           overflow: 'hidden',
