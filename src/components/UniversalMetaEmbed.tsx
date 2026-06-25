@@ -556,7 +556,10 @@ const normalizeFacebookUrl = (raw: string): string => {
     .replace(/^https?:\/\/lm\.facebook\.com\//, 'https://www.facebook.com/')
     .replace(/^https?:\/\/l\.facebook\.com\//, 'https://www.facebook.com/');
 
-  // 2) If it's a login redirect, extract the actual post URL from "next" parameter
+  // 2) If it's a login redirect, extract the actual post URL from "next" parameter.
+  // Facebook photo/share links often route anonymous server-side expansion
+  // through /login/?next=<story.php...>; that does NOT mean the post is
+  // private. The plugins can render the next URL, but never the login URL.
   try {
     const u = new URL(url);
     if (u.hostname.endsWith('facebook.com') && u.pathname.includes('/login') && u.searchParams.get('next')) {
@@ -808,12 +811,17 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             if (!expandError && expandData?.finalUrl) {
               finalUrl = expandData.finalUrl;
               urlForEmbed = finalUrl;
-              
 
-              // If expanded URL is a login redirect or has login in title, use fallback
+              // A Facebook /login/?next=<post> expansion is still usable after
+              // normalizeFacebookUrl extracts the real post URL. Only fallback
+              // when there is no next= target to embed.
               if (finalUrl.includes('/login/') && platform === 'facebook') {
-                
-                shouldShowFallback = true;
+                try {
+                  const fbLogin = new URL(finalUrl);
+                  shouldShowFallback = !fbLogin.searchParams.get('next');
+                } catch {
+                  shouldShowFallback = true;
+                }
               }
 
               if (expandData?.title?.toLowerCase().includes('log in to facebook')) {
