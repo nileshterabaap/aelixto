@@ -67,7 +67,9 @@ const decodeHtmlEntities = (text: string): string => {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)));
 };
 
 function resolveUrl(maybeRelative: string, baseUrl: string): string | null {
@@ -499,9 +501,9 @@ serve(async (req) => {
             console.log('[fetch-og] Twitter syndication success:', thumbnail?.substring(0, 60));
             return new Response(
               JSON.stringify({ 
-                title: tweet.text?.substring(0, 100) || 'Tweet', 
+                title: tweet.user?.name ? `@${tweet.user.screen_name}` : 'X', 
                 image: thumbnail, 
-                description: tweet.user?.name ? `@${tweet.user.screen_name}` : 'View on X',
+                description: tweet.text?.substring(0, 4000) || '',
                 finalUrl: targetUrl 
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

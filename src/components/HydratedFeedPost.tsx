@@ -37,6 +37,7 @@ import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
+import { getOriginalPostCaption } from "@/lib/originalCaption";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
@@ -541,9 +542,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
 
       {(() => {
-        const previewText = ((post as any).preview_text || '').trim();
-        const userCaption = (post.content || '').trim();
-        if (!previewText || previewText === userCaption) return null;
+        const previewText = getOriginalPostCaption({
+          previewText: (post as any).preview_text,
+          title: post.title,
+          userCaption: post.content,
+          platform: detectedPlatform,
+        });
+        if (!previewText) return null;
         return (
           <div className="px-5 pb-3">
             <CollapsibleCaption
@@ -737,6 +742,9 @@ const arePropsEqual = (prev: HydratedFeedPostProps, next: HydratedFeedPostProps)
     p.title === n.title &&
     p.mediaUrl === n.mediaUrl &&
     p.thumbnailUrl === n.thumbnailUrl &&
+    (p as any).preview_text === (n as any).preview_text &&
+    (p as any).preview_title === (n as any).preview_title &&
+    (p as any).preview_image_url === (n as any).preview_image_url &&
     p.platform === n.platform &&
     p.saves === n.saves &&
     p.isRepost === n.isRepost &&

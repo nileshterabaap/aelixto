@@ -63,6 +63,9 @@ const Index = () => {
         mediaType: post.media_type as "image" | "video" | "none",
         mediaUrl: post.media_url || undefined,
         thumbnailUrl: post.thumbnail_url || undefined,
+        preview_text: post.preview_text,
+        preview_title: post.preview_title,
+        preview_image_url: post.preview_image_url,
         platform: post.platform as
           | "youtube"
           | "instagram"
@@ -100,6 +103,10 @@ const Index = () => {
       mediaType: post.media_type as "image" | "video" | "none",
       mediaUrl: post.media_url || undefined,
       thumbnailUrl: post.thumbnail_url || undefined,
+      preview_text: post.preview_text,
+      preview_title: post.preview_title,
+      preview_image_url: post.preview_image_url,
+      suggested_height: post.suggested_height,
       platform: post.platform as
         | "youtube"
         | "instagram"

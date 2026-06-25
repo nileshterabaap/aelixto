@@ -44,6 +44,7 @@ import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
+import { getOriginalPostCaption } from "@/lib/originalCaption";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -486,14 +487,21 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {/* Original post caption fetched from the source link (Facebook /
             Threads / Reddit etc.). Always rendered below the user's caption
             and above the embed, with the same collapsible "... more" toggle. */}
-        {previewText &&
-          previewText.trim() &&
-          previewText.trim() !== (post.content || '').trim() && (
-          <CollapsibleCaption
-            content={previewText}
-            className="text-sm mb-3 text-muted-foreground"
-          />
-        )}
+        {(() => {
+          const originalCaption = getOriginalPostCaption({
+            previewText,
+            title: post.title,
+            userCaption: post.content,
+            platform: detectedPlatform,
+          });
+          if (!originalCaption) return null;
+          return (
+            <CollapsibleCaption
+              content={originalCaption}
+              className="text-sm mb-3 text-muted-foreground"
+            />
+          );
+        })()}
 
         {/* Feature flag check - show disabled message if embed is disabled */}
         {!embedEnabled && (
