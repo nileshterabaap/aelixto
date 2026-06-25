@@ -432,11 +432,17 @@ serve(async (req) => {
             }
             
             console.log('[fetch-og] Reddit JSON API success:', thumbnail?.substring(0, 60) || 'no image');
+            // Prefer the actual post body (selftext) so creators get the
+            // original caption auto-filled. Fall back to author/byline.
+            const selftext = typeof post.selftext === 'string' ? post.selftext.trim() : '';
+            const captionText = selftext.length > 0
+              ? selftext.slice(0, 2000)
+              : (post.author ? `Posted by u/${post.author}` : (redditOembed?.description || 'View on Reddit'));
             return new Response(
               JSON.stringify({ 
                 title: post.title || redditOembed?.title || 'Reddit Post', 
                 image: thumbnail, 
-                description: post.author ? `Posted by u/${post.author}` : (redditOembed?.description || 'View on Reddit'),
+                description: captionText,
                 finalUrl: redditUrl 
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
