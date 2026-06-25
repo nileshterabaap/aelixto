@@ -175,7 +175,7 @@ export const usePostActions = (
         .eq("user_id", userId)
         .maybeSingle();
 
-      const { error } = await supabase
+      const { data: deletedRows, error } = await supabase
         .from("posts")
         .delete()
         .eq("id", postId)
@@ -183,6 +183,7 @@ export const usePostActions = (
         .select("id");
 
       if (error) throw error;
+      if (!deletedRows || deletedRows.length === 0) throw new Error("Post not found or not owned");
 
       return { createdAt: existing?.created_at as string | undefined, deletedRepost: false };
     },
