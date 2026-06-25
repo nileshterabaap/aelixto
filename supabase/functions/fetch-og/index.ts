@@ -310,6 +310,8 @@ function extractFacebookNextUrl(raw: string): string | null {
     if (!next) return null;
     const nextUrl = new URL(decodeURIComponent(next));
     if (!/(^|\.)facebook\.com$/i.test(nextUrl.hostname)) return null;
+    // rdid breaks Facebook's public plugin for story.php image posts.
+    nextUrl.searchParams.delete('rdid');
     const looksLikePost =
       /\/story\.php/i.test(nextUrl.pathname) ||
       /\/permalink\.php/i.test(nextUrl.pathname) ||
@@ -403,7 +405,7 @@ function extractFacebookPluginImage(html: string, baseUrl: string): string | nul
 }
 
 async function scrapeFacebookPlugin(url: string, fallbackUrl?: string): Promise<{ title: string | null; image: string | null; description: string | null; finalUrl: string }> {
-  const hrefs = [...new Set([url, fallbackUrl].filter(Boolean) as string[])];
+  const hrefs = [...new Set(([url, fallbackUrl].filter(Boolean) as string[]).map(normalizeFacebookPluginHref))];
   const endpoints = hrefs.flatMap((href) => [
     `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
     `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
@@ -434,6 +436,21 @@ async function scrapeFacebookPlugin(url: string, fallbackUrl?: string): Promise<
   }
 
   return { title: null, image: null, description: null, finalUrl: url };
+}
+
+function normalizeFacebookPluginHref(raw: string): string {
+  try {
+    const parsed = new URL(raw);
+    if (/(^|\.)facebook\.com$/i.test(parsed.hostname)) {
+      parsed.searchParams.delete('rdid');
+      parsed.searchParams.delete('mibextid');
+      parsed.searchParams.delete('__cft__');
+      parsed.searchParams.delete('__tn__');
+    }
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
 }
 
 serve(async (req) => {

@@ -419,6 +419,9 @@ function extractFacebookNextUrl(raw: string): string | null {
     if (!next) return null;
     const nextUrl = new URL(decodeURIComponent(next));
     if (!/(^|\.)facebook\.com$/i.test(nextUrl.hostname)) return null;
+    // Facebook share redirects add volatile rdid before share_url; the public
+    // plugin rejects otherwise-valid story.php URLs when that param is present.
+    nextUrl.searchParams.delete('rdid');
     const looksLikePost =
       /\/story\.php/i.test(nextUrl.pathname) ||
       /\/permalink\.php/i.test(nextUrl.pathname) ||
@@ -434,7 +437,7 @@ function extractFacebookNextUrl(raw: string): string | null {
 
 async function scrapeFacebookPlugin(url: string, fallbackUrl?: string): Promise<{ caption: string | null; image: string | null; title: string | null; imageWidth: number | null; imageHeight: number | null }> {
   const empty = { caption: null, image: null, title: null, imageWidth: null, imageHeight: null };
-  const hrefs = [...new Set([url, fallbackUrl].filter(Boolean) as string[])];
+  const hrefs = [...new Set(([url, fallbackUrl].filter(Boolean) as string[]).map(normalizeFacebookPluginHref))];
   const endpoints = hrefs.flatMap((href) => [
     `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
     `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
@@ -473,6 +476,21 @@ async function scrapeFacebookPlugin(url: string, fallbackUrl?: string): Promise<
   }
 
   return empty;
+}
+
+function normalizeFacebookPluginHref(raw: string): string {
+  try {
+    const parsed = new URL(raw);
+    if (/(^|\.)facebook\.com$/i.test(parsed.hostname)) {
+      parsed.searchParams.delete('rdid');
+      parsed.searchParams.delete('mibextid');
+      parsed.searchParams.delete('__cft__');
+      parsed.searchParams.delete('__tn__');
+    }
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
 }
 
 function extractFacebookPluginCaption(html: string): string | null {
