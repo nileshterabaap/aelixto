@@ -8,10 +8,34 @@ const decodeHtmlEntities = (value: string) => {
 const cleanFacebookTitleCaption = (value: string) => {
   let text = value.trim();
   // Facebook titles often arrive as: "8.7M views · 332K reactions | caption | Page".
-  text = text.replace(/^\s*[\d.,]+\s*[KMB]?\s+views?\s*·\s*[\d.,]+\s*[KMB]?\s+reactions?\s*\|\s*/i, '');
+  text = text
+    .replace(/^\s*[\d.,]+\s*[KMB]?\s+views?\s*(?:·|&#xb7;|&middot;|•)\s*[\d.,]+\s*[KMB]?\s+reactions?\s*\|\s*/i, '')
+    .replace(/^\s*[\d.,]+\s*[KMB]?\s+reactions?\s*(?:·|&#xb7;|&middot;|•)\s*[\d.,]+\s*[KMB]?\s+shares?\s*\|\s*/i, '')
+    .replace(/^\s*[\d.,]+\s*[KMB]?\s+(?:views?|reactions?|shares?)\s*\|\s*/i, '');
   const parts = text.split('|').map((part) => part.trim()).filter(Boolean);
   if (parts.length >= 2) return parts.slice(0, -1).join(' | ').trim();
   return text;
+};
+
+const normalizeCaption = (value: string) =>
+  decodeHtmlEntities(value).replace(/\s+/g, ' ').trim();
+
+const looksClipped = (value: string) => /(?:\.\.\.|…)\s*$/u.test(value.trim());
+
+export const extractOriginalCaptionFromSourceTitle = ({
+  title,
+  platform,
+}: {
+  title?: string | null;
+  platform?: string | null;
+}) => {
+  const rawTitle = title?.trim();
+  if (!rawTitle) return '';
+  const platformKey = (platform || '').toLowerCase();
+  const cleaned = platformKey === 'facebook' ? cleanFacebookTitleCaption(rawTitle) : rawTitle;
+  const decoded = normalizeCaption(cleaned);
+  if (!decoded || isJunkSourceCaption(decoded)) return '';
+  return decoded;
 };
 
 const isJunkSourceCaption = (value: string) => {
@@ -39,20 +63,32 @@ export const getOriginalPostCaption = ({
   platform?: string | null;
 }) => {
   const rawPreview = previewText?.trim();
-  const rawTitle = title?.trim();
-  const normalizedUserCaption = decodeHtmlEntities(userCaption?.trim() || '');
+  const normalizedUserCaption = normalizeCaption(userCaption?.trim() || '');
   const platformKey = (platform || '').toLowerCase();
 
   let candidate = rawPreview && !isJunkSourceCaption(rawPreview) ? rawPreview : '';
+  const titleCandidate = ['facebook', 'reddit', 'threads', 'twitter', 'x', 'tiktok'].includes(platformKey)
+    ? extractOriginalCaptionFromSourceTitle({ title, platform: platformKey })
+    : '';
+
+  // Facebook often gives a short OG description (~200 chars) but the oEmbed
+  // title contains the complete original caption. If the preview text is
+  // clipped, prefer the longer title-derived source caption.
+  if (platformKey === 'facebook' && titleCandidate) {
+    const normalizedPreview = candidate ? normalizeCaption(candidate) : '';
+    if (!normalizedPreview || looksClipped(normalizedPreview) || titleCandidate.length > normalizedPreview.length + 80) {
+      candidate = titleCandidate;
+    }
+  }
 
   // Existing Facebook/Reddit/Threads posts created before preview_text was wired
   // still have the original source text embedded in title. Use it only as a
   // fallback so future fetched captions remain authoritative.
-  if (!candidate && rawTitle && ['facebook', 'reddit', 'threads', 'twitter', 'x', 'tiktok'].includes(platformKey)) {
-    candidate = platformKey === 'facebook' ? cleanFacebookTitleCaption(rawTitle) : rawTitle;
+  if (!candidate && titleCandidate) {
+    candidate = titleCandidate;
   }
 
-  const decoded = decodeHtmlEntities(candidate).replace(/\s+/g, ' ').trim();
+  const decoded = normalizeCaption(candidate);
   if (!decoded || decoded === normalizedUserCaption) return '';
   if (isJunkSourceCaption(decoded)) return '';
   return decoded;
