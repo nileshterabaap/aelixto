@@ -307,7 +307,12 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ thumbnail_url: thumbnailUrl, title: previewTitle, preview_text: previewText }),
+      JSON.stringify({
+        thumbnail_url: thumbnailUrl,
+        preview_image_url: thumbnailUrl,
+        title: previewTitle,
+        preview_text: previewText,
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
