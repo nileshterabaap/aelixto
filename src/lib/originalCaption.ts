@@ -47,8 +47,43 @@ const isJunkSourceCaption = (value: string) => {
     /^log in to facebook$/i.test(text) ||
     /^facebook$/i.test(text) ||
     /^x$/i.test(text) ||
-    /^tweet$/i.test(text)
+    /^tweet$/i.test(text) ||
+    isPageBootstrapDump(text)
   );
+};
+
+// Facebook (and other platforms) occasionally leak raw page bootstrap / SDK
+// JavaScript into og:description or oEmbed title fields. Detect those dumps
+// and treat them as junk so they never render as a "source caption".
+const isPageBootstrapDump = (value: string) => {
+  const text = value.slice(0, 4000);
+  const bootstrapMarkers = [
+    'requireLazy',
+    'Bootloader',
+    'ServerJSQueue',
+    'envFlush',
+    'ajaxpipe_token',
+    'enableBootload',
+    'window.Env',
+    'bumpVultureJSHash',
+    '"__rc"',
+    '"rds":{"m"',
+    'AsyncRequest',
+    'IntlQtEventFalcoEvent',
+  ];
+  let hits = 0;
+  for (const marker of bootstrapMarkers) {
+    if (text.includes(marker)) {
+      hits += 1;
+      if (hits >= 1) return true;
+    }
+  }
+  // Long strings that are mostly braces / quotes / brackets are code, not prose.
+  if (text.length > 120) {
+    const codey = (text.match(/[{}\[\]"`]/g) || []).length;
+    if (codey / text.length > 0.18) return true;
+  }
+  return false;
 };
 
 export const getOriginalPostCaption = ({
