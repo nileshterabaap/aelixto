@@ -437,7 +437,11 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   }, [post.id]);
 
   useEffect(() => {
-    if (detectedPlatform !== 'facebook' || (!mediaUrl && originalPostCaption)) return;
+    const needsFacebookHydration =
+      detectedPlatform === 'facebook' &&
+      !!mediaUrl &&
+      (!originalPostCaption || (!thumbnailUrl && !previewImageUrl));
+    if (!needsFacebookHydration) return;
     if (facebookCaptionHydrationRequested.has(post.id)) return;
     facebookCaptionHydrationRequested.add(post.id);
 
@@ -464,7 +468,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       .catch(() => {
         facebookCaptionHydrationRequested.delete(post.id);
       });
-  }, [detedPlatform, originalPostCaption, mediaUrl, post.id, post.isRealPost, post.content, thumbnailUrl, previewImageUrl]);
+  }, [detectedPlatform, originalPostCaption, mediaUrl, post.id, post.isRealPost, post.content, thumbnailUrl, previewImageUrl]);
 
   const handleLikeClick = useCallback(() => {
     if (!canUseActions) return;
