@@ -499,6 +499,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setOgType(null);
     setDraftId(null);
     setSubmitState(null);
+    fetchedPreviewTextRef.current = null;
+    measuredHeightRef.current = null;
+    measurePromiseRef.current = null;
     onOpenChange(false);
   };
 
