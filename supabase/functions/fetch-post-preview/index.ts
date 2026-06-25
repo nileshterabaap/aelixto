@@ -134,18 +134,16 @@ serve(async (req) => {
         thumbnailUrl = isPreviewOnly ? imageUrl : await storeThumbnailPermanently(postId, imageUrl);
       };
 
-      const isJunk = (t: string | null) => {
-        const lower = (t || '').trim().toLowerCase();
-        return !lower || lower === 'facebook' || lower.includes('log in to facebook') || lower.includes('see posts, photos and more on facebook');
-      };
+      const isJunk = (t: string | null) => !cleanFacebookCaption(t);
 
       const oembedData = await fetchFacebookOembed(targetUrl);
       if (oembedData?.thumbnail_url) {
         await useThumb(oembedData.thumbnail_url);
       }
       if (oembedData?.title) {
-        previewText = oembedData.title;
-        previewTitle = oembedData.title;
+        const cleanedTitle = cleanFacebookCaption(oembedData.title);
+        previewText = cleanedTitle;
+        previewTitle = cleanedTitle;
       }
       oembedThumbW = oembedData?.thumbnail_width ?? null;
       oembedThumbH = oembedData?.thumbnail_height ?? null;
@@ -157,11 +155,12 @@ serve(async (req) => {
           await useThumb(ogData.image);
         }
         if (!previewText || isJunk(previewText)) {
-          const candidate = ogData.description || ogData.title || null;
-          if (!isJunk(candidate)) previewText = candidate;
+          const candidate = cleanFacebookCaption(ogData.description) || cleanFacebookCaption(ogData.title);
+          if (candidate) previewText = candidate;
         }
         if (!previewTitle || isJunk(previewTitle)) {
-          if (!isJunk(ogData.title)) previewTitle = ogData.title;
+          const cleanTitle = cleanFacebookCaption(ogData.title);
+          if (cleanTitle) previewTitle = cleanTitle;
         }
       }
 
@@ -559,8 +558,37 @@ function cleanFacebookCaption(text: string | null | undefined): string | null {
     .trim();
   cleaned = cleaned.replace(/^Facebook\s*[-–—:]?\s*/i, '').trim();
   const lower = cleaned.toLowerCase();
-  if (!cleaned || lower === 'facebook' || lower.includes('log in to facebook') || lower.includes('see posts, photos and more on facebook')) return null;
+  if (
+    !cleaned ||
+    lower === 'facebook' ||
+    lower.includes('log in to facebook') ||
+    lower.includes('see posts, photos and more on facebook') ||
+    isPageBootstrapDump(cleaned)
+  ) return null;
   return cleaned.slice(0, 4000);
+}
+
+function isPageBootstrapDump(value: string): boolean {
+  const text = value.slice(0, 4000);
+  const markers = [
+    'requireLazy',
+    'Bootloader',
+    'ServerJSQueue',
+    'envFlush',
+    'ajaxpipe_token',
+    'enableBootload',
+    'window.Env',
+    'bumpVultureJSHash',
+    'AsyncRequest',
+    'IntlQtEventFalcoEvent',
+    'DTSGInitialData',
+  ];
+  if (markers.some((marker) => text.includes(marker))) return true;
+  if (text.length > 120) {
+    const codey = (text.match(/[{}\[\]"`]/g) || []).length;
+    if (codey / text.length > 0.18) return true;
+  }
+  return false;
 }
 
 function extractFacebookPluginImage(html: string, baseUrl: string): { image: string | null; width: number | null; height: number | null } {

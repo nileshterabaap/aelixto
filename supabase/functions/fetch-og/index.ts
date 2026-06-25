@@ -334,8 +334,37 @@ function cleanFacebookCaption(text: string | null | undefined): string | null {
     .trim();
   cleaned = cleaned.replace(/^Facebook\s*[-–—:]?\s*/i, '').trim();
   const lower = cleaned.toLowerCase();
-  if (!cleaned || lower === 'facebook' || lower.includes('log in to facebook') || lower.includes('see posts, photos and more on facebook')) return null;
+  if (
+    !cleaned ||
+    lower === 'facebook' ||
+    lower.includes('log in to facebook') ||
+    lower.includes('see posts, photos and more on facebook') ||
+    isPageBootstrapDump(cleaned)
+  ) return null;
   return cleaned.slice(0, 4000);
+}
+
+function isPageBootstrapDump(value: string): boolean {
+  const text = value.slice(0, 4000);
+  const markers = [
+    'requireLazy',
+    'Bootloader',
+    'ServerJSQueue',
+    'envFlush',
+    'ajaxpipe_token',
+    'enableBootload',
+    'window.Env',
+    'bumpVultureJSHash',
+    'AsyncRequest',
+    'IntlQtEventFalcoEvent',
+    'DTSGInitialData',
+  ];
+  if (markers.some((marker) => text.includes(marker))) return true;
+  if (text.length > 120) {
+    const codey = (text.match(/[{}\[\]"`]/g) || []).length;
+    if (codey / text.length > 0.18) return true;
+  }
+  return false;
 }
 
 function extractFacebookPluginCaption(html: string): string | null {

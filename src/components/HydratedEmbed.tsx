@@ -148,14 +148,27 @@ export const HydratedEmbed = memo(({
   const forceUniversalRenderer =
     r.kind === 'raw' &&
     !!mediaUrl &&
-    (platformHint === 'threads' ||
+    (platformHint === 'facebook' ||
+      platformHint === 'threads' ||
       platformHint === 'linkedin' ||
       platformHint === 'instagram' ||
+      lowerUrl.includes('facebook.com/') ||
+      lowerUrl.includes('fb.watch/') ||
+      lowerUrl.includes('fb.me/') ||
       lowerUrl.includes('threads.net/') ||
       lowerUrl.includes('threads.com/') ||
       lowerUrl.includes('linkedin.com/') ||
       lowerUrl.includes('instagram.com/') ||
       lowerUrl.includes('instagr.am/'));
+
+  const isFacebookVideoLike =
+    platformHint === 'facebook' &&
+    (mediaTypeHint === 'video' ||
+      String((post as any).media_kind || '').toLowerCase() === 'video' ||
+      lowerUrl.includes('/reel/') ||
+      lowerUrl.includes('/videos/') ||
+      lowerUrl.includes('/watch/') ||
+      lowerUrl.includes('fb.watch/'));
 
   useEffect(() => {
     if (!shouldHydrate) return;
@@ -196,6 +209,33 @@ export const HydratedEmbed = memo(({
             loading="eager"
             decoding="async"
           />
+        </ImageViewTracker>
+      </div>
+    );
+  }
+
+  // Facebook photo posts render more reliably as the fetched media itself.
+  // The plugin iframe reserves a reactions/footer area that creates the blank
+  // strip the user reported; videos still use the iframe/player path.
+  if (shouldHydrate && platformHint === 'facebook' && effectiveThumbnail && !isFacebookVideoLike) {
+    return (
+      <div ref={embedContainerRef} className="w-full" data-embed-status="ready">
+        <ImageViewTracker postId={post.id}>
+          <a
+            href={mediaUrl || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleOriginalVisit}
+            className="block w-full overflow-hidden bg-muted"
+          >
+            <img
+              src={effectiveThumbnail}
+              alt="Facebook post content"
+              className="w-full h-auto object-contain"
+              loading="eager"
+              decoding="async"
+            />
+          </a>
         </ImageViewTracker>
       </div>
     );
