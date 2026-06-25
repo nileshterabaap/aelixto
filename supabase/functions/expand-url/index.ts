@@ -99,6 +99,28 @@ async function resolveRedditAppShareUrl(parsedTarget: URL): Promise<string | nul
   return bodyRedirect ? bodyRedirect.replace(/&amp;/g, '&') : null;
 }
 
+function extractFacebookNextUrl(raw: string): string | null {
+  try {
+    const parsed = new URL(raw);
+    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return null;
+    const next = parsed.searchParams.get('next');
+    if (!next) return null;
+    const decoded = decodeURIComponent(next);
+    const nextUrl = new URL(decoded);
+    if (!/(^|\.)facebook\.com$/i.test(nextUrl.hostname)) return null;
+    const looksLikePost =
+      /\/story\.php/i.test(nextUrl.pathname) ||
+      /\/permalink\.php/i.test(nextUrl.pathname) ||
+      /\/(?:photo|photos|posts|videos?|watch|reel)\b/i.test(nextUrl.pathname) ||
+      nextUrl.searchParams.has('story_fbid') ||
+      nextUrl.searchParams.has('fbid') ||
+      nextUrl.searchParams.has('v');
+    return looksLikePost ? nextUrl.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -154,6 +176,11 @@ serve(async (req) => {
     let finalUrl = redirectLocation && /^https?:\/\//i.test(redirectLocation)
       ? redirectLocation
       : response.url;
+
+    const facebookNextUrl = extractFacebookNextUrl(finalUrl);
+    if (facebookNextUrl) {
+      finalUrl = facebookNextUrl;
+    }
 
     console.log('[expand-url] Final URL:', finalUrl);
 
