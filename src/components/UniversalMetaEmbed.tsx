@@ -161,23 +161,18 @@ const ThreadsIframeEmbed = ({
 /**
  * Instagram iframe that adapts its visible height per post.
  *
- * The IG embed iframe always renders a ~500px "Add a comment / footer" area
- * at the bottom that we don't want to show. We crop it by sizing the
- * container to the visible height (header + media + caption) and making the
- * iframe itself 500px taller so the comment area falls outside the clipping
- * container.
- *
- * Visible height comes from (in order):
- *   1. `suggestedHeight` saved at create time (`measureEmbedHeight`)
- *      — that value already represents the FULL iframe height including
- *      the comment area, so we subtract `IG_COMMENT_TRIM` to get visible.
- *   2. Live postMessage updates from instagram.com (also full height).
- *   3. A reasonable default while we wait.
+ * Instagram's direct /embed/ iframe sends an exact MEASURE height for the
+ * rendered card. The previous large trim was based on /embed/captioned/ and
+ * caused exactly the two failures the user reported: short posts kept a huge
+ * blank area, while medium posts were cropped. Use the live /embed/ height and
+ * only trim the Instagram controls/comment footer so the media is complete and
+ * Instagram's duplicate action buttons don't show above Aelix's own actions.
  */
-const IG_COMMENT_TRIM = 500;
-const IG_MIN_VISIBLE = 320;
-const IG_MAX_VISIBLE = 1100;
+const IG_BOTTOM_CONTROLS_TRIM = 112;
+const IG_MIN_VISIBLE = 260;
+const IG_MAX_VISIBLE = 1000;
 const IG_DEFAULT_VISIBLE = 560;
+const IG_MAX_TRUSTED_SUGGESTED_HEIGHT = 900;
 
 const clampIgVisible = (h: number) =>
   Math.min(IG_MAX_VISIBLE, Math.max(IG_MIN_VISIBLE, Math.round(h)));
@@ -192,8 +187,11 @@ const InstagramIframeEmbed = ({
   suggestedHeight?: number | null;
 }) => {
   const [visible, setVisible] = useState(() => {
-    if (suggestedHeight && suggestedHeight > IG_COMMENT_TRIM + IG_MIN_VISIBLE) {
-      return clampIgVisible(suggestedHeight - IG_COMMENT_TRIM);
+    // Older saved Instagram heights may have come from /embed/captioned/ and
+    // can be 1000px+. Ignore those stale captioned values; the live /embed/
+    // MEASURE message will replace the fallback almost immediately.
+    if (suggestedHeight && suggestedHeight <= IG_MAX_TRUSTED_SUGGESTED_HEIGHT) {
+      return clampIgVisible(suggestedHeight - IG_BOTTOM_CONTROLS_TRIM);
     }
     return IG_DEFAULT_VISIBLE;
   });
@@ -208,12 +206,12 @@ const InstagramIframeEmbed = ({
       if (!origin.includes('instagram.com') && !origin.includes('cdninstagram.com')) return;
 
       const full = parseThreadsHeightFromMessage(event.data);
-      if (!full || full < IG_COMMENT_TRIM + IG_MIN_VISIBLE) return;
+      if (!full || full < IG_MIN_VISIBLE) return;
 
-      const nextVisible = clampIgVisible(full - IG_COMMENT_TRIM);
+      const nextVisible = clampIgVisible(full - IG_BOTTOM_CONTROLS_TRIM);
       setVisible((prev) => (Math.abs(prev - nextVisible) > 4 ? nextVisible : prev));
-      // Persist the FULL iframe height so create-time and view-time stay
-      // consistent (both store full height; only render-time trims).
+      // Persist the FULL /embed/ iframe height. Render-time trims only the IG
+      // controls/footer, and the live message keeps old captioned values healed.
       persistHeight(Math.round(full));
     };
     window.addEventListener('message', handler);
@@ -238,7 +236,7 @@ const InstagramIframeEmbed = ({
           top: 0,
           left: 0,
           width: '100%',
-          height: `${visible + IG_COMMENT_TRIM}px`,
+          height: `${visible + IG_BOTTOM_CONTROLS_TRIM}px`,
           overflow: 'hidden',
           display: 'block',
         }}

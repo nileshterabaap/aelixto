@@ -70,7 +70,7 @@ const buildInstagramSrc = (url: string): string | null => {
     const u = new URL(url);
     const path = u.pathname.replace(/\/$/, "");
     if (!/\/(p|reel|reels|tv)\/[A-Za-z0-9_-]+/.test(path)) return null;
-    return `https://www.instagram.com${path}/embed/captioned/`;
+    return `https://www.instagram.com${path}/embed/`;
   } catch {
     return null;
   }
