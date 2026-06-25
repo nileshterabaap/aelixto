@@ -196,6 +196,39 @@ serve(async (req) => {
       previewText = redditData.description || redditData.title;
       sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
     }
+    // LinkedIn — OG description is short. The public embed page exposes the
+    // full post commentary (with paragraph breaks) for any URN ID we can
+    // extract from the share URL.
+    else if (platform === 'linkedin') {
+      const ogData = await scrapeOgData(url, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)');
+      thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
+      previewText = ogData.description || ogData.title || null;
+      if (ogData.title) previewTitle = ogData.title;
+
+      const liEmbed = await fetchLinkedInEmbedCaption(url);
+      if (liEmbed.caption) {
+        // Prefer the embed caption when it has paragraph breaks or is longer
+        // than the OG description (which LinkedIn truncates near ~200 chars).
+        const prev = (previewText || '').trim();
+        if (!prev || liEmbed.caption.length > prev.length + 40 || liEmbed.caption.includes('\n')) {
+          previewText = liEmbed.caption;
+        }
+      }
+      if (!thumbnailUrl && liEmbed.image) {
+        thumbnailUrl = isPreviewOnly ? liEmbed.image : await storeThumbnailPermanently(postId, liEmbed.image);
+      }
+
+      const hasVideo = ogData.hasVideo;
+      const dims = ogData.imageWidth && ogData.imageHeight ? { w: ogData.imageWidth, h: ogData.imageHeight } : null;
+      const ar = dims ? clampAR(dims.w / dims.h) : null;
+      if (hasVideo) {
+        sizing = { media_kind: 'video', aspect_ratio: ar ?? 16 / 9, suggested_height: null };
+      } else if (thumbnailUrl) {
+        sizing = { media_kind: 'image', aspect_ratio: ar ?? 4 / 5, suggested_height: null };
+      } else {
+        sizing = { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(previewText) };
+      }
+    }
     // Article handling — try Medium RSS first (because Medium blocks the
     // normal HTML fetch for some posts), then fall back to the universal
     // metadata scraper that works on any website.
@@ -1297,4 +1330,80 @@ function resolveUrl(maybeRelative: string, baseUrl: string): string | null {
   } catch {
     return null;
   }
+}
+
+// LinkedIn — extract activity / share / ugcPost ID from any post URL flavour.
+function extractLinkedInUrn(url: string): string | null {
+  if (!url) return null;
+  // urn:li:activity:1234... already in the URL
+  const direct = url.match(/urn(?::|%3A)li(?::|%3A)(activity|share|ugcPost)(?::|%3A)(\d{6,})/i);
+  if (direct) return `urn:li:${direct[1]}:${direct[2]}`;
+  // /posts/<slug>-activity-1234567890-abcd
+  const activity = url.match(/-(activity|share|ugcPost)-(\d{6,})/i);
+  if (activity) return `urn:li:${activity[1]}:${activity[2]}`;
+  // /feed/update/urn:li:.../
+  const update = url.match(/\/feed\/update\/(urn:li:[a-zA-Z]+:\d+)/i);
+  if (update) return update[1];
+  return null;
+}
+
+async function fetchLinkedInEmbedCaption(url: string): Promise<{ caption: string | null; image: string | null }> {
+  const urn = extractLinkedInUrn(url);
+  if (!urn) return { caption: null, image: null };
+  const embedUrl = `https://www.linkedin.com/embed/feed/update/${urn}`;
+  try {
+    const res = await fetch(embedUrl, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    });
+    if (!res.ok) return { caption: null, image: null };
+    const html = await res.text();
+
+    // The post commentary lives inside a div with class
+    // `attributed-text-segment-list__content` (sometimes nested in
+    // `feed-shared-update-v2__commentary`). Capture the block, preserve
+    // <br>/</p> as newlines, and strip the rest of the markup.
+    const blockMatch =
+      html.match(/<div[^>]*class="[^"]*attributed-text-segment-list__content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
+      html.match(/<p[^>]*class="[^"]*commentary[^"]*"[^>]*>([\s\S]*?)<\/p>/i) ||
+      html.match(/<div[^>]*data-test-id="main-feed-activity-card__commentary"[^>]*>([\s\S]*?)<\/div>/i);
+
+    let caption: string | null = null;
+    if (blockMatch) {
+      caption = htmlBlockToText(blockMatch[1]);
+    } else {
+      // Fallback: OG description from the embed page itself (often fuller
+      // than the public post page, with newlines preserved).
+      const ogDesc = html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)?.[1];
+      if (ogDesc) caption = decodeHtmlEntities(ogDesc).trim();
+    }
+
+    // Hero/preview image from the embed page (avoids generic LinkedIn logo).
+    let image: string | null = null;
+    const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1];
+    if (ogImage) image = decodeHtmlEntities(ogImage).trim();
+
+    return { caption: caption || null, image: image || null };
+  } catch (error) {
+    console.error('[fetch-post-preview] LinkedIn embed scrape failed:', error);
+    return { caption: null, image: null };
+  }
+}
+
+function htmlBlockToText(snippet: string): string {
+  return decodeHtmlEntities(
+    snippet
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p\s*>/gi, '\n\n')
+      .replace(/<\/div\s*>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+  )
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }

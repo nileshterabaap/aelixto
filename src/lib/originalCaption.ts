@@ -41,7 +41,19 @@ const stripPageBootstrapDumpTail = (value: string) => {
 };
 
 const normalizeCaption = (value: string) =>
-  stripPageBootstrapDumpTail(decodeHtmlEntities(value)).replace(/\s+/g, ' ').trim();
+  stripPageBootstrapDumpTail(decodeHtmlEntities(value))
+    // Normalise Windows / Mac line endings.
+    .replace(/\r\n?/g, '\n')
+    // Treat various unicode line/paragraph separators as plain newlines so
+    // the visible paragraph breaks from the source post survive.
+    .replace(/[\u2028\u2029]/g, '\n')
+    // Collapse horizontal whitespace runs (spaces / tabs) only — keep \n.
+    .replace(/[ \t\f\v]+/g, ' ')
+    // Trim spaces around each newline.
+    .replace(/[ \t]*\n[ \t]*/g, '\n')
+    // Cap consecutive blank lines at one (i.e. max double-newline).
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
 const looksClipped = (value: string) => /(?:\.\.\.|…)\s*$/u.test(value.trim());
 
