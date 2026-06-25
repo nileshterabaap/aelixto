@@ -217,14 +217,20 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       if (imageFirstPlatform) return true;
       return !hasUsableTextThumbnail(p);
     });
+    const missingPreviewText = items.filter((p) => {
+      if (!p.media_url) return false;
+      if ((p.preview_text || "").trim()) return false;
+      return ["facebook", "reddit", "threads", "twitter", "x", "tiktok"].includes(platformLower);
+    });
     const expiring = items.filter((p) => isLikelyExpiringMetaCdnUrl(p.thumbnail_url));
-    if (!missing.length && !expiring.length) return;
+    if (!missing.length && !missingPreviewText.length && !expiring.length) return;
 
     let cancelled = false;
 
     (async () => {
       // small, safe concurrency (1-by-1) to avoid rate limits
-      for (const p of missing.slice(0, 6)) {
+      const backfillTargets = [...new Map([...missing, ...missingPreviewText].map((p) => [p.id, p])).values()];
+      for (const p of backfillTargets.slice(0, 6)) {
         if (cancelled) return;
         await backfillThumbnail(p);
       }
