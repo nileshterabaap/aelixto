@@ -46,7 +46,7 @@ const revealedPostsCache = new Set<string>();
 // Hydrate posts well ahead of the viewport so the next ~6–7 posts in the
 // feed are always ready to display the moment the user scrolls to them.
 const HYDRATION_ROOT_MARGIN = '4500px 0px';
-const facebookCaptionHydrationRequested = new Set<string>();
+const captionHydrationRequested = new Set<string>();
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -437,20 +437,22 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   }, [post.id]);
 
   useEffect(() => {
-    const needsFacebookHydration =
-      detectedPlatform === 'facebook' &&
+    const isHydratablePlatform =
+      detectedPlatform === 'facebook' || detectedPlatform === 'linkedin';
+    const needsHydration =
+      isHydratablePlatform &&
       !!mediaUrl &&
       (!originalPostCaption || (!thumbnailUrl && !previewImageUrl));
-    if (!needsFacebookHydration) return;
-    if (facebookCaptionHydrationRequested.has(post.id)) return;
-    facebookCaptionHydrationRequested.add(post.id);
+    if (!needsHydration) return;
+    if (captionHydrationRequested.has(post.id)) return;
+    captionHydrationRequested.add(post.id);
 
     supabase.functions
       .invoke('fetch-post-preview', {
         body: {
           postId: post.isRealPost ? post.id : undefined,
           url: mediaUrl,
-          platform: 'facebook',
+          platform: detectedPlatform,
           previewOnly: !post.isRealPost,
         },
       })
@@ -459,14 +461,14 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           previewText: data?.preview_text,
           title: data?.title,
           userCaption: post.content,
-          platform: 'facebook',
+          platform: detectedPlatform,
         });
         if (recovered) setHydratedSourceCaption(recovered);
         const recoveredImage = data?.thumbnail_url || data?.preview_image_url;
         if (recoveredImage && !thumbnailUrl && !previewImageUrl) setHydratedPreviewImageUrl(recoveredImage);
       })
       .catch(() => {
-        facebookCaptionHydrationRequested.delete(post.id);
+        captionHydrationRequested.delete(post.id);
       });
   }, [detectedPlatform, originalPostCaption, mediaUrl, post.id, post.isRealPost, post.content, thumbnailUrl, previewImageUrl]);
 
