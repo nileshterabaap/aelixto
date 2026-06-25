@@ -161,13 +161,20 @@ export const HydratedEmbed = memo(({
       lowerUrl.includes('instagram.com/') ||
       lowerUrl.includes('instagr.am/'));
 
+  const isFacebookPost =
+    platformHint === 'facebook' ||
+    lowerUrl.includes('facebook.com/') ||
+    lowerUrl.includes('fb.watch/') ||
+    lowerUrl.includes('fb.me/');
+
   const isFacebookVideoLike =
-    platformHint === 'facebook' &&
+    isFacebookPost &&
     (mediaTypeHint === 'video' ||
       String((post as any).media_kind || '').toLowerCase() === 'video' ||
       lowerUrl.includes('/reel/') ||
       lowerUrl.includes('/videos/') ||
       lowerUrl.includes('/watch/') ||
+      lowerUrl.includes('/share/v/') ||
       lowerUrl.includes('fb.watch/'));
 
   useEffect(() => {
@@ -217,7 +224,7 @@ export const HydratedEmbed = memo(({
   // Facebook photo posts render more reliably as the fetched media itself.
   // The plugin iframe reserves a reactions/footer area that creates the blank
   // strip the user reported; videos still use the iframe/player path.
-  if (shouldHydrate && platformHint === 'facebook' && effectiveThumbnail && !isFacebookVideoLike) {
+  if (shouldHydrate && isFacebookPost && effectiveThumbnail && !isFacebookVideoLike) {
     return (
       <div ref={embedContainerRef} className="w-full" data-embed-status="ready">
         <ImageViewTracker postId={post.id}>

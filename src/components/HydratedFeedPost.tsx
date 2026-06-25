@@ -126,6 +126,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [displayCommentCount] = useState<number>(Number((post as any).comments_count ?? (post as any).comments ?? 0));
   const [displayRepostCount, setDisplayRepostCount] = useState<number>(Number((post as any).reposts_count ?? (post as any).shares ?? 0));
   const [hydratedSourceCaption, setHydratedSourceCaption] = useState("");
+  const [hydratedPreviewImageUrl, setHydratedPreviewImageUrl] = useState<string | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
 
@@ -383,7 +384,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   
   // Normalize field access
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
-  const previewImageUrl = (post as any).preview_image_url;
+  const previewImageUrl = hydratedPreviewImageUrl || (post as any).preview_image_url;
   const mediaUrl = post.mediaUrl || (post as any).media_url;
   
   // Detect platform
@@ -432,10 +433,11 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
   useEffect(() => {
     setHydratedSourceCaption("");
+    setHydratedPreviewImageUrl(null);
   }, [post.id]);
 
   useEffect(() => {
-    if (detectedPlatform !== 'facebook' || originalPostCaption || !mediaUrl) return;
+    if (detectedPlatform !== 'facebook' || (!mediaUrl && originalPostCaption)) return;
     if (facebookCaptionHydrationRequested.has(post.id)) return;
     facebookCaptionHydrationRequested.add(post.id);
 
@@ -456,11 +458,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           platform: 'facebook',
         });
         if (recovered) setHydratedSourceCaption(recovered);
+        const recoveredImage = data?.thumbnail_url || data?.preview_image_url;
+        if (recoveredImage && !thumbnailUrl && !previewImageUrl) setHydratedPreviewImageUrl(recoveredImage);
       })
       .catch(() => {
         facebookCaptionHydrationRequested.delete(post.id);
       });
-  }, [detectedPlatform, originalPostCaption, mediaUrl, post.id, post.isRealPost, post.content]);
+  }, [detedPlatform, originalPostCaption, mediaUrl, post.id, post.isRealPost, post.content, thumbnailUrl, previewImageUrl]);
 
   const handleLikeClick = useCallback(() => {
     if (!canUseActions) return;
