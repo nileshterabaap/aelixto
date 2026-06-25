@@ -125,7 +125,7 @@ serve(async (req) => {
       if (targetUrl.includes('facebook.com/share/') || targetUrl.includes('fb.watch') || targetUrl.includes('fb.me')) {
         try {
           const res = await fetch(targetUrl, { method: 'GET', redirect: 'follow', headers: { 'User-Agent': 'facebookexternalhit/1.1' } });
-          targetUrl = res.url;
+          targetUrl = extractFacebookNextUrl(res.url) || res.url;
         } catch (e) { console.error('[fetch-post-preview] FB expansion failed', e); }
       }
 
@@ -169,7 +169,7 @@ serve(async (req) => {
       // recovers captions from data-testid="post_message" plus scontent images
       // when both Graph oEmbed and OG scraping are blocked by login walls.
       if (!thumbnailUrl || isJunk(previewText)) {
-        const pluginData = await scrapeFacebookPlugin(targetUrl);
+        const pluginData = await scrapeFacebookPlugin(targetUrl, url);
         if (!thumbnailUrl && pluginData.image) {
           await useThumb(pluginData.image);
         }
@@ -411,12 +411,34 @@ async function fetchFacebookOembed(url: string): Promise<{ thumbnail_url: string
   }
 }
 
-async function scrapeFacebookPlugin(url: string): Promise<{ caption: string | null; image: string | null; title: string | null; imageWidth: number | null; imageHeight: number | null }> {
+function extractFacebookNextUrl(raw: string): string | null {
+  try {
+    const parsed = new URL(raw);
+    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return null;
+    const next = parsed.searchParams.get('next');
+    if (!next) return null;
+    const nextUrl = new URL(decodeURIComponent(next));
+    if (!/(^|\.)facebook\.com$/i.test(nextUrl.hostname)) return null;
+    const looksLikePost =
+      /\/story\.php/i.test(nextUrl.pathname) ||
+      /\/permalink\.php/i.test(nextUrl.pathname) ||
+      /\/(?:photo|photos|posts|videos?|watch|reel)\b/i.test(nextUrl.pathname) ||
+      nextUrl.searchParams.has('story_fbid') ||
+      nextUrl.searchParams.has('fbid') ||
+      nextUrl.searchParams.has('v');
+    return looksLikePost ? nextUrl.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function scrapeFacebookPlugin(url: string, fallbackUrl?: string): Promise<{ caption: string | null; image: string | null; title: string | null; imageWidth: number | null; imageHeight: number | null }> {
   const empty = { caption: null, image: null, title: null, imageWidth: null, imageHeight: null };
-  const endpoints = [
-    `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(url)}&show_text=true&width=500`,
-    `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=true&width=500`,
-  ];
+  const hrefs = [...new Set([url, fallbackUrl].filter(Boolean) as string[])];
+  const endpoints = hrefs.flatMap((href) => [
+    `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
+    `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
+  ]);
 
   for (const pluginUrl of endpoints) {
     try {
@@ -824,7 +846,11 @@ function isMisleadingRedditThumbnail(url: string): boolean {
 
 function isGenericPlaceholderImage(url: string): boolean {
   const lower = url.toLowerCase();
-  return lower.includes('images.unsplash.com') || lower.includes('source.unsplash.com');
+  return lower.includes('images.unsplash.com') ||
+    lower.includes('source.unsplash.com') ||
+    lower.includes('/images/login/qrcodeloginpizza') ||
+    lower.includes('static.xx.fbcdn.net') ||
+    lower.includes('/rsrc.php/');
 }
 
 function stripHtml(text: string): string {
