@@ -51,6 +51,7 @@ interface HydratedFeedPostProps {
   userId?: string;
   isActive?: boolean; // Controlled by parent - whether this post is near viewport
   startHydrated?: boolean; // Skip IntersectionObserver, hydrate immediately
+  onDeleted?: () => void;
 }
 
 const formatTimestamp = (date: Date) => {
@@ -98,7 +99,7 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
-export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
+export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false, onDeleted }: HydratedFeedPostProps) => {
   // If this post was already revealed in a previous render, skip ALL skeleton/transition work
   const alreadyRevealed = revealedPostsCache.has(post.id);
 
@@ -389,7 +390,10 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const platform = getPlatformIcon(detectedPlatform);
   
   // Always call hooks unconditionally
-  const postActionsResult = usePostActions(post.id, userId || '');
+  const postActionsResult = usePostActions(post.id, userId || '', {
+    isRepost: !!post.isRepost,
+    onDeleted,
+  });
   const repostActionsResult = useRepost(post.id, userId || '');
   
   const canUseActions = post.isRealPost && !!userId;
@@ -504,7 +508,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
               className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' ? 'w-6 h-6' : 'w-8 h-8'}`}
             />
           )}
-          {post.isRealPost && (post as any).user_id === userId && (
+          {post.isRealPost && !!userId && (post as any).user_id === userId && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">

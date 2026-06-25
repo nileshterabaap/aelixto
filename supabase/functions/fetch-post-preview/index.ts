@@ -118,10 +118,45 @@ serve(async (req) => {
     }
     // Facebook - use official oEmbed API with Meta token
     else if (platform === 'facebook') {
-      const oembedData = await fetchFacebookOembed(url);
+      let targetUrl = url;
+      // Expand Facebook share URLs
+      if (targetUrl.includes('facebook.com/share/')) {
+        try {
+          const res = await fetch(targetUrl, { method: 'GET', redirect: 'follow', headers: { 'User-Agent': 'facebookexternalhit/1.1' } });
+          targetUrl = res.url;
+        } catch (e) { console.error('[fetch-post-preview] FB expansion failed', e); }
+      }
+
+      const oembedData = await fetchFacebookOembed(targetUrl);
       if (oembedData?.thumbnail_url) {
         thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
       }
+      if (oembedData?.title) {
+        previewText = oembedData.title;
+        previewTitle = oembedData.title;
+      }
+      oembedThumbW = oembedData?.thumbnail_width ?? null;
+      oembedThumbH = oembedData?.thumbnail_height ?? null;
+
+      // Fallback: scrape OG metadata
+      if (!thumbnailUrl || !previewText) {
+        const ogData = await scrapeOgData(targetUrl, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)');
+        if (!thumbnailUrl && ogData.image && !isGenericPlaceholderImage(ogData.image)) {
+          thumbnailUrl = await storeThumbnailPermanently(postId, ogData.image);
+        }
+        const isJunk = (t: string | null) => !t || t.toLowerCase().includes('log in to facebook') || t.toLowerCase() === 'facebook';
+        if (!previewText || isJunk(previewText)) {
+          const candidate = ogData.description || ogData.title || null;
+          if (!isJunk(candidate)) previewText = candidate;
+        }
+        if (!previewTitle || isJunk(previewTitle)) {
+          if (!isJunk(ogData.title)) previewTitle = ogData.title;
+        }
+      }
+      const isReel = /\/reel\//i.test(targetUrl);
+      const isVideo = /\/videos?\//i.test(targetUrl);
+      const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : (isReel ? 9 / 16 : (isVideo ? 16 / 9 : 4 / 5));
+      sizing = { media_kind: isVideo || isReel ? 'video' : 'image', aspect_ratio: clampAR(ar), suggested_height: null };
       // Fallback: scrape OG metadata (works for share/p/ image posts where oEmbed requires app review)
       if (!thumbnailUrl || !previewText) {
         const ogData = await scrapeOgData(url, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)');
@@ -325,7 +360,7 @@ async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: strin
 }
 
 // Fetch Facebook thumbnail using official oEmbed API
-async function fetchFacebookOembed(url: string): Promise<{ thumbnail_url: string | null } | null> {
+async function fetchFacebookOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null; thumbnail_width: number | null; thumbnail_height: number | null } | null> {
   const metaToken = Deno.env.get('META_APP_TOKEN');
   
   if (!metaToken) {
@@ -360,7 +395,7 @@ async function fetchFacebookOembed(url: string): Promise<{ thumbnail_url: string
       }
     }
 
-    return { thumbnail_url: thumbnailUrl };
+    return { thumbnail_url: thumbnailUrl, title: data.title || data.author_name || null, thumbnail_width: typeof data.thumbnail_width === "number" ? data.thumbnail_width : null, thumbnail_height: typeof data.thumbnail_height === "number" ? data.thumbnail_height : null };
   } catch (error) {
     console.error('[fetch-post-preview] Facebook oEmbed error:', error);
     return null;
