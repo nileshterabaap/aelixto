@@ -66,6 +66,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
   const handleLinkSubmit = async () => {
     if (!linkUrl.trim()) return;
+    fetchedPreviewTextRef.current = null;
+    measuredHeightRef.current = null;
+    measurePromiseRef.current = null;
     
     setIsLoadingPreview(true);
     
@@ -169,6 +172,22 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           }
         } catch (error) {
           console.error('[CreatePostDialog] Twitter OG fetch failed:', error);
+        }
+      } else if (linkUrl.includes("tiktok.com")) {
+        try {
+          const { data: previewData, error } = await supabase.functions.invoke('fetch-post-preview', {
+            body: { url: linkUrl, platform: 'tiktok', previewOnly: true }
+          });
+          if (!error && previewData) {
+            if (!videoTitle && previewData.title) videoTitle = previewData.title;
+            if (!thumbnail && previewData.thumbnail_url) thumbnail = previewData.thumbnail_url;
+            const previewText = previewData.preview_text ? String(previewData.preview_text).trim() : "";
+            if (!fetchedPreviewTextRef.current && previewText && !/^view on /i.test(previewText)) {
+              fetchedPreviewTextRef.current = previewText.slice(0, 4000);
+            }
+          }
+        } catch (error) {
+          console.error('[CreatePostDialog] TikTok preview fetch failed:', error);
         }
       }
       
@@ -532,6 +551,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setOgType(null);
     setDraftId(null);
     setSubmitState(null);
+    fetchedPreviewTextRef.current = null;
+    measuredHeightRef.current = null;
+    measurePromiseRef.current = null;
     onOpenChange(false);
   };
 
