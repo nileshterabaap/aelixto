@@ -37,6 +37,7 @@ import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
+import { getOriginalPostCaption } from "@/lib/originalCaption";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
@@ -44,12 +45,6 @@ const revealedPostsCache = new Set<string>();
 // Hydrate posts well ahead of the viewport so the next ~6–7 posts in the
 // feed are always ready to display the moment the user scrolls to them.
 const HYDRATION_ROOT_MARGIN = '4500px 0px';
-
-const decodeHtmlEntities = (value: string) => {
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = value;
-  return textarea.value;
-};
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -547,9 +542,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
 
       {(() => {
-        const previewText = decodeHtmlEntities(((post as any).preview_text || '').trim());
-        const userCaption = (post.content || '').trim();
-        if (!previewText || previewText === userCaption) return null;
+        const previewText = getOriginalPostCaption({
+          previewText: (post as any).preview_text,
+          title: post.title,
+          userCaption: post.content,
+          platform: detectedPlatform,
+        });
+        if (!previewText) return null;
         return (
           <div className="px-5 pb-3">
             <CollapsibleCaption
