@@ -405,7 +405,7 @@ function extractFacebookPluginImage(html: string, baseUrl: string): string | nul
 }
 
 async function scrapeFacebookPlugin(url: string, fallbackUrl?: string): Promise<{ title: string | null; image: string | null; description: string | null; finalUrl: string }> {
-  const hrefs = [...new Set(([url, fallbackUrl].filter(Boolean) as string[]).map(normalizeFacebookPluginHref))];
+  const hrefs = [...new Set(([url, fallbackUrl].filter(Boolean) as string[]).flatMap(getFacebookPluginHrefs))];
   const endpoints = hrefs.flatMap((href) => [
     `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
     `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
@@ -451,6 +451,38 @@ function normalizeFacebookPluginHref(raw: string): string {
   } catch {
     return raw;
   }
+}
+
+function getFacebookPluginHrefs(raw: string): string[] {
+  const normalized = normalizeFacebookPluginHref(raw);
+  const candidates = [normalized];
+  try {
+    const parsed = new URL(normalized);
+    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return candidates;
+
+    let storyId = parsed.searchParams.get('story_fbid') || parsed.searchParams.get('fbid');
+    let pageId = parsed.searchParams.get('id');
+    const postId = parsed.searchParams.get('post_id');
+    if (postId?.includes('_')) {
+      const [postPageId, postStoryId] = postId.split('_');
+      pageId = pageId || postPageId;
+      storyId = storyId || postStoryId;
+    }
+    const pathPost = parsed.pathname.match(/^\/(\d+)\/posts\/(\d+)/i);
+    if (pathPost) {
+      pageId = pageId || pathPost[1];
+      storyId = storyId || pathPost[2];
+    }
+
+    if (storyId && pageId) {
+      candidates.push(`https://www.facebook.com/story.php?story_fbid=${encodeURIComponent(storyId)}&id=${encodeURIComponent(pageId)}`);
+      candidates.push(`https://www.facebook.com/permalink.php?story_fbid=${encodeURIComponent(storyId)}&id=${encodeURIComponent(pageId)}`);
+      candidates.push(`https://www.facebook.com/${encodeURIComponent(pageId)}/posts/${encodeURIComponent(storyId)}`);
+    }
+  } catch {
+    // keep normalized URL only
+  }
+  return candidates;
 }
 
 serve(async (req) => {
