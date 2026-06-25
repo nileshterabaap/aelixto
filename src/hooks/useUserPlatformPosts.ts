@@ -60,11 +60,11 @@ const hasUsableTextThumbnail = (post: PlatformPost) => {
   return !!content || hasTitle || hasPreviewTitle || (!!previewText && previewText !== "Threads");
 };
 
-async function backfillThumbnail(post: PlatformPost) {
+async function backfillThumbnail(post: PlatformPost, force = false) {
   if (!post.media_url || !post.platform) return;
   const platform = post.platform.toLowerCase();
   if (!THUMB_BACKFILL_PLATFORMS.has(platform)) return;
-  if (post.thumbnail_url && !isGenericPlaceholderThumbnail(post.thumbnail_url)) return;
+  if (!force && post.thumbnail_url && !isGenericPlaceholderThumbnail(post.thumbnail_url)) return;
   // For Reddit/Instagram/Facebook/TikTok, ALWAYS try to recover the real
   // media thumbnail even when we have usable text — an image post should
   // show the image, not its title. For pure text platforms (Threads, X,
@@ -229,10 +229,11 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
 
     (async () => {
       // small, safe concurrency (1-by-1) to avoid rate limits
+      const previewTextIds = new Set(missingPreviewText.map((p) => p.id));
       const backfillTargets = [...new Map([...missing, ...missingPreviewText].map((p) => [p.id, p])).values()];
       for (const p of backfillTargets.slice(0, 6)) {
         if (cancelled) return;
-        await backfillThumbnail(p);
+        await backfillThumbnail(p, previewTextIds.has(p.id));
       }
 
       // Also persist any currently-visible Meta CDN thumbnails so they don't break weeks later
