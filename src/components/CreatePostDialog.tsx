@@ -45,6 +45,10 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   // (including the creator) opens the card at its real size — no blank space.
   const measuredHeightRef = useRef<number | null>(null);
   const measurePromiseRef = useRef<Promise<number | null> | null>(null);
+  // Original post body fetched from the source link (Facebook/Reddit/Threads/etc.).
+  // Stored separately from the user's caption and saved as posts.preview_text so
+  // it renders inside the embedded card without ever touching the user's own caption.
+  const fetchedPreviewTextRef = useRef<string | null>(null);
 
   // Hydrate from existing draft when opening
   useEffect(() => {
@@ -173,9 +177,10 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             if (!videoTitle && ogData.title) videoTitle = ogData.title;
             if (ogData.image) thumbnail = ogData.image;
             if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
-            // Auto-prefill caption with the original post text for platforms
-            // whose body lives in OG description (Facebook, Reddit, Threads).
-            if (!caption.trim() && ogData.description) {
+            // Capture the original post body for platforms whose text lives in
+            // OG description (Facebook, Reddit, Threads). Stored separately from
+            // the user's caption — never overwrites what the user typed.
+            if (!fetchedPreviewTextRef.current && ogData.description) {
               const lower = linkUrl.toLowerCase();
               const wantsAutoCaption =
                 lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ||
@@ -184,7 +189,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
               if (wantsAutoCaption) {
                 const desc = String(ogData.description).trim();
                 if (desc && !/^view on |^posted by u\//i.test(desc)) {
-                  setCaption(desc.slice(0, 2000));
+                  fetchedPreviewTextRef.current = desc.slice(0, 4000);
                 }
               }
             }
@@ -198,8 +203,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
       // For Facebook/Reddit/Threads: even when a thumbnail was already found
       // by the platform-specific branch above, we still need a separate OG
-      // pass to grab the post body for the caption.
-      if (!caption.trim()) {
+      // pass to grab the post body. Stored as preview_text — independent of
+      // the user's caption.
+      if (!fetchedPreviewTextRef.current) {
         const lower = linkUrl.toLowerCase();
         const wantsAutoCaption =
           lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ||
@@ -212,10 +218,10 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             });
             const desc = ogData2?.description ? String(ogData2.description).trim() : '';
             if (desc && !/^view on |^posted by u\//i.test(desc)) {
-              setCaption(desc.slice(0, 2000));
+              fetchedPreviewTextRef.current = desc.slice(0, 4000);
             }
           } catch (e) {
-            console.warn('[CreatePostDialog] Caption auto-fill skipped:', e);
+            console.warn('[CreatePostDialog] Preview text fetch skipped:', e);
           }
         }
       }
@@ -438,6 +444,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
       suggested_height: suggestedHeight,
+      preview_text: fetchedPreviewTextRef.current || undefined,
     }, {
       onSuccess: (created: any) => {
         incrementDailyCount();
@@ -492,6 +499,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setOgType(null);
     setDraftId(null);
     setSubmitState(null);
+    fetchedPreviewTextRef.current = null;
+    measuredHeightRef.current = null;
+    measurePromiseRef.current = null;
     onOpenChange(false);
   };
 
