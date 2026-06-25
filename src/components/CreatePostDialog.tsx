@@ -18,6 +18,7 @@ import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts"
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 import { measureEmbedHeight } from "@/lib/measureEmbedHeight";
 import { estimateEmbedHeight } from "@/lib/estimateEmbedHeight";
+import { extractOriginalCaptionFromSourceTitle } from "@/lib/originalCaption";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -128,6 +129,15 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           if (!error && data) {
             videoTitle = data.title || "";
             thumbnail = data.thumbnail || "";
+            if (platform === 'facebook' && !fetchedPreviewTextRef.current) {
+              const fullCaption = extractOriginalCaptionFromSourceTitle({
+                title: data.title,
+                platform: 'facebook',
+              });
+              if (fullCaption) {
+                fetchedPreviewTextRef.current = fullCaption.slice(0, 4000);
+              }
+            }
           }
         } catch (error) {
           console.error(`[CreatePostDialog] ${platform} thumbnail fetch failed:`, error);
@@ -216,7 +226,13 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                 lower.includes('twitter.com') || lower.includes('x.com');
               if (wantsAutoCaption) {
                 const desc = String(ogData.description).trim();
-                if (desc && !/^view on |^posted by u\//i.test(desc)) {
+                const fullFacebookCaption = extractOriginalCaptionFromSourceTitle({
+                  title: ogData.title,
+                  platform: lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ? 'facebook' : undefined,
+                });
+                if (fullFacebookCaption) {
+                  fetchedPreviewTextRef.current = fullFacebookCaption.slice(0, 4000);
+                } else if (desc && !/^view on |^posted by u\//i.test(desc)) {
                   fetchedPreviewTextRef.current = desc.slice(0, 4000);
                 }
               }
@@ -245,8 +261,14 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             const { data: ogData2 } = await supabase.functions.invoke('fetch-og', {
               body: { url: linkUrl }
             });
+            const fullFacebookCaption = extractOriginalCaptionFromSourceTitle({
+              title: ogData2?.title,
+              platform: lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ? 'facebook' : undefined,
+            });
             const desc = ogData2?.description ? String(ogData2.description).trim() : '';
-            if (desc && !/^view on |^posted by u\//i.test(desc)) {
+            if (fullFacebookCaption) {
+              fetchedPreviewTextRef.current = fullFacebookCaption.slice(0, 4000);
+            } else if (desc && !/^view on |^posted by u\//i.test(desc)) {
               fetchedPreviewTextRef.current = desc.slice(0, 4000);
             }
           } catch (e) {
