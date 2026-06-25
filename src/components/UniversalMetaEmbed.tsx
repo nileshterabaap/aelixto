@@ -654,7 +654,7 @@ const buildLinkedInEmbed = (url: string): string | null => {
     const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
     if (feedMatch) {
       const urn = feedMatch[1];
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
@@ -664,13 +664,13 @@ const buildLinkedInEmbed = (url: string): string | null => {
       const id = postMatch[1];
       const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
       const type = typeMatch ? typeMatch[1] : 'ugcPost';
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 3: /posts/username_slug-share-ID-hash
     const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
     if (shareMatch) {
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through to null
@@ -707,7 +707,7 @@ const buildTikTokEmbed = (url: string): string | null => {
     const videoMatch = u.pathname.match(/\/@[^/]+\/video\/(\d+)/);
     if (videoMatch) {
       const videoId = videoMatch[1];
-      return `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" style="border:none;width:100%;height:740px;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" style="border:none;width:100%;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
@@ -918,6 +918,8 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
       const isInstagramIframe = embedHtml.includes('instagram.com');
       const isThreadsIframe = embedHtml.includes('threads.net');
       const isFacebookIframe = embedHtml.includes('facebook.com/plugins/');
+      const isLinkedInIframe = embedHtml.includes('linkedin.com/embed');
+      const isTikTokIframe = embedHtml.includes('tiktok.com/embed');
 
       if (isFacebookIframe) {
         return (
@@ -925,6 +927,30 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             html={sanitizedHtml}
             expandedUrl={expandedUrl}
             fallbackData={fallbackData}
+            postId={postId}
+            suggestedHeight={suggestedHeight}
+          />
+        );
+      }
+
+      if (isLinkedInIframe) {
+        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
+        const iframeSrc = srcMatch ? srcMatch[1] : '';
+        return (
+          <LinkedInIframeEmbed
+            src={iframeSrc}
+            postId={postId}
+            suggestedHeight={suggestedHeight}
+          />
+        );
+      }
+
+      if (isTikTokIframe) {
+        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
+        const iframeSrc = srcMatch ? srcMatch[1] : '';
+        return (
+          <TikTokIframeEmbed
+            src={iframeSrc}
             postId={postId}
             suggestedHeight={suggestedHeight}
           />
