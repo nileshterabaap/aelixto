@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface PlatformPost {
   id: string;
   user_id: string;
+  profile_owner_id?: string | null;
   content: string;
   created_at: string;
   likes_count: number;
@@ -145,6 +146,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
         const pageItems = (data || []) as PlatformPost[];
         all.push(...pageItems.map((post) => ({
           ...post,
+          profile_owner_id: userId,
           preview_text: (post as any).preview_text ?? null,
           preview_title: (post as any).preview_title ?? null,
           preview_image_url: (post as any).preview_image_url ?? null,
