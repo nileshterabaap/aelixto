@@ -14,6 +14,19 @@ const cleanFacebookTitleCaption = (value: string) => {
   return text;
 };
 
+const isJunkSourceCaption = (value: string) => {
+  const text = value.trim();
+  return (
+    !text ||
+    /^view (this post )?on /i.test(text) ||
+    /^posted by u\//i.test(text) ||
+    /^log in to facebook$/i.test(text) ||
+    /^facebook$/i.test(text) ||
+    /^x$/i.test(text) ||
+    /^tweet$/i.test(text)
+  );
+};
+
 export const getOriginalPostCaption = ({
   previewText,
   title,
@@ -30,17 +43,17 @@ export const getOriginalPostCaption = ({
   const normalizedUserCaption = decodeHtmlEntities(userCaption?.trim() || '');
   const platformKey = (platform || '').toLowerCase();
 
-  let candidate = rawPreview || '';
+  let candidate = rawPreview && !isJunkSourceCaption(rawPreview) ? rawPreview : '';
 
   // Existing Facebook/Reddit/Threads posts created before preview_text was wired
   // still have the original source text embedded in title. Use it only as a
   // fallback so future fetched captions remain authoritative.
-  if (!candidate && rawTitle && ['facebook', 'reddit', 'threads'].includes(platformKey)) {
+  if (!candidate && rawTitle && ['facebook', 'reddit', 'threads', 'twitter', 'x', 'tiktok'].includes(platformKey)) {
     candidate = platformKey === 'facebook' ? cleanFacebookTitleCaption(rawTitle) : rawTitle;
   }
 
   const decoded = decodeHtmlEntities(candidate).replace(/\s+/g, ' ').trim();
   if (!decoded || decoded === normalizedUserCaption) return '';
-  if (/^view (this post )?on /i.test(decoded)) return '';
+  if (isJunkSourceCaption(decoded)) return '';
   return decoded;
 };

@@ -431,7 +431,9 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
         return {
           thumbnail_url: thumbnail,
           title: typeof post?.title === 'string' ? post.title : oembedData.title,
-          description: typeof post?.selftext === 'string' && post.selftext.trim() ? post.selftext : oembedData.description,
+          description: typeof post?.selftext === 'string' && post.selftext.trim()
+            ? post.selftext
+            : (typeof post?.title === 'string' ? post.title : null),
           post_data: post ?? null,
         };
       }
@@ -444,7 +446,7 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
   return {
     thumbnail_url: ogData.image && !isMisleadingRedditThumbnail(ogData.image) ? ogData.image : null,
     title: oembedData.title || ogData.title,
-    description: oembedData.description || ogData.description,
+    description: ogData.description || oembedData.title,
     post_data: null,
   };
 }
