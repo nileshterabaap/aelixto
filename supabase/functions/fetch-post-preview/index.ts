@@ -122,6 +122,19 @@ serve(async (req) => {
       if (oembedData?.thumbnail_url) {
         thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
       }
+      // Fallback: scrape OG metadata (works for share/p/ image posts where oEmbed requires app review)
+      if (!thumbnailUrl || !previewText) {
+        const ogData = await scrapeOgData(url, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)');
+        if (!thumbnailUrl && ogData.image && !isGenericPlaceholderImage(ogData.image)) {
+          thumbnailUrl = await storeThumbnailPermanently(postId, ogData.image);
+        }
+        if (!previewText) {
+          previewText = ogData.description || ogData.title || null;
+        }
+        if (!previewTitle) {
+          previewTitle = ogData.title || null;
+        }
+      }
       // /reel/ → 9:16 vertical, /videos/ → 16:9, else 4:5 portrait photo card
       const isReel = /\/reel\//i.test(url);
       const isVideo = /\/videos?\//i.test(url);
