@@ -177,6 +177,16 @@ export const HydratedEmbed = memo(({
       lowerUrl.includes('/share/v/') ||
       lowerUrl.includes('fb.watch/'));
 
+  const isLinkedInPost =
+    platformHint === 'linkedin' || lowerUrl.includes('linkedin.com/');
+
+  const isLinkedInVideoLike =
+    isLinkedInPost &&
+    (mediaTypeHint === 'video' ||
+      String((post as any).media_kind || '').toLowerCase() === 'video' ||
+      lowerUrl.includes('/video/') ||
+      lowerUrl.includes('/videos/'));
+
   useEffect(() => {
     if (!shouldHydrate) return;
     rememberHydratedPost(post.id);
@@ -238,6 +248,34 @@ export const HydratedEmbed = memo(({
             <img
               src={effectiveThumbnail}
               alt="Facebook post content"
+              className="w-full h-auto object-contain"
+              loading="eager"
+              decoding="async"
+            />
+          </a>
+        </ImageViewTracker>
+      </div>
+    );
+  }
+
+  // LinkedIn image posts: mirror the Facebook treatment — the official
+  // LinkedIn embed iframe leaves a tall blank strip below the media for the
+  // reactions/comments stub. Rendering the fetched preview image directly
+  // gives a tight, flexible card just like Facebook image posts.
+  if (shouldHydrate && isLinkedInPost && effectiveThumbnail && !isLinkedInVideoLike) {
+    return (
+      <div ref={embedContainerRef} className="w-full" data-embed-status="ready">
+        <ImageViewTracker postId={post.id}>
+          <a
+            href={mediaUrl || '#'}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleOriginalVisit}
+            className="block w-full overflow-hidden bg-muted"
+          >
+            <img
+              src={effectiveThumbnail}
+              alt="LinkedIn post content"
               className="w-full h-auto object-contain"
               loading="eager"
               decoding="async"

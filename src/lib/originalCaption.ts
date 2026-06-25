@@ -113,14 +113,14 @@ export const getOriginalPostCaption = ({
   const platformKey = (platform || '').toLowerCase();
 
   let candidate = rawPreview && !isJunkSourceCaption(rawPreview) ? rawPreview : '';
-  const titleCandidate = ['facebook', 'reddit', 'threads', 'twitter', 'x', 'tiktok'].includes(platformKey)
+  const titleCandidate = ['facebook', 'reddit', 'threads', 'twitter', 'x', 'tiktok', 'linkedin'].includes(platformKey)
     ? extractOriginalCaptionFromSourceTitle({ title, platform: platformKey })
     : '';
 
   // Facebook often gives a short OG description (~200 chars) but the oEmbed
   // title contains the complete original caption. If the preview text is
   // clipped, prefer the longer title-derived source caption.
-  if (platformKey === 'facebook' && titleCandidate) {
+  if ((platformKey === 'facebook' || platformKey === 'linkedin') && titleCandidate) {
     const normalizedPreview = candidate ? normalizeCaption(candidate) : '';
     if (!normalizedPreview || looksClipped(normalizedPreview) || titleCandidate.length > normalizedPreview.length + 80) {
       candidate = titleCandidate;
