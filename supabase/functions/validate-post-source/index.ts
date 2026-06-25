@@ -11,6 +11,28 @@ type Verdict = "ok" | "removed" | "unknown";
 const UA =
   "Mozilla/5.0 (compatible; AelixtoBot/1.0; +https://aelixto.com)";
 
+function extractFacebookNextUrl(raw: string): string | null {
+  try {
+    const parsed = new URL(raw);
+    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return null;
+    const next = parsed.searchParams.get("next");
+    if (!next) return null;
+    const decoded = decodeURIComponent(next);
+    const nextUrl = new URL(decoded);
+    if (!/(^|\.)facebook\.com$/i.test(nextUrl.hostname)) return null;
+    const looksLikePost =
+      /\/story\.php/i.test(nextUrl.pathname) ||
+      /\/permalink\.php/i.test(nextUrl.pathname) ||
+      /\/(?:photo|photos|posts|videos?|watch|reel)\b/i.test(nextUrl.pathname) ||
+      nextUrl.searchParams.has("story_fbid") ||
+      nextUrl.searchParams.has("fbid") ||
+      nextUrl.searchParams.has("v");
+    return looksLikePost ? nextUrl.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 async function fetchWithTimeout(url: string, init: RequestInit = {}, ms = 8000) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), ms);
@@ -82,7 +104,14 @@ export async function validate(platform: string | null, url: string | null): Pro
       try {
         const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } });
         const finalUrl = r.url || "";
-        if (/\/login\//i.test(finalUrl)) return "removed";
+        if (/\/login\//i.test(finalUrl)) {
+          // Facebook photo/share links often redirect anonymous server fetches
+          // through /login/?next=<real post URL> even when the post is public
+          // and embeddable. Treat those as reachable instead of blocking image
+          // posts at creation time.
+          if (extractFacebookNextUrl(finalUrl)) return "ok";
+          return "removed";
+        }
         if (r.status === 404 || r.status === 410) return "removed";
       } catch (_e) { /* ignore */ }
       return "unknown";
