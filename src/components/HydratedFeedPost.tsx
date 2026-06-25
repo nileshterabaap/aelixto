@@ -540,6 +540,20 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       )}
 
 
+      {(() => {
+        const previewText = ((post as any).preview_text || '').trim();
+        const userCaption = (post.content || '').trim();
+        if (!previewText || previewText === userCaption) return null;
+        return (
+          <div className="px-5 pb-3">
+            <CollapsibleCaption
+              content={previewText}
+              className="text-sm text-muted-foreground"
+            />
+          </div>
+        );
+      })()}
+
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
         <div ref={embedRef} className="relative" style={{ contain: 'layout paint' }}>
