@@ -196,6 +196,39 @@ serve(async (req) => {
       previewText = redditData.description || redditData.title;
       sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
     }
+    // LinkedIn — OG description is short. The public embed page exposes the
+    // full post commentary (with paragraph breaks) for any URN ID we can
+    // extract from the share URL.
+    else if (platform === 'linkedin') {
+      const ogData = await scrapeOgData(url, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)');
+      thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
+      previewText = ogData.description || ogData.title || null;
+      if (ogData.title) previewTitle = ogData.title;
+
+      const liEmbed = await fetchLinkedInEmbedCaption(url);
+      if (liEmbed.caption) {
+        // Prefer the embed caption when it has paragraph breaks or is longer
+        // than the OG description (which LinkedIn truncates near ~200 chars).
+        const prev = (previewText || '').trim();
+        if (!prev || liEmbed.caption.length > prev.length + 40 || liEmbed.caption.includes('\n')) {
+          previewText = liEmbed.caption;
+        }
+      }
+      if (!thumbnailUrl && liEmbed.image) {
+        thumbnailUrl = isPreviewOnly ? liEmbed.image : await storeThumbnailPermanently(postId, liEmbed.image);
+      }
+
+      const hasVideo = ogData.hasVideo;
+      const dims = ogData.imageWidth && ogData.imageHeight ? { w: ogData.imageWidth, h: ogData.imageHeight } : null;
+      const ar = dims ? clampAR(dims.w / dims.h) : null;
+      if (hasVideo) {
+        sizing = { media_kind: 'video', aspect_ratio: ar ?? 16 / 9, suggested_height: null };
+      } else if (thumbnailUrl) {
+        sizing = { media_kind: 'image', aspect_ratio: ar ?? 4 / 5, suggested_height: null };
+      } else {
+        sizing = { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(previewText) };
+      }
+    }
     // Article handling — try Medium RSS first (because Medium blocks the
     // normal HTML fetch for some posts), then fall back to the universal
     // metadata scraper that works on any website.
