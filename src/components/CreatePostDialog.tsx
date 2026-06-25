@@ -173,11 +173,50 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             if (!videoTitle && ogData.title) videoTitle = ogData.title;
             if (ogData.image) thumbnail = ogData.image;
             if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
+            // Auto-prefill caption with the original post text for platforms
+            // whose body lives in OG description (Facebook, Reddit, Threads).
+            if (!caption.trim() && ogData.description) {
+              const lower = linkUrl.toLowerCase();
+              const wantsAutoCaption =
+                lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ||
+                lower.includes('reddit.com') ||
+                lower.includes('threads.net') || lower.includes('threads.com');
+              if (wantsAutoCaption) {
+                const desc = String(ogData.description).trim();
+                if (desc && !/^view on |^posted by u\//i.test(desc)) {
+                  setCaption(desc.slice(0, 2000));
+                }
+              }
+            }
           } else {
             console.error('[CreatePostDialog] OG fetch error:', error);
           }
         } catch (error) {
           console.error('[CreatePostDialog] Failed to fetch OG data:', error);
+        }
+      }
+
+      // For Facebook/Reddit/Threads: even when a thumbnail was already found
+      // by the platform-specific branch above, we still need a separate OG
+      // pass to grab the post body for the caption.
+      if (!caption.trim()) {
+        const lower = linkUrl.toLowerCase();
+        const wantsAutoCaption =
+          lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ||
+          lower.includes('reddit.com') ||
+          lower.includes('threads.net') || lower.includes('threads.com');
+        if (wantsAutoCaption) {
+          try {
+            const { data: ogData2 } = await supabase.functions.invoke('fetch-og', {
+              body: { url: linkUrl }
+            });
+            const desc = ogData2?.description ? String(ogData2.description).trim() : '';
+            if (desc && !/^view on |^posted by u\//i.test(desc)) {
+              setCaption(desc.slice(0, 2000));
+            }
+          } catch (e) {
+            console.warn('[CreatePostDialog] Caption auto-fill skipped:', e);
+          }
         }
       }
       
