@@ -264,7 +264,7 @@ const FacebookIframeEmbed = ({
 }) => {
   const [failed, setFailed] = useState(false);
   const [height, setHeight] = useState(() =>
-    suggestedHeight && suggestedHeight >= 200 ? Math.min(1400, suggestedHeight) : 420
+    suggestedHeight && suggestedHeight >= 200 ? Math.min(1400, suggestedHeight) : 320
   );
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
@@ -272,21 +272,21 @@ const FacebookIframeEmbed = ({
   const srcMatch = html.match(/src="([^"]+)"/);
   const iframeSrc = srcMatch ? srcMatch[1] : '';
 
-  // Listen for Facebook's cross-origin resize messages
+  // Listen for Facebook's cross-origin resize messages. FB plugins post a
+  // few different shapes (`{type:"resize",height}`, nested xdArbiter payloads,
+  // `frame.height`, etc.) — use the generic extractor so we catch them all
+  // and snap the container to the real rendered height (kills blank space).
   useEffect(() => {
-    const handler = (e: MessageEvent) => {
-      if (typeof e.data === 'string') {
-        try {
-          const parsed = JSON.parse(e.data);
-          // Facebook plugin sends {"type":"resize","height":XXX}
-          if (parsed?.type === 'resize' && typeof parsed.height === 'number' && parsed.height > 50) {
-            setHeight(parsed.height);
-            persistHeight(parsed.height);
-          }
-        } catch {
-          // not JSON, ignore
-        }
-      }
+    const handler = (event: MessageEvent) => {
+      const iframeWindow = iframeRef.current?.contentWindow;
+      if (!iframeWindow || event.source !== iframeWindow) return;
+      const origin = event.origin || '';
+      if (!origin.includes('facebook.com')) return;
+      const next = parseThreadsHeightFromMessage(event.data);
+      if (!next || next < 80) return;
+      const clamped = Math.min(1400, Math.max(200, Math.round(next)));
+      setHeight((prev) => (Math.abs(prev - clamped) > 4 ? clamped : prev));
+      persistHeight(clamped);
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
