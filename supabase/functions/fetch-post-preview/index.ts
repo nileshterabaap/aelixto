@@ -116,20 +116,32 @@ serve(async (req) => {
       const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : 1;
       sizing = { media_kind: 'image', aspect_ratio: clampAR(ar), suggested_height: null };
     }
-    // Facebook - use official oEmbed API with Meta token
+    // Facebook - use official oEmbed API first, then the public plugin HTML.
+    // Direct Facebook pages often return a login wall to server-side fetches;
+    // the plugin endpoint still exposes public post captions/media.
     else if (platform === 'facebook') {
       let targetUrl = url;
       // Expand Facebook share URLs
-      if (targetUrl.includes('facebook.com/share/')) {
+      if (targetUrl.includes('facebook.com/share/') || targetUrl.includes('fb.watch') || targetUrl.includes('fb.me')) {
         try {
           const res = await fetch(targetUrl, { method: 'GET', redirect: 'follow', headers: { 'User-Agent': 'facebookexternalhit/1.1' } });
           targetUrl = res.url;
         } catch (e) { console.error('[fetch-post-preview] FB expansion failed', e); }
       }
 
+      const useThumb = async (imageUrl: string | null | undefined) => {
+        if (!imageUrl || isGenericPlaceholderImage(imageUrl)) return;
+        thumbnailUrl = isPreviewOnly ? imageUrl : await storeThumbnailPermanently(postId, imageUrl);
+      };
+
+      const isJunk = (t: string | null) => {
+        const lower = (t || '').trim().toLowerCase();
+        return !lower || lower === 'facebook' || lower.includes('log in to facebook') || lower.includes('see posts, photos and more on facebook');
+      };
+
       const oembedData = await fetchFacebookOembed(targetUrl);
       if (oembedData?.thumbnail_url) {
-        thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
+        await useThumb(oembedData.thumbnail_url);
       }
       if (oembedData?.title) {
         previewText = oembedData.title;
@@ -142,9 +154,8 @@ serve(async (req) => {
       if (!thumbnailUrl || !previewText) {
         const ogData = await scrapeOgData(targetUrl, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)');
         if (!thumbnailUrl && ogData.image && !isGenericPlaceholderImage(ogData.image)) {
-          thumbnailUrl = await storeThumbnailPermanently(postId, ogData.image);
+          await useThumb(ogData.image);
         }
-        const isJunk = (t: string | null) => !t || t.toLowerCase().includes('log in to facebook') || t.toLowerCase() === 'facebook';
         if (!previewText || isJunk(previewText)) {
           const candidate = ogData.description || ogData.title || null;
           if (!isJunk(candidate)) previewText = candidate;
@@ -153,31 +164,29 @@ serve(async (req) => {
           if (!isJunk(ogData.title)) previewTitle = ogData.title;
         }
       }
+
+      // Final fallback: public Facebook plugin page. This is the path that
+      // recovers captions from data-testid="post_message" plus scontent images
+      // when both Graph oEmbed and OG scraping are blocked by login walls.
+      if (!thumbnailUrl || isJunk(previewText)) {
+        const pluginData = await scrapeFacebookPlugin(targetUrl);
+        if (!thumbnailUrl && pluginData.image) {
+          await useThumb(pluginData.image);
+        }
+        if (isJunk(previewText) && pluginData.caption) {
+          previewText = pluginData.caption;
+        }
+        if (isJunk(previewTitle) && pluginData.title) {
+          previewTitle = pluginData.title;
+        }
+        if (oembedThumbW === null) oembedThumbW = pluginData.imageWidth;
+        if (oembedThumbH === null) oembedThumbH = pluginData.imageHeight;
+      }
+
       const isReel = /\/reel\//i.test(targetUrl);
       const isVideo = /\/videos?\//i.test(targetUrl);
       const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : (isReel ? 9 / 16 : (isVideo ? 16 / 9 : 4 / 5));
       sizing = { media_kind: isVideo || isReel ? 'video' : 'image', aspect_ratio: clampAR(ar), suggested_height: null };
-      // Fallback: scrape OG metadata (works for share/p/ image posts where oEmbed requires app review)
-      if (!thumbnailUrl || !previewText) {
-        const ogData = await scrapeOgData(url, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)');
-        if (!thumbnailUrl && ogData.image && !isGenericPlaceholderImage(ogData.image)) {
-          thumbnailUrl = await storeThumbnailPermanently(postId, ogData.image);
-        }
-        if (!previewText) {
-          previewText = ogData.description || ogData.title || null;
-        }
-        if (!previewTitle) {
-          previewTitle = ogData.title || null;
-        }
-      }
-      // /reel/ → 9:16 vertical, /videos/ → 16:9, else 4:5 portrait photo card
-      const isReel = /\/reel\//i.test(url);
-      const isVideo = /\/videos?\//i.test(url);
-      sizing = {
-        media_kind: 'video',
-        aspect_ratio: isReel ? 9 / 16 : (isVideo ? 16 / 9 : 4 / 5),
-        suggested_height: null,
-      };
     }
     // Reddit special handling
     else if (platform === 'reddit') {
