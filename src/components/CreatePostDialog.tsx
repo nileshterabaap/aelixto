@@ -108,6 +108,10 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           if (!error && previewData) {
             videoTitle = previewData.title || "";
             thumbnail = previewData.thumbnail_url || "";
+            const previewText = previewData.preview_text ? String(previewData.preview_text).trim() : "";
+            if (!fetchedPreviewTextRef.current && previewText && !/^view on |^posted by u\//i.test(previewText)) {
+              fetchedPreviewTextRef.current = previewText.slice(0, 4000);
+            }
           }
         } catch (error) {
           console.error('[CreatePostDialog] Reddit preview fetch failed:', error);
@@ -158,6 +162,10 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           if (!error && ogData) {
             videoTitle = ogData.title || "";
             thumbnail = ogData.image || "";
+            const previewText = ogData.description ? String(ogData.description).trim() : "";
+            if (!fetchedPreviewTextRef.current && previewText && !/^view on |^@/i.test(previewText)) {
+              fetchedPreviewTextRef.current = previewText.slice(0, 4000);
+            }
           }
         } catch (error) {
           console.error('[CreatePostDialog] Twitter OG fetch failed:', error);
@@ -185,7 +193,8 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
               const wantsAutoCaption =
                 lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ||
                 lower.includes('reddit.com') ||
-                lower.includes('threads.net') || lower.includes('threads.com');
+                lower.includes('threads.net') || lower.includes('threads.com') ||
+                lower.includes('twitter.com') || lower.includes('x.com');
               if (wantsAutoCaption) {
                 const desc = String(ogData.description).trim();
                 if (desc && !/^view on |^posted by u\//i.test(desc)) {
@@ -210,7 +219,8 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
         const wantsAutoCaption =
           lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ||
           lower.includes('reddit.com') ||
-          lower.includes('threads.net') || lower.includes('threads.com');
+          lower.includes('threads.net') || lower.includes('threads.com') ||
+          lower.includes('twitter.com') || lower.includes('x.com');
         if (wantsAutoCaption) {
           try {
             const { data: ogData2 } = await supabase.functions.invoke('fetch-og', {

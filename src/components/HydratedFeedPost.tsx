@@ -742,6 +742,9 @@ const arePropsEqual = (prev: HydratedFeedPostProps, next: HydratedFeedPostProps)
     p.title === n.title &&
     p.mediaUrl === n.mediaUrl &&
     p.thumbnailUrl === n.thumbnailUrl &&
+    (p as any).preview_text === (n as any).preview_text &&
+    (p as any).preview_title === (n as any).preview_title &&
+    (p as any).preview_image_url === (n as any).preview_image_url &&
     p.platform === n.platform &&
     p.saves === n.saves &&
     p.isRepost === n.isRepost &&

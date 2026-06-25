@@ -501,9 +501,9 @@ serve(async (req) => {
             console.log('[fetch-og] Twitter syndication success:', thumbnail?.substring(0, 60));
             return new Response(
               JSON.stringify({ 
-                title: tweet.text?.substring(0, 100) || 'Tweet', 
+                title: tweet.user?.name ? `@${tweet.user.screen_name}` : 'X', 
                 image: thumbnail, 
-                description: tweet.user?.name ? `@${tweet.user.screen_name}` : 'View on X',
+                description: tweet.text?.substring(0, 4000) || '',
                 finalUrl: targetUrl 
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
