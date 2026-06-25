@@ -125,7 +125,7 @@ serve(async (req) => {
       if (targetUrl.includes('facebook.com/share/') || targetUrl.includes('fb.watch') || targetUrl.includes('fb.me')) {
         try {
           const res = await fetch(targetUrl, { method: 'GET', redirect: 'follow', headers: { 'User-Agent': 'facebookexternalhit/1.1' } });
-          targetUrl = res.url;
+          targetUrl = extractFacebookNextUrl(res.url) || res.url;
         } catch (e) { console.error('[fetch-post-preview] FB expansion failed', e); }
       }
 
@@ -169,7 +169,7 @@ serve(async (req) => {
       // recovers captions from data-testid="post_message" plus scontent images
       // when both Graph oEmbed and OG scraping are blocked by login walls.
       if (!thumbnailUrl || isJunk(previewText)) {
-        const pluginData = await scrapeFacebookPlugin(targetUrl);
+        const pluginData = await scrapeFacebookPlugin(targetUrl, url);
         if (!thumbnailUrl && pluginData.image) {
           await useThumb(pluginData.image);
         }
@@ -411,20 +411,44 @@ async function fetchFacebookOembed(url: string): Promise<{ thumbnail_url: string
   }
 }
 
-async function scrapeFacebookPlugin(url: string): Promise<{ caption: string | null; image: string | null; title: string | null; imageWidth: number | null; imageHeight: number | null }> {
+function extractFacebookNextUrl(raw: string): string | null {
+  try {
+    const parsed = new URL(raw);
+    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return null;
+    const next = parsed.searchParams.get('next');
+    if (!next) return null;
+    const nextUrl = new URL(decodeURIComponent(next));
+    if (!/(^|\.)facebook\.com$/i.test(nextUrl.hostname)) return null;
+    // Facebook share redirects add volatile rdid before share_url; the public
+    // plugin rejects otherwise-valid story.php URLs when that param is present.
+    nextUrl.searchParams.delete('rdid');
+    const looksLikePost =
+      /\/story\.php/i.test(nextUrl.pathname) ||
+      /\/permalink\.php/i.test(nextUrl.pathname) ||
+      /\/(?:photo|photos|posts|videos?|watch|reel)\b/i.test(nextUrl.pathname) ||
+      nextUrl.searchParams.has('story_fbid') ||
+      nextUrl.searchParams.has('fbid') ||
+      nextUrl.searchParams.has('v');
+    return looksLikePost ? nextUrl.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+async function scrapeFacebookPlugin(url: string, fallbackUrl?: string): Promise<{ caption: string | null; image: string | null; title: string | null; imageWidth: number | null; imageHeight: number | null }> {
   const empty = { caption: null, image: null, title: null, imageWidth: null, imageHeight: null };
-  const endpoints = [
-    `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(url)}&show_text=true&width=500`,
-    `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(url)}&show_text=true&width=500`,
-  ];
+  const hrefs = [...new Set(([url, fallbackUrl].filter(Boolean) as string[]).flatMap(getFacebookPluginHrefs))];
+  const endpoints = hrefs.flatMap((href) => [
+    `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
+    `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
+  ]);
 
   for (const pluginUrl of endpoints) {
     try {
       const response = await fetch(pluginUrl, {
         redirect: 'follow',
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
           'Accept-Language': 'en-US,en;q=0.9',
         },
       });
@@ -451,6 +475,53 @@ async function scrapeFacebookPlugin(url: string): Promise<{ caption: string | nu
   }
 
   return empty;
+}
+
+function normalizeFacebookPluginHref(raw: string): string {
+  try {
+    const parsed = new URL(raw);
+    if (/(^|\.)facebook\.com$/i.test(parsed.hostname)) {
+      parsed.searchParams.delete('rdid');
+      parsed.searchParams.delete('mibextid');
+      parsed.searchParams.delete('__cft__');
+      parsed.searchParams.delete('__tn__');
+    }
+    return parsed.toString();
+  } catch {
+    return raw;
+  }
+}
+
+function getFacebookPluginHrefs(raw: string): string[] {
+  const normalized = normalizeFacebookPluginHref(raw);
+  const candidates = [normalized];
+  try {
+    const parsed = new URL(normalized);
+    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return candidates;
+
+    let storyId = parsed.searchParams.get('story_fbid') || parsed.searchParams.get('fbid');
+    let pageId = parsed.searchParams.get('id');
+    const postId = parsed.searchParams.get('post_id');
+    if (postId?.includes('_')) {
+      const [postPageId, postStoryId] = postId.split('_');
+      pageId = pageId || postPageId;
+      storyId = storyId || postStoryId;
+    }
+    const pathPost = parsed.pathname.match(/^\/(\d+)\/posts\/(\d+)/i);
+    if (pathPost) {
+      pageId = pageId || pathPost[1];
+      storyId = storyId || pathPost[2];
+    }
+
+    if (storyId && pageId) {
+      candidates.push(`https://www.facebook.com/story.php?story_fbid=${encodeURIComponent(storyId)}&id=${encodeURIComponent(pageId)}`);
+      candidates.push(`https://www.facebook.com/permalink.php?story_fbid=${encodeURIComponent(storyId)}&id=${encodeURIComponent(pageId)}`);
+      candidates.push(`https://www.facebook.com/${encodeURIComponent(pageId)}/posts/${encodeURIComponent(storyId)}`);
+    }
+  } catch {
+    // keep normalized URL only
+  }
+  return candidates;
 }
 
 function extractFacebookPluginCaption(html: string): string | null {
@@ -824,7 +895,11 @@ function isMisleadingRedditThumbnail(url: string): boolean {
 
 function isGenericPlaceholderImage(url: string): boolean {
   const lower = url.toLowerCase();
-  return lower.includes('images.unsplash.com') || lower.includes('source.unsplash.com');
+  return lower.includes('images.unsplash.com') ||
+    lower.includes('source.unsplash.com') ||
+    lower.includes('/images/login/qrcodeloginpizza') ||
+    lower.includes('static.xx.fbcdn.net') ||
+    lower.includes('/rsrc.php/');
 }
 
 function stripHtml(text: string): string {
