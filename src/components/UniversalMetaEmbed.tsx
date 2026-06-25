@@ -340,6 +340,135 @@ const FacebookIframeEmbed = ({
   );
 };
 
+/**
+ * LinkedIn iframe that adapts to its content height. LinkedIn's embed
+ * occasionally posts resize messages from linkedin.com; in all other cases
+ * we seed from the persisted suggestedHeight and self-heal at view time.
+ */
+const LI_MIN_HEIGHT = 260;
+const LI_MAX_HEIGHT = 1400;
+const LI_DEFAULT_HEIGHT = 460;
+
+const LinkedInIframeEmbed = ({
+  src,
+  postId,
+  suggestedHeight,
+}: {
+  src: string;
+  postId?: string | null;
+  suggestedHeight?: number | null;
+}) => {
+  const [height, setHeight] = useState(() =>
+    suggestedHeight && suggestedHeight >= LI_MIN_HEIGHT
+      ? Math.min(LI_MAX_HEIGHT, suggestedHeight)
+      : LI_DEFAULT_HEIGHT
+  );
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const persistHeight = usePersistEmbedHeight(postId);
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      const iframeWindow = iframeRef.current?.contentWindow;
+      if (!iframeWindow || event.source !== iframeWindow) return;
+      const origin = event.origin || '';
+      if (!origin.includes('linkedin.com')) return;
+      const next = parseThreadsHeightFromMessage(event.data);
+      if (!next) return;
+      const clamped = Math.min(LI_MAX_HEIGHT, Math.max(LI_MIN_HEIGHT, Math.round(next)));
+      setHeight((prev) => (Math.abs(prev - clamped) > 4 ? clamped : prev));
+      persistHeight(clamped);
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  return (
+    <div
+      className="relative w-full overflow-hidden"
+      style={{ width: '100%', height: `${height}px`, touchAction: 'pan-y' }}
+    >
+      <iframe
+        ref={iframeRef}
+        src={src}
+        scrolling="no"
+        allowFullScreen
+        allow="encrypted-media"
+        loading="lazy"
+        style={{
+          border: 'none',
+          width: '100%',
+          height: '100%',
+          display: 'block',
+        }}
+      />
+    </div>
+  );
+};
+
+/**
+ * TikTok iframe that adapts to content height. TikTok's /embed/v2/ posts
+ * cross-origin messages with the rendered card height.
+ */
+const TT_MIN_HEIGHT = 480;
+const TT_MAX_HEIGHT = 900;
+const TT_DEFAULT_HEIGHT = 740;
+
+const TikTokIframeEmbed = ({
+  src,
+  postId,
+  suggestedHeight,
+}: {
+  src: string;
+  postId?: string | null;
+  suggestedHeight?: number | null;
+}) => {
+  const [height, setHeight] = useState(() =>
+    suggestedHeight && suggestedHeight >= TT_MIN_HEIGHT
+      ? Math.min(TT_MAX_HEIGHT, suggestedHeight)
+      : TT_DEFAULT_HEIGHT
+  );
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const persistHeight = usePersistEmbedHeight(postId);
+
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      const iframeWindow = iframeRef.current?.contentWindow;
+      if (!iframeWindow || event.source !== iframeWindow) return;
+      const origin = event.origin || '';
+      if (!origin.includes('tiktok.com')) return;
+      const next = parseThreadsHeightFromMessage(event.data);
+      if (!next) return;
+      const clamped = Math.min(TT_MAX_HEIGHT, Math.max(TT_MIN_HEIGHT, Math.round(next)));
+      setHeight((prev) => (Math.abs(prev - clamped) > 4 ? clamped : prev));
+      persistHeight(clamped);
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  return (
+    <div
+      className="relative w-full overflow-hidden"
+      style={{ width: '100%', height: `${height}px`, touchAction: 'pan-y' }}
+    >
+      <iframe
+        ref={iframeRef}
+        src={src}
+        scrolling="no"
+        allowFullScreen
+        allow="encrypted-media; autoplay"
+        loading="lazy"
+        style={{
+          border: 'none',
+          width: '100%',
+          height: '100%',
+          display: 'block',
+        }}
+      />
+    </div>
+  );
+};
+
 interface UniversalMetaEmbedProps {
   url: string;
   postId?: string | null;
@@ -525,7 +654,7 @@ const buildLinkedInEmbed = (url: string): string | null => {
     const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
     if (feedMatch) {
       const urn = feedMatch[1];
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
@@ -535,13 +664,13 @@ const buildLinkedInEmbed = (url: string): string | null => {
       const id = postMatch[1];
       const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
       const type = typeMatch ? typeMatch[1] : 'ugcPost';
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 3: /posts/username_slug-share-ID-hash
     const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
     if (shareMatch) {
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through to null
@@ -578,7 +707,7 @@ const buildTikTokEmbed = (url: string): string | null => {
     const videoMatch = u.pathname.match(/\/@[^/]+\/video\/(\d+)/);
     if (videoMatch) {
       const videoId = videoMatch[1];
-      return `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" style="border:none;width:100%;height:740px;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" style="border:none;width:100%;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
@@ -789,6 +918,8 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
       const isInstagramIframe = embedHtml.includes('instagram.com');
       const isThreadsIframe = embedHtml.includes('threads.net');
       const isFacebookIframe = embedHtml.includes('facebook.com/plugins/');
+      const isLinkedInIframe = embedHtml.includes('linkedin.com/embed');
+      const isTikTokIframe = embedHtml.includes('tiktok.com/embed');
 
       if (isFacebookIframe) {
         return (
@@ -796,6 +927,30 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             html={sanitizedHtml}
             expandedUrl={expandedUrl}
             fallbackData={fallbackData}
+            postId={postId}
+            suggestedHeight={suggestedHeight}
+          />
+        );
+      }
+
+      if (isLinkedInIframe) {
+        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
+        const iframeSrc = srcMatch ? srcMatch[1] : '';
+        return (
+          <LinkedInIframeEmbed
+            src={iframeSrc}
+            postId={postId}
+            suggestedHeight={suggestedHeight}
+          />
+        );
+      }
+
+      if (isTikTokIframe) {
+        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
+        const iframeSrc = srcMatch ? srcMatch[1] : '';
+        return (
+          <TikTokIframeEmbed
+            src={iframeSrc}
             postId={postId}
             suggestedHeight={suggestedHeight}
           />
