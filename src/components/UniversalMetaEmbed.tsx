@@ -263,14 +263,24 @@ const FacebookIframeEmbed = ({
   suggestedHeight?: number | null;
 }) => {
   const [failed, setFailed] = useState(false);
-  const [height, setHeight] = useState(() =>
-    suggestedHeight && suggestedHeight >= 200 ? Math.min(1400, suggestedHeight) : 320
-  );
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
 
   const srcMatch = html.match(/src="([^"]+)"/);
   const iframeSrc = srcMatch ? srcMatch[1] : '';
+
+  // Detect video vs static post — image posts get a tighter cap so there's
+  // no large blank strip below the photo before our action bar.
+  const isVideo = /\/(video\.php|reel|videos|watch)/i.test(iframeSrc) || /fb\.watch/i.test(iframeSrc);
+  const MAX_HEIGHT = isVideo ? 1400 : 720;
+  const DEFAULT_HEIGHT = isVideo ? 520 : 380;
+  const MIN_HEIGHT = 160;
+
+  const [height, setHeight] = useState(() =>
+    suggestedHeight && suggestedHeight >= MIN_HEIGHT
+      ? Math.min(MAX_HEIGHT, suggestedHeight)
+      : DEFAULT_HEIGHT
+  );
 
   // Listen for Facebook's cross-origin resize messages. FB plugins post a
   // few different shapes (`{type:"resize",height}`, nested xdArbiter payloads,
@@ -284,13 +294,13 @@ const FacebookIframeEmbed = ({
       if (!origin.includes('facebook.com')) return;
       const next = parseThreadsHeightFromMessage(event.data);
       if (!next || next < 80) return;
-      const clamped = Math.min(1400, Math.max(200, Math.round(next)));
+      const clamped = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.round(next)));
       setHeight((prev) => (Math.abs(prev - clamped) > 4 ? clamped : prev));
       persistHeight(clamped);
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, []);
+  }, [MAX_HEIGHT]);
 
   // Fallback: if iframe doesn't render in 12s, show OG card
   useEffect(() => {
