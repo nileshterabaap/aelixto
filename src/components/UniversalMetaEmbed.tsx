@@ -168,7 +168,7 @@ const ThreadsIframeEmbed = ({
  * only trim the Instagram controls/comment footer so the media is complete and
  * Instagram's duplicate action buttons don't show above Aelix's own actions.
  */
-const IG_BOTTOM_CONTROLS_TRIM = 96;
+const IG_BOTTOM_CONTROLS_TRIM = 112;
 const IG_MIN_VISIBLE = 260;
 const IG_MAX_VISIBLE = 1000;
 const IG_DEFAULT_VISIBLE = 560;
