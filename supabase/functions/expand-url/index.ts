@@ -138,6 +138,9 @@ function extractFacebookNextUrl(raw: string): string | null {
     const decoded = decodeURIComponent(next);
     const nextUrl = new URL(decoded);
     if (!/(^|\.)facebook\.com$/i.test(nextUrl.hostname)) return null;
+    // Facebook share redirects add volatile rdid params that make the public
+    // plugin reject otherwise-valid photo/story URLs.
+    nextUrl.searchParams.delete('rdid');
     const looksLikePost =
       /\/story\.php/i.test(nextUrl.pathname) ||
       /\/permalink\.php/i.test(nextUrl.pathname) ||
