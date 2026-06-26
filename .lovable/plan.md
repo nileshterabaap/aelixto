@@ -1,8 +1,12 @@
-Success probability: 86%.
+Success probability: 82%.
 
 Plan:
-1. Patch only the Facebook embed renderer in `UniversalMetaEmbed.tsx`.
-2. For non-video Facebook posts, put the height on the outer wrapper too — right now only the iframe has height, so the parent can still reserve extra space.
-3. Add an image-post crop/trim mode: keep the Facebook iframe at the measured/plugin height, but show only the media-height portion in the wrapper so the white plugin footer cannot create a giant blank gap.
-4. Ignore stale persisted Facebook heights that are clearly too tall for image posts, so old bad measurements stop reappearing.
-5. Do not touch PTR, feed ordering, Aelix score, seen logic, auth, or backend functions.
+1. Patch only the LinkedIn caption path in `fetch-post-preview` and the caption rendering gate; do not touch PTR, Aelix score, feed order, seen logic, auth, or post card sizing.
+2. Make LinkedIn caption extraction more complete by reading the embed page more broadly:
+   - keep the existing `attributed-text-segment-list__content` extraction;
+   - add fallbacks for LinkedIn's escaped JSON/embed markup where full commentary is often stored outside the first matched `<div>`;
+   - preserve paragraph breaks when converting HTML/escaped text to plain caption text.
+3. Fix the current hydration condition so LinkedIn posts can refresh if the stored caption is obviously clipped (`...` / `…`) or much shorter than the newly fetched caption, not only when caption is missing.
+4. Store the improved caption back into `preview_text` through the existing backend function update, so old LinkedIn posts self-heal after they render once.
+5. Keep `CollapsibleCaption` behavior as-is (`... more` still expands), but ensure it receives the full source caption with paragraph gaps.
+6. Deploy only the changed backend function after code changes, then do one targeted function test with a LinkedIn URL if one is available in current data/logs; otherwise validate the extraction logic structurally without affecting live feed behavior.

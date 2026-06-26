@@ -1363,21 +1363,43 @@ async function fetchLinkedInEmbedCaption(url: string): Promise<{ caption: string
     if (!res.ok) return { caption: null, image: null };
     const html = await res.text();
 
-    // The post commentary lives inside a div with class
-    // `attributed-text-segment-list__content` (sometimes nested in
-    // `feed-shared-update-v2__commentary`). Capture the block, preserve
-    // <br>/</p> as newlines, and strip the rest of the markup.
-    const blockMatch =
-      html.match(/<div[^>]*class="[^"]*attributed-text-segment-list__content[^"]*"[^>]*>([\s\S]*?)<\/div>/i) ||
-      html.match(/<p[^>]*class="[^"]*commentary[^"]*"[^>]*>([\s\S]*?)<\/p>/i) ||
-      html.match(/<div[^>]*data-test-id="main-feed-activity-card__commentary"[^>]*>([\s\S]*?)<\/div>/i);
-
+    // LinkedIn nests commentary inside many spans/divs; a non-greedy match on
+    // the first `</div>` truncates the post. Extract by finding the opening
+    // commentary container and walking tags to its matching close.
     let caption: string | null = null;
-    if (blockMatch) {
-      caption = htmlBlockToText(blockMatch[1]);
-    } else {
-      // Fallback: OG description from the embed page itself (often fuller
-      // than the public post page, with newlines preserved).
+
+    const containerStarts = [
+      /<div\b[^>]*class="[^"]*feed-shared-update-v2__commentary[^"]*"[^>]*>/i,
+      /<div\b[^>]*class="[^"]*attributed-text-segment-list__container[^"]*"[^>]*>/i,
+      /<div\b[^>]*class="[^"]*attributed-text-segment-list__content[^"]*"[^>]*>/i,
+      /<div\b[^>]*data-test-id="main-feed-activity-card__commentary"[^>]*>/i,
+      /<p\b[^>]*class="[^"]*commentary[^"]*"[^>]*>/i,
+    ];
+    for (const re of containerStarts) {
+      const m = html.match(re);
+      if (!m || m.index === undefined) continue;
+      const inner = extractBalancedTag(html, m.index, m[0].startsWith('<p') ? 'p' : 'div');
+      if (!inner) continue;
+      const text = htmlBlockToText(inner);
+      if (text && text.length >= 2) { caption = text; break; }
+    }
+
+    if (!caption) {
+      // Some embed responses ship the post payload as escaped JSON inside an
+      // <code> tag. The full commentary text is on a "text" field.
+      const codeBlocks = html.match(/<code[^>]*>([\s\S]*?)<\/code>/gi) || [];
+      for (const block of codeBlocks) {
+        const json = decodeHtmlEntities(block.replace(/<\/?code[^>]*>/gi, '')).trim();
+        if (!json.startsWith('{') && !json.startsWith('[')) continue;
+        try {
+          const parsed = JSON.parse(json);
+          const found = findCommentaryText(parsed);
+          if (found && found.length > (caption?.length || 0)) caption = found;
+        } catch { /* ignore */ }
+      }
+    }
+
+    if (!caption) {
       const ogDesc = html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)?.[1];
       if (ogDesc) caption = decodeHtmlEntities(ogDesc).trim();
     }
@@ -1406,4 +1428,70 @@ function htmlBlockToText(snippet: string): string {
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+// Walk an HTML string starting at the index of an opening tag and return the
+// inner content up to its matching closing tag, accounting for nesting.
+function extractBalancedTag(html: string, openIndex: number, tagName: string): string | null {
+  const openRe = new RegExp(`<${tagName}\\b[^>]*>`, 'gi');
+  const closeRe = new RegExp(`</${tagName}\\s*>`, 'gi');
+  openRe.lastIndex = openIndex;
+  const openMatch = openRe.exec(html);
+  if (!openMatch) return null;
+  const innerStart = openMatch.index + openMatch[0].length;
+  let depth = 1;
+  openRe.lastIndex = innerStart;
+  closeRe.lastIndex = innerStart;
+  while (depth > 0) {
+    const nextOpen = openRe.exec(html);
+    const nextClose = closeRe.exec(html);
+    if (!nextClose) return null;
+    if (nextOpen && nextOpen.index < nextClose.index) {
+      depth += 1;
+      closeRe.lastIndex = nextOpen.index + nextOpen[0].length;
+      continue;
+    }
+    depth -= 1;
+    if (depth === 0) return html.slice(innerStart, nextClose.index);
+    openRe.lastIndex = nextClose.index + nextClose[0].length;
+  }
+  return null;
+}
+
+// Recursively search a parsed JSON payload for the longest plausible
+// commentary string. LinkedIn embed payloads expose post text on fields like
+// `text`, `commentary`, or `attributedText.text`.
+function findCommentaryText(value: unknown, depth = 0): string | null {
+  if (depth > 6 || value === null || value === undefined) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 40 ? trimmed : null;
+  }
+  if (Array.isArray(value)) {
+    let best: string | null = null;
+    for (const item of value) {
+      const found = findCommentaryText(item, depth + 1);
+      if (found && (!best || found.length > best.length)) best = found;
+    }
+    return best;
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const preferredKeys = ['text', 'commentary', 'commentaryV2', 'attributedText'];
+    let best: string | null = null;
+    for (const key of preferredKeys) {
+      if (key in obj) {
+        const found = findCommentaryText(obj[key], depth + 1);
+        if (found && (!best || found.length > best.length)) best = found;
+      }
+    }
+    if (best) return best;
+    for (const key of Object.keys(obj)) {
+      if (preferredKeys.includes(key)) continue;
+      const found = findCommentaryText(obj[key], depth + 1);
+      if (found && (!best || found.length > best.length)) best = found;
+    }
+    return best;
+  }
+  return null;
 }

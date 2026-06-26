@@ -439,10 +439,15 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   useEffect(() => {
     const isHydratablePlatform =
       detectedPlatform === 'facebook' || detectedPlatform === 'linkedin';
+    const captionLooksClipped =
+      !!originalPostCaption &&
+      (/(?:\.\.\.|…)\s*$/.test(originalPostCaption) || originalPostCaption.length < 220);
     const needsHydration =
       isHydratablePlatform &&
       !!mediaUrl &&
-      (!originalPostCaption || (!thumbnailUrl && !previewImageUrl));
+      (!originalPostCaption ||
+        (detectedPlatform === 'linkedin' && captionLooksClipped) ||
+        (!thumbnailUrl && !previewImageUrl));
     if (!needsHydration) return;
     if (captionHydrationRequested.has(post.id)) return;
     captionHydrationRequested.add(post.id);
