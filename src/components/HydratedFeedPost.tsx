@@ -603,6 +603,10 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {(() => {
         if (!originalPostCaption) return null;
+        // Reddit's own embed already renders the post title/body and a
+        // "Read more" toggle. Showing the same text above the iframe
+        // duplicates it, so skip the original caption for Reddit.
+        if (detectedPlatform === 'reddit') return null;
         return (
           <div className="px-5 pb-3">
             <CollapsibleCaption

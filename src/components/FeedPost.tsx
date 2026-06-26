@@ -495,6 +495,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             platform: detectedPlatform,
           });
           if (!originalCaption) return null;
+          // Reddit's official iframe already displays the post title and
+          // body (with its own "Read more" expander), so skip the
+          // duplicate caption above the embed.
+          if (detectedPlatform === 'reddit') return null;
           return (
             <CollapsibleCaption
               content={originalCaption}
