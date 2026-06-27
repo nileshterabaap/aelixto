@@ -76,9 +76,6 @@ function DraftCard({
             <img src={icon} alt="" className="w-3.5 h-3.5 invert" />
           </div>
         )}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-          <span className="text-[10px] font-medium text-white uppercase tracking-wide">Draft</span>
-        </div>
       </button>
       <button
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
