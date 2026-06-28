@@ -240,30 +240,39 @@ const Conversation = () => {
       </header>
 
       {/* Messages */}
-      <main className="flex-1 overflow-y-auto">
-        <div className="container max-w-2xl mx-auto px-4 py-6 space-y-4 animate-fade-in">
-          {messages.map((message) => {
+      <main className="flex-1 overflow-y-auto flex flex-col">
+        <div className="container max-w-2xl mx-auto w-full px-4 py-4 space-y-1 animate-fade-in mt-auto">
+          {messages.map((message, idx) => {
             const isOwn = message.sender_id === user?.id;
             const postMatch = message.content.match(/\/post\/([a-f0-9-]{36})$/);
             const isPostShare = postMatch && message.content.trim().match(/^https?:\/\/.+\/post\/[a-f0-9-]{36}$/);
             const isEditing = editingId === message.id;
+            const prev = idx > 0 ? messages[idx - 1] : null;
+            const senderChanged = !prev || prev.sender_id !== message.sender_id;
+            const showTimeSeparator =
+              !prev ||
+              new Date(message.created_at).getTime() - new Date(prev.created_at).getTime() > 5 * 60 * 1000;
 
             return (
-              <div
-                key={message.id}
-                className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-                onTouchStart={(e) => handleTouchStart(message, e)}
-                onTouchEnd={handleTouchEnd}
-                onTouchMove={handleTouchEnd}
-                onContextMenu={(e) => handleContextMenu(message, e)}
-              >
-                {isPostShare && postMatch ? (
-                  <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} gap-0.5`}>
-                    <SharedPostCard postId={postMatch[1]} isOwn={isOwn} />
-                    <p className="text-[10px] px-1 text-muted-foreground">
+              <div key={message.id}>
+                {showTimeSeparator && (
+                  <div className="flex justify-center py-2">
+                    <span className="text-[11px] text-muted-foreground">
                       {formatTime(message.created_at)}
-                    </p>
+                    </span>
                   </div>
+                )}
+                <div
+                  className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${
+                    senderChanged && !showTimeSeparator ? 'mt-2' : ''
+                  }`}
+                  onTouchStart={(e) => handleTouchStart(message, e)}
+                  onTouchEnd={handleTouchEnd}
+                  onTouchMove={handleTouchEnd}
+                  onContextMenu={(e) => handleContextMenu(message, e)}
+                >
+                {isPostShare && postMatch ? (
+                  <SharedPostCard postId={postMatch[1]} isOwn={isOwn} />
                 ) : isEditing ? (
                   <div className="max-w-[70%] flex flex-col gap-1">
                     <Input
@@ -293,20 +302,16 @@ const Conversation = () => {
                   </div>
                 ) : (
                   <div
-                    className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                    className={`max-w-[70%] rounded-2xl px-3.5 py-2 ${
                       isOwn
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted text-foreground'
                     }`}
                   >
                     <p className="text-sm">{message.content}</p>
-                    <p className={`text-[10px] mt-0.5 ${
-                      isOwn ? 'text-primary-foreground/60' : 'text-muted-foreground'
-                    }`}>
-                      {formatTime(message.created_at)}
-                    </p>
                   </div>
                 )}
+                </div>
               </div>
             );
           })}
