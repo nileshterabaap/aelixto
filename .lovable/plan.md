@@ -1,27 +1,24 @@
-## Fix two small issues
+## Goal
+Make the chat thread look like Instagram: messages anchored to the bottom near the input, bubbles hug the text, and no per-bubble timestamp line.
 
-### 1. Missing Pinterest & Article icons on draft/saved thumbnails
+## Changes (single file: `src/pages/Conversation.tsx`)
 
-In `src/components/saved/DraftsGrid.tsx` and `src/components/saved/SavedThumbnailGrid.tsx`, the `PLATFORM_ICONS` map omits `pinterest` and `article`. Add them:
+1. **Anchor messages to bottom (kills the empty space).**
+   - On the `<main>` scroll container, add `flex flex-col` so its child can push to the bottom.
+   - On the inner messages wrapper, add `mt-auto` and reduce vertical spacing from `space-y-4` → `space-y-1`. This way a short conversation sits right above the input bar (like Instagram), and long conversations still scroll normally.
 
-- `pinterest: pinterestIcon` (from `@/assets/platforms/pinterest.svg`)
-- `article: articlesIcon` (from `@/assets/platforms/articles.svg`)
+2. **Remove per-bubble timestamp (compact bubbles).**
+   - Delete the `<p className="text-[10px] mt-0.5 ...">{formatTime(...)}</p>` inside each bubble and the one under `SharedPostCard`.
+   - Tighten bubble padding from `px-4 py-2` → `px-3.5 py-2` so "Hi"/"How" hug the text.
 
-Result: Pinterest pins and article drafts show the correct corner badge instead of no icon.
+3. **Group-separator timestamps (Instagram-style).**
+   - Show a centered muted timestamp line above a message only when >5 minutes since the previous message (or first message of the thread). Reuses existing `formatTime`.
 
-### 2. Remove "[username] on Threads" caption above Threads posts
+4. **Tighten stacked spacing.**
+   - Add `mt-2` only when the sender changes from the previous message, so consecutive bubbles from one person sit tightly together.
 
-The text "Shon R. (@shotbyshon_) on Threads" comes from the Threads og:title being treated as the original source caption by `getOriginalPostCaption` in `src/lib/originalCaption.ts`.
-
-Update `isJunkSourceCaption` (or the title-extraction step for `platform === 'threads'`) to discard any string matching the pattern:
-
-```
-/^.+?\s+\(@[^)]+\)\s+on Threads$/i
-/^.+\s+on Threads$/i
-```
-
-So Threads posts only show the real post body (rendered by the Threads iframe), with no duplicate "X on Threads" line above the card.
-
-No other files touched. PTR, Aelix score, feed RPC, and realtime hooks remain untouched.
+## Out of scope
+- Header, input bar, SharedPostCard internals, realtime, unread badges, edit/unsend menu — all untouched.
+- No avatars added.
 
 Success probability: 95%.
