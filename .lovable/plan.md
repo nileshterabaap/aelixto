@@ -1,51 +1,40 @@
+## 1. Quora post card — render like Articles (image 2), not bare link
 
-## 1. Move bubble timestamp to bottom
+**Why it looks wrong now:** Quora URLs often fail to unfurl (Quora aggressively blocks scrapers), so `ArticleEmbed` falls back to `LinkPreviewCard` — that's the minimal favicon + domain + Continue Reading card you see. Medium works because its HTML scrapes fine and renders via `ArticleContentEmbed`.
 
-In `src/pages/Conversation.tsx`, the timestamp currently uses `float-right` inside the same `<p>` as the text, so it visually sits next to the first line. Switch to a flex layout: render the message text and the timestamp as siblings inside a column-flex bubble, with the time on its own row, right-aligned, sitting flush at the bottom.
+**Fix (presentation only):**
+- In `src/features/article-embeds/ArticleEmbed.tsx`, when the unfurl + fetch-og fallback still returns no usable data **and** the URL is Quora, build a minimal `UnfurlResult` object from the URL itself (title derived from the URL slug, Quora favicon, Quora as `site.name`) and render it through `ArticleContentEmbed` with `platform="quora"` instead of falling through to `LinkPreviewCard`.
+- Also when partial data is returned (e.g. title is just the domain), enrich the `site.name` to "Quora" and keep the article-card path.
+- Result: Quora posts always show the full card — bold title, thumbnail (when available), excerpt area, Quora favicon + "Quora" row, and the "Continue Reading" button — matching the Medium screenshot exactly.
 
-- Replace the single `<p>` containing `{content}` + floated time with:
-  - `<div class="flex flex-col">`
-    - `<p class="text-sm whitespace-pre-wrap break-words">{content}</p>`
-    - `<span class="self-end text-[10px] leading-none mt-1 {isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'}">{HH:mm}</span>`
-- For longer messages, time sits under the last line on the right (WhatsApp-style). For short one-word messages it drops to a new line below — acceptable and matches the screenshot intent ("at bottom in bubble").
+No changes to `ArticleContentEmbed`, no backend changes, no impact on Reddit / other article platforms.
 
-No other message logic changes. Day chips, long-press menu, edit/unsend, reply remain untouched.
+## 2. Message bubble timestamp — inline at bottom-right (WhatsApp style)
 
-## 2. Quora: render like Articles, but as its own platform
+**Current:** bubble uses `flex flex-col`, so the time sits on its own line below the text → wastes vertical space (image 3).
 
-Currently `ArticleEmbed.tsx` routes Quora through `LinkPreviewCard` with only "View on Quora / Read more" — no thumbnail, no title, no description. Goal: same rich card as generic articles (thumbnail, title, description, domain chip) but tagged as Quora.
+**Wanted:** time hugs the bottom-right corner on the **same baseline** as the last text line, with text wrapping around it (image 4).
 
-Changes (presentation only, no backend):
+**Fix in `src/pages/Conversation.tsx` bubble markup:**
+- Drop `flex flex-col` on the bubble.
+- Render the time as a `<span>` floated right (`float-right`) inside/after the text node, with `ml-2 mt-1 leading-none` and a small `pl-1` so it never collides with the last word. Use the classic WhatsApp pattern:
+  ```tsx
+  <div className="max-w-[70%] rounded-2xl px-3 py-1.5 ...">
+    <p className="text-sm whitespace-pre-wrap break-words">
+      {message.content}
+      <span className="float-right ml-2 mt-1 text-[10px] leading-none opacity-70 select-none">
+        {formatTime(message.created_at)}
+      </span>
+    </p>
+  </div>
+  ```
+- Tighten vertical padding to `py-1.5` so the bubble hugs the text height like the green WhatsApp bubble.
+- Same treatment for the editing state is not needed (editing has its own input UI).
 
-a. `src/features/article-embeds/ArticleEmbed.tsx`
-   - Remove the Quora early-return branch that forces `LinkPreviewCard`.
-   - Route Quora through `ArticleContentEmbed` exactly like generic articles, passing `platform="quora"`.
-   - Keep the OG-fallback enhancement (already present) so even when `unfurl-article` returns a thin Quora payload, `fetch-og` fills in title/image/description.
+Result: single-line messages like "Hii" and "97.25" render with the timestamp tucked to the right on the same row, bubble height shrinks to match.
 
-b. `src/features/article-embeds/ArticleContentEmbed.tsx` (read first to confirm shape)
-   - Ensure it accepts/uses the `platform` prop to show the Quora favicon/domain chip. If it already renders `data.site.favicon` + `data.site.domain`, no changes needed beyond what Article does today — the Quora `Q` favicon already shows in the user's screenshot.
-   - If the card title falls back to "View on Quora" when meta title is missing, keep that as last-resort text but only after thumbnail/description attempts.
+## Out of scope / safety
+- No changes to PTR, feed RPC, Aelix score, realtime hooks, or any edge function.
+- `SharedPostCard` already has no per-bubble timestamp — untouched.
 
-c. No change to platform registry, icons, or post-creation flow — Quora stays a distinct platform; this only changes how its card body renders.
-
-### Why this works without breaking other platforms
-- Reddit branch (`rendererType === 'reddit'`) is untouched.
-- Generic article branch is untouched.
-- Only the Quora branch swaps from `LinkPreviewCard` to `ArticleContentEmbed`, reusing existing rich-card code path.
-
-## 3. Timezone for credit refills (advice, no code)
-
-Standard US SaaS practice for daily-refill quotas is **Pacific Time (America/Los_Angeles)** at **midnight 00:00 PT**:
-- OpenAI/ChatGPT, Anthropic Claude, Cursor, Perplexity, Replit, Vercel — all use Pacific midnight for daily resets.
-- Reason: most US tech companies HQ in CA; PT midnight = 3am ET, lowest-traffic window across the contiguous US.
-
-Recommendation for Aelixto USA launch: **reset daily 5 credits at 00:00 America/Los_Angeles (handles DST automatically)**. Store reset timestamps in UTC in DB, compute "next reset" by converting current UTC → LA local → next LA midnight → back to UTC. This matches user expectations from every major US AI/dev product.
-
-Alt option some consumer apps use: **rolling 24h window** (Twitter/X rate limits, Discord Nitro boost) — refills exactly 24h after the credit was consumed. Simpler UX ("comes back in 7h 23m") but heavier to track per-credit. Stick with fixed PT midnight unless you want the rolling model.
-
-## Files to edit
-- `src/pages/Conversation.tsx` — bubble layout for time
-- `src/features/article-embeds/ArticleEmbed.tsx` — Quora routing
-- `src/features/article-embeds/ArticleContentEmbed.tsx` — verify/ensure platform-aware chip (read first; edit only if needed)
-
-Success probability: 92%.
+Success probability: 95%.
