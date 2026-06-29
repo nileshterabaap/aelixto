@@ -289,7 +289,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url: rawUrl } = await req.json();
+    const { url: rawUrl, bustCache } = await req.json();
 
     if (!rawUrl) {
       return new Response(
@@ -324,18 +324,24 @@ serve(async (req) => {
       .eq('url', targetUrl)
       .single();
 
-    if (cached) {
+    if (cached && !bustCache) {
       const cacheAge = Date.now() - new Date(cached.updated_at).getTime();
       const cacheAgeHours = cacheAge / (1000 * 60 * 60);
-      
-      if (cacheAgeHours < TTL_HOURS) {
+
+      // Refresh stale Quora cache entries that never captured an image so
+      // the improved scraper has a chance to fill it in.
+      const cachedData: any = cached.data;
+      const isEmptyQuora =
+        cachedData?.kind === 'quora-post' && !cachedData?.meta?.image;
+
+      if (cacheAgeHours < TTL_HOURS && !isEmptyQuora) {
         console.log('[unfurl-article] Cache hit, age:', cacheAgeHours.toFixed(2), 'hours');
         return new Response(
           JSON.stringify(cached.data),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      console.log('[unfurl-article] Cache expired, refetching');
+      console.log('[unfurl-article] Cache expired or empty Quora image, refetching');
     }
 
     // Detect platform and kind
