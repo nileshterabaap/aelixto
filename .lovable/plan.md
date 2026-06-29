@@ -1,40 +1,26 @@
-## 1. Quora post card — render like Articles (image 2), not bare link
+## 1. Tighten message bubble corners (WhatsApp-style)
 
-**Why it looks wrong now:** Quora URLs often fail to unfurl (Quora aggressively blocks scrapers), so `ArticleEmbed` falls back to `LinkPreviewCard` — that's the minimal favicon + domain + Continue Reading card you see. Medium works because its HTML scrapes fine and renders via `ArticleContentEmbed`.
+In `src/pages/Conversation.tsx`, change bubble container at line 320 from `rounded-2xl` (≈16px) to `rounded-lg` (≈8px) to match WhatsApp's subtler corners. No other styling changes — padding, tail/spacing, inline timestamp all stay.
 
-**Fix (presentation only):**
-- In `src/features/article-embeds/ArticleEmbed.tsx`, when the unfurl + fetch-og fallback still returns no usable data **and** the URL is Quora, build a minimal `UnfurlResult` object from the URL itself (title derived from the URL slug, Quora favicon, Quora as `site.name`) and render it through `ArticleContentEmbed` with `platform="quora"` instead of falling through to `LinkPreviewCard`.
-- Also when partial data is returned (e.g. title is just the domain), enrich the `site.name` to "Quora" and keep the article-card path.
-- Result: Quora posts always show the full card — bold title, thumbnail (when available), excerpt area, Quora favicon + "Quora" row, and the "Continue Reading" button — matching the Medium screenshot exactly.
+## 2. Fix Quora "Content blocked by Quora protection" card
 
-No changes to `ArticleContentEmbed`, no backend changes, no impact on Reddit / other article platforms.
+Quora aggressively blocks all UA fingerprints (mobile, desktop, r.jina.ai), so `unfurl-article` falls through to the placeholder that shows "Quora Post" + "Content blocked by Quora protection". We already have Firecrawl wired for non-Quora articles — extend it to Quora.
 
-## 2. Message bubble timestamp — inline at bottom-right (WhatsApp style)
+**Edit `supabase/functions/unfurl-article/index.ts`:**
 
-**Current:** bubble uses `flex flex-col`, so the time sits on its own line below the text → wastes vertical space (image 3).
+- In the Quora branch, before returning the placeholder, add a Firecrawl Strategy 4:
+  - `POST https://api.firecrawl.dev/v2/scrape` with `{ url, formats: ['html','markdown'], onlyMainContent: true, waitFor: 2500 }` and `Authorization: Bearer ${FIRECRAWL_API_KEY}`.
+  - On success, set `html = data.html` and continue into the normal parsing path so the title (question text), description (first answer paragraph), og:image (author/answer image) and publishedTime get populated naturally.
+- If Firecrawl also fails or `FIRECRAWL_API_KEY` is missing, keep the existing placeholder return — but improve it:
+  - Derive a readable title from the URL slug (same logic already in `ArticleEmbed.tsx`'s Quora fallback) instead of literal "Quora Post".
+  - Set `description: ''` so we no longer render "Content blocked by Quora protection" text in the card.
 
-**Wanted:** time hugs the bottom-right corner on the **same baseline** as the last text line, with text wrapping around it (image 4).
+**Edit `src/features/article-embeds/ArticleContentEmbed.tsx`:** no change needed — once description is empty and Firecrawl populates real content, card renders cleanly with title + (optional) hero + excerpt + Continue Reading.
 
-**Fix in `src/pages/Conversation.tsx` bubble markup:**
-- Drop `flex flex-col` on the bubble.
-- Render the time as a `<span>` floated right (`float-right`) inside/after the text node, with `ml-2 mt-1 leading-none` and a small `pl-1` so it never collides with the last word. Use the classic WhatsApp pattern:
-  ```tsx
-  <div className="max-w-[70%] rounded-2xl px-3 py-1.5 ...">
-    <p className="text-sm whitespace-pre-wrap break-words">
-      {message.content}
-      <span className="float-right ml-2 mt-1 text-[10px] leading-none opacity-70 select-none">
-        {formatTime(message.created_at)}
-      </span>
-    </p>
-  </div>
-  ```
-- Tighten vertical padding to `py-1.5` so the bubble hugs the text height like the green WhatsApp bubble.
-- Same treatment for the editing state is not needed (editing has its own input UI).
+## Success probability
+85% — bubble radius is a one-liner. Quora fix depends on Firecrawl rendering the page (it usually does for Quora since it runs a headless browser). If Firecrawl is rate-limited or the question is gated to logged-in users, the card will still render but without an excerpt/image — strictly better than today's "blocked" message.
 
-Result: single-line messages like "Hii" and "97.25" render with the timestamp tucked to the right on the same row, bubble height shrinks to match.
-
-## Out of scope / safety
-- No changes to PTR, feed RPC, Aelix score, realtime hooks, or any edge function.
-- `SharedPostCard` already has no per-bubble timestamp — untouched.
-
-Success probability: 95%.
+## Technical notes
+- Files touched: `src/pages/Conversation.tsx`, `supabase/functions/unfurl-article/index.ts`.
+- No DB / RLS / client-state changes. PTR, Aelix score, mark-as-seen untouched.
+- Firecrawl secret `FIRECRAWL_API_KEY` already configured (used by fetch-og line 831 and unfurl-article line 526).
