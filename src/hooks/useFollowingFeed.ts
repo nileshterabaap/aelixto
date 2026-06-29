@@ -46,7 +46,7 @@ interface UseFollowingFeedResult {
 
 const PAGE_SIZE = 20;
 const fetchFeedPage = async (cursor?: string) => {
-  const { data, error } = await supabase.rpc('get_following_feed', {
+  const { data, error } = await supabase.rpc('get_following_feed_v3', {
     limit_count: PAGE_SIZE,
     cursor_key: cursor || null,
   } as any);
