@@ -37,8 +37,7 @@ import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
-import { getOriginalPostCaption } from "@/lib/originalCaption";
-import { supabase } from "@/integrations/supabase/client";
+import { getPostThumb } from "@/lib/getPostThumb";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
@@ -46,14 +45,12 @@ const revealedPostsCache = new Set<string>();
 // Hydrate posts well ahead of the viewport so the next ~6–7 posts in the
 // feed are always ready to display the moment the user scrolls to them.
 const HYDRATION_ROOT_MARGIN = '4500px 0px';
-const captionHydrationRequested = new Set<string>();
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
   userId?: string;
   isActive?: boolean; // Controlled by parent - whether this post is near viewport
   startHydrated?: boolean; // Skip IntersectionObserver, hydrate immediately
-  onDeleted?: () => void;
 }
 
 const formatTimestamp = (date: Date) => {
@@ -101,7 +98,7 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
-export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false, onDeleted }: HydratedFeedPostProps) => {
+export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
   // If this post was already revealed in a previous render, skip ALL skeleton/transition work
   const alreadyRevealed = revealedPostsCache.has(post.id);
 
@@ -125,8 +122,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [displayLikeCount, setDisplayLikeCount] = useState<number>(Number((post as any).likes_count ?? (post as any).likes ?? 0));
   const [displayCommentCount] = useState<number>(Number((post as any).comments_count ?? (post as any).comments ?? 0));
   const [displayRepostCount, setDisplayRepostCount] = useState<number>(Number((post as any).reposts_count ?? (post as any).shares ?? 0));
-  const [hydratedSourceCaption, setHydratedSourceCaption] = useState("");
-  const [hydratedPreviewImageUrl, setHydratedPreviewImageUrl] = useState<string | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
 
@@ -384,7 +379,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   
   // Normalize field access
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
-  const previewImageUrl = hydratedPreviewImageUrl || (post as any).preview_image_url;
+  const previewImageUrl = (post as any).preview_image_url;
   const mediaUrl = post.mediaUrl || (post as any).media_url;
   
   // Detect platform
@@ -392,18 +387,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const isYouTubePost = detectedPlatform === 'youtube';
   const shouldRenderMediaTitle = isYouTubePost || r.kind === 'image' || r.kind === 'video';
   const platform = getPlatformIcon(detectedPlatform);
-  const originalPostCaption = useMemo(() => getOriginalPostCaption({
-    previewText: hydratedSourceCaption || (post as any).preview_text,
-    title: post.title,
-    userCaption: post.content,
-    platform: detectedPlatform,
-  }), [hydratedSourceCaption, post.content, post.title, detectedPlatform, (post as any).preview_text]);
   
   // Always call hooks unconditionally
-  const postActionsResult = usePostActions(post.id, userId || '', {
-    isRepost: !!post.isRepost,
-    onDeleted,
-  });
+  const postActionsResult = usePostActions(post.id, userId || '');
   const repostActionsResult = useRepost(post.id, userId || '');
   
   const canUseActions = post.isRealPost && !!userId;
@@ -431,52 +417,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setDisplayRepostCount(Number((post as any).reposts_count ?? (post as any).shares ?? 0));
   }, [post.id, (post as any).likes_count, (post as any).likes, (post as any).reposts_count, (post as any).shares]);
 
-  useEffect(() => {
-    setHydratedSourceCaption("");
-    setHydratedPreviewImageUrl(null);
-  }, [post.id]);
-
-  useEffect(() => {
-    const isHydratablePlatform =
-      detectedPlatform === 'facebook' || detectedPlatform === 'linkedin';
-    const captionLooksClipped =
-      !!originalPostCaption &&
-      (/(?:\.\.\.|…)\s*$/.test(originalPostCaption) || originalPostCaption.length < 220);
-    const needsHydration =
-      isHydratablePlatform &&
-      !!mediaUrl &&
-      (!originalPostCaption ||
-        (detectedPlatform === 'linkedin' && captionLooksClipped) ||
-        (!thumbnailUrl && !previewImageUrl));
-    if (!needsHydration) return;
-    if (captionHydrationRequested.has(post.id)) return;
-    captionHydrationRequested.add(post.id);
-
-    supabase.functions
-      .invoke('fetch-post-preview', {
-        body: {
-          postId: post.isRealPost ? post.id : undefined,
-          url: mediaUrl,
-          platform: detectedPlatform,
-          previewOnly: !post.isRealPost,
-        },
-      })
-      .then(({ data }) => {
-        const recovered = getOriginalPostCaption({
-          previewText: data?.preview_text,
-          title: data?.title,
-          userCaption: post.content,
-          platform: detectedPlatform,
-        });
-        if (recovered) setHydratedSourceCaption(recovered);
-        const recoveredImage = data?.thumbnail_url || data?.preview_image_url;
-        if (recoveredImage && !thumbnailUrl && !previewImageUrl) setHydratedPreviewImageUrl(recoveredImage);
-      })
-      .catch(() => {
-        captionHydrationRequested.delete(post.id);
-      });
-  }, [detectedPlatform, originalPostCaption, mediaUrl, post.id, post.isRealPost, post.content, thumbnailUrl, previewImageUrl]);
-
   const handleLikeClick = useCallback(() => {
     if (!canUseActions) return;
     setDisplayLikeCount((current) => Math.max(0, current + (isLiked ? -1 : 1)));
@@ -499,8 +439,15 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setIsHydrated(true);
   }, []);
 
-  // Derive thumbnail: prefer stored, then derive from URL
-  const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
+  // Derive thumbnail: filter misleading Reddit placeholders, then derive from URL
+  const effectiveThumbnail = getPostThumb({
+    platform: post.platform,
+    thumbnailUrl,
+    thumbnail_url: (post as any).thumbnail_url,
+    mediaUrl: mediaUrl,
+    media_url: (post as any).media_url,
+    author_avatar_url: post.author?.avatar,
+  }) || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
   const showCard = isTextOnly || embedState === 'ready' || embedState === 'error';
 
@@ -531,7 +478,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           transition: 'opacity 250ms ease-in-out, filter 400ms ease-out',
         }}
       >
-    <Card className="glass-post-card overflow-hidden rounded-[2rem]">
+    <Card className="post-card border-0 shadow-none">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
         <div className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
@@ -564,7 +511,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
               className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' ? 'w-6 h-6' : 'w-8 h-8'}`}
             />
           )}
-          {post.isRealPost && !!userId && (post as any).user_id === userId && (
+          {post.isRealPost && (post as any).user_id === userId && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
@@ -593,29 +540,17 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       </div>
 
-      {/* Caption */}
-      {detectedPlatform !== 'instagram' && post.content?.trim() && (
-        <div className="px-5 pb-3">
-          <CollapsibleCaption content={post.content} />
-        </div>
-      )}
-
-
+      {/* Caption — Instagram captions intentionally hidden (media-only) */}
       {(() => {
-        if (!originalPostCaption) return null;
-        // Reddit's own embed already renders the post title/body and a
-        // "Read more" toggle. Showing the same text above the iframe
-        // duplicates it, so skip the original caption for Reddit.
-        if (detectedPlatform === 'reddit') return null;
-        return (
+        const captionText =
+          detectedPlatform === 'instagram' ? '' : (post.content?.trim() || '');
+        return captionText ? (
           <div className="px-5 pb-3">
-            <CollapsibleCaption
-              content={originalPostCaption}
-              className="text-sm text-muted-foreground"
-            />
+            <CollapsibleCaption content={captionText} />
           </div>
-        );
+        ) : null;
       })()}
+
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
@@ -800,9 +735,6 @@ const arePropsEqual = (prev: HydratedFeedPostProps, next: HydratedFeedPostProps)
     p.title === n.title &&
     p.mediaUrl === n.mediaUrl &&
     p.thumbnailUrl === n.thumbnailUrl &&
-    (p as any).preview_text === (n as any).preview_text &&
-    (p as any).preview_title === (n as any).preview_title &&
-    (p as any).preview_image_url === (n as any).preview_image_url &&
     p.platform === n.platform &&
     p.saves === n.saves &&
     p.isRepost === n.isRepost &&

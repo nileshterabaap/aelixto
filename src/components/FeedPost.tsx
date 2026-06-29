@@ -44,7 +44,6 @@ import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
-import { getOriginalPostCaption } from "@/lib/originalCaption";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -267,7 +266,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   // This does not touch Reddit or any other renderer.
   if (EMBED_FEATURE_FLAGS.quora_preview && isQuoraUrl) {
     return (
-      <Card className="glass-post-card overflow-hidden rounded-[2rem]">
+      <Card className="post-card border-0 shadow-none">
         <div className="p-5">
           {/* Author Info */}
           <div className="flex items-center gap-3 mb-4">
@@ -299,7 +298,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                     <MoreVertical className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-background z-50">
+                <DropdownMenuContent align="end" className="bg-background z-[100]">
                   <DropdownMenuItem
                     onClick={() => deletePost()}
                     disabled={isDeleting}
@@ -321,7 +320,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
 
           {/* Caption with see more/less */}
-          {detectedPlatform !== 'instagram' && post.content && (
+          {post.content && (
             <CollapsibleCaption content={post.content} />
           )}
 
@@ -418,7 +417,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const r = resolveRenderer(post);
 
   return (
-    <Card className="glass-post-card overflow-hidden rounded-[2rem]">
+    <Card className="post-card border-0 shadow-none">
       <div className="p-5">
         {/* Repost Indicator */}
         {post.isRepost && post.repostedByUsername && (
@@ -458,7 +457,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                     <MoreVertical className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="bg-background z-50">
+                <DropdownMenuContent align="end" className="bg-background z-[100]">
                   <DropdownMenuItem
                     onClick={() => deletePost()}
                     disabled={isDeleting}
@@ -480,32 +479,9 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         </div>
 
         {/* Caption with see more/less */}
-        {detectedPlatform !== 'instagram' && post.content && (
+        {post.content && (
           <CollapsibleCaption content={post.content} />
         )}
-
-        {/* Original post caption fetched from the source link (Facebook /
-            Threads / Reddit etc.). Always rendered below the user's caption
-            and above the embed, with the same collapsible "... more" toggle. */}
-        {(() => {
-          const originalCaption = getOriginalPostCaption({
-            previewText,
-            title: post.title,
-            userCaption: post.content,
-            platform: detectedPlatform,
-          });
-          if (!originalCaption) return null;
-          // Reddit's official iframe already displays the post title and
-          // body (with its own "Read more" expander), so skip the
-          // duplicate caption above the embed.
-          if (detectedPlatform === 'reddit') return null;
-          return (
-            <CollapsibleCaption
-              content={originalCaption}
-              className="text-sm mb-3 text-muted-foreground"
-            />
-          );
-        })()}
 
         {/* Feature flag check - show disabled message if embed is disabled */}
         {!embedEnabled && (
@@ -555,7 +531,14 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <RedditEmbed url={r.url} />
+                  <RedditEmbed
+                    url={r.url}
+                    title={previewTitle || post.title}
+                    thumbnailUrl={thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform)}
+                    description={previewText}
+                    authorAvatar={post.author?.avatar || null}
+                    postId={post.id}
+                  />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -566,7 +549,14 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <RedditEmbed url={r.url} />
+                <RedditEmbed
+                  url={r.url}
+                  title={previewTitle || post.title}
+                  thumbnailUrl={thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform)}
+                  description={previewText}
+                  authorAvatar={post.author?.avatar || null}
+                  postId={post.id}
+                />
               </LazyEmbed>
             )}
             {r.kind === 'twitter' && post.isRealPost && (
@@ -625,7 +615,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 autoLoad={false}
               >
                 <ImageViewTracker postId={post.id}>
-                  <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
+                  <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} postId={post.id} platform={post.platform} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -638,7 +628,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
                 autoLoad={false}
               >
-                <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
+                <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} postId={post.id} platform={post.platform} />
               </LazyEmbed>
             )}
             {r.kind === 'universal' && !isFacebookUnavailable && post.isRealPost && (
@@ -650,7 +640,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+                  <UniversalMetaEmbed url={r.url} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -661,7 +651,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+                <UniversalMetaEmbed url={r.url} />
               </LazyEmbed>
             )}
             {r.kind === 'universal' && isFacebookUnavailable && (

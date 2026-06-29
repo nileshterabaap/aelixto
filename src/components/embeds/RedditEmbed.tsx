@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { OgCardFallback } from "@/components/OgCardFallback";
 import { supabase } from "@/integrations/supabase/client";
 import redditIcon from "@/assets/platforms/reddit.svg";
-import { usePersistEmbedHeight } from "@/hooks/usePersistEmbedHeight";
 
 type RedditEmbedProps = {
   url: string;
@@ -18,7 +17,7 @@ type RedditEmbedProps = {
 
 const REDDIT_EMBED_MIN_HEIGHT = 240;
 const REDDIT_EMBED_MAX_HEIGHT = 1600;
-const REDDIT_EMBED_INITIAL_HEIGHT = 380;
+const REDDIT_EMBED_INITIAL_HEIGHT = 500;
 const REDDIT_IFRAME_TIMEOUT = 8500;
 
 function ensureProtocol(rawUrl: string): string {
@@ -154,13 +153,6 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     if (mediaKind === 'text' && suggestedHeight && suggestedHeight > 0) {
       return Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, suggestedHeight));
     }
-    if (mediaKind === 'text') {
-      // Text-only Reddit posts collapse behind a "Read more" toggle in the
-      // official embed. Start tight so there's no blank strip below the
-      // action bar; the postMessage listener below grows the iframe when
-      // the user expands the body.
-      return 360;
-    }
     if (aspectRatio && aspectRatio > 0 && (mediaKind === 'video' || mediaKind === 'image' || mediaKind === 'gallery')) {
       // Reddit's chrome (header + action bar + comments button) takes ~210px.
       const mediaH = viewportWidth / aspectRatio;
@@ -177,7 +169,6 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const validThumb = !!effectiveThumb && !thumbBroken && !sameUrl(effectiveThumb, authorAvatar);
   const fallbackImage = validThumb ? effectiveThumb! : undefined;
   const embedSrc = useMemo(() => (resolvedUrl ? toRedditEmbedSrc(resolvedUrl) : null), [resolvedUrl]);
-  const persistHeight = usePersistEmbedHeight(postId);
 
   // Detect broken/blocked Reddit thumbnails (e.g. URLs that 403 or 404) so the
   // fallback card swaps to the author's profile picture instead of rendering a
@@ -291,24 +282,17 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
       }
       const data: any = event.data;
       if (!data || typeof data !== "object") return;
-      // Accept any height-bearing message from reddit.com — the embed
-      // sometimes fires bare `{height}` payloads after the "Read more"
-      // toggle expands the body, without a recognisable `type`.
       const candidate =
-        typeof data.height === "number"
-          ? data.height
-          : typeof data?.data?.height === "number"
-          ? data.data.height
-          : null;
+        (data.type === "embed" || data.type === "embed-resize" || data.message === "embed-resize") &&
+        (typeof data.height === "number" ? data.height : typeof data.data?.height === "number" ? data.data.height : null);
       if (typeof candidate === "number" && candidate > 0) {
         const clamped = Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, Math.ceil(candidate)));
         setIframeHeight(clamped);
-        persistHeight(clamped, aspectRatio ?? null);
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [embedSrc, persistHeight, aspectRatio]);
+  }, [embedSrc]);
 
   if (resolving || (!resolvedUrl && !failed)) {
     return <div data-embed-status="loading" className="w-full" style={{ minHeight: iframeHeight }} />;
