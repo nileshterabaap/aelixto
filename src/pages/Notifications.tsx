@@ -155,10 +155,8 @@ const NotificationItem = ({
   return (
     <div 
       onClick={handleClick}
-      className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
-        notification.is_read 
-          ? 'bg-card hover:border-primary/50' 
-          : 'bg-primary/5 border-primary/20 hover:bg-primary/10'
+      className={`glass-post-card p-4 rounded-xl cursor-pointer transition-all duration-200 ${
+        notification.is_read ? '' : 'ring-1 ring-primary/20'
       }`}
     >
       <div className="flex gap-3">
@@ -279,7 +277,7 @@ const NotificationItem = ({
 };
 
 const NotificationSkeleton = () => (
-  <div className="p-4 rounded-xl border bg-card">
+  <div className="glass-post-card p-4 rounded-xl">
     <div className="flex gap-3">
       <Skeleton className="h-10 w-10 rounded-full shrink-0" />
       <div className="flex-1 space-y-2">
