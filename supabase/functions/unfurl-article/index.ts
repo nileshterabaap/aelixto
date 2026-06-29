@@ -304,7 +304,6 @@ const normalizeImageCandidate = (raw?: string | null, baseUrl?: string): string 
 
 const extractImageFromImgTag = (tag: string, baseUrl?: string): string | null => {
   const attrs = [
-    'src',
     'data-src',
     'data-original',
     'data-lazy-src',
@@ -312,6 +311,7 @@ const extractImageFromImgTag = (tag: string, baseUrl?: string): string | null =>
     'data-image-src',
     'srcset',
     'data-srcset',
+    'src',
   ];
 
   for (const attr of attrs) {
@@ -497,8 +497,11 @@ serve(async (req) => {
               meta['twitter:image'] ||
               meta.image ||
               '';
-            if (ogImage && /^https?:\/\//i.test(ogImage)) {
-              fcImage = ogImage;
+            const normalizedOgImage = normalizeImageCandidate(ogImage, targetUrl);
+            if (normalizedOgImage && /^https?:\/\//i.test(normalizedOgImage) && !isLikelyRealContentImage(normalizedOgImage)) {
+              fcImage = null;
+            } else if (normalizedOgImage && /^https?:\/\//i.test(normalizedOgImage)) {
+              fcImage = normalizedOgImage;
             }
 
             const isQuoraContentImg = (src: string) =>
