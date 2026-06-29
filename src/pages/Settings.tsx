@@ -154,6 +154,16 @@ const Settings = () => {
           <Row label="Change password" onClick={() => setChangePasswordOpen(true)} />
           <Row label="Notifications" onClick={() => navigate('/settings/notifications')} />
           <Row label="Privacy settings" onClick={() => navigate('/settings/privacy')} />
+          <button
+            type="button"
+            disabled
+            className="w-full flex items-center justify-between py-4 text-left"
+          >
+            <div className="flex flex-col">
+              <span className="text-base text-foreground">Theme</span>
+              <span className="text-xs text-muted-foreground mt-0.5">Light · Dark coming soon</span>
+            </div>
+          </button>
         </div>
 
         {/* Support */}
