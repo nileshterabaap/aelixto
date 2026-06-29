@@ -214,27 +214,14 @@ export const ArticleEmbed = ({ url, onFaviconLoaded, postId, platform }: Article
     );
   }
 
-  // Quora posts - link card only (Quora blocks embeds)
-  if (rendererType === 'quora') {
-    return (
-      <div data-embed-status="ready">
-        <LinkPreviewCard
-          url={data.resolvedUrl}
-          title={data.meta.title || 'View on Quora'}
-          description={data.meta.description}
-          image={data.meta.image || undefined}
-          domain={data.site.domain}
-          favicon={data.site.favicon}
-          siteName={data.site.name}
-        />
-      </div>
-    );
-  }
-
-  // Everything else - rich article card
+  // Quora + everything else - rich article card
   return (
     <div data-embed-status="ready">
-      <ArticleContentEmbed data={data} postId={postId} platform={platform} />
+      <ArticleContentEmbed
+        data={data}
+        postId={postId}
+        platform={rendererType === 'quora' ? 'quora' : platform}
+      />
     </div>
   );
 };
