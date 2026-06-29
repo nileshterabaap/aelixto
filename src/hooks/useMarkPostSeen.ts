@@ -2,8 +2,8 @@ import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 const BATCH_INTERVAL = 3000; // flush every 3s
-const VISIBILITY_THRESHOLD = 0.5; // 50% visible
-const MIN_VIEW_TIME = 1500; // 1.5s minimum viewing time
+const VISIBILITY_THRESHOLD = 0.01; // any sliver visible counts
+const MIN_VIEW_TIME = 0; // mark immediately on appearance, like Instagram
 
 /**
  * Mark a single post as seen immediately (fire-and-forget).
@@ -88,20 +88,8 @@ export const useMarkPostSeen = (userId: string | undefined) => {
         const observer = new IntersectionObserver(
           ([entry]) => {
             if (entry.isIntersecting) {
-              // Start timer when post becomes visible
-              if (!viewTimers.current.has(postId)) {
-                viewTimers.current.set(postId, window.setTimeout(() => {
-                  pendingRef.current.add(postId);
-                  viewTimers.current.delete(postId);
-                }, MIN_VIEW_TIME));
-              }
-            } else {
-              // Cancel timer if post scrolls out before min time
-              const timer = viewTimers.current.get(postId);
-              if (timer) {
-                clearTimeout(timer);
-                viewTimers.current.delete(postId);
-              }
+              // Mark as seen the moment it appears, even on fast scroll
+              pendingRef.current.add(postId);
             }
           },
           { threshold: VISIBILITY_THRESHOLD }

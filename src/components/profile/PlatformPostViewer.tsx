@@ -1,16 +1,24 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
-import { useUserPlatformPosts, PlatformPost } from "@/hooks/useUserPlatformPosts";
+import { PostSkeleton } from "@/components/PostSkeleton";
+import { motion } from "framer-motion";
 import { useSession } from "@/hooks/useSession";
 import { markPostsSeenImmediate } from "@/hooks/useMarkPostSeen";
+import { supabase } from "@/integrations/supabase/client";
 import type { Post } from "@/data/demoData";
+import type { PlatformPost } from "@/hooks/useUserPlatformPosts";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 
 interface PlatformPostViewerProps {
   userId: string;
+  posts: PlatformPost[];
+  loading: boolean;
   initialPostId: string;
+  initialPostIndex: number;
   tabs: PlatformTab[];
   activeTab: string;
   onClose: () => void;
@@ -23,8 +31,15 @@ interface ProfileData {
   avatar_url: string | null;
 }
 
+// Render all posts so users can scroll UP to see posts above the tapped one
+// and DOWN to see posts below. We anchor the scroll position to the tapped
+// post on mount and keep it anchored while posts above hydrate (their height
+// changes), until the user starts scrolling themselves.
+
 function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { isRealPost: boolean; user_id: string; likes_count: number; comments_count: number } {
-  const postUserId = post.original_user_id || post.user_id;
+  // Ownership = the row's user_id (i.e. who owns this post/repost on this profile).
+  // Using original_user_id here would hide the Delete button on your own reposts.
+  const postUserId = post.is_repost ? String((post as any).profile_owner_id || post.user_id) : post.user_id;
   return {
     id: post.id,
     user_id: postUserId,
@@ -38,78 +53,214 @@ function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { 
     mediaType: (post.media_type as "image" | "video") || "none",
     mediaUrl: post.media_url || undefined,
     thumbnailUrl: post.thumbnail_url || undefined,
+    preview_text: post.preview_text,
+    preview_title: post.preview_title,
+    preview_image_url: post.preview_image_url,
     platform: post.platform as any,
     embed_html: post.embed_html,
     timestamp: new Date(post.created_at),
     saves: post.saves_count,
     likes_count: post.likes_count || 0,
     comments_count: 0,
+    isRepost: !!post.is_repost,
     isRealPost: true,
   } as any;
 }
 
 export const PlatformPostViewer = ({
   userId,
+  posts,
+  loading,
   initialPostId,
+  initialPostIndex,
   tabs,
   activeTab,
   onClose,
   onTabChange,
 }: PlatformPostViewerProps) => {
   const { user } = useSession();
-  const { items, loading } = useUserPlatformPosts(userId, activeTab);
-  const [profileData, setProfileData] = useState<ProfileData | null>(null);
+  // Use react-query so the profile is cached across viewer opens — instant after first load.
+  const { data: profileData = null } = useQuery({
+    queryKey: ["viewer-profile", userId],
+    enabled: !!userId,
+    staleTime: 10 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+    queryFn: async (): Promise<ProfileData | null> => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("username, display_name, avatar_url")
+        .eq("user_id", userId)
+        .single();
+      if (error) return null;
+      return data as ProfileData;
+    },
+  });
+  const [portalReady, setPortalReady] = useState(false);
+  // Gate the inner content for one paint so the modal's enter animation
+  // (opacity/scale) always plays visibly — otherwise, when profile + posts
+  // are cached, content commits on the same frame as the modal mounts and
+  // the user perceives an instant jump with no transition.
+  const [contentReady, setContentReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  // Persist scroll-locked state across effect re-runs. Without this, if
+  // `posts`/`profileData`/etc change after the user has already started
+  // scrolling, the anchoring effect re-runs with userScrolled=false and
+  // re-grabs the scroll position — producing the "treadmill" feel where
+  // the page keeps snapping back as you scroll.
+  const userScrolledRef = useRef(false);
+  // Reset the lock only when the viewer is opened to a new target post
+  // (e.g. user tapped a different grid item).
+  useEffect(() => {
+    userScrolledRef.current = false;
+  }, [initialPostId]);
+  const initialIdx = useMemo(
+    () => {
+      if (initialPostIndex >= 0 && initialPostIndex < posts.length) {
+        return initialPostIndex;
+      }
+      return posts.findIndex((post) => post.id === initialPostId);
+    },
+    [posts, initialPostId, initialPostIndex]
+  );
+  const targetPostId = initialIdx >= 0 ? posts[initialIdx]?.id : undefined;
   
   // Touch handling for swipe
   const touchStartX = useRef<number>(0);
   const touchEndX = useRef<number>(0);
 
-  // Fetch profile data for post author info
   useEffect(() => {
-    if (!userId) return;
-    
-    const fetchProfile = async () => {
-      try {
-        const { supabase } = await import("@/integrations/supabase/client");
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("username, display_name, avatar_url")
-          .eq("user_id", userId)
-          .single();
-        
-        if (error) {
-          console.error("[PlatformPostViewer] Error fetching profile:", error);
-          return;
-        }
-        if (data) setProfileData(data);
-      } catch (err) {
-        console.error("[PlatformPostViewer] Failed to fetch profile:", err);
+    setPortalReady(true);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  // Reveal content shortly after mount so the entry animation always plays.
+  useEffect(() => {
+    const t = window.setTimeout(() => setContentReady(true), 180);
+    return () => window.clearTimeout(t);
+  }, []);
+
+  // Anchor scroll to the tapped post and keep it anchored while posts above
+  // hydrate. Stops anchoring once the user scrolls.
+  useLayoutEffect(() => {
+    if (!portalReady || !contentReady || !targetPostId || !profileData) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    let cancelled = false;
+    let lastScrollTop = container.scrollTop;
+
+    const anchor = () => {
+      if (cancelled || userScrolledRef.current) return;
+      const target = postRefs.current.get(targetPostId);
+      if (!target) return;
+      const targetRect = target.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const desired =
+        container.scrollTop + (targetRect.top - containerRect.top);
+      const maxScroll = container.scrollHeight - container.clientHeight;
+      const clamped = Math.max(0, Math.min(desired, maxScroll));
+      if (Math.abs(container.scrollTop - clamped) > 1) {
+        container.scrollTop = clamped;
+        lastScrollTop = clamped;
       }
     };
-    fetchProfile();
-  }, [userId]);
 
-  // Scroll to initial post when items load
-  useEffect(() => {
-    if (items.length > 0 && initialPostId) {
-      // Small delay to ensure refs are set
-      setTimeout(() => {
-        const targetRef = postRefs.current.get(initialPostId);
-        if (targetRef) {
-          targetRef.scrollIntoView({ behavior: "auto", block: "start" });
-        }
-      }, 100);
-    }
-  }, [items, initialPostId, activeTab]);
+    // Initial anchor on two frames to catch layout commit
+    requestAnimationFrame(() => {
+      anchor();
+      requestAnimationFrame(anchor);
+    });
+
+    // Re-anchor whenever posts above (or the target) resize during hydration.
+    // We observe ALL post refs (including the live set that get registered
+    // after this effect runs) plus the inner scroll-content so any embed
+    // hydration above the target re-anchors us to the right post.
+    const ro = new ResizeObserver(() => {
+      if (userScrolledRef.current) return;
+      requestAnimationFrame(anchor);
+    });
+    postRefs.current.forEach((el) => ro.observe(el));
+    // Observe new posts as they mount, and re-anchor on any DOM mutation
+    // (embeds inject iframes/images that change height long after mount).
+    const mo = new MutationObserver(() => {
+      if (userScrolledRef.current) return;
+      postRefs.current.forEach((el) => {
+        try { ro.observe(el); } catch { /* already observed */ }
+      });
+      requestAnimationFrame(anchor);
+    });
+    mo.observe(container, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class", "height"] });
+    // Iframe load events are the strongest signal for embed height changes.
+    const onAnyLoad = (e: Event) => {
+      if (userScrolledRef.current) return;
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      if (t.tagName === "IFRAME" || t.tagName === "IMG") {
+        requestAnimationFrame(anchor);
+      }
+    };
+    container.addEventListener("load", onAnyLoad, true);
+
+    const markScrolled = () => {
+      userScrolledRef.current = true;
+      ro.disconnect();
+      mo.disconnect();
+    };
+    container.addEventListener("wheel", markScrolled, { passive: true });
+    container.addEventListener("touchmove", markScrolled, { passive: true });
+    container.addEventListener("pointerdown", markScrolled, { passive: true });
+    container.addEventListener("touchstart", markScrolled, { passive: true });
+    container.addEventListener("keydown", markScrolled, { passive: true });
+    // Last-resort: any genuine scroll delta the observers didn't catch
+    // (momentum, scrollbar drag, programmatic-but-user-initiated) trips
+    // the lock so anchoring can never fight the user.
+    const onScroll = () => {
+      if (userScrolledRef.current) return;
+      const delta = Math.abs(container.scrollTop - lastScrollTop);
+      // Ignore tiny sub-pixel adjustments from our own anchor() writes.
+      if (delta > 8) {
+        markScrolled();
+      }
+      lastScrollTop = container.scrollTop;
+    };
+    container.addEventListener("scroll", onScroll, { passive: true });
+
+    // Safety: stop anchoring after 12s — long enough for slow embeds to
+    // finish hydrating, short enough to never feel sticky.
+    const safetyTimeout = window.setTimeout(() => {
+      cancelled = true;
+      ro.disconnect();
+      mo.disconnect();
+    }, 4000);
+
+    return () => {
+      cancelled = true;
+      ro.disconnect();
+      mo.disconnect();
+      window.clearTimeout(safetyTimeout);
+      container.removeEventListener("wheel", markScrolled);
+      container.removeEventListener("touchmove", markScrolled);
+      container.removeEventListener("pointerdown", markScrolled);
+      container.removeEventListener("touchstart", markScrolled);
+      container.removeEventListener("keydown", markScrolled);
+      container.removeEventListener("scroll", onScroll);
+      container.removeEventListener("load", onAnyLoad, true);
+    };
+  }, [portalReady, contentReady, targetPostId, posts, initialIdx, activeTab, profileData]);
 
   // Mark all visible posts as seen when viewing profile posts
   useEffect(() => {
-    if (user?.id && items.length > 0) {
-      markPostsSeenImmediate(user.id, items.map(p => p.id));
+    if (user?.id && posts.length > 0) {
+      markPostsSeenImmediate(user.id, posts.map(p => p.id));
     }
-  }, [user?.id, items]);
+  }, [user?.id, posts]);
 
   // Get adjacent tabs for swipe navigation
   const currentTabIndex = tabs.findIndex(t => t.key === activeTab);
@@ -139,9 +290,18 @@ export const PlatformPostViewer = ({
 
   const currentTab = tabs.find(t => t.key === activeTab);
 
-  return (
-    <div 
-      className="fixed inset-0 z-50 bg-background"
+  // Gate post rendering until profile is loaded so the author header never
+  // flashes "Unknown". Also wait for one paint after mount so the modal's
+  // enter animation has a chance to play (otherwise cached opens look instant).
+  const profileReady = !!profileData && contentReady;
+
+  const viewer = (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.98 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.98 }}
+      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+      className="fixed inset-0 z-[70] bg-background"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -195,35 +355,49 @@ export const PlatformPostViewer = ({
       {/* Scrollable posts */}
       <div 
         ref={scrollContainerRef}
-        className="h-[calc(100vh-56px)] overflow-y-auto pb-8"
+        className="h-[calc(100dvh-56px)] overflow-y-auto overscroll-contain pb-8"
       >
         <div className="mx-auto max-w-2xl px-4 py-4 space-y-6">
-          {loading && items.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Loading posts...</p>
-            </div>
-          ) : items.length === 0 ? (
+          {(loading && posts.length === 0) || !profileReady ? (
+            <>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <PostSkeleton />
+                </motion.div>
+              ))}
+            </>
+          ) : posts.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No posts in this section</p>
             </div>
           ) : (
-            items.map((post) => (
-              <div
+            posts.map((post, idx) => (
+              <motion.div
                 key={post.id}
                 ref={(el) => {
                   if (el) postRefs.current.set(post.id, el);
+                  else postRefs.current.delete(post.id);
+                }}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: 0.28,
+                  delay: Math.min(Math.abs(idx - initialIdx), 4) * 0.04,
+                  ease: [0.22, 1, 0.36, 1],
                 }}
               >
                 <HydratedFeedPost
-                  post={transformPost(post, profileData || undefined)}
+                  post={transformPost(post, profileData)}
                   userId={user?.id}
-                  startHydrated={(() => {
-                    const idx = items.findIndex(p => p.id === initialPostId);
-                    const postIdx = items.findIndex(p => p.id === post.id);
-                    return idx >= 0 && Math.abs(postIdx - idx) <= 1;
-                  })()}
+                  startHydrated={true}
+                  onDeleted={onClose}
                 />
-              </div>
+              </motion.div>
             ))
           )}
         </div>
@@ -240,6 +414,9 @@ export const PlatformPostViewer = ({
           />
         ))}
       </div>
-    </div>
+    </motion.div>
   );
+
+  if (!portalReady) return null;
+  return createPortal(viewer, document.body);
 };

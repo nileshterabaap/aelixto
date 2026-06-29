@@ -39,6 +39,12 @@ export const ARTICLE_DOMAINS = [
   'dev.to',
   'mirror.xyz',
   'blogger.com',
+  'wikipedia.org',
+  'wikimedia.org',
+  'fandom.com',
+  'notion.site',
+  'bearblog.dev',
+  'tumblr.com',
 ];
 
 /**

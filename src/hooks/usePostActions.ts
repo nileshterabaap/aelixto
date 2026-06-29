@@ -1,10 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 
-export const usePostActions = (postId: string, userId: string | undefined) => {
+interface UsePostActionsOptions {
+  isRepost?: boolean;
+  onDeleted?: () => void;
+}
+
+export const usePostActions = (
+  postId: string,
+  userId: string | undefined,
+  options: UsePostActionsOptions = {}
+) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { decrement: decrementDailyCount } = useDailyPostLimit();
 
   // Check if post is liked
   const { data: isLiked } = useQuery({
@@ -121,7 +132,8 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
 
   // Share functionality
   const handleShare = async () => {
-    const url = `${window.location.origin}/post/${postId}`;
+    const { buildShortUrl, buildPostPath } = await import("@/lib/shortUrl");
+    const url = await buildShortUrl(buildPostPath(postId));
     if (navigator.share) {
       try {
         await navigator.share({ url });
@@ -141,17 +153,72 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
     mutationFn: async () => {
       if (!userId) throw new Error("Not authenticated");
 
-      const { error } = await supabase
+      if (options.isRepost) {
+        const { data, error } = await supabase
+          .from("reposts")
+          .delete()
+          .eq("post_id", postId)
+          .eq("user_id", userId)
+          .select("id");
+
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error("Repost not found or not owned");
+
+        return { createdAt: undefined as string | undefined, deletedRepost: true };
+      }
+
+      // Fetch created_at first so we can decide whether to refund the daily credit
+      const { data: existing } = await supabase
+        .from("posts")
+        .select("created_at")
+        .eq("id", postId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      const { data: deletedRows, error } = await supabase
         .from("posts")
         .delete()
         .eq("id", postId)
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .select("id");
 
       if (error) throw error;
+      if (!deletedRows || deletedRows.length === 0) throw new Error("Post not found or not owned");
+
+      return { createdAt: existing?.created_at as string | undefined, deletedRepost: false };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      // Refund the daily post credit only if the post was created today (same local day)
+      let refunded = false;
+      try {
+        if (result?.createdAt) {
+          const createdLocal = new Date(result.createdAt).toLocaleDateString();
+          const todayLocal = new Date().toLocaleDateString();
+          if (createdLocal === todayLocal) {
+            decrementDailyCount();
+            refunded = true;
+          }
+        }
+      } catch { /* ignore */ }
+
+      // Invalidate every cache that may contain this post so the UI updates immediately
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-      toast({ title: "Post deleted", description: "Your post has been removed" });
+      queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+      queryClient.invalidateQueries({ queryKey: ["platform-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["saved-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["user-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["profile-posts"] });
+
+      options.onDeleted?.();
+
+      toast({
+        title: result?.deletedRepost ? "Repost removed" : "Post deleted",
+        description: result?.deletedRepost
+          ? "Removed from your profile."
+          : refunded
+          ? "Your post has been removed. Daily credit refunded."
+          : "Your post has been removed.",
+      });
     },
     onError: () => {
       toast({ 

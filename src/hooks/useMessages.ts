@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
 import { useToast } from './use-toast';
+import { emitMessageThreadRead } from '@/lib/messageReadEvents';
 
 export interface Message {
   id: string;
@@ -73,6 +74,10 @@ export const useMessages = (conversationId: string | null) => {
             }
             return next;
           });
+          const message = payload.new as Message;
+          if (message.sender_id !== user.id) {
+            markAsRead();
+          }
         }
       )
       .subscribe();
@@ -114,6 +119,8 @@ export const useMessages = (conversationId: string | null) => {
 
   const markAsRead = async () => {
     if (!conversationId || !user) return;
+
+    emitMessageThreadRead(conversationId);
 
     try {
       await supabase

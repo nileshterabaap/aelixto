@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { CheckCircle2 } from "lucide-react";
-import { Loader2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { BottomNav } from "@/components/BottomNav";
+import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
 import { PostSkeleton } from "@/components/PostSkeleton";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
@@ -21,6 +20,7 @@ const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const { user, loading: sessionLoading } = useSession();
+  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
@@ -63,6 +63,9 @@ const Index = () => {
         mediaType: post.media_type as "image" | "video" | "none",
         mediaUrl: post.media_url || undefined,
         thumbnailUrl: post.thumbnail_url || undefined,
+        preview_text: post.preview_text,
+        preview_title: post.preview_title,
+        preview_image_url: post.preview_image_url,
         platform: post.platform as
           | "youtube"
           | "instagram"
@@ -100,6 +103,10 @@ const Index = () => {
       mediaType: post.media_type as "image" | "video" | "none",
       mediaUrl: post.media_url || undefined,
       thumbnailUrl: post.thumbnail_url || undefined,
+      preview_text: post.preview_text,
+      preview_title: post.preview_title,
+      preview_image_url: post.preview_image_url,
+      suggested_height: post.suggested_height,
       platform: post.platform as
         | "youtube"
         | "instagram"
@@ -144,24 +151,26 @@ const Index = () => {
     await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
   }, [queryClient, showDemoFeed]);
 
-  // Prefetch next page when user is within last 5 posts
-  const prefetchSentinelRef = useRef<HTMLDivElement>(null);
+  // Data-friendly invisible pagination: load the next page only when the
+  // user reaches a post ~7 items before the end. Uses an IntersectionObserver
+  // attached to that specific post so nothing fetches until it's actually
+  // needed — and no loader is ever shown.
+  const PREFETCH_OFFSET = 7;
+  const prefetchTriggerIndex = Math.max(0, allPosts.length - PREFETCH_OFFSET);
+  const prefetchSentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!hasMore || showDemoFeed) return;
     const el = prefetchSentinelRef.current;
     if (!el) return;
-
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) {
-          loadMore();
-        }
+        if (entry.isIntersecting) loadMore();
       },
-      { rootMargin: '1500px', threshold: 0 }
+      { rootMargin: '0px', threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, loadMore, showDemoFeed, allPosts.length]);
+  }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
   // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
@@ -179,7 +188,6 @@ const Index = () => {
               ))}
             </div>
           </main>
-          <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
         </div>
       </SwipeableView>
     );
@@ -216,6 +224,9 @@ const Index = () => {
                   ref={(el) => {
                     registerItem(post.id)(el);
                     if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
+                    if (index === prefetchTriggerIndex) {
+                      prefetchSentinelRef.current = el;
+                    }
                   }}
                   data-feed-item-id={post.id}
                 >
@@ -226,15 +237,8 @@ const Index = () => {
                   />
                 </div>
               ))}
-              {/* Sentinel for prefetching next page ahead of scroll */}
-              {hasMore && !showDemoFeed && (
-                <>
-                  <div ref={prefetchSentinelRef} style={{ height: 1 }} />
-                  <div className="flex justify-center py-4">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                </>
-              )}
+              {/* No visible loader — pagination happens silently far before
+                  the user reaches the end. */}
               {/* All caught up message */}
               {!hasMore && !showDemoFeed && allPosts.length > 0 && (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
@@ -249,8 +253,6 @@ const Index = () => {
           )}
         </main>
       </PullToRefresh>
-
-      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
         <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
       </div>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
+import { onMessageThreadRead } from '@/lib/messageReadEvents';
 
 export interface ConversationWithDetails {
   id: string;
@@ -54,6 +55,24 @@ export const useConversations = () => {
 
     fetchConversations();
 
+    const stopListeningForReadEvents = onMessageThreadRead((conversationId) => {
+      setConversations(prev => {
+        const next = prev.map(conversation =>
+          conversation.id === conversationId
+            ? { ...conversation, unread_count: 0 }
+            : conversation,
+        );
+        if (cacheKey) {
+          try {
+            window.localStorage.setItem(cacheKey, JSON.stringify(next));
+          } catch {
+            /* quota exceeded - ignore */
+          }
+        }
+        return next;
+      });
+    });
+
     // Subscribe to realtime updates
     const channel = supabase
       .channel('conversations-updates')
@@ -68,9 +87,22 @@ export const useConversations = () => {
           fetchConversations();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversation_participants',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchConversations();
+        }
+      )
       .subscribe();
 
     return () => {
+      stopListeningForReadEvents();
       supabase.removeChannel(channel);
     };
   }, [user]);

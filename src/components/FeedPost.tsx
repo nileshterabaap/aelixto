@@ -44,6 +44,7 @@ import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
+import { getOriginalPostCaption } from "@/lib/originalCaption";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -266,7 +267,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   // This does not touch Reddit or any other renderer.
   if (EMBED_FEATURE_FLAGS.quora_preview && isQuoraUrl) {
     return (
-      <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
+      <Card className="glass-post-card overflow-hidden rounded-[2rem]">
         <div className="p-5">
           {/* Author Info */}
           <div className="flex items-center gap-3 mb-4">
@@ -320,7 +321,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
 
           {/* Caption with see more/less */}
-          {post.content && (
+          {detectedPlatform !== 'instagram' && post.content && (
             <CollapsibleCaption content={post.content} />
           )}
 
@@ -417,7 +418,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const r = resolveRenderer(post);
 
   return (
-    <Card className="overflow-hidden border-2 border-foreground rounded-[2rem]">
+    <Card className="glass-post-card overflow-hidden rounded-[2rem]">
       <div className="p-5">
         {/* Repost Indicator */}
         {post.isRepost && post.repostedByUsername && (
@@ -479,9 +480,32 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         </div>
 
         {/* Caption with see more/less */}
-        {post.content && (
+        {detectedPlatform !== 'instagram' && post.content && (
           <CollapsibleCaption content={post.content} />
         )}
+
+        {/* Original post caption fetched from the source link (Facebook /
+            Threads / Reddit etc.). Always rendered below the user's caption
+            and above the embed, with the same collapsible "... more" toggle. */}
+        {(() => {
+          const originalCaption = getOriginalPostCaption({
+            previewText,
+            title: post.title,
+            userCaption: post.content,
+            platform: detectedPlatform,
+          });
+          if (!originalCaption) return null;
+          // Reddit's official iframe already displays the post title and
+          // body (with its own "Read more" expander), so skip the
+          // duplicate caption above the embed.
+          if (detectedPlatform === 'reddit') return null;
+          return (
+            <CollapsibleCaption
+              content={originalCaption}
+              className="text-sm mb-3 text-muted-foreground"
+            />
+          );
+        })()}
 
         {/* Feature flag check - show disabled message if embed is disabled */}
         {!embedEnabled && (
@@ -626,7 +650,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <UniversalMetaEmbed url={r.url} />
+                  <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -637,7 +661,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <UniversalMetaEmbed url={r.url} />
+                <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
               </LazyEmbed>
             )}
             {r.kind === 'universal' && isFacebookUnavailable && (
