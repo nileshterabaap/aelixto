@@ -250,60 +250,6 @@ export type Database = {
         }
         Relationships: []
       }
-      device_tokens: {
-        Row: {
-          bundle_id: string | null
-          created_at: string
-          id: string
-          platform: string
-          token: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          bundle_id?: string | null
-          created_at?: string
-          id?: string
-          platform: string
-          token: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          bundle_id?: string | null
-          created_at?: string
-          id?: string
-          platform?: string
-          token?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      domain_classifications: {
-        Row: {
-          content_type: string
-          domain: string
-          updated_at: string
-          updated_by: string | null
-          vote_count: number
-        }
-        Insert: {
-          content_type: string
-          domain: string
-          updated_at?: string
-          updated_by?: string | null
-          vote_count?: number
-        }
-        Update: {
-          content_type?: string
-          domain?: string
-          updated_at?: string
-          updated_by?: string | null
-          vote_count?: number
-        }
-        Relationships: []
-      }
       email_send_log: {
         Row: {
           created_at: string
@@ -388,27 +334,6 @@ export type Database = {
           id?: string
           token?: string
           used_at?: string | null
-        }
-        Relationships: []
-      }
-      follow_requests: {
-        Row: {
-          created_at: string
-          id: string
-          requester_id: string
-          target_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          requester_id: string
-          target_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          requester_id?: string
-          target_id?: string
         }
         Relationships: []
       }
@@ -767,18 +692,13 @@ export type Database = {
       }
       posts: {
         Row: {
-          aspect_ratio: number | null
-          broken_check_count: number
-          broken_first_seen_at: string | null
           comments_count: number | null
           content: string
           created_at: string
           embed_html: string | null
           id: string
           is_public: boolean
-          last_validated_at: string | null
           likes_count: number | null
-          media_kind: string | null
           media_type: string | null
           media_url: string | null
           platform: string | null
@@ -788,24 +708,18 @@ export type Database = {
           raw_json_data: Json | null
           reposts_count: number | null
           saves_count: number | null
-          suggested_height: number | null
           thumbnail_url: string | null
           title: string | null
           user_id: string
         }
         Insert: {
-          aspect_ratio?: number | null
-          broken_check_count?: number
-          broken_first_seen_at?: string | null
           comments_count?: number | null
           content: string
           created_at?: string
           embed_html?: string | null
           id?: string
           is_public?: boolean
-          last_validated_at?: string | null
           likes_count?: number | null
-          media_kind?: string | null
           media_type?: string | null
           media_url?: string | null
           platform?: string | null
@@ -815,24 +729,18 @@ export type Database = {
           raw_json_data?: Json | null
           reposts_count?: number | null
           saves_count?: number | null
-          suggested_height?: number | null
           thumbnail_url?: string | null
           title?: string | null
           user_id: string
         }
         Update: {
-          aspect_ratio?: number | null
-          broken_check_count?: number
-          broken_first_seen_at?: string | null
           comments_count?: number | null
           content?: string
           created_at?: string
           embed_html?: string | null
           id?: string
           is_public?: boolean
-          last_validated_at?: string | null
           likes_count?: number | null
-          media_kind?: string | null
           media_type?: string | null
           media_url?: string | null
           platform?: string | null
@@ -842,7 +750,6 @@ export type Database = {
           raw_json_data?: Json | null
           reposts_count?: number | null
           saves_count?: number | null
-          suggested_height?: number | null
           thumbnail_url?: string | null
           title?: string | null
           user_id?: string
@@ -865,7 +772,6 @@ export type Database = {
           cover_url: string | null
           created_at: string
           display_name: string | null
-          email_verified: boolean
           id: string
           search_tsv: unknown
           settings: Json
@@ -880,7 +786,6 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           display_name?: string | null
-          email_verified?: boolean
           id?: string
           search_tsv?: unknown
           settings?: Json
@@ -895,7 +800,6 @@ export type Database = {
           cover_url?: string | null
           created_at?: string
           display_name?: string | null
-          email_verified?: boolean
           id?: string
           search_tsv?: unknown
           settings?: Json
@@ -1043,54 +947,6 @@ export type Database = {
           },
         ]
       }
-      short_links: {
-        Row: {
-          click_count: number
-          code: string
-          created_at: string
-          target_path: string
-        }
-        Insert: {
-          click_count?: number
-          code: string
-          created_at?: string
-          target_path: string
-        }
-        Update: {
-          click_count?: number
-          code?: string
-          created_at?: string
-          target_path?: string
-        }
-        Relationships: []
-      }
-      signup_otps: {
-        Row: {
-          attempts: number
-          code_hash: string
-          created_at: string
-          email: string
-          expires_at: string
-          last_sent_at: string
-        }
-        Insert: {
-          attempts?: number
-          code_hash: string
-          created_at?: string
-          email: string
-          expires_at: string
-          last_sent_at?: string
-        }
-        Update: {
-          attempts?: number
-          code_hash?: string
-          created_at?: string
-          email?: string
-          expires_at?: string
-          last_sent_at?: string
-        }
-        Relationships: []
-      }
       suppressed_emails: {
         Row: {
           created_at: string
@@ -1141,11 +997,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      cancel_follow_or_request: {
-        Args: { _target: string }
-        Returns: undefined
-      }
-      create_short_link: { Args: { p_target_path: string }; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
@@ -1154,7 +1005,6 @@ export type Database = {
         Args: { payload: Json; queue_name: string }
         Returns: number
       }
-      get_email_for_username: { Args: { _username: string }; Returns: string }
       get_following_count: { Args: never; Returns: number }
       get_following_feed: {
         Args: { cursor?: string; limit_count: number }
@@ -1185,56 +1035,6 @@ export type Database = {
           thumbnail_url: string
           title: string
           user_id: string
-        }[]
-      }
-      get_following_feed_v2: {
-        Args: { cursor_key?: string; limit_count: number }
-        Returns: {
-          aspect_ratio: number
-          comments_count: number
-          content: string
-          created_at: string
-          embed_html: string
-          feed_cursor: string
-          id: string
-          is_public: boolean
-          is_repost: boolean
-          likes_count: number
-          media_kind: string
-          media_type: string
-          media_url: string
-          platform: string
-          preview_image_url: string
-          preview_text: string
-          preview_title: string
-          profile_avatar_url: string
-          profile_display_name: string
-          profile_id: string
-          profile_username: string
-          reposted_at: string
-          reposted_by_user_id: string
-          reposted_by_username: string
-          reposts_count: number
-          saves_count: number
-          suggested_height: number
-          thumbnail_url: string
-          title: string
-          user_id: string
-        }[]
-      }
-      get_mutual_followers: {
-        Args: { profile_owner_id: string; viewer_id: string }
-        Returns: {
-          display_name: string
-          username: string
-        }[]
-      }
-      get_mutual_followers_with_count: {
-        Args: { profile_owner_id: string; viewer_id: string }
-        Returns: {
-          display_name: string
-          total_count: number
-          username: string
         }[]
       }
       get_user_platform_counts: {
@@ -1296,15 +1096,6 @@ export type Database = {
           msg_id: number
           read_ct: number
         }[]
-      }
-      record_domain_classification: {
-        Args: { _content_type: string; _domain: string }
-        Returns: undefined
-      }
-      request_or_follow: { Args: { _target: string }; Returns: string }
-      respond_to_follow_request: {
-        Args: { _approve: boolean; _requester: string }
-        Returns: string
       }
       search_profiles: {
         Args: { cursor?: string; limit_count: number; q: string }

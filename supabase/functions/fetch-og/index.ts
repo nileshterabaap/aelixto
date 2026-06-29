@@ -60,246 +60,6 @@ function isValidExternalUrl(url: string): boolean {
   }
 }
 
-const decodeHtmlEntities = (text: string): string => {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
-};
-
-function resolveUrl(maybeRelative: string, baseUrl: string): string | null {
-  try { return new URL(maybeRelative, baseUrl).toString(); } catch { return null; }
-}
-
-function isLikelyRealContentImage(url: string): boolean {
-  if (!url) return false;
-  const u = url.trim();
-  if (!u || u.startsWith('data:')) return false;
-  if (/\.svg(\?|#|$)/i.test(u)) return false;
-  const lower = u.toLowerCase();
-  const blockedHints = ['sprite','icon','favicon','logo','avatar','profile-photo','blank.gif','spacer.gif','pixel.gif','1x1','tracking','analytics','badge','emoji'];
-  if (blockedHints.some(h => lower.includes(h))) return false;
-  if (/[?&=_/-](?:w|width)=(?:8|16|24|32|48|64)\b/i.test(u)) return false;
-  if (/(^|[/_-])(?:16|24|32|48|64)x(?:16|24|32|48|64)([._/]|$)/i.test(u)) return false;
-  return true;
-}
-
-function findFirstContentImage(html: string): string | null {
-  const scopes: string[] = [];
-  const articleMatch = html.match(/<article[\s\S]*?<\/article>/i);
-  if (articleMatch) scopes.push(articleMatch[0]);
-  const mainMatch = html.match(/<main[\s\S]*?<\/main>/i);
-  if (mainMatch) scopes.push(mainMatch[0]);
-  scopes.push(html);
-  for (const scope of scopes) {
-    const imgRegex = /<img[^>]+>/gi;
-    let m: RegExpExecArray | null;
-    while ((m = imgRegex.exec(scope)) !== null) {
-      const tag = m[0];
-      const src =
-        tag.match(/\s(?:data-src|data-original|data-lazy-src|data-srcset|srcset)=["']([^"']+)["']/i)?.[1] ||
-        tag.match(/\ssrc=["']([^"']+)["']/i)?.[1];
-      if (!src) continue;
-      const candidate = decodeHtmlEntities(src.split(',')[0].trim().split(/\s+/)[0]);
-      if (isLikelyRealContentImage(candidate)) return candidate;
-    }
-  }
-  return null;
-}
-
-function extractArticleMetadata(
-  html: string,
-  baseUrl: string
-): { image: string | null; title: string | null; description: string | null } {
-  const meta = (name: string): string | null => {
-    const want = name.toLowerCase();
-    const tagRegex = /<meta\b[^>]*>/gi;
-    let m: RegExpExecArray | null;
-    while ((m = tagRegex.exec(html)) !== null) {
-      const tag = m[0];
-      const propMatch = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
-      if (!propMatch || propMatch[2].toLowerCase() !== want) continue;
-      const contentMatch =
-        tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
-        tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
-        tag.match(/\scontent\s*=\s*([^\s>]+)/i);
-      if (contentMatch?.[1]) return decodeHtmlEntities(contentMatch[1]).trim();
-    }
-    return null;
-  };
-
-  let jsonLdTitle: string | null = null;
-  let jsonLdImage: string | null = null;
-  let jsonLdDesc: string | null = null;
-  const ldBlocks = html.match(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
-  for (const block of ldBlocks) {
-    const inner = block.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '').trim();
-    if (!inner) continue;
-    try {
-      const parsed = JSON.parse(inner);
-      const nodes: any[] = Array.isArray(parsed) ? parsed : (parsed['@graph'] && Array.isArray(parsed['@graph']) ? parsed['@graph'] : [parsed]);
-      for (const node of nodes) {
-        if (!node || typeof node !== 'object') continue;
-        const t = node.headline || node.name;
-        const d = node.description;
-        let img: any = node.image || node.thumbnailUrl || node.thumbnail;
-        if (Array.isArray(img)) img = img[0];
-        if (img && typeof img === 'object') img = img.url || img['@id'] || null;
-        if (!jsonLdTitle && typeof t === 'string') jsonLdTitle = t.trim();
-        if (!jsonLdDesc && typeof d === 'string') jsonLdDesc = d.trim();
-        if (!jsonLdImage && typeof img === 'string') jsonLdImage = img.trim();
-        if (jsonLdTitle && jsonLdImage) break;
-      }
-    } catch { /* ignore */ }
-    if (jsonLdTitle && jsonLdImage) break;
-  }
-
-  const titleTag = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1];
-  const h1Tag = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)?.[1];
-  let title =
-    meta('og:title') ||
-    (titleTag ? decodeHtmlEntities(titleTag.trim()) : null) ||
-    meta('twitter:title') ||
-    jsonLdTitle ||
-    (h1Tag ? decodeHtmlEntities(h1Tag.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()) : null);
-
-  if (!title) {
-    try {
-      title = new URL(baseUrl).hostname.replace(/^www\./, '');
-    } catch {
-      title = null;
-    }
-  }
-
-  const description =
-    meta('og:description') || meta('twitter:description') || meta('description') || jsonLdDesc;
-
-  let image =
-    meta('og:image') || meta('og:image:secure_url') || meta('og:image:url') ||
-    meta('twitter:image') || meta('twitter:image:src') ||
-    jsonLdImage || findFirstContentImage(html);
-
-  if (image) {
-    image = resolveUrl(image, baseUrl);
-    if (image && !isLikelyRealContentImage(image)) image = findFirstContentImage(html);
-    if (image) image = resolveUrl(image, baseUrl);
-  }
-
-  return { image: image || null, title: title || null, description: description || null };
-}
-
-const stripHtml = (text: string): string =>
-  decodeHtmlEntities(text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
-
-const extractXmlTag = (xml: string, tag: string): string | null => {
-  const escaped = tag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const cdata = xml.match(new RegExp(`<${escaped}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${escaped}>`, 'i'));
-  if (cdata?.[1]) return decodeHtmlEntities(cdata[1].trim());
-  const plain = xml.match(new RegExp(`<${escaped}[^>]*>([\\s\\S]*?)<\\/${escaped}>`, 'i'));
-  return plain?.[1] ? decodeHtmlEntities(plain[1].trim()) : null;
-};
-
-const getMediumFeedUrl = (targetUrl: string): { feedUrl: string; postId: string | null; slug: string | null } | null => {
-  try {
-    const parsed = new URL(targetUrl);
-    const host = parsed.hostname.toLowerCase();
-    const postId = parsed.pathname.match(/(?:-|\/p\/)([a-f0-9]{10,})(?:[/?#]|$)/i)?.[1] || null;
-    const lastSegment = parsed.pathname.split('/').filter(Boolean).pop() || '';
-    const slug = lastSegment.replace(/-[a-f0-9]{10,}$/i, '').toLowerCase() || null;
-
-    if (host === 'medium.com' || host === 'www.medium.com') {
-      const author = parsed.pathname.match(/^\/@([^/]+)/)?.[1];
-      return author ? { feedUrl: `https://medium.com/feed/@${author}`, postId, slug } : null;
-    }
-
-    if (host.endsWith('.medium.com')) {
-      return { feedUrl: `https://${host}/feed`, postId, slug };
-    }
-  } catch {
-    return null;
-  }
-  return null;
-};
-
-async function fetchMediumRssPreview(targetUrl: string): Promise<{ title: string; image: string | null; description: string | null; finalUrl: string } | null> {
-  const info = getMediumFeedUrl(targetUrl);
-  if (!info) return null;
-
-  try {
-    const res = await fetch(info.feedUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0',
-        'Accept': 'application/rss+xml,text/xml;q=0.9,*/*;q=0.8',
-      },
-    });
-    if (!res.ok) return null;
-
-    const xml = await res.text();
-    const items = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
-    const item = items.find((entry) => {
-      const link = extractXmlTag(entry, 'link') || '';
-      const guid = extractXmlTag(entry, 'guid') || '';
-      const haystack = `${link} ${guid} ${entry}`.toLowerCase();
-      return (!!info.postId && haystack.includes(info.postId.toLowerCase())) || (!!info.slug && haystack.includes(info.slug));
-    });
-    if (!item) return null;
-
-    const title = extractXmlTag(item, 'title');
-    const link = extractXmlTag(item, 'link') || targetUrl;
-    const content = extractXmlTag(item, 'content:encoded') || extractXmlTag(item, 'description') || '';
-    const subtitle = content.match(/<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/i)?.[1];
-    const firstParagraph = content.match(/<p[^>]*>([\s\S]*?)<\/p>/i)?.[1];
-    const image = content.match(/<img[^>]+src=["']([^"']+)["']/i)?.[1] || null;
-
-    if (!title) return null;
-    return {
-      title: stripHtml(title),
-      image: image ? decodeHtmlEntities(image) : null,
-      description: subtitle ? stripHtml(subtitle) : (firstParagraph ? stripHtml(firstParagraph) : null),
-      finalUrl: link,
-    };
-  } catch (error) {
-    console.log('[fetch-og] Medium RSS failed:', error);
-    return null;
-  }
-}
-
-async function resolveRedditCanonicalUrl(targetUrl: string): Promise<string> {
-  try {
-    const parsed = new URL(targetUrl);
-    const isShortShare = /^www\.reddit\.com$/i.test(parsed.hostname) && /^\/r\/[^/]+\/s\/[^/]+\/?$/i.test(parsed.pathname);
-    if (!isShortShare) return targetUrl;
-    const res = await fetch(`https://reddit.com${parsed.pathname}${parsed.search}`, {
-      method: 'GET',
-      redirect: 'manual',
-      headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15' },
-    });
-    const location = res.headers.get('location');
-    return location && /\/comments\//i.test(location) ? location : targetUrl;
-  } catch {
-    return targetUrl;
-  }
-}
-
-async function fetchRedditOembed(targetUrl: string): Promise<{ title: string | null; description: string | null } | null> {
-  try {
-    const res = await fetch(`https://www.reddit.com/oembed?url=${encodeURIComponent(targetUrl)}`, {
-      headers: { 'User-Agent': 'Aelixto/1.0', 'Accept': 'application/json' },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return {
-      title: typeof data.title === 'string' ? decodeHtmlEntities(data.title) : null,
-      description: typeof data.author_name === 'string' ? `Posted by u/${data.author_name}` : 'View on Reddit',
-    };
-  } catch {
-    return null;
-  }
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -328,18 +88,7 @@ serve(async (req) => {
 
     const urlLower = targetUrl.toLowerCase();
     
-    // Try oEmbed/RSS APIs first for specific platforms (more reliable)
-    if (urlLower.includes('medium.com')) {
-      const mediumData = await fetchMediumRssPreview(targetUrl);
-      if (mediumData) {
-        console.log('[fetch-og] Medium RSS success:', mediumData.title);
-        return new Response(
-          JSON.stringify({ ...mediumData, og_type: 'article' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
+    // Try oEmbed APIs first for specific platforms (more reliable)
     if (urlLower.includes('spotify.com') || urlLower.includes('open.spotify.com')) {
       try {
         const oembedUrl = `https://open.spotify.com/oembed?url=${encodeURIComponent(targetUrl)}`;
@@ -384,21 +133,16 @@ serve(async (req) => {
     }
     
     if (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) {
-      const redditUrl = await resolveRedditCanonicalUrl(targetUrl);
-      const redditOembed = await fetchRedditOembed(redditUrl);
-      // Use Reddit's public JSON API - append .json to the post URL.
-      // Only handle proper post URLs (reddit.com/r/*/comments/*).
+      // Use Reddit's JSON API via old.reddit.com - more reliable
       try {
-        let jsonUrl = redditUrl.split('?')[0].split('#')[0];
-        const isPostUrl = /reddit\.com\/r\/[^/]+\/comments\/[^/]+/i.test(jsonUrl);
-        if (!isPostUrl) {
-          throw new Error('Not a Reddit post URL, skipping JSON API');
-        }
-        if (jsonUrl.endsWith('/')) jsonUrl = jsonUrl.slice(0, -1);
+        // Convert to old.reddit.com and append .json
+        let jsonUrl = targetUrl.split('?')[0]; // Remove query params
+        jsonUrl = jsonUrl.replace('www.reddit.com', 'old.reddit.com');
+        if (!jsonUrl.endsWith('/')) jsonUrl += '/';
         jsonUrl += '.json';
-
+        
         console.log('[fetch-og] Trying Reddit JSON:', jsonUrl);
-
+        
         const redditRes = await fetch(jsonUrl, {
           headers: { 
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -412,32 +156,21 @@ serve(async (req) => {
           const data = await redditRes.json();
           const post = data?.[0]?.data?.children?.[0]?.data;
           if (post) {
-            // Prefer the post's thumbnail field; fall back to a real media URL.
-            // Reject sentinel values ("self", "nsfw", "default", "spoiler", "image").
-            const invalidThumbs = new Set(['self', 'nsfw', 'default', 'spoiler', 'image', '']);
-            let thumbnail: string | null = null;
-            const rawThumb = typeof post.thumbnail === 'string' ? post.thumbnail.trim() : '';
-            if (rawThumb && !invalidThumbs.has(rawThumb.toLowerCase()) && /^https?:\/\//i.test(rawThumb)) {
-              thumbnail = rawThumb.replace(/&amp;/g, '&');
-            } else if (post.url_overridden_by_dest && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(post.url_overridden_by_dest)) {
-              thumbnail = post.url_overridden_by_dest;
-            } else if (typeof post.url === 'string' && /\.(png|jpe?g|webp|gif)(\?|$)/i.test(post.url)) {
-              thumbnail = post.url;
-            } else if (post.preview?.images?.[0]?.source?.url) {
+            // Reddit provides thumbnail or preview images
+            let thumbnail = null;
+            if (post.preview?.images?.[0]?.source?.url) {
               thumbnail = post.preview.images[0].source.url.replace(/&amp;/g, '&');
-            } else if (post.gallery_data?.items?.[0]?.media_id && post.media_metadata?.[post.gallery_data.items[0].media_id]?.s?.u) {
-              thumbnail = post.media_metadata[post.gallery_data.items[0].media_id].s.u.replace(/&amp;/g, '&');
-            } else if (post.secure_media?.oembed?.thumbnail_url || post.media?.oembed?.thumbnail_url) {
-              thumbnail = post.secure_media?.oembed?.thumbnail_url || post.media?.oembed?.thumbnail_url;
+            } else if (post.thumbnail && post.thumbnail !== 'self' && post.thumbnail !== 'default' && post.thumbnail !== 'nsfw' && post.thumbnail !== 'spoiler') {
+              thumbnail = post.thumbnail;
             }
             
             console.log('[fetch-og] Reddit JSON API success:', thumbnail?.substring(0, 60) || 'no image');
             return new Response(
               JSON.stringify({ 
-                title: post.title || redditOembed?.title || 'Reddit Post', 
+                title: post.title || 'Reddit Post', 
                 image: thumbnail, 
-                description: post.author ? `Posted by u/${post.author}` : (redditOembed?.description || 'View on Reddit'),
-                finalUrl: redditUrl 
+                description: post.author ? `Posted by u/${post.author}` : 'View on Reddit',
+                finalUrl: targetUrl 
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
@@ -445,18 +178,6 @@ serve(async (req) => {
         }
       } catch (e) {
         console.log('[fetch-og] Reddit JSON API failed, falling back to HTML:', e);
-      }
-
-      if (redditOembed?.title) {
-        return new Response(
-          JSON.stringify({
-            title: redditOembed.title,
-            image: null,
-            description: redditOembed.description || 'View on Reddit',
-            finalUrl: redditUrl,
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       }
     }
     
@@ -508,102 +229,21 @@ serve(async (req) => {
     }
 
     // Fetch the HTML with better headers to avoid 403 blocks
-    const buildHeaders = (ua: string) => ({
-      'User-Agent': ua,
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'gzip, deflate, br',
-      'Connection': 'keep-alive',
-      'Upgrade-Insecure-Requests': '1',
-      'Sec-Fetch-Dest': 'document',
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'none',
-      'Cache-Control': 'max-age=0',
-    });
-
-    const fallbackUAs = [
-      'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-      'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
-      'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    ];
-
-    let response: Response | null = null;
-    for (const ua of fallbackUAs) {
-      try {
-        const r = await fetch(targetUrl, { headers: buildHeaders(ua), redirect: 'follow' });
-        if (r.ok) { response = r; console.log('[fetch-og] Success with UA:', ua); break; }
-        console.log('[fetch-og] UA failed:', ua, r.status);
-        response = r;
-      } catch (e) {
-        console.log('[fetch-og] UA error:', ua, e instanceof Error ? e.message : String(e));
-      }
-    }
-
-    // Last-resort: r.jina.ai proxy (returns markdown but contains title/image refs)
-    if (!response || !response.ok) {
-      try {
-        const jina = await fetch(`https://r.jina.ai/${targetUrl}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,*/*' },
-          redirect: 'follow',
-        });
-        if (jina.ok) { response = jina; console.log('[fetch-og] Success with r.jina.ai proxy'); }
-      } catch (e) {
-        console.log('[fetch-og] Jina proxy failed:', e instanceof Error ? e.message : String(e));
-      }
-    }
-
-    // Final fallback: Firecrawl (bypasses Cloudflare / anti-bot challenges)
-    if (!response || !response.ok) {
-      const fcKey = Deno.env.get('FIRECRAWL_API_KEY');
-      if (fcKey) {
-        try {
-          console.log('[fetch-og] Trying Firecrawl fallback');
-          const fc = await fetch('https://api.firecrawl.dev/v2/scrape', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${fcKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              url: targetUrl,
-              formats: ['html'],
-              onlyMainContent: false,
-            }),
-          });
-          if (fc.ok) {
-            const data = await fc.json();
-            const payload = data?.data || data || {};
-            const md = payload.metadata || {};
-            const title = md.ogTitle || md.title || '';
-            const desc = md.ogDescription || md.description || '';
-            const image = md.ogImage || md['og:image'] || md.image || '';
-            const ogType = md.ogType || md['og:type'] || null;
-            const finalUrl = md.sourceURL || md.url || targetUrl;
-            if (title || image) {
-              console.log('[fetch-og] Firecrawl direct return. title:', title?.slice(0,80), 'image:', image?.slice(0,120));
-              return new Response(
-                JSON.stringify({ title: title || null, image: image || null, description: desc || null, finalUrl, og_type: ogType }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-              );
-            }
-          } else {
-            console.log('[fetch-og] Firecrawl failed:', fc.status);
-          }
-        } catch (e) {
-          console.log('[fetch-og] Firecrawl error:', e instanceof Error ? e.message : String(e));
-        }
-      }
-    }
-
-    if (!response) {
-      response = await fetch(targetUrl, {
+    const response = await fetch(targetUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Cache-Control': 'max-age=0',
       },
       redirect: 'follow',
     });
-    }
 
     if (!response.ok) {
       // If blocked (403/401), return platform-specific placeholders
@@ -617,18 +257,18 @@ serve(async (req) => {
         if (urlLower.includes('quora.com')) {
           platformName = 'Quora';
           placeholderImage = 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=1200&h=630&fit=crop';
-        } else if (urlLower.includes('reddit.com') || urlLower.includes('redd.it')) {
+        } else if (urlLower.includes('reddit.com')) {
           platformName = 'Reddit';
-          placeholderImage = '';
+          placeholderImage = 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=1200&h=630&fit=crop';
         } else if (urlLower.includes('medium.com')) {
           platformName = 'Medium';
-          placeholderImage = '';
+          placeholderImage = 'https://images.unsplash.com/photo-1455390582262-044cdead277a?w=1200&h=630&fit=crop';
         }
         
         return new Response(
           JSON.stringify({ 
             title: `${platformName} Post`,
-            image: placeholderImage || null,
+            image: placeholderImage,
             description: `View this post on ${platformName}`,
             finalUrl: targetUrl
           }),
@@ -642,30 +282,46 @@ serve(async (req) => {
     const html = await response.text();
     const finalUrl = response.url;
 
+    // Helper to decode HTML entities
+    const decodeHtmlEntities = (text: string): string => {
+      return text
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&nbsp;/g, ' ');
+    };
+
+    // Extract Open Graph metadata with multiple fallbacks (handle both attribute orders)
+    // Pattern 1: property="og:X" content="Y"
+    // Pattern 2: content="Y" property="og:X"
     const extractMeta = (propName: string): string | null => {
-      const want = propName.toLowerCase();
-      const tagRegex = /<meta\b[^>]*>/gi;
-      let m: RegExpExecArray | null;
-      while ((m = tagRegex.exec(html)) !== null) {
-        const tag = m[0];
-        const propMatch = tag.match(/\s(property|name|itemprop)\s*=\s*["']?([^"'\s>]+)["']?/i);
-        if (!propMatch || propMatch[2].toLowerCase() !== want) continue;
-        const contentMatch =
-          tag.match(/\scontent\s*=\s*"([^"]*)"/i) ||
-          tag.match(/\scontent\s*=\s*'([^']*)'/i) ||
-          tag.match(/\scontent\s*=\s*([^\s>]+)/i);
-        if (contentMatch?.[1]) return decodeHtmlEntities(contentMatch[1]).trim();
+      // Try property first, then name
+      const patterns = [
+        new RegExp(`<meta[^>]+property=["']${propName}["'][^>]+content=["']([^"']+)["']`, 'i'),
+        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${propName}["']`, 'i'),
+        new RegExp(`<meta[^>]+name=["']${propName}["'][^>]+content=["']([^"']+)["']`, 'i'),
+        new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${propName}["']`, 'i'),
+      ];
+      for (const pattern of patterns) {
+        const match = html.match(pattern);
+        if (match) return decodeHtmlEntities(match[1]);
       }
       return null;
     };
+    
+    // Try multiple property names for each field
+    const title = extractMeta('og:title') || extractMeta('twitter:title') || 
+                  (html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] ? decodeHtmlEntities(html.match(/<title[^>]*>([^<]+)<\/title>/i)![1]) : null);
+    
+    const image = extractMeta('og:image') || extractMeta('og:image:url') || 
+                  extractMeta('og:image:secure_url') || extractMeta('twitter:image') ||
+                  extractMeta('twitter:image:src');
+    
+    const description = extractMeta('og:description') || extractMeta('twitter:description') || 
+                        extractMeta('description');
 
-    // Use the universal article metadata extractor so titles/images work
-    // across any website (Open Graph → Twitter → JSON-LD → <h1> → first
-    // real <img> inside <article>/<main>).
-    const meta = extractArticleMetadata(html, finalUrl);
-    const title = meta.title;
-    const image = meta.image;
-    const description = meta.description;
     const ogType = extractMeta('og:type');
 
     console.log('[fetch-og] Extracted OG data:', { title, image, description, ogType, finalUrl });

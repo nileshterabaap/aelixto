@@ -7,9 +7,9 @@ interface PullToRefreshProps {
   children: ReactNode;
 }
 
-const THRESHOLD = 60;
-const MAX_PULL = 180;
-const LOADING_REST = 55;
+const THRESHOLD = 55;
+const MAX_PULL = 100;
+const LOADING_REST = 45;
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -22,8 +22,6 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const [refreshing, setRefreshing] = useState(false);
   const pullY = useMotionValue(0);
   const touchStartY = useRef(0);
-  const touchStartX = useRef(0);
-  const directionLocked = useRef<"none" | "vertical" | "horizontal">("none");
   const pulling = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -56,8 +54,6 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       if (!touch) return;
 
       touchStartY.current = touch.clientY;
-      touchStartX.current = touch.clientX;
-      directionLocked.current = "none";
       pulling.current = true;
     };
 
@@ -67,35 +63,11 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       const touch = event.touches[0];
       if (!touch) return;
 
-      const diffY = touch.clientY - touchStartY.current;
-      const diffX = touch.clientX - touchStartX.current;
-
-      // Lock direction after small movement; bail on horizontal swipes (e.g. SwipeableView)
-      if (directionLocked.current === "none") {
-        if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
-          directionLocked.current =
-            Math.abs(diffX) > Math.abs(diffY) ? "horizontal" : "vertical";
-        }
-      }
-
-      if (directionLocked.current === "horizontal") {
-        pulling.current = false;
-        pullY.set(0);
-        return;
-      }
-
-      const diff = diffY;
+      const diff = touch.clientY - touchStartY.current;
 
       if (diff > 0 && isAtTop()) {
-        // 1:1 tracking up to threshold, then gentle resistance for elastic over-pull
-        let dampened: number;
-        if (diff <= THRESHOLD) {
-          dampened = diff;
-        } else {
-          const over = diff - THRESHOLD;
-          dampened = THRESHOLD + over * 0.55 * (1 - over / (over + 400));
-        }
-        pullY.set(Math.min(MAX_PULL, dampened));
+        const dampened = Math.min(MAX_PULL, diff * 0.5 * (1 - diff / (diff + 300)));
+        pullY.set(dampened);
         return;
       }
 
