@@ -1,26 +1,33 @@
-## 1. Tighten message bubble corners (WhatsApp-style)
+## Goal
+Make Quora post cards render exactly like the Medium reference: bold title, hero image, 2–3 sentence excerpt with fade, "Quora • date" footer, and a "Continue Reading" button. No more bare slug-title cards.
 
-In `src/pages/Conversation.tsx`, change bubble container at line 320 from `rounded-2xl` (≈16px) to `rounded-lg` (≈8px) to match WhatsApp's subtler corners. No other styling changes — padding, tail/spacing, inline timestamp all stay.
+## Why it's still failing today
+`unfurl-article` tries mobile UA → desktop UA → r.jina.ai → Firecrawl for Quora. Quora's anti-bot rejects the first three on every request, so it always falls through to Firecrawl. The current Firecrawl call asks for `html` + `markdown` but the downstream parser is HTML-only — when Firecrawl returns sanitized "main content" HTML (no `<meta og:*>`, no `<h1>` wrapper, stripped first `<img>`), title/image/excerpt extraction yields nothing and we ship the minimal slug-only card.
 
-## 2. Fix Quora "Content blocked by Quora protection" card
+## Plan
 
-Quora aggressively blocks all UA fingerprints (mobile, desktop, r.jina.ai), so `unfurl-article` falls through to the placeholder that shows "Quora Post" + "Content blocked by Quora protection". We already have Firecrawl wired for non-Quora articles — extend it to Quora.
+### 1. `supabase/functions/unfurl-article/index.ts` — Quora branch only
+- Skip the three doomed pre-Firecrawl strategies for Quora. Go straight to Firecrawl (faster + reliable).
+- Call Firecrawl v2 `scrape` requesting `formats: ['markdown', 'html', 'screenshot']` with `onlyMainContent: false` and `waitFor: 3500` so we get the full DOM including `<head>` (OG tags) and the first inline image.
+- Build the response directly from Firecrawl's structured output instead of re-parsing HTML downstream:
+  - `meta.title` ← `data.metadata.ogTitle` → `data.metadata.title` → first markdown `# heading` → URL slug.
+  - `meta.image` ← `data.metadata.ogImage` → first `<img src>` in HTML whose host is `*.quoracdn.net` and is not a 1px tracker/avatar.
+  - `meta.description` ← first 2 sentences of markdown body (strip the title line, skip "Sign in", "All related", "More answers"), truncated to ~200 chars with ellipsis.
+  - `meta.publishedTime` ← `data.metadata.publishedTime` if present.
+- Always return `kind: 'quora-post'` with `site.name: 'Quora'` and the Quora favicon, so `ArticleEmbed`'s router sends it to `ArticleContentEmbed` (the Medium-style card) instead of `LinkPreviewCard`.
+- Only fall back to the slug-only minimal card if Firecrawl actually errors (no key / network failure).
 
-**Edit `supabase/functions/unfurl-article/index.ts`:**
+### 2. `src/features/article-embeds/ArticleEmbed.tsx`
+- Keep the Quora synthesis fallback that's already there, but drop the OG re-fetch detour for Quora (it always fails and just adds latency). For `rendererType === 'quora'`, trust the unfurl result.
 
-- In the Quora branch, before returning the placeholder, add a Firecrawl Strategy 4:
-  - `POST https://api.firecrawl.dev/v2/scrape` with `{ url, formats: ['html','markdown'], onlyMainContent: true, waitFor: 2500 }` and `Authorization: Bearer ${FIRECRAWL_API_KEY}`.
-  - On success, set `html = data.html` and continue into the normal parsing path so the title (question text), description (first answer paragraph), og:image (author/answer image) and publishedTime get populated naturally.
-- If Firecrawl also fails or `FIRECRAWL_API_KEY` is missing, keep the existing placeholder return — but improve it:
-  - Derive a readable title from the URL slug (same logic already in `ArticleEmbed.tsx`'s Quora fallback) instead of literal "Quora Post".
-  - Set `description: ''` so we no longer render "Content blocked by Quora protection" text in the card.
+### 3. `src/features/article-embeds/ArticleContentEmbed.tsx`
+- No structural changes — it already renders the exact layout in the reference image. Just verify it doesn't strip the Firecrawl-provided `meta.description` when `content.html` is empty (the `parseContent()` fallback path already handles this; confirm with a quick read).
 
-**Edit `src/features/article-embeds/ArticleContentEmbed.tsx`:** no change needed — once description is empty and Firecrawl populates real content, card renders cleanly with title + (optional) hero + excerpt + Continue Reading.
+## What stays untouched
+- Medium / generic article path
+- Reddit embed routing
+- PTR, Aelix score, mark-as-seen, realtime invalidations
+- All other platform embeds
 
 ## Success probability
-85% — bubble radius is a one-liner. Quora fix depends on Firecrawl rendering the page (it usually does for Quora since it runs a headless browser). If Firecrawl is rate-limited or the question is gated to logged-in users, the card will still render but without an excerpt/image — strictly better than today's "blocked" message.
-
-## Technical notes
-- Files touched: `src/pages/Conversation.tsx`, `supabase/functions/unfurl-article/index.ts`.
-- No DB / RLS / client-state changes. PTR, Aelix score, mark-as-seen untouched.
-- Firecrawl secret `FIRECRAWL_API_KEY` already configured (used by fetch-og line 831 and unfurl-article line 526).
+85% — Firecrawl with `onlyMainContent: false` reliably retrieves Quora OG metadata in our existing integration; the only residual risk is rate-limit / cold-start latency, mitigated by the existing skeleton state.
