@@ -317,7 +317,7 @@ const Conversation = () => {
                   </div>
                 ) : (
                   <div
-                    className={`max-w-[70%] rounded-2xl px-3.5 py-2 ${
+                    className={`max-w-[70%] rounded-2xl px-3.5 py-1.5 flex flex-col ${
                       isOwn
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted text-foreground'
@@ -325,14 +325,14 @@ const Conversation = () => {
                   >
                     <p className="text-sm whitespace-pre-wrap break-words">
                       {message.content}
-                      <span
-                        className={`float-right ml-2 mt-1 text-[10px] leading-none select-none ${
-                          isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                        }`}
-                      >
-                        {formatTime(message.created_at)}
-                      </span>
                     </p>
+                    <span
+                      className={`self-end text-[10px] leading-none mt-0.5 select-none ${
+                        isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                      }`}
+                    >
+                      {formatTime(message.created_at)}
+                    </span>
                   </div>
                 )}
                 </div>
