@@ -283,6 +283,69 @@ const cleanUrl = (url: string): string => {
   return cleaned;
 };
 
+const normalizeImageCandidate = (raw?: string | null, baseUrl?: string): string | null => {
+  if (!raw) return null;
+  let src = decodeHtmlEntities(String(raw))
+    .replace(/\\u0026/g, '&')
+    .replace(/\\\//g, '/')
+    .replace(/&amp;/g, '&')
+    .trim();
+
+  if (!src || src.startsWith('data:') || src.startsWith('blob:')) return null;
+  src = src.split(',')[0].trim().split(/\s+/)[0];
+  if (!src) return null;
+
+  try {
+    return baseUrl ? new URL(src, baseUrl).href : new URL(src).href;
+  } catch {
+    return null;
+  }
+};
+
+const extractImageFromImgTag = (tag: string, baseUrl?: string): string | null => {
+  const attrs = [
+    'data-src',
+    'data-original',
+    'data-lazy-src',
+    'data-testid-src',
+    'data-image-src',
+    'srcset',
+    'data-srcset',
+    'src',
+  ];
+
+  for (const attr of attrs) {
+    const match = tag.match(new RegExp(`\\s${attr}\\s*=\\s*["']([^"']+)["']`, 'i'));
+    const normalized = normalizeImageCandidate(match?.[1], baseUrl);
+    if (normalized) return normalized;
+  }
+
+  return null;
+};
+
+const extractQuoraImageFromText = (text: string, baseUrl: string): string | null => {
+  if (!text) return null;
+  const candidates: string[] = [];
+  const patterns = [
+    /https?:\\?\/\\?\/(?:qph\.[^\s"'<>\\)]+|[^\s"'<>\\)]*quoracdn\.net[^\s"'<>\\)]*)/gi,
+    /https?:\\u002f\\u002f(?:qph\.[^\s"'<>\\)]+|[^\s"'<>\\)]*quoracdn\.net[^\s"'<>\\)]*)/gi,
+  ];
+
+  for (const pattern of patterns) {
+    let m: RegExpExecArray | null;
+    while ((m = pattern.exec(text)) !== null) {
+      candidates.push(m[0]);
+    }
+  }
+
+  for (const candidate of candidates) {
+    const normalized = normalizeImageCandidate(candidate, baseUrl);
+    if (normalized && isLikelyRealContentImage(normalized)) return normalized;
+  }
+
+  return null;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -434,20 +497,24 @@ serve(async (req) => {
               meta['twitter:image'] ||
               meta.image ||
               '';
-            if (ogImage && /^https?:\/\//i.test(ogImage)) {
-              fcImage = ogImage;
+            const normalizedOgImage = normalizeImageCandidate(ogImage, targetUrl);
+            if (normalizedOgImage && /^https?:\/\//i.test(normalizedOgImage) && !isLikelyRealContentImage(normalizedOgImage)) {
+              fcImage = null;
+            } else if (normalizedOgImage && /^https?:\/\//i.test(normalizedOgImage)) {
+              fcImage = normalizedOgImage;
             }
 
             const isQuoraContentImg = (src: string) =>
-              /(?:^|\.)quoracdn\.net\//i.test(src) || /\/\/qph\./i.test(src);
+              /(?:^|\.)quoracdn\.net\//i.test(src) || /\/\/qph\./i.test(src) || /main-qimg/i.test(src);
             const isJunkImg = (src: string) =>
-              /\/-?\d-images\.|\bavatar\b|\bspacer\b|\b1x1\b|tracking|favicon|logo|sprite|emoji/i.test(src);
+              /\/-?\d-images\.|\bavatar\b|\bprofile\b|\bspacer\b|\b1x1\b|tracking|favicon|logo|sprite|emoji|default_user/i.test(src);
 
             if (!fcImage && fcHtml) {
-              const imgRegex = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+              const imgRegex = /<img\b[^>]*>/gi;
               let m: RegExpExecArray | null;
               while ((m = imgRegex.exec(fcHtml)) !== null) {
-                const src = m[1];
+                const src = extractImageFromImgTag(m[0], targetUrl);
+                if (!src) continue;
                 if (!/^https?:\/\//i.test(src)) continue;
                 if (!isQuoraContentImg(src)) continue;
                 if (isJunkImg(src)) continue;
@@ -461,22 +528,29 @@ serve(async (req) => {
               let m: RegExpExecArray | null;
               while ((m = mdImg.exec(md)) !== null) {
                 const src = m[1];
-                if (isJunkImg(src)) continue;
-                if (isQuoraContentImg(src)) { fcImage = src; break; }
-                if (!fcImage) fcImage = src; // remember as a last resort
+                const normalized = normalizeImageCandidate(src, targetUrl);
+                if (!normalized || isJunkImg(normalized)) continue;
+                if (isQuoraContentImg(normalized)) { fcImage = normalized; break; }
+                if (!fcImage && isLikelyRealContentImage(normalized)) fcImage = normalized; // remember as a last resort
               }
             }
 
             if (!fcImage && fcHtml) {
-              const imgRegex = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+              const imgRegex = /<img\b[^>]*>/gi;
               let m: RegExpExecArray | null;
               while ((m = imgRegex.exec(fcHtml)) !== null) {
-                const src = m[1];
+                const src = extractImageFromImgTag(m[0], targetUrl);
+                if (!src) continue;
                 if (!/^https?:\/\//i.test(src)) continue;
                 if (isJunkImg(src)) continue;
+                if (!isLikelyRealContentImage(src)) continue;
                 fcImage = src;
                 break;
               }
+            }
+
+            if (!fcImage) {
+              fcImage = extractQuoraImageFromText(`${fcHtml}\n${md}\n${JSON.stringify(meta)}`, targetUrl);
             }
 
             // Description: first 2 meaningful sentences from markdown
@@ -515,8 +589,7 @@ serve(async (req) => {
         console.log('[unfurl-article] FIRECRAWL_API_KEY missing — returning minimal Quora card');
       }
 
-      return new Response(
-        JSON.stringify({
+      const result = {
           kind,
           resolvedUrl: targetUrl,
           site: { name: 'Quora', domain: quoraDomain, favicon: quoraFavicon },
@@ -527,7 +600,24 @@ serve(async (req) => {
             publishedTime: fcPublished,
           },
           content: { html: '' },
-        }),
+        };
+
+      const { error: upsertError } = await supabase
+        .from('link_previews')
+        .upsert({
+          url: targetUrl,
+          data: result,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'url',
+        });
+
+      if (upsertError) {
+        console.error('[unfurl-article] Quora cache error:', upsertError);
+      }
+
+      return new Response(
+        JSON.stringify(result),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {
