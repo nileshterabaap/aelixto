@@ -289,7 +289,7 @@ serve(async (req) => {
   }
 
   try {
-    const { url: rawUrl } = await req.json();
+    const { url: rawUrl, bustCache } = await req.json();
 
     if (!rawUrl) {
       return new Response(
@@ -324,18 +324,24 @@ serve(async (req) => {
       .eq('url', targetUrl)
       .single();
 
-    if (cached) {
+    if (cached && !bustCache) {
       const cacheAge = Date.now() - new Date(cached.updated_at).getTime();
       const cacheAgeHours = cacheAge / (1000 * 60 * 60);
-      
-      if (cacheAgeHours < TTL_HOURS) {
+
+      // Refresh stale Quora cache entries that never captured an image so
+      // the improved scraper has a chance to fill it in.
+      const cachedData: any = cached.data;
+      const isEmptyQuora =
+        cachedData?.kind === 'quora-post' && !cachedData?.meta?.image;
+
+      if (cacheAgeHours < TTL_HOURS && !isEmptyQuora) {
         console.log('[unfurl-article] Cache hit, age:', cacheAgeHours.toFixed(2), 'hours');
         return new Response(
           JSON.stringify(cached.data),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      console.log('[unfurl-article] Cache expired, refetching');
+      console.log('[unfurl-article] Cache expired or empty Quora image, refetching');
     }
 
     // Detect platform and kind
@@ -416,18 +422,58 @@ serve(async (req) => {
             fcTitle = fcTitle.replace(/\s*-\s*Quora\s*$/i, '').trim();
             if (!fcTitle) fcTitle = slugTitle;
 
-            // Image: og:image -> first quoracdn <img> that isn't an avatar/tracker
-            const ogImage = meta.ogImage || meta.image || '';
+            // Image extraction (in priority order):
+            // 1) og:image / twitter:image from metadata
+            // 2) First Quora-CDN <img> in HTML that isn't an avatar/UI sprite
+            // 3) First Quora-CDN image referenced in the markdown (![](url))
+            // 4) First non-avatar https <img> of any host
+            const ogImage =
+              meta.ogImage ||
+              meta['og:image'] ||
+              meta.twitterImage ||
+              meta['twitter:image'] ||
+              meta.image ||
+              '';
             if (ogImage && /^https?:\/\//i.test(ogImage)) {
               fcImage = ogImage;
-            } else if (fcHtml) {
+            }
+
+            const isQuoraContentImg = (src: string) =>
+              /(?:^|\.)quoracdn\.net\//i.test(src) || /\/\/qph\./i.test(src);
+            const isJunkImg = (src: string) =>
+              /\/-?\d-images\.|\bavatar\b|\bspacer\b|\b1x1\b|tracking|favicon|logo|sprite|emoji/i.test(src);
+
+            if (!fcImage && fcHtml) {
               const imgRegex = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
               let m: RegExpExecArray | null;
               while ((m = imgRegex.exec(fcHtml)) !== null) {
                 const src = m[1];
                 if (!/^https?:\/\//i.test(src)) continue;
-                if (!/quoracdn\.net/i.test(src)) continue;
-                if (/\/-3-images\.|\bavatar\b|\bspacer\b|\b1x1\b|tracking/i.test(src)) continue;
+                if (!isQuoraContentImg(src)) continue;
+                if (isJunkImg(src)) continue;
+                fcImage = src;
+                break;
+              }
+            }
+
+            if (!fcImage && md) {
+              const mdImg = /!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/gi;
+              let m: RegExpExecArray | null;
+              while ((m = mdImg.exec(md)) !== null) {
+                const src = m[1];
+                if (isJunkImg(src)) continue;
+                if (isQuoraContentImg(src)) { fcImage = src; break; }
+                if (!fcImage) fcImage = src; // remember as a last resort
+              }
+            }
+
+            if (!fcImage && fcHtml) {
+              const imgRegex = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+              let m: RegExpExecArray | null;
+              while ((m = imgRegex.exec(fcHtml)) !== null) {
+                const src = m[1];
+                if (!/^https?:\/\//i.test(src)) continue;
+                if (isJunkImg(src)) continue;
                 fcImage = src;
                 break;
               }
