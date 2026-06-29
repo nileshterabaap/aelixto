@@ -317,7 +317,7 @@ const Conversation = () => {
                   </div>
                 ) : (
                   <div
-                    className={`max-w-[70%] rounded-2xl px-3 py-1.5 ${
+                    className={`max-w-[70%] rounded-lg px-3 py-1.5 ${
                       isOwn
                         ? 'bg-primary text-primary-foreground'
                         : 'bg-muted text-foreground'
