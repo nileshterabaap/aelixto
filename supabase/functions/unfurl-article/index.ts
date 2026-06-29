@@ -357,176 +357,133 @@ serve(async (req) => {
     let resolvedUrl = targetUrl;
     
     if (kind === 'quora-post') {
-      console.log('[unfurl-article] Attempting Quora fetch with multiple strategies');
-      
-      // Strategy 1: Mobile user agent (less protection)
-      const mobileHeaders = {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Sec-Fetch-Dest': 'document',
-        'Sec-Fetch-Mode': 'navigate',
-        'Sec-Fetch-Site': 'none',
-      };
-      
-      try {
-        console.log('[unfurl-article] Strategy 1: Mobile user agent');
-        const mobileResponse = await fetch(targetUrl, {
-          headers: mobileHeaders,
-          redirect: 'follow',
-        });
-        
-        console.log('[unfurl-article] Mobile response status:', mobileResponse.status);
-        
-        if (mobileResponse.ok) {
-          html = await mobileResponse.text();
-          resolvedUrl = mobileResponse.url;
-          console.log('[unfurl-article] Success with mobile user agent, HTML length:', html.length);
-        } else {
-          throw new Error(`Mobile fetch failed: ${mobileResponse.status}`);
-        }
-      } catch (mobileError) {
-        console.log('[unfurl-article] Mobile strategy failed:', mobileError instanceof Error ? mobileError.message : String(mobileError));
-        
-        // Strategy 2: Desktop with enhanced headers
-        const desktopHeaders = {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Connection': 'keep-alive',
-          'Upgrade-Insecure-Requests': '1',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Sec-Fetch-User': '?1',
-          'Cache-Control': 'max-age=0',
-          'sec-ch-ua': '"Chromium";v="122", "Not(A:Brand";v="24", "Google Chrome";v="122"',
-          'sec-ch-ua-mobile': '?0',
-          'sec-ch-ua-platform': '"Windows"',
-        };
-        
-        try {
-          console.log('[unfurl-article] Strategy 2: Enhanced desktop headers');
-          const desktopResponse = await fetch(targetUrl, {
-            headers: desktopHeaders,
-            redirect: 'follow',
-          });
-          
-          console.log('[unfurl-article] Desktop response status:', desktopResponse.status);
-          
-          if (desktopResponse.ok) {
-            html = await desktopResponse.text();
-            resolvedUrl = desktopResponse.url;
-            console.log('[unfurl-article] Success with desktop headers, HTML length:', html.length);
-          } else {
-            throw new Error(`Desktop fetch failed: ${desktopResponse.status}`);
-          }
-        } catch (desktopError) {
-          console.log('[unfurl-article] Desktop strategy failed:', desktopError instanceof Error ? desktopError.message : String(desktopError));
-          
-          // Strategy 3: r.jina.ai proxy
-          try {
-            console.log('[unfurl-article] Strategy 3: Using r.jina.ai proxy');
-            const jinaUrl = `https://r.jina.ai/${targetUrl}`;
-            const jinaResponse = await fetch(jinaUrl, {
-              headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-              },
-              redirect: 'follow',
-            });
-            
-            console.log('[unfurl-article] Jina response status:', jinaResponse.status);
-            
-            if (jinaResponse.ok) {
-              html = await jinaResponse.text();
-              resolvedUrl = targetUrl; // Use original URL
-              console.log('[unfurl-article] Success with r.jina.ai proxy, HTML length:', html.length);
-              console.log('[unfurl-article] HTML sample (first 500 chars):', html.substring(0, 500));
-            } else {
-              throw new Error(`Jina fetch failed: ${jinaResponse.status}`);
-            }
-          } catch (jinaError) {
-            console.log('[unfurl-article] All strategies failed for Quora:', jinaError instanceof Error ? jinaError.message : String(jinaError));
+      console.log('[unfurl-article] Quora: routing directly to Firecrawl');
 
-            // Strategy 4: Firecrawl (headless browser, bypasses Quora protection)
-            const fcKey = Deno.env.get('FIRECRAWL_API_KEY');
-            if (fcKey) {
-              try {
-                console.log('[unfurl-article] Strategy 4: Firecrawl scrape');
-                const fc = await fetch('https://api.firecrawl.dev/v2/scrape', {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${fcKey}`,
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    url: targetUrl,
-                    formats: ['html', 'markdown'],
-                    onlyMainContent: true,
-                    waitFor: 2500,
-                  }),
-                });
-                if (fc.ok) {
-                  const fcData = await fc.json();
-                  const fcHtml = fcData?.data?.html || fcData?.html || '';
-                  if (fcHtml && fcHtml.length > 200) {
-                    html = fcHtml;
-                    resolvedUrl = fcData?.data?.metadata?.sourceURL || targetUrl;
-                    console.log('[unfurl-article] Success with Firecrawl, HTML length:', html.length);
-                  } else {
-                    throw new Error('Firecrawl returned empty html');
-                  }
-                } else {
-                  throw new Error(`Firecrawl failed: ${fc.status}`);
-                }
-              } catch (fcErr) {
-                console.log('[unfurl-article] Firecrawl failed:', fcErr instanceof Error ? fcErr.message : String(fcErr));
+      const slugTitle = (() => {
+        try {
+          const u = new URL(targetUrl);
+          const parts = u.pathname.split('/').filter(Boolean);
+          const last = parts[parts.length - 1];
+          if (last) {
+            return last
+              .split('-')
+              .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+              .join(' ');
+          }
+        } catch { /* ignore */ }
+        return 'Quora Post';
+      })();
+
+      const quoraFavicon = 'https://qsf.cf2.quoracdn.net/-4-images.favicon.ico-26-8c912802e29ec03e.ico';
+      const quoraDomain = (() => { try { return new URL(targetUrl).hostname; } catch { return 'quora.com'; } })();
+
+      const fcKey = Deno.env.get('FIRECRAWL_API_KEY');
+      let fcTitle = '';
+      let fcImage: string | null = null;
+      let fcDescription = '';
+      let fcPublished: string | null = null;
+
+      if (fcKey) {
+        try {
+          const fc = await fetch('https://api.firecrawl.dev/v2/scrape', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${fcKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              url: targetUrl,
+              formats: ['markdown', 'html'],
+              onlyMainContent: false,
+              waitFor: 3500,
+            }),
+          });
+
+          if (fc.ok) {
+            const fcData = await fc.json();
+            const payload = fcData?.data ?? fcData;
+            const md: string = payload?.markdown || '';
+            const fcHtml: string = payload?.html || payload?.rawHtml || '';
+            const meta = payload?.metadata || {};
+
+            // Title: og:title -> metadata.title -> first markdown # heading -> slug
+            fcTitle = (meta.ogTitle || meta.title || '').trim();
+            if (!fcTitle && md) {
+              const h = md.match(/^#\s+(.+)$/m);
+              if (h) fcTitle = h[1].trim();
+            }
+            // Strip trailing " - Quora"
+            fcTitle = fcTitle.replace(/\s*-\s*Quora\s*$/i, '').trim();
+            if (!fcTitle) fcTitle = slugTitle;
+
+            // Image: og:image -> first quoracdn <img> that isn't an avatar/tracker
+            const ogImage = meta.ogImage || meta.image || '';
+            if (ogImage && /^https?:\/\//i.test(ogImage)) {
+              fcImage = ogImage;
+            } else if (fcHtml) {
+              const imgRegex = /<img\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/gi;
+              let m: RegExpExecArray | null;
+              while ((m = imgRegex.exec(fcHtml)) !== null) {
+                const src = m[1];
+                if (!/^https?:\/\//i.test(src)) continue;
+                if (!/quoracdn\.net/i.test(src)) continue;
+                if (/\/-3-images\.|\bavatar\b|\bspacer\b|\b1x1\b|tracking/i.test(src)) continue;
+                fcImage = src;
+                break;
               }
             }
 
-            // If Firecrawl also failed (or no key), return a clean minimal card
-            if (!html) {
-              let slugTitle = 'Quora Post';
-              try {
-                const u = new URL(targetUrl);
-                const parts = u.pathname.split('/').filter(Boolean);
-                const last = parts[parts.length - 1];
-                if (last) {
-                  slugTitle = last
-                    .split('-')
-                    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                    .join(' ');
-                }
-              } catch { /* keep default */ }
-
-            return new Response(
-              JSON.stringify({
-                kind,
-                resolvedUrl: targetUrl,
-                site: {
-                  name: 'Quora',
-                  domain: new URL(targetUrl).hostname,
-                  favicon: 'https://qsf.cf2.quoracdn.net/-4-images.favicon.ico-26-8c912802e29ec03e.ico',
-                },
-                meta: {
-                  title: slugTitle,
-                  description: '',
-                  image: null,
-                  publishedTime: null,
-                },
-                content: {
-                  html: '',
-                },
-              }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
+            // Description: first 2 meaningful sentences from markdown
+            if (md) {
+              const lines = md.split(/\n+/).map((l) => l.trim());
+              const skip = /^(sign in|sign up|all related|more answers|related questions|continue with|by continuing|profile photo|upvote|downvote|share|comment|follow|view \d|\d+ answer|original question|loading|©|home|search)/i;
+              const bodyLines: string[] = [];
+              for (const l of lines) {
+                if (!l) continue;
+                if (l.startsWith('#')) continue;
+                if (l.startsWith('![')) continue; // image markdown
+                if (l.startsWith('[')) continue;  // link-only lines
+                if (l.length < 40) continue;
+                if (skip.test(l)) continue;
+                bodyLines.push(l);
+                if (bodyLines.length >= 2) break;
+              }
+              const joined = bodyLines.join(' ').replace(/\s+/g, ' ').trim();
+              if (joined) {
+                const sentences = joined.split(/(?<=[.!?])\s+/).slice(0, 2).join(' ');
+                fcDescription = sentences.length > 220
+                  ? sentences.slice(0, 220).replace(/\s+\S*$/, '') + '…'
+                  : sentences;
+              }
             }
+
+            fcPublished = meta.ogPublishedTime || meta.publishedTime || meta['article:published_time'] || null;
+            console.log('[unfurl-article] Quora Firecrawl ok. title:', fcTitle.slice(0, 80), 'image:', !!fcImage, 'desc len:', fcDescription.length);
+          } else {
+            console.log('[unfurl-article] Quora Firecrawl HTTP', fc.status);
           }
+        } catch (e) {
+          console.log('[unfurl-article] Quora Firecrawl error:', e instanceof Error ? e.message : String(e));
         }
+      } else {
+        console.log('[unfurl-article] FIRECRAWL_API_KEY missing — returning minimal Quora card');
       }
+
+      return new Response(
+        JSON.stringify({
+          kind,
+          resolvedUrl: targetUrl,
+          site: { name: 'Quora', domain: quoraDomain, favicon: quoraFavicon },
+          meta: {
+            title: fcTitle || slugTitle,
+            description: fcDescription,
+            image: fcImage,
+            publishedTime: fcPublished,
+          },
+          content: { html: '' },
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     } else {
       // For non-Quora sites, try a UA fallback chain to bypass anti-bot protections (Cloudflare, etc.)
       const buildHeaders = (ua: string) => ({
