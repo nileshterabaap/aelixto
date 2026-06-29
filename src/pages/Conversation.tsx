@@ -112,7 +112,24 @@ const Conversation = () => {
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  };
+
+  const formatDaySeparator = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const diffDays = Math.round((startOfDay(now) - startOfDay(date)) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays > 1 && diffDays < 7) return date.toLocaleDateString('en-US', { weekday: 'long' });
+    return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
+  const isSameDay = (a: string, b: string) => {
+    const da = new Date(a);
+    const db = new Date(b);
+    return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
   };
 
   // Long press handlers
@@ -249,22 +266,20 @@ const Conversation = () => {
             const isEditing = editingId === message.id;
             const prev = idx > 0 ? messages[idx - 1] : null;
             const senderChanged = !prev || prev.sender_id !== message.sender_id;
-            const showTimeSeparator =
-              !prev ||
-              new Date(message.created_at).getTime() - new Date(prev.created_at).getTime() > 5 * 60 * 1000;
+            const showDaySeparator = !prev || !isSameDay(prev.created_at, message.created_at);
 
             return (
               <div key={message.id}>
-                {showTimeSeparator && (
-                  <div className="flex justify-center py-2">
-                    <span className="text-[11px] text-muted-foreground">
-                      {formatTime(message.created_at)}
+                {showDaySeparator && (
+                  <div className="flex justify-center py-3">
+                    <span className="text-[11px] text-muted-foreground bg-muted/60 rounded-full px-3 py-1">
+                      {formatDaySeparator(message.created_at)}
                     </span>
                   </div>
                 )}
                 <div
                   className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${
-                    senderChanged && !showTimeSeparator ? 'mt-2' : ''
+                    senderChanged && !showDaySeparator ? 'mt-2' : ''
                   }`}
                   onTouchStart={(e) => handleTouchStart(message, e)}
                   onTouchEnd={handleTouchEnd}
@@ -308,7 +323,16 @@ const Conversation = () => {
                         : 'bg-muted text-foreground'
                     }`}
                   >
-                    <p className="text-sm">{message.content}</p>
+                    <p className="text-sm whitespace-pre-wrap break-words">
+                      {message.content}
+                      <span
+                        className={`float-right ml-2 mt-1 text-[10px] leading-none select-none ${
+                          isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                        }`}
+                      >
+                        {formatTime(message.created_at)}
+                      </span>
+                    </p>
                   </div>
                 )}
                 </div>
