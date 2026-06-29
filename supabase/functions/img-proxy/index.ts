@@ -32,10 +32,25 @@ serve(async (req) => {
 
     console.log(`[img-proxy] Fetching: ${imageUrl}`);
 
-    // Fetch the image
+    let referer = 'https://www.google.com/';
+    try {
+      const host = new URL(imageUrl).hostname.toLowerCase();
+      if (host.includes('quoracdn.net') || host.startsWith('qph.')) {
+        referer = 'https://www.quora.com/';
+      } else if (host.includes('licdn.com')) {
+        referer = 'https://www.linkedin.com/';
+      }
+    } catch {
+      // keep safe default referer
+    }
+
+    // Fetch the image with browser-like headers for CDNs that block hotlinks
     const imageResponse = await fetch(imageUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Referer': referer,
       },
     });
 
