@@ -154,19 +154,21 @@ const Settings = () => {
           <Row label="Change password" onClick={() => setChangePasswordOpen(true)} />
           <Row label="Notifications" onClick={() => navigate('/settings/notifications')} />
           <Row label="Privacy settings" onClick={() => navigate('/settings/privacy')} />
-          <div className="py-4">
+          <div className="py-4 space-y-3">
+            <p className="text-sm text-muted-foreground">Theme</p>
             <div className="flex items-center justify-between">
-              <span className="text-base text-foreground">Theme</span>
-              <div className="inline-flex items-center rounded-full bg-muted p-1">
-                <span className="px-3 py-1 text-sm font-medium rounded-full bg-background shadow-sm text-foreground">
-                  Light
-                </span>
-                <span className="px-3 py-1 text-sm font-medium rounded-full text-muted-foreground/60 cursor-not-allowed">
-                  Dark
-                </span>
-              </div>
+              <span className="text-base text-foreground">Light</span>
+              <span className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-foreground">
+                <span className="h-2.5 w-2.5 rounded-full bg-foreground" />
+              </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-2">Dark — Coming soon</p>
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-base text-muted-foreground/50">Dark</span>
+                <span className="text-xs text-muted-foreground/50">Coming soon</span>
+              </div>
+              <span className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
+            </div>
           </div>
         </div>
 
