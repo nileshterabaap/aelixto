@@ -55,7 +55,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
     },
   });
 
-  const { isFollowing, isRequested, followsMe, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
+  const { isFollowing, isRequested, followsMe, follow, unfollow, loading: followLoading, counts, countsReady, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
@@ -111,7 +111,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
     return () => { clearTimeout(t); img.onload = null; img.onerror = null; };
   }, [profile?.user_id, profile?.avatar_url]);
 
-  const contentReady = !!profile && !tabsLoading && coverReady && avatarReady;
+  const contentReady = !!profile && !tabsLoading && coverReady && avatarReady && countsReady;
   const showSkeleton = !contentReady;
 
   const handleRefresh = useCallback(async () => {
