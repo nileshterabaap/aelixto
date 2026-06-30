@@ -352,23 +352,6 @@ const FacebookIframeEmbed = ({
     >
       {/* Transparent overlay catches double-tap to open original; single taps
           pass through to the iframe so pause/resume continues to work. */}
-      <div
-        onClick={handleDoubleTap}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          zIndex: 2,
-          pointerEvents: 'auto',
-          background: 'transparent',
-        }}
-        onPointerDown={(e) => {
-          // forward the pointer to the iframe by not blocking it
-          (e.currentTarget as HTMLDivElement).style.pointerEvents = 'none';
-          setTimeout(() => {
-            if (e.currentTarget) (e.currentTarget as HTMLDivElement).style.pointerEvents = 'auto';
-          }, 50);
-        }}
-      />
       <iframe
         ref={iframeRef}
         src={iframeSrc}
