@@ -265,6 +265,25 @@ const FacebookIframeEmbed = ({
   const [failed, setFailed] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
+  const lastTapRef = useRef<number>(0);
+
+  // Cross-origin iframe taps can't be observed directly, but tapping the
+  // iframe steals focus from the window. Detect two rapid focus-steals as a
+  // double tap → open original. Single tap still pauses/resumes natively.
+  useEffect(() => {
+    const onBlur = () => {
+      if (document.activeElement !== iframeRef.current) return;
+      const now = Date.now();
+      if (now - lastTapRef.current < 400 && now - lastTapRef.current > 0) {
+        window.open(expandedUrl, '_blank', 'noopener,noreferrer');
+        lastTapRef.current = 0;
+        return;
+      }
+      lastTapRef.current = now;
+    };
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, [expandedUrl]);
 
   const srcMatch = html.match(/src="([^"]+)"/);
   const iframeSrc = srcMatch ? srcMatch[1] : '';
@@ -341,6 +360,8 @@ const FacebookIframeEmbed = ({
         height: `${Math.max(MIN_HEIGHT, height - FB_FOOTER_TRIM)}px`,
       }}
     >
+      {/* Transparent overlay catches double-tap to open original; single taps
+          pass through to the iframe so pause/resume continues to work. */}
       <iframe
         ref={iframeRef}
         src={iframeSrc}
@@ -416,7 +437,7 @@ const LinkedInIframeEmbed = ({
         src={src}
         scrolling="no"
         allowFullScreen
-        allow="encrypted-media"
+        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
         loading="lazy"
         style={{
           border: 'none',
@@ -681,7 +702,7 @@ const buildLinkedInEmbed = (url: string): string | null => {
     const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
     if (feedMatch) {
       const urn = feedMatch[1];
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
@@ -691,13 +712,13 @@ const buildLinkedInEmbed = (url: string): string | null => {
       const id = postMatch[1];
       const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
       const type = typeMatch ? typeMatch[1] : 'ugcPost';
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 3: /posts/username_slug-share-ID-hash
     const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
     if (shareMatch) {
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through to null
