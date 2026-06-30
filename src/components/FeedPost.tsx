@@ -497,7 +497,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           if (!originalCaption) return null;
           // Reddit and Threads official iframes already render the post
           // caption inside the embed, so skip the duplicate above.
-          if (detectedPlatform === 'reddit' || detectedPlatform === 'threads') return null;
+          if (detectedPlatform === 'reddit' || detectedPlatform === 'threads' || detectedPlatform === 'twitter') return null;
           return (
             <CollapsibleCaption
               content={originalCaption}
