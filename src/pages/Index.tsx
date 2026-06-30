@@ -41,6 +41,22 @@ const Index = () => {
       return count ?? 0;
     },
   });
+
+  // Has the viewer seen any posts? Used to differentiate "no posts yet"
+  // (follows haven't posted anything) from "all caught up" (everything seen).
+  const { data: hasSeenAnyPosts } = useQuery({
+    queryKey: ["has-seen-any-posts", user?.id],
+    enabled: !!user?.id,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { count } = await (supabase as any)
+        .from("post_views")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user!.id)
+        .limit(1);
+      return (count ?? 0) > 0;
+    },
+  });
   
   
   // Demo feed for signed-out users
@@ -232,6 +248,14 @@ const Index = () => {
                 >
                   Discover people to follow
                 </Link>
+              </div>
+            ) : hasSeenAnyPosts ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <CheckCircle2 className="h-10 w-10 text-primary mb-3" strokeWidth={1.5} />
+                <h2 className="text-xl font-semibold">You're all caught up</h2>
+                <p className="text-sm text-muted-foreground mt-2">
+                  You've seen all recent posts from people you follow.
+                </p>
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
