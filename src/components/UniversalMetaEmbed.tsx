@@ -437,7 +437,7 @@ const LinkedInIframeEmbed = ({
         src={src}
         scrolling="no"
         allowFullScreen
-        allow="encrypted-media"
+        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
         loading="lazy"
         style={{
           border: 'none',
