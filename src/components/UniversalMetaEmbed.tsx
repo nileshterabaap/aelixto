@@ -267,13 +267,23 @@ const FacebookIframeEmbed = ({
   const persistHeight = usePersistEmbedHeight(postId);
   const lastTapRef = useRef<number>(0);
 
-  const handleDoubleTap = () => {
-    const now = Date.now();
-    if (now - lastTapRef.current < 300 && now - lastTapRef.current > 0) {
-      window.open(expandedUrl, '_blank', 'noopener,noreferrer');
-    }
-    lastTapRef.current = now;
-  };
+  // Cross-origin iframe taps can't be observed directly, but tapping the
+  // iframe steals focus from the window. Detect two rapid focus-steals as a
+  // double tap → open original. Single tap still pauses/resumes natively.
+  useEffect(() => {
+    const onBlur = () => {
+      if (document.activeElement !== iframeRef.current) return;
+      const now = Date.now();
+      if (now - lastTapRef.current < 400 && now - lastTapRef.current > 0) {
+        window.open(expandedUrl, '_blank', 'noopener,noreferrer');
+        lastTapRef.current = 0;
+        return;
+      }
+      lastTapRef.current = now;
+    };
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, [expandedUrl]);
 
   const srcMatch = html.match(/src="([^"]+)"/);
   const iframeSrc = srcMatch ? srcMatch[1] : '';
