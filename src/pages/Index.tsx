@@ -217,21 +217,30 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <h2 className="text-xl font-semibold">Nothing here yet 👀</h2>
-              <p className="text-sm text-muted-foreground mt-2">
-                No algorithm should decide your feed..
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                only your follows do.
-              </p>
-              <Link
-                to="/discover"
-                className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
-              >
-                Discover people to follow
-              </Link>
-            </div>
+            (followingCount ?? 0) === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <h2 className="text-xl font-semibold">Nothing here yet 👀</h2>
+                <p className="text-sm text-muted-foreground mt-2">
+                  No algorithm should decide your feed..
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  only your follows do.
+                </p>
+                <Link
+                  to="/discover"
+                  className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
+                >
+                  Discover people to follow
+                </Link>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <h2 className="text-xl font-semibold">No posts yet</h2>
+                <p className="text-sm text-muted-foreground mt-2">
+                  The people you follow haven't posted anything yet.
+                </p>
+              </div>
+            )
           ) : (
             <div className="space-y-6">
               {allPosts.map((post, index) => (
