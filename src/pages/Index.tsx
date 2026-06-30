@@ -13,7 +13,8 @@ import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 import { SwipeableView } from "@/components/SwipeableView";
 const Index = () => {
@@ -25,6 +26,21 @@ const Index = () => {
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
   const { observePost } = useMarkPostSeen(user?.id);
+
+  // How many people does this user follow? Used to differentiate the
+  // "Nothing here yet" (no follows) vs "No posts yet" (follows have no posts) states.
+  const { data: followingCount } = useQuery({
+    queryKey: ["my-following-count", user?.id],
+    enabled: !!user?.id,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("follower_id", user!.id);
+      return count ?? 0;
+    },
+  });
   
   
   // Demo feed for signed-out users
@@ -201,21 +217,30 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <h2 className="text-xl font-semibold">Nothing here yet 👀</h2>
-              <p className="text-sm text-muted-foreground mt-2">
-                No algorithm should decide your feed..
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                only your follows do.
-              </p>
-              <Link
-                to="/discover"
-                className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
-              >
-                Discover people to follow
-              </Link>
-            </div>
+            (followingCount ?? 0) === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <h2 className="text-xl font-semibold">Nothing here yet 👀</h2>
+                <p className="text-sm text-muted-foreground mt-2">
+                  No algorithm should decide your feed..
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  only your follows do.
+                </p>
+                <Link
+                  to="/discover"
+                  className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
+                >
+                  Discover people to follow
+                </Link>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <h2 className="text-xl font-semibold">No posts yet</h2>
+                <p className="text-sm text-muted-foreground mt-2">
+                  The people you follow haven't posted anything yet.
+                </p>
+              </div>
+            )
           ) : (
             <div className="space-y-6">
               {allPosts.map((post, index) => (
