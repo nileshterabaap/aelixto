@@ -265,6 +265,15 @@ const FacebookIframeEmbed = ({
   const [failed, setFailed] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
+  const lastTapRef = useRef<number>(0);
+
+  const handleDoubleTap = () => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300 && now - lastTapRef.current > 0) {
+      window.open(expandedUrl, '_blank', 'noopener,noreferrer');
+    }
+    lastTapRef.current = now;
+  };
 
   const srcMatch = html.match(/src="([^"]+)"/);
   const iframeSrc = srcMatch ? srcMatch[1] : '';
@@ -341,6 +350,25 @@ const FacebookIframeEmbed = ({
         height: `${Math.max(MIN_HEIGHT, height - FB_FOOTER_TRIM)}px`,
       }}
     >
+      {/* Transparent overlay catches double-tap to open original; single taps
+          pass through to the iframe so pause/resume continues to work. */}
+      <div
+        onClick={handleDoubleTap}
+        style={{
+          position: 'absolute',
+          inset: 0,
+          zIndex: 2,
+          pointerEvents: 'auto',
+          background: 'transparent',
+        }}
+        onPointerDown={(e) => {
+          // forward the pointer to the iframe by not blocking it
+          (e.currentTarget as HTMLDivElement).style.pointerEvents = 'none';
+          setTimeout(() => {
+            if (e.currentTarget) (e.currentTarget as HTMLDivElement).style.pointerEvents = 'auto';
+          }, 50);
+        }}
+      />
       <iframe
         ref={iframeRef}
         src={iframeSrc}
