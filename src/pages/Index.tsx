@@ -50,7 +50,7 @@ const Index = () => {
     staleTime: 30_000,
     queryFn: async () => {
       const { count } = await (supabase as any)
-        .from("post_views")
+        .from("post_seen")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user!.id)
         .limit(1);
