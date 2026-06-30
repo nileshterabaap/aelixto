@@ -13,7 +13,8 @@ import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 import { SwipeableView } from "@/components/SwipeableView";
 const Index = () => {
@@ -25,6 +26,21 @@ const Index = () => {
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
   const { observePost } = useMarkPostSeen(user?.id);
+
+  // How many people does this user follow? Used to differentiate the
+  // "Nothing here yet" (no follows) vs "No posts yet" (follows have no posts) states.
+  const { data: followingCount } = useQuery({
+    queryKey: ["my-following-count", user?.id],
+    enabled: !!user?.id,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { count } = await supabase
+        .from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("follower_id", user!.id);
+      return count ?? 0;
+    },
+  });
   
   
   // Demo feed for signed-out users
