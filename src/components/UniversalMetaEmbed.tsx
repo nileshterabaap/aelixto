@@ -370,6 +370,7 @@ const FacebookIframeEmbed = ({
         allowFullScreen
         allow="encrypted-media"
         loading="lazy"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         onError={() => setFailed(true)}
         style={{
           border: 'none',
