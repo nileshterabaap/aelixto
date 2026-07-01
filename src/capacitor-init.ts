@@ -85,50 +85,69 @@ export async function initCapacitorPlugins() {
   }
 
   // Register for native push notifications (FCM on Android, APNs on iOS).
-  // Token is stored in `device_tokens` and used by the send-push-notification
-  // edge function to deliver follow/like/comment/repost alerts.
-  try {
-    const { PushNotifications } = await import("@capacitor/push-notifications");
+  // IMPORTANT: this MUST run fully detached from the startup await chain.
+  // If FCM isn't configured or is slow, `PushNotifications.register()` can
+  // block the WebView boot after the user grants the permission — which
+  // manifests as "app stuck / won't open on grant, works on deny".
+  // We fire-and-forget on a later tick, and hard-timeout every call.
+  const initPushDetached = () => {
+    setTimeout(async () => {
+      try {
+        const { PushNotifications } = await import("@capacitor/push-notifications");
 
-    const saveToken = async (token: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const platform = Capacitor.getPlatform() === "ios" ? "ios" : "android";
-      await supabase.from("device_tokens").upsert(
-        {
-          user_id: user.id,
-          token,
-          platform,
-          bundle_id: "com.aelixto.app10",
-        },
-        { onConflict: "user_id,token" },
-      );
-    };
+        const saveToken = async (token: string) => {
+          try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+            const platform = Capacitor.getPlatform() === "ios" ? "ios" : "android";
+            await supabase.from("device_tokens").upsert(
+              { user_id: user.id, token, platform, bundle_id: "com.aelixto.app10" },
+              { onConflict: "user_id,token" },
+            );
+          } catch (e) {
+            console.warn("device_tokens upsert failed", e);
+          }
+        };
 
-    PushNotifications.addListener("registration", (t) => {
-      saveToken(t.value).catch((e) => console.warn("device_tokens upsert failed", e));
-    });
-    PushNotifications.addListener("registrationError", (err) => {
-      console.warn("Push registration error", err);
-    });
+        PushNotifications.addListener("registration", (t) => { void saveToken(t.value); });
+        PushNotifications.addListener("registrationError", (err) => {
+          console.warn("Push registration error", err);
+        });
 
-    const register = async () => {
-      const perm = await PushNotifications.checkPermissions();
-      let granted = perm.receive === "granted";
-      if (!granted && perm.receive !== "denied") {
-        const req = await PushNotifications.requestPermissions();
-        granted = req.receive === "granted";
+        const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T | null> =>
+          Promise.race([
+            p.catch((e) => { console.warn("push call failed", e); return null as T | null; }),
+            new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
+          ]);
+
+        const register = async () => {
+          try {
+            const perm = await withTimeout(PushNotifications.checkPermissions(), 3000);
+            let granted = perm?.receive === "granted";
+            if (!granted && perm && perm.receive !== "denied") {
+              const req = await withTimeout(PushNotifications.requestPermissions(), 60000);
+              granted = req?.receive === "granted";
+            }
+            if (granted) {
+              // Never await — register() can hang indefinitely if FCM isn't
+              // reachable. The `registration` event listener above handles
+              // the token whenever/if it arrives.
+              void withTimeout(PushNotifications.register(), 15000);
+            }
+          } catch (e) {
+            console.warn("push register wrapper failed", e);
+          }
+        };
+
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) void register();
+        supabase.auth.onAuthStateChange((event) => {
+          if (event === "SIGNED_IN") void register();
+        });
+      } catch (e) {
+        console.warn("PushNotifications plugin not available", e);
       }
-      if (granted) await PushNotifications.register();
-    };
-
-    // Register once a user is authenticated, and on every subsequent sign-in.
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) register();
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") register();
-    });
-  } catch (e) {
-    console.warn("PushNotifications plugin not available", e);
-  }
+    }, 2000);
+  };
+  initPushDetached();
 }
