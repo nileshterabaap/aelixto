@@ -30,7 +30,7 @@ const config: CapacitorConfig = {
       // NOTE: even on Android, GoogleAuth needs the WEB client ID, not the Android one.
       // Replace this placeholder with your actual Web Client ID.
       scopes: ["profile", "email"],
-      serverClientId: "REPLACE_WITH_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com",
+      serverClientId: "660089311336-km4o1a2jo9vfenrlotn1vpk0epj18ntd.apps.googleusercontent.com",
       forceCodeForRefreshToken: true,
     },
   },
