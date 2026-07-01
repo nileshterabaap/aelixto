@@ -4,6 +4,59 @@ import { supabase } from "@/integrations/supabase/client";
 export async function initCapacitorPlugins() {
   if (!Capacitor.isNativePlatform()) return;
 
+  const openNativeExternal = async (url: string) => {
+    try {
+      const { AppLauncher } = await import("@capacitor/app-launcher");
+      await AppLauncher.openUrl({ url });
+    } catch (e) {
+      console.warn("External app launch failed", e);
+      try {
+        const { Browser } = await import("@capacitor/browser");
+        await Browser.open({ url, presentationStyle: "fullscreen" });
+      } catch (browserError) {
+        console.warn("External browser fallback failed", browserError);
+      }
+    }
+  };
+
+  const originalWindowOpen = window.open.bind(window);
+  window.open = ((url?: string | URL, target?: string, features?: string) => {
+    if (url) {
+      try {
+        const next = new URL(String(url), window.location.href);
+        if ((next.protocol === "http:" || next.protocol === "https:") && next.origin !== window.location.origin) {
+          void openNativeExternal(next.href);
+          return null;
+        }
+      } catch {
+        // Fall back to the browser's default handling below.
+      }
+    }
+    return originalWindowOpen(url as string | undefined, target, features);
+  }) as typeof window.open;
+
+  document.addEventListener(
+    "click",
+    (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const anchor = target.closest("a[href]") as HTMLAnchorElement | null;
+      if (!anchor?.href) return;
+
+      try {
+        const next = new URL(anchor.href, window.location.href);
+        if ((next.protocol === "http:" || next.protocol === "https:") && next.origin !== window.location.origin) {
+          event.preventDefault();
+          event.stopPropagation();
+          void openNativeExternal(next.href);
+        }
+      } catch {
+        // Ignore malformed hrefs and let the WebView handle them.
+      }
+    },
+    true,
+  );
+
   try {
     const { StatusBar, Style } = await import("@capacitor/status-bar");
     // Webview should NOT draw under the status bar — the OS reserves that space

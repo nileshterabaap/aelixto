@@ -1,4 +1,4 @@
-import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, memo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
 import type { Post } from '@/data/demoData';
@@ -11,6 +11,7 @@ import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
 import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
+import { openExternalUrl } from '@/lib/openExternalUrl';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -200,6 +201,13 @@ export const HydratedEmbed = memo(({
   const handleOriginalVisit = useCallback(() => {
     markOriginalVisit(post.id);
   }, [post.id]);
+
+  const handleExternalOriginalClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
+    handleOriginalVisit();
+    if (!mediaUrl) return;
+    event.preventDefault();
+    void openExternalUrl(mediaUrl);
+  }, [handleOriginalVisit, mediaUrl]);
   
   // For YouTube, prefer their thumbnail
   const effectiveThumbnail = post.platform === 'youtube' && r.url 
@@ -242,7 +250,7 @@ export const HydratedEmbed = memo(({
             href={mediaUrl || '#'}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={handleOriginalVisit}
+            onClick={handleExternalOriginalClick}
             className="block w-full overflow-hidden bg-muted"
           >
             <img
@@ -270,7 +278,7 @@ export const HydratedEmbed = memo(({
             href={mediaUrl || '#'}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={handleOriginalVisit}
+            onClick={handleExternalOriginalClick}
             className="block w-full overflow-hidden bg-muted"
           >
             <img
