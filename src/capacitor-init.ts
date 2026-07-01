@@ -10,6 +10,12 @@ export async function initCapacitorPlugins() {
       await AppLauncher.openUrl({ url });
     } catch (e) {
       console.warn("External app launch failed", e);
+      try {
+        const { Browser } = await import("@capacitor/browser");
+        await Browser.open({ url, presentationStyle: "fullscreen" });
+      } catch (browserError) {
+        console.warn("External browser fallback failed", browserError);
+      }
     }
   };
 
