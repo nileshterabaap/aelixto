@@ -535,6 +535,17 @@ const Auth = () => {
                 <GoogleIcon />
                 Continue with Google
               </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
+                onClick={handleAppleSignIn}
+                disabled={loading}
+              >
+                <AppleIcon />
+                Continue with Apple
+              </Button>
             </form>
           </TabsContent>
 
@@ -601,6 +612,17 @@ const Auth = () => {
               >
                 <GoogleIcon />
                 Continue with Google
+              </Button>
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
+                onClick={handleAppleSignIn}
+                disabled={loading}
+              >
+                <AppleIcon />
+                Continue with Apple
               </Button>
             </form>
           </TabsContent>
