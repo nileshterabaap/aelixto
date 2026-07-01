@@ -103,6 +103,7 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
   const {
     data,
     isLoading: feedLoading,
+    isFetching,
     error: feedError,
     fetchNextPage,
     hasNextPage,
@@ -112,10 +113,10 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
+    staleTime: 0, // feed depends on seen-state; always verify fresh data
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: true, // refetch if stale on mount/page reload
+    refetchOnMount: 'always',
     refetchOnReconnect: true,
     structuralSharing: true,
   });
@@ -161,8 +162,8 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
 
   return {
     items,
-    empty: !feedLoading && items.length === 0,
-    loading: feedLoading,
+    empty: !feedLoading && !isFetching && items.length === 0,
+    loading: feedLoading || (isFetching && items.length === 0),
     error: feedError?.message ?? null,
     loadMore,
     hasMore: hasNextPage ?? false,

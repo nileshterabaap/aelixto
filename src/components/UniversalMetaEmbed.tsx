@@ -4,6 +4,7 @@ import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
+import { openExternalUrl } from '@/lib/openExternalUrl';
 
 const THREADS_MIN_HEIGHT = 220;
 const THREADS_MAX_HEIGHT = 1400;
@@ -275,7 +276,7 @@ const FacebookIframeEmbed = ({
       if (document.activeElement !== iframeRef.current) return;
       const now = Date.now();
       if (now - lastTapRef.current < 400 && now - lastTapRef.current > 0) {
-        window.open(expandedUrl, '_blank', 'noopener,noreferrer');
+        void openExternalUrl(expandedUrl);
         lastTapRef.current = 0;
         return;
       }
@@ -439,6 +440,7 @@ const LinkedInIframeEmbed = ({
         allowFullScreen
         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
         loading="lazy"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         style={{
           border: 'none',
           width: '100%',
@@ -799,7 +801,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
 
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
       // Double tap detected
-      window.open(embedUrl, '_blank', 'noopener,noreferrer');
+      void openExternalUrl(embedUrl);
     }
 
     lastTapRef.current = now;

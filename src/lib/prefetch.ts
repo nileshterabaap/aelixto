@@ -27,22 +27,23 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
 
   // Prefetch following count first
   await queryClient.prefetchQuery({
-    queryKey: ['following-count'],
+    queryKey: ['my-following-count', session.user.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_following_count');
       if (error) throw error;
       return data ?? 0;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 
-  // Then prefetch first page of feed
+  // Then prefetch first page of feed using the same seen-aware RPC as useFollowingFeed.
   await queryClient.prefetchInfiniteQuery({
     queryKey: ['following-feed'],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_following_feed', {
-        limit_count: 10,
-      });
+    queryFn: async ({ pageParam }) => {
+      const { data, error } = await supabase.rpc('get_following_feed_v3', {
+        limit_count: 20,
+        cursor_key: pageParam ?? null,
+      } as any);
       if (error) throw error;
       
       // Map to the same format useFollowingFeed expects
@@ -53,13 +54,21 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
         created_at: item.created_at,
         likes_count: item.likes_count,
         saves_count: item.saves_count,
+        comments_count: item.comments_count,
+        reposts_count: item.reposts_count,
         media_type: item.media_type,
         media_url: item.media_url,
         platform: item.platform,
         embed_html: item.embed_html,
         thumbnail_url: item.thumbnail_url,
         title: item.title,
+        preview_text: item.preview_text,
+        preview_title: item.preview_title,
+        preview_image_url: item.preview_image_url,
         is_public: item.is_public,
+        media_kind: item.media_kind,
+        aspect_ratio: item.aspect_ratio,
+        suggested_height: item.suggested_height,
         is_repost: item.is_repost,
         reposted_by_user_id: item.reposted_by_user_id,
         reposted_by_username: item.reposted_by_username,
@@ -75,11 +84,12 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
       
       return {
         posts: mappedPosts,
-        nextCursor: mappedPosts.length === 10 ? mappedPosts[mappedPosts.length - 1].created_at : undefined,
+        nextCursor: mappedPosts.length === 20 ? data?.[data.length - 1]?.feed_cursor : undefined,
       };
     },
     initialPageParam: undefined,
-    staleTime: 5 * 60 * 1000,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: 0,
   });
 };
 
