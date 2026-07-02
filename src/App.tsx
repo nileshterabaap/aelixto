@@ -9,8 +9,10 @@ import { AnimatePresence } from "framer-motion";
 import { preloadEmbedSDKs } from "@/lib/ScriptLoader";
 import { prefetchCoreData } from "@/lib/prefetch";
 import { useGlobalMediaPauseOnNavigate } from "@/hooks/useMediaPauseOnScroll";
+import { useRealtimeInvalidations } from "@/hooks/useRealtimeInvalidations";
 import { PageTransition } from "@/components/PageTransition";
 import { KeepAliveRoutes } from "@/components/KeepAliveRoutes";
+import { PersistentBottomNav } from "@/components/PersistentBottomNav";
 import { persistOptions } from "@/lib/queryPersister";
 import Index from "./pages/Index";
 import Discover from "./pages/Discover";
@@ -32,6 +34,7 @@ import TermsOfService from "./pages/TermsOfService";
 import ChildSafety from "./pages/ChildSafety";
 import AuthBridge from "./pages/AuthBridge";
 import Unsubscribe from "./pages/Unsubscribe";
+import ShortLinkRedirect from "./pages/ShortLinkRedirect";
 
 // Configure QueryClient with aggressive caching for instant navigation
 const queryClient = new QueryClient({
@@ -54,6 +57,7 @@ prefetchCoreData(queryClient);
 const AnimatedRoutes = () => {
   const location = useLocation();
   useGlobalMediaPauseOnNavigate();
+  useRealtimeInvalidations();
   
   // Disable browser's automatic scroll restoration
   useEffect(() => {
@@ -73,7 +77,9 @@ const AnimatedRoutes = () => {
       pattern: "/u/:username", 
       // Extract username from path for the KeepAlive version
       element: (path: string) => {
-        const username = path.split('/u/')[1];
+        const raw = path.split('/u/')[1] ?? '';
+        let username = raw;
+        try { username = decodeURIComponent(raw); } catch {}
         return <UserProfile key={path} usernameOverride={username} />;
       }
     }
@@ -102,13 +108,20 @@ const AnimatedRoutes = () => {
             <Route path="/terms" element={<PageTransition><TermsOfService /></PageTransition>} />
             <Route path="/child-safety" element={<PageTransition><ChildSafety /></PageTransition>} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
+            {/* Short-link redirect */}
+            <Route path="/s/:code" element={<ShortLinkRedirect />} />
             {/* Native OAuth bridge — converts web redirect into a custom-scheme deep link */}
             <Route path="/~auth-bridge" element={<AuthBridge />} />
+            {/* Username vanity route — must stay just above the catch-all */}
+            <Route path="/:username" element={<PageTransition><UserProfile /></PageTransition>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
           </Routes>
         </AnimatePresence>
       </KeepAliveRoutes>
+      {/* Persistent navigation — lives OUTSIDE PageTransition so it
+          stays mounted across route changes and never flickers. */}
+      <PersistentBottomNav />
     </>
   );
 };

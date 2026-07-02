@@ -22,7 +22,9 @@ export interface Post {
   profiles: {
     username: string;
     avatar_url: string | null;
-    settings?: any;
+    settings?: {
+      hide_likes?: boolean;
+    } | null;
   } | null;
 }
 
@@ -65,6 +67,8 @@ export const useCreatePost = () => {
       platform?: string;
       embed_html?: string;
       thumbnail_url?: string;
+      suggested_height?: number | null;
+      preview_text?: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -80,16 +84,42 @@ export const useCreatePost = () => {
           platform: newPost.platform || null,
           embed_html: newPost.embed_html || null,
           thumbnail_url: newPost.thumbnail_url || null,
+          suggested_height: newPost.suggested_height ?? null,
+          preview_text: newPost.preview_text || null,
         })
-        .select()
+        .select(`
+          *,
+          profiles!posts_user_id_fkey (
+            username,
+            display_name,
+            avatar_url,
+            settings
+          )
+        `)
         .single();
 
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+    onSuccess: async (createdPost: any) => {
+      await queryClient.cancelQueries({ queryKey: ["posts"] });
+      await queryClient.cancelQueries({ queryKey: ["following-feed"] });
+      await queryClient.cancelQueries({ queryKey: ["platform-posts"] });
+      await queryClient.cancelQueries({ queryKey: ["user-platform-tabs"] });
+      await queryClient.cancelQueries({ queryKey: ["user-posts"] });
+
+      queryClient.removeQueries({ queryKey: ["posts"] });
+      queryClient.removeQueries({ queryKey: ["platform-posts"] });
+      queryClient.removeQueries({ queryKey: ["user-platform-tabs"] });
+      queryClient.removeQueries({ queryKey: ["user-posts"] });
+
+      queryClient.invalidateQueries({ queryKey: ["posts"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["following-feed"], refetchType: "all" });
+      // The profile grid + tabs are powered by separate caches.
+      // Without these the new post only appears after a manual refresh.
+      queryClient.invalidateQueries({ queryKey: ["platform-posts"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["user-platform-tabs"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["user-posts"], refetchType: "all" });
       toast({
         title: "Post created!",
         description: "Your post has been published successfully.",

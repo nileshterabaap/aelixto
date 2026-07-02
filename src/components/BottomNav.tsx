@@ -1,7 +1,7 @@
 import { Home, Search, Plus, Bell, User, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useCallback, MouseEvent, useRef } from "react";
+import { useState, useCallback, MouseEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchRoute } from "@/lib/prefetch";
 import { setScrollPosition } from "@/hooks/useScrollRestoration";
@@ -55,10 +55,6 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     return location.pathname === path;
   };
   const [ripples, setRipples] = useState<Record<string, Ripple[]>>({});
-  
-  // Track last home tap time to detect double-tap for refresh
-  const lastHomeTapRef = useRef<number>(0);
-
   const baseIcon = "text-foreground transition-all duration-200";
   const activeIcon = "h-[3.375rem] w-[3.375rem] opacity-100";
   const inactiveIcon = "h-[2.625rem] w-[2.625rem] opacity-50 hover:opacity-80";
@@ -91,20 +87,13 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
   const handleHomeClick = (e: MouseEvent<HTMLButtonElement>) => {
     createRipple(e, "home");
     
-    const now = Date.now();
     const isAlreadyOnHome = location.pathname === "/";
     const isAtTop = window.scrollY < 50;
     
     if (isAlreadyOnHome) {
-      if (isAtTop) {
-        // Already at top - force refresh the feed (refetchQueries actually refetches, invalidate just marks stale)
-        queryClient.refetchQueries({ queryKey: ["following-feed"] });
-        queryClient.refetchQueries({ queryKey: ["posts"] });
-      } else {
-        // Not at top - scroll to top smoothly
+      if (!isAtTop) {
         window.scrollTo({ top: 0, behavior: "smooth" });
       }
-      lastHomeTapRef.current = now;
     } else {
       // Navigate to home
       setScrollPosition(location.pathname, window.scrollY);
@@ -237,15 +226,45 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
         </div>
 
         {/* Floating center + button (rounded square) */}
-        <button
-          aria-label="Create post"
-          onClick={onCreatePost}
-          className="absolute left-1/2 -top-4 h-12 w-12 -translate-x-1/2 rounded-2xl bg-foreground text-background transition-transform duration-300 ease-out active:scale-90"
-        >
-          <span className="absolute inset-0 rounded-2xl bg-background/10 opacity-0 transition-opacity duration-300 active:opacity-100" />
-          <Plus className="relative mx-auto h-5 w-5 stroke-[3] text-background" />
-        </button>
+        <FabCreateButton onCreatePost={onCreatePost} />
       </div>
     </nav>
+  );
+};
+
+const FabCreateButton = ({ onCreatePost }: { onCreatePost: () => void }) => {
+  const [pressKey, setPressKey] = useState(0);
+  const triggerPress = useCallback(() => {
+    setPressKey((k) => k + 1);
+  }, []);
+  return (
+    <button
+      aria-label="Create post"
+      onClick={onCreatePost}
+      onPointerDown={triggerPress}
+      style={{ transform: "translate3d(-50%,0,0)", WebkitTapHighlightColor: "transparent" }}
+      className="absolute left-1/2 -top-4 h-12 w-12 select-none touch-manipulation focus:outline-none"
+    >
+      {/* Inner pressable shape — animates without affecting the outer translateX */}
+      <span
+        key={`press-${pressKey}`}
+        style={{ transformOrigin: "50% 50%" }}
+        className={`relative flex h-full w-full items-center justify-center rounded-2xl bg-foreground will-change-transform ${pressKey ? "animate-fab-press" : ""}`}
+      >
+        {/* Inner white flash */}
+        <span
+          key={`flash-${pressKey}`}
+          className={`pointer-events-none absolute inset-0 rounded-2xl bg-background/45 opacity-0 ${pressKey ? "animate-fab-flash" : ""}`}
+          aria-hidden
+        />
+        {/* Expanding ring blink */}
+        <span
+          key={`ring-${pressKey}`}
+          className={`pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-foreground/70 opacity-0 ${pressKey ? "animate-fab-blink" : ""}`}
+          aria-hidden
+        />
+        <Plus className="relative h-5 w-5 stroke-[3] text-background" />
+      </span>
+    </button>
   );
 };

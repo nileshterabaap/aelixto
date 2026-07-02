@@ -51,10 +51,10 @@ export const useUserPlatformTabs = (userId: string | undefined) => {
   const { data: tabs = [], isLoading } = useQuery({
     queryKey: ["user-platform-tabs", userId],
     enabled: !!userId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
+    refetchOnMount: "always",
     refetchOnReconnect: false,
     queryFn: async (): Promise<PlatformTab[]> => {
       const { data, error } = await supabase.rpc("get_user_platform_counts", {

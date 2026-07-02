@@ -122,6 +122,31 @@ export const clearScriptCache = (src: string) => {
 // Twitter/X embed script loader
 export const loadTwitterEmbed = () => loadScript('https://platform.twitter.com/widgets.js');
 
+// Reddit embed script loader (official blockquote widget)
+export const loadRedditEmbed = (): Promise<void> => {
+  const url = 'https://embed.reddit.com/widgets.js';
+  return new Promise((resolve, reject) => {
+    loadScript(url)
+      .then(() => {
+        // Re-trigger parsing for any blockquotes already on the page
+        try {
+          // Reddit's widget reads blockquotes on script load; for subsequent
+          // mounts we re-inject the script tag (cheap, idempotent because the
+          // browser caches it) so it re-scans the DOM.
+          const existing = document.querySelector(`script[data-reddit-rescan="1"]`);
+          if (existing) existing.remove();
+          const s = document.createElement('script');
+          s.src = url;
+          s.async = true;
+          s.setAttribute('data-reddit-rescan', '1');
+          document.body.appendChild(s);
+        } catch {}
+        resolve();
+      })
+      .catch(reject);
+  });
+};
+
 // Preload all embed SDKs early for faster embed rendering
 export const preloadEmbedSDKs = () => {
   // Load in background without blocking — stagger to avoid bandwidth contention

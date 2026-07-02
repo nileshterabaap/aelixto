@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { BottomNav } from "@/components/BottomNav";
+import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronRight, Loader2 } from "lucide-react";
@@ -22,11 +22,13 @@ const Settings = () => {
   const { toast } = useToast();
   const { isSupported: pushSupported } = usePushNotifications();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
 
   // Dialogs
   const [changeEmailOpen, setChangeEmailOpen] = useState(false);
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -52,6 +54,10 @@ const Settings = () => {
   };
 
   const handleChangePassword = async () => {
+    if (!currentPassword) {
+      toast({ title: "Error", description: "Enter your current password", variant: "destructive" });
+      return;
+    }
     if (newPassword !== confirmPassword) {
       toast({ title: "Error", description: "Passwords don't match", variant: "destructive" });
       return;
@@ -60,7 +66,22 @@ const Settings = () => {
       toast({ title: "Error", description: "Password must be at least 6 characters", variant: "destructive" });
       return;
     }
+    if (!user.email) {
+      toast({ title: "Error", description: "Unable to verify your current password", variant: "destructive" });
+      return;
+    }
     setIsSubmitting(true);
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+
+    if (verifyError) {
+      setIsSubmitting(false);
+      toast({ title: "Incorrect password", description: "Please check your current password and try again.", variant: "destructive" });
+      return;
+    }
+
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setIsSubmitting(false);
     if (error) {
@@ -68,6 +89,7 @@ const Settings = () => {
     } else {
       toast({ title: "Success", description: "Password updated successfully." });
       setChangePasswordOpen(false);
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     }
@@ -132,6 +154,22 @@ const Settings = () => {
           <Row label="Change password" onClick={() => setChangePasswordOpen(true)} />
           <Row label="Notifications" onClick={() => navigate('/settings/notifications')} />
           <Row label="Privacy settings" onClick={() => navigate('/settings/privacy')} />
+          <div className="py-4 space-y-3">
+            <p className="text-sm text-muted-foreground">Theme</p>
+            <div className="flex items-center justify-between">
+              <span className="text-base text-foreground">Light</span>
+              <span className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-foreground">
+                <span className="h-2.5 w-2.5 rounded-full bg-foreground" />
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-base text-muted-foreground/50">Dark</span>
+                <span className="text-xs text-muted-foreground/50">Coming soon</span>
+              </div>
+              <span className="h-5 w-5 rounded-full border-2 border-muted-foreground/30" />
+            </div>
+          </div>
         </div>
 
         {/* Support */}
@@ -150,7 +188,6 @@ const Settings = () => {
         </div>
       </main>
 
-      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
       <CreatePostDialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen} />
 
       {/* Change Email Dialog */}
@@ -184,17 +221,21 @@ const Settings = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
+              <Label htmlFor="current-password">Current Password</Label>
+              <Input id="current-password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="new-password">New Password</Label>
-              <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••" />
+              <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••••" autoComplete="new-password" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirm Password</Label>
-              <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" />
+              <Input id="confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="••••••••" autoComplete="new-password" />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setChangePasswordOpen(false)}>Cancel</Button>
-            <Button onClick={handleChangePassword} disabled={isSubmitting || !newPassword || !confirmPassword}>
+            <Button onClick={handleChangePassword} disabled={isSubmitting || !currentPassword || !newPassword || !confirmPassword}>
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Update Password'}
             </Button>
           </DialogFooter>

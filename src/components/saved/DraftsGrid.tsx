@@ -24,11 +24,14 @@ import facebookIcon from "@/assets/platforms/facebook.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import redditIcon from "@/assets/platforms/reddit.svg";
 import tiktokIcon from "@/assets/platforms/tiktok.svg";
+import pinterestIcon from "@/assets/platforms/pinterest.svg";
+import articlesIcon from "@/assets/platforms/articles.svg";
 
 const PLATFORM_ICONS: Record<string, string> = {
   instagram: instagramIcon, youtube: youtubeIcon, x: xIcon, twitter: xIcon,
   spotify: spotifyIcon, medium: mediumIcon, threads: threadsIcon,
   facebook: facebookIcon, linkedin: linkedinIcon, reddit: redditIcon, tiktok: tiktokIcon,
+  pinterest: pinterestIcon, article: articlesIcon,
 };
 
 interface DraftsGridProps {
@@ -76,9 +79,6 @@ function DraftCard({
             <img src={icon} alt="" className="w-3.5 h-3.5 invert" />
           </div>
         )}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-          <span className="text-[10px] font-medium text-white uppercase tracking-wide">Draft</span>
-        </div>
       </button>
       <button
         onClick={(e) => { e.stopPropagation(); onDelete(); }}

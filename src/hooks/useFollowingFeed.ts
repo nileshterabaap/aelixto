@@ -18,7 +18,13 @@ interface FeedPost {
   embed_html: string | null;
   thumbnail_url: string | null;
   title: string | null;
+  preview_text?: string | null;
+  preview_title?: string | null;
+  preview_image_url?: string | null;
   is_public: boolean;
+  media_kind?: string | null;
+  aspect_ratio?: number | null;
+  suggested_height?: number | null;
   is_repost?: boolean;
   reposted_by_user_id?: string | null;
   reposted_by_username?: string | null;
@@ -38,11 +44,12 @@ interface UseFollowingFeedResult {
   hasMore: boolean;
 }
 
+const PAGE_SIZE = 20;
 const fetchFeedPage = async (cursor?: string) => {
-  const { data, error } = await supabase.rpc('get_following_feed', {
-    limit_count: 20,
-    cursor: cursor || null,
-  });
+  const { data, error } = await supabase.rpc('get_following_feed_v3', {
+    limit_count: PAGE_SIZE,
+    cursor_key: cursor || null,
+  } as any);
 
   if (error) throw error;
 
@@ -66,7 +73,13 @@ const fetchFeedPage = async (cursor?: string) => {
     embed_html: item.embed_html,
     thumbnail_url: item.thumbnail_url,
     title: item.title,
+    preview_text: item.preview_text,
+    preview_title: item.preview_title,
+    preview_image_url: item.preview_image_url,
     is_public: item.is_public,
+    media_kind: item.media_kind,
+    aspect_ratio: item.aspect_ratio,
+    suggested_height: item.suggested_height,
     is_repost: item.is_repost,
     reposted_by_user_id: item.reposted_by_user_id,
     reposted_by_username: item.reposted_by_username,
@@ -77,7 +90,8 @@ const fetchFeedPage = async (cursor?: string) => {
     },
   }));
 
-  const nextCursor = data.length < 20 ? undefined : mappedPosts[mappedPosts.length - 1]?.created_at;
+  const lastRow: any = data[data.length - 1];
+  const nextCursor = data.length < PAGE_SIZE ? undefined : (lastRow?.feed_cursor as string | undefined);
 
   return { posts: mappedPosts, nextCursor };
 };
@@ -89,6 +103,7 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
   const {
     data,
     isLoading: feedLoading,
+    isFetching,
     error: feedError,
     fetchNextPage,
     hasNextPage,
@@ -98,10 +113,10 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
+    staleTime: 0, // feed depends on seen-state; always verify fresh data
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: true, // refetch if stale on mount/page reload
+    refetchOnMount: 'always',
     refetchOnReconnect: true,
     structuralSharing: true,
   });
@@ -147,8 +162,8 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
 
   return {
     items,
-    empty: !feedLoading && items.length === 0,
-    loading: feedLoading,
+    empty: !feedLoading && !isFetching && items.length === 0,
+    loading: feedLoading || (isFetching && items.length === 0),
     error: feedError?.message ?? null,
     loadMore,
     hasMore: hasNextPage ?? false,

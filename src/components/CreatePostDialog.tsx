@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -9,7 +9,16 @@ import { ArrowLeft, Link2, Loader2, Sparkles, X, Check } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
+import {
+  extractRootDomain,
+  getDomainOverride,
+  recordDomainClassification,
+} from "@/lib/domainClassification";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
+import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
+import { measureEmbedHeight } from "@/lib/measureEmbedHeight";
+import { estimateEmbedHeight } from "@/lib/estimateEmbedHeight";
+import { extractOriginalCaptionFromSourceTitle } from "@/lib/originalCaption";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -32,6 +41,15 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const createPost = useCreatePost();
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
+  const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
+  // Height measured offscreen at create-time so the very first viewer
+  // (including the creator) opens the card at its real size — no blank space.
+  const measuredHeightRef = useRef<number | null>(null);
+  const measurePromiseRef = useRef<Promise<number | null> | null>(null);
+  // Original post body fetched from the source link (Facebook/Reddit/Threads/etc.).
+  // Stored separately from the user's caption and saved as posts.preview_text so
+  // it renders inside the embedded card without ever touching the user's own caption.
+  const fetchedPreviewTextRef = useRef<string | null>(null);
 
   // Hydrate from existing draft when opening
   useEffect(() => {
@@ -49,12 +67,16 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
   const handleLinkSubmit = async () => {
     if (!linkUrl.trim()) return;
+    fetchedPreviewTextRef.current = null;
+    measuredHeightRef.current = null;
+    measurePromiseRef.current = null;
     
     setIsLoadingPreview(true);
     
     // Auto-generate thumbnail URL and fetch title based on platform
     let thumbnail = "";
     let videoTitle = "";
+    let detectedOgType: string | null = ogType;
     
     console.log('[CreatePostDialog] Processing URL:', linkUrl);
     
@@ -77,28 +99,62 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           }
         }
       } else if (linkUrl.includes("reddit.com") || linkUrl.includes("redd.it")) {
-        console.log('[CreatePostDialog] Fetching Reddit thumbnail via edge function');
+        // Reddit's og:image is frequently the generic orange logo
+        // (share.redd.it/preview/post/...). Use fetch-post-preview which
+        // pulls the real post thumbnail from Reddit's JSON API so the
+        // create-time preview and the saved post both render the actual
+        // media instead of a typographic fallback.
+        console.log('[CreatePostDialog] Fetching Reddit preview via fetch-post-preview');
         try {
-          const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
-            body: { url: linkUrl }
+          const { data: previewData, error } = await supabase.functions.invoke('fetch-post-preview', {
+            body: { url: linkUrl, platform: 'reddit', previewOnly: true }
           });
-          if (!error && ogData) {
-            videoTitle = ogData.title || "";
-            thumbnail = ogData.image || "";
-            if (ogData.og_type) setOgType(ogData.og_type);
+          if (!error && previewData) {
+            videoTitle = previewData.title || "";
+            thumbnail = previewData.thumbnail_url || "";
+            const previewText = previewData.preview_text ? String(previewData.preview_text).trim() : "";
+            if (!fetchedPreviewTextRef.current && previewText && !/^view on |^posted by u\//i.test(previewText)) {
+              fetchedPreviewTextRef.current = previewText.slice(0, 4000);
+            }
           }
         } catch (error) {
-          console.error('[CreatePostDialog] Reddit fetch failed:', error);
+          console.error('[CreatePostDialog] Reddit preview fetch failed:', error);
         }
       } else if (linkUrl.includes("instagram.com") || linkUrl.includes("facebook.com") || linkUrl.includes("fb.watch") || linkUrl.includes("fb.me")) {
         const platform = linkUrl.includes("instagram.com") ? "instagram" : "facebook";
+        if (platform === "facebook") {
+          try {
+            const { data: previewData, error } = await supabase.functions.invoke('fetch-post-preview', {
+              body: { url: linkUrl, platform: 'facebook', previewOnly: true }
+            });
+            if (!error && previewData) {
+              videoTitle = previewData.title || "";
+              thumbnail = previewData.thumbnail_url || "";
+              const previewText = previewData.preview_text ? String(previewData.preview_text).trim() : "";
+              if (previewText && !/^view on |^facebook$/i.test(previewText)) {
+                fetchedPreviewTextRef.current = previewText.slice(0, 4000);
+              }
+            }
+          } catch (error) {
+            console.error('[CreatePostDialog] Facebook preview fetch failed:', error);
+          }
+        }
         try {
           const { data, error } = await supabase.functions.invoke('fetch-meta-thumbnail', {
             body: { url: linkUrl, platform }
           });
           if (!error && data) {
-            videoTitle = data.title || "";
-            thumbnail = data.thumbnail || "";
+            if (!videoTitle) videoTitle = data.title || "";
+            if (!thumbnail) thumbnail = data.thumbnail || "";
+            if (platform === 'facebook' && !fetchedPreviewTextRef.current) {
+              const fullCaption = extractOriginalCaptionFromSourceTitle({
+                title: data.title,
+                platform: 'facebook',
+              });
+              if (fullCaption) {
+                fetchedPreviewTextRef.current = fullCaption.slice(0, 4000);
+              }
+            }
           }
         } catch (error) {
           console.error(`[CreatePostDialog] ${platform} thumbnail fetch failed:`, error);
@@ -111,7 +167,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           if (!error && ogData) {
             videoTitle = ogData.title || "";
             thumbnail = ogData.image || "";
-            if (ogData.og_type) setOgType(ogData.og_type);
+            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
           }
         } catch (error) {
           console.error('[CreatePostDialog] Pinterest OG fetch failed:', error);
@@ -136,9 +192,29 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           if (!error && ogData) {
             videoTitle = ogData.title || "";
             thumbnail = ogData.image || "";
+            const previewText = ogData.description ? String(ogData.description).trim() : "";
+            if (!fetchedPreviewTextRef.current && previewText && !/^view on |^@/i.test(previewText)) {
+              fetchedPreviewTextRef.current = previewText.slice(0, 4000);
+            }
           }
         } catch (error) {
           console.error('[CreatePostDialog] Twitter OG fetch failed:', error);
+        }
+      } else if (linkUrl.includes("tiktok.com")) {
+        try {
+          const { data: previewData, error } = await supabase.functions.invoke('fetch-post-preview', {
+            body: { url: linkUrl, platform: 'tiktok', previewOnly: true }
+          });
+          if (!error && previewData) {
+            if (!videoTitle && previewData.title) videoTitle = previewData.title;
+            if (!thumbnail && previewData.thumbnail_url) thumbnail = previewData.thumbnail_url;
+            const previewText = previewData.preview_text ? String(previewData.preview_text).trim() : "";
+            if (!fetchedPreviewTextRef.current && previewText && !/^view on /i.test(previewText)) {
+              fetchedPreviewTextRef.current = previewText.slice(0, 4000);
+            }
+          }
+        } catch (error) {
+          console.error('[CreatePostDialog] TikTok preview fetch failed:', error);
         }
       }
       
@@ -154,7 +230,30 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             console.log('[CreatePostDialog] OG data received:', ogData);
             if (!videoTitle && ogData.title) videoTitle = ogData.title;
             if (ogData.image) thumbnail = ogData.image;
-            if (ogData.og_type) setOgType(ogData.og_type);
+            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
+            // Capture the original post body for platforms whose text lives in
+            // OG description (Facebook, Reddit, Threads). Stored separately from
+            // the user's caption — never overwrites what the user typed.
+            if (!fetchedPreviewTextRef.current && ogData.description) {
+              const lower = linkUrl.toLowerCase();
+              const wantsAutoCaption =
+                lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ||
+                lower.includes('reddit.com') ||
+                lower.includes('threads.net') || lower.includes('threads.com') ||
+                lower.includes('twitter.com') || lower.includes('x.com');
+              if (wantsAutoCaption) {
+                const desc = String(ogData.description).trim();
+                const fullFacebookCaption = extractOriginalCaptionFromSourceTitle({
+                  title: ogData.title,
+                  platform: lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ? 'facebook' : undefined,
+                });
+                if (fullFacebookCaption) {
+                  fetchedPreviewTextRef.current = fullFacebookCaption.slice(0, 4000);
+                } else if (desc && !/^view on |^posted by u\//i.test(desc)) {
+                  fetchedPreviewTextRef.current = desc.slice(0, 4000);
+                }
+              }
+            }
           } else {
             console.error('[CreatePostDialog] OG fetch error:', error);
           }
@@ -162,15 +261,49 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           console.error('[CreatePostDialog] Failed to fetch OG data:', error);
         }
       }
+
+      // For Facebook/Reddit/Threads: even when a thumbnail was already found
+      // by the platform-specific branch above, we still need a separate OG
+      // pass to grab the post body. Stored as preview_text — independent of
+      // the user's caption.
+      if (!fetchedPreviewTextRef.current) {
+        const lower = linkUrl.toLowerCase();
+        const wantsAutoCaption =
+          lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ||
+          lower.includes('reddit.com') ||
+          lower.includes('threads.net') || lower.includes('threads.com') ||
+          lower.includes('twitter.com') || lower.includes('x.com');
+        if (wantsAutoCaption) {
+          try {
+            const { data: ogData2 } = await supabase.functions.invoke('fetch-og', {
+              body: { url: linkUrl }
+            });
+            const fullFacebookCaption = extractOriginalCaptionFromSourceTitle({
+              title: ogData2?.title,
+              platform: lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ? 'facebook' : undefined,
+            });
+            const desc = ogData2?.description ? String(ogData2.description).trim() : '';
+            if (fullFacebookCaption) {
+              fetchedPreviewTextRef.current = fullFacebookCaption.slice(0, 4000);
+            } else if (desc && !/^view on |^posted by u\//i.test(desc)) {
+              fetchedPreviewTextRef.current = desc.slice(0, 4000);
+            }
+          } catch (e) {
+            console.warn('[CreatePostDialog] Preview text fetch skipped:', e);
+          }
+        }
+      }
       
       // Fetch oEmbed HTML in parallel for instant embed rendering
       console.log('[CreatePostDialog] Fetching oEmbed HTML...');
+      let fetchedEmbedHtml = "";
       try {
         const { data: oembedData, error: oembedError } = await supabase.functions.invoke('fetch-oembed', {
           body: { url: linkUrl }
         });
         if (!oembedError && oembedData?.embed_html) {
           setEmbedHtml(oembedData.embed_html);
+          fetchedEmbedHtml = oembedData.embed_html;
           console.log('[CreatePostDialog] Got oEmbed HTML, length:', oembedData.embed_html.length);
         }
       } catch (error) {
@@ -179,18 +312,144 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
       setThumbnailUrl(thumbnail);
       setTitle(videoTitle);
+
+      // Smart privacy check — verify the source is publicly accessible.
+      const platform = classifyUrl(linkUrl, detectedOgType);
+      const platformLabel = platform && platform !== "external"
+        ? platform.charAt(0).toUpperCase() + platform.slice(1)
+        : "this site";
+      let verdict: string | undefined;
+      try {
+        const { data: validation } = await supabase.functions.invoke(
+          "validate-post-source",
+          { body: { url: linkUrl, platform } }
+        );
+        verdict = validation?.verdict;
+      } catch (err) {
+        console.error("[CreatePostDialog] Privacy check failed:", err);
+      }
+
+      if (verdict === "removed") {
+        toast.error(
+          `We couldn't load this ${platformLabel} post. It looks private, deleted, or region-restricted — try a different link.`,
+          { duration: 6000 }
+        );
+        return;
+      }
+
+      // Content-availability check — if we got nothing usable to render,
+      // tell the user the likely reason instead of letting them publish a broken card.
+      const hasAnyContent = Boolean(thumbnail) || Boolean(fetchedEmbedHtml) || Boolean(videoTitle);
+      if (!hasAnyContent) {
+        if (platform === "external") {
+          toast.error(
+            "We couldn't read this link. It may not be a supported platform, the page may block previews, or the URL might be wrong.",
+            { duration: 6000 }
+          );
+        } else {
+          toast.error(
+            `We couldn't fetch this ${platformLabel} post. It may be private, deleted, age- or region-restricted, or ${platformLabel} is blocking the preview right now. Double-check the link or try another post.`,
+            { duration: 6000 }
+          );
+        }
+        return;
+      }
+
       setStep(2);
+
+      // Kick off offscreen measurement in the background. Works best for
+      // Threads + Facebook (they postMessage their rendered height). For
+      // other platforms this resolves null and the viewer-time persistence
+      // takes over on first scroll.
+      measuredHeightRef.current = null;
+      measurePromiseRef.current = measureEmbedHeight(linkUrl)
+        .then((h) => {
+          measuredHeightRef.current = h;
+          return h;
+        })
+        .catch(() => null);
     } finally {
       setIsLoadingPreview(false);
     }
   };
 
-  const handlePost = () => {
+  const promptSectionFeedback = (
+    postId: string | undefined,
+    url: string,
+    currentType: "article" | "external"
+  ) => {
+    if (!postId) return;
+    const domain = extractRootDomain(url);
+    if (!domain) return;
+    const otherType: "article" | "external" =
+      currentType === "article" ? "external" : "article";
+    const otherLabel = otherType === "article" ? "Articles" : "External";
+    const currentLabel = currentType === "article" ? "Articles" : "External";
+
+    const id = toast(
+      `Posted to ${currentLabel}. Wrong section?`,
+      {
+        description: `Move it to ${otherLabel} — Aelixto will remember ${domain} for next time.`,
+        duration: 12000,
+        action: {
+          label: `Move to ${otherLabel}`,
+          onClick: async () => {
+            try {
+              const { error } = await supabase
+                .from("posts")
+                .update({ platform: otherType })
+                .eq("id", postId);
+              if (error) throw error;
+              await recordDomainClassification(domain, otherType);
+              toast.success(`Moved to ${otherLabel}. Aelixto will remember.`);
+            } catch (e: any) {
+              toast.error(e?.message || "Couldn't move the post.");
+            }
+          },
+        },
+        cancel: {
+          label: "Keep here",
+          onClick: async () => {
+            // Confirming the current placement also teaches the system.
+            try { await recordDomainClassification(domain, currentType); } catch {}
+          },
+        },
+      }
+    );
+    return id;
+  };
+
+  const handlePost = async () => {
     if (!linkUrl.trim()) return;
 
+    if (limitReached) {
+      toast.error(`You've reached your ${limit} post limit for today. Resets at midnight.`);
+      return;
+    }
+
     // Use centralised classification
-    const platform = classifyUrl(linkUrl, ogType);
+    let platform = classifyUrl(linkUrl, ogType);
+
+    // Apply user-learned override for unknown sites (article vs external).
+    if (platform === "article" || platform === "external") {
+      const domain = extractRootDomain(linkUrl);
+      const override = await getDomainOverride(domain);
+      if (override) platform = override;
+    }
+
     const mediaType = deriveMediaType(linkUrl, platform);
+
+    // Final safety net — never publish a card with nothing to show.
+    if (!thumbnailUrl && !embedHtml && !title.trim()) {
+      const label = platform && platform !== "external"
+        ? platform.charAt(0).toUpperCase() + platform.slice(1)
+        : "this link";
+      toast.error(
+        `We couldn't find any content for this ${label} post. It may be private, deleted, or unsupported — try a different link.`,
+        { duration: 6000 }
+      );
+      return;
+    }
 
     // Validate Facebook embed HTML before saving
     if (platform === 'facebook' && embedHtml) {
@@ -214,6 +473,36 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     });
 
     setSubmitState("post");
+
+    // Give the offscreen measurement up to ~1.2s extra to settle, then
+    // post with whatever height we have (or null = fall back to defaults).
+    let suggestedHeight: number | null = measuredHeightRef.current;
+    if (suggestedHeight === null && measurePromiseRef.current) {
+      suggestedHeight = await Promise.race([
+        measurePromiseRef.current,
+        new Promise<number | null>((r) => window.setTimeout(() => r(null), 1200)),
+      ]);
+    }
+
+    // Fallback: if the platform didn't broadcast a height (Instagram,
+    // TikTok, LinkedIn, Pinterest, etc.) compute a content-aware estimate
+    // from the data we already have (caption length, thumbnail, platform).
+    // This gives the very first viewer a card sized close to the real
+    // content instead of a generic 380px stub.
+    if (suggestedHeight === null) {
+      try {
+        suggestedHeight = estimateEmbedHeight({
+          platform,
+          url: linkUrl,
+          caption: caption,
+          title: title,
+          thumbnailUrl: thumbnailUrl,
+        });
+      } catch {
+        suggestedHeight = null;
+      }
+    }
+
     createPost.mutate({
       title: title.trim() || undefined,
       content: caption.trim() || "",
@@ -222,6 +511,15 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       platform: platform,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
+      suggested_height: suggestedHeight,
+      preview_text: fetchedPreviewTextRef.current || undefined,
+    }, {
+      onSuccess: (created: any) => {
+        incrementDailyCount();
+        if (platform === "article" || platform === "external") {
+          promptSectionFeedback(created?.id, linkUrl, platform);
+        }
+      },
     });
 
     // If posted from a draft, remove it
@@ -269,6 +567,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setOgType(null);
     setDraftId(null);
     setSubmitState(null);
+    fetchedPreviewTextRef.current = null;
+    measuredHeightRef.current = null;
+    measurePromiseRef.current = null;
     onOpenChange(false);
   };
 
@@ -289,6 +590,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setOgType(null);
     setDraftId(null);
     setSubmitState(null);
+    fetchedPreviewTextRef.current = null;
+    measuredHeightRef.current = null;
+    measurePromiseRef.current = null;
     onOpenChange(false);
   };
 
@@ -515,7 +819,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           <motion.div whileTap={{ scale: 0.98 }}>
                             <Button
                               onClick={handlePost}
-                              disabled={submitState !== null}
+                              disabled={submitState !== null || limitReached}
                               className="h-12 w-full rounded-[22px] bg-foreground text-background shadow-[0_18px_38px_-26px_hsl(var(--foreground)/0.9)] hover:bg-foreground/90"
                             >
                               {submitState === "post" ? (
@@ -527,11 +831,22 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                                 >
                                   <Check className="mr-1.5 h-5 w-5" /> Posted
                                 </motion.span>
+                              ) : limitReached ? (
+                                "Daily limit reached"
                               ) : (
                                 "Post"
                               )}
                             </Button>
                           </motion.div>
+                          {limitReached ? (
+                            <p className="text-center text-xs text-muted-foreground">
+                              You've reached your {limit} post limit for today. Resets at midnight.
+                            </p>
+                          ) : (
+                            <p className="text-center text-xs text-muted-foreground">
+                              {remaining} of {limit} posts remaining today
+                            </p>
+                          )}
                           <motion.div whileTap={{ scale: 0.98 }}>
                             <Button
                               onClick={handleSaveAsDraft}

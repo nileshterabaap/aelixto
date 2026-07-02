@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { Header } from "@/components/Header";
-import { BottomNav } from "@/components/BottomNav";
+import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
@@ -15,10 +15,17 @@ import { SavedSkeleton } from "@/components/saved/SavedSkeleton";
 import { DraftsGrid } from "@/components/saved/DraftsGrid";
 import { useDrafts } from "@/hooks/useDrafts";
 
+const isGenericPlaceholderThumbnail = (url?: string | null) => {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  return lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com");
+};
+
 export default function SavedPosts() {
   const { session, loading } = useSession();
   const navigate = useNavigate();
   const [createPostOpen, setCreatePostOpen] = useState(false);
+  useCreatePostTrigger(useCallback(() => setCreatePostOpen(true), []));
   const [activeTab, setActiveTab] = useState<"all" | "collections" | "drafts">("all");
   const queryClient = useQueryClient();
 
@@ -40,7 +47,8 @@ export default function SavedPosts() {
           posts (
             id, user_id, content, created_at, likes_count, saves_count,
             comments_count, reposts_count, media_type, media_url,
-            platform, embed_html, thumbnail_url, title, is_public,
+            platform, embed_html, thumbnail_url, title, preview_text,
+            preview_title, preview_image_url, is_public,
             profiles:user_id (username, display_name, avatar_url)
           )
         `)
@@ -64,6 +72,9 @@ export default function SavedPosts() {
             platform: post.platform,
             embed_html: post.embed_html,
             thumbnail_url: post.thumbnail_url,
+            preview_text: post.preview_text,
+            preview_title: post.preview_title,
+            preview_image_url: post.preview_image_url,
             timestamp: new Date(post.created_at),
             likes: post.likes_count || 0,
             comments: post.comments_count || 0,
@@ -99,13 +110,39 @@ export default function SavedPosts() {
     ]);
   }, [queryClient]);
 
+  useEffect(() => {
+    const targets = savedPosts.filter((post: any) => {
+      const platform = (post.platform || "").toLowerCase();
+      return ["article", "medium", "reddit"].includes(platform)
+        && post.mediaUrl
+        && (!post.thumbnail_url || isGenericPlaceholderThumbnail(post.thumbnail_url));
+    });
+    if (!targets.length) return;
+
+    let cancelled = false;
+    (async () => {
+      for (const post of targets.slice(0, 6) as any[]) {
+        if (cancelled) return;
+        await supabase.functions.invoke("fetch-post-preview", {
+          body: { postId: post.id, url: post.mediaUrl, platform: post.platform },
+        }).catch(() => {});
+      }
+      if (!cancelled) {
+        queryClient.invalidateQueries({ queryKey: ["saved-posts", session?.user?.id] });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [savedPosts, queryClient, session?.user?.id]);
+
   if (loading || isLoading) {
     return (
       <SwipeableView rightRoute="/" rightLabel="Home">
         <div className="min-h-screen pb-20">
           <Header onCreatePost={() => setCreatePostOpen(true)} />
           <SavedSkeleton />
-          <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
         </div>
       </SwipeableView>
     );
@@ -118,23 +155,25 @@ export default function SavedPosts() {
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="container max-w-2xl mx-auto px-4 py-6 animate-fade-in">
-          <h1 className="text-2xl font-bold mb-4">Saved</h1>
-
           {/* Tabs */}
-          <div className="flex gap-1 mb-6 bg-muted rounded-xl p-1">
-            {(["all", "collections", "drafts"] as const).map((tab) => (
+          <div className="flex gap-1 mb-6 bg-muted/60 rounded-full p-1.5">
+            {([
+              { key: "drafts", label: "Drafts" },
+              { key: "all", label: "Saved" },
+              { key: "collections", label: "Collection" },
+            ] as const).map(({ key, label }) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${
-                  activeTab === tab
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground"
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`flex-1 py-2.5 text-[15px] rounded-full transition-all ${
+                  activeTab === key
+                    ? "bg-background text-foreground shadow-sm font-semibold"
+                    : "text-muted-foreground font-medium"
                 }`}
               >
-                {tab === "drafts" && drafts.length > 0
+                {key === "drafts" && drafts.length > 0
                   ? `Drafts (${drafts.length})`
-                  : tab}
+                  : label}
               </button>
             ))}
           </div>
@@ -155,7 +194,6 @@ export default function SavedPosts() {
         </main>
       </PullToRefresh>
 
-      <BottomNav onCreatePost={() => setCreatePostOpen(true)} />
       <CreatePostDialog open={createPostOpen} onOpenChange={setCreatePostOpen} />
     </div>
     </SwipeableView>

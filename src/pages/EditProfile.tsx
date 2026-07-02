@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
-import { BottomNav } from "@/components/BottomNav";
+import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Check, X, Share2, Info } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { ImageUploadButton } from "@/components/ImageUploadButton";
@@ -15,9 +15,12 @@ import { useImageUpload } from "@/hooks/useImageUpload";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { buildShortUrl, buildProfilePath } from "@/lib/shortUrl";
+import { toast as sonnerToast } from "sonner";
 
 const EditProfile = () => {
   const navigate = useNavigate();
@@ -27,6 +30,7 @@ const EditProfile = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const [formData, setFormData] = useState({
     username: '',
     display_name: '',
@@ -35,6 +39,16 @@ const EditProfile = () => {
     cover_url: '',
   });
   const [aelixScoreEnabled, setAelixScoreEnabled] = useState(true);
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false);
+  const infoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'self'>('idle');
+
+  // Cleanup info tooltip timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (infoTimeoutRef.current) clearTimeout(infoTimeoutRef.current);
+    };
+  }, []);
 
   // Check ownership and redirect if not owner
   useEffect(() => {
@@ -59,6 +73,38 @@ const EditProfile = () => {
     }
   }, [profile]);
 
+  // Debounced username availability check
+  useEffect(() => {
+    const uname = formData.username.trim();
+    if (!profile) return;
+    if (uname === profile.username) {
+      setUsernameStatus('self');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_.]{3,30}$/.test(uname)) {
+      setUsernameStatus('invalid');
+      return;
+    }
+    setUsernameStatus('checking');
+    const t = setTimeout(async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id')
+        .ilike('username', uname)
+        .maybeSingle();
+      if (error) {
+        setUsernameStatus('idle');
+        return;
+      }
+      if (!data || data.user_id === profile.user_id) {
+        setUsernameStatus('available');
+      } else {
+        setUsernameStatus('taken');
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [formData.username, profile]);
+
   const handleAvatarUpload = async (file: File) => {
     if (!user) return;
     const url = await uploadImage(file, "avatars", user.id);
@@ -75,8 +121,34 @@ const EditProfile = () => {
     }
   };
 
+  const handleShareProfile = async () => {
+    if (!profile) return;
+    const url = await buildShortUrl(buildProfilePath(profile.username));
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `${profile.display_name || profile.username} on Aelixto`,
+          url,
+        });
+      } catch {
+        // user cancelled
+      }
+    } else {
+      navigator.clipboard.writeText(url);
+      sonnerToast.success("Profile link copied");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (usernameStatus === 'taken' || usernameStatus === 'invalid' || usernameStatus === 'checking') {
+      toast({
+        title: "Username unavailable",
+        description: usernameStatus === 'checking' ? "Still checking, please wait." : "Please choose a different username.",
+        variant: "destructive",
+      });
+      return;
+    }
     await upsertProfile({
       ...formData,
       settings: {
@@ -128,17 +200,42 @@ const EditProfile = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              placeholder="your_username"
-              pattern="^[a-zA-Z0-9_.]{3,30}$"
-              required
-            />
-            <p className="text-sm text-muted-foreground">
-              3-30 characters, letters, numbers, dots and underscores only
-            </p>
+            <div className="relative">
+              <Input
+                id="username"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                placeholder="your_username"
+                pattern="^[a-zA-Z0-9_.]{3,30}$"
+                required
+                className="pr-10"
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                {usernameStatus === 'checking' && (
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                )}
+                {usernameStatus === 'available' && (
+                  <Check className="h-4 w-4 text-green-600" />
+                )}
+                {(usernameStatus === 'taken' || usernameStatus === 'invalid') && (
+                  <X className="h-4 w-4 text-destructive" />
+                )}
+              </div>
+            </div>
+            {usernameStatus === 'available' && (
+              <p className="text-sm text-green-600">Username is available</p>
+            )}
+            {usernameStatus === 'taken' && (
+              <p className="text-sm text-destructive">Username is not available</p>
+            )}
+            {usernameStatus === 'invalid' && (
+              <p className="text-sm text-destructive">3-30 characters, letters, numbers, dots and underscores only</p>
+            )}
+            {(usernameStatus === 'idle' || usernameStatus === 'self' || usernameStatus === 'checking') && (
+              <p className="text-sm text-muted-foreground">
+                3-30 characters, letters, numbers, dots and underscores only
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -152,13 +249,24 @@ const EditProfile = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="bio">Bio</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="bio">Bio</Label>
+              <span className={`text-xs ${formData.bio.length > 150 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                {formData.bio.length}/150
+              </span>
+            </div>
             <Textarea
               id="bio"
               value={formData.bio}
-              onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val.length <= 150) {
+                  setFormData({ ...formData, bio: val });
+                }
+              }}
               placeholder="Tell us about yourself..."
               rows={4}
+              maxLength={150}
             />
           </div>
 
@@ -203,8 +311,31 @@ const EditProfile = () => {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="aelix-score">Aelix Score</Label>
+              <div className="space-y-0.5 relative">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="aelix-score">Aelix Score</Label>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    onClick={() => {
+                      if (infoTimeoutRef.current) clearTimeout(infoTimeoutRef.current);
+                      setShowInfoTooltip(true);
+                      infoTimeoutRef.current = setTimeout(() => setShowInfoTooltip(false), 5000);
+                    }}
+                  >
+                    <Info className="h-4 w-4" />
+                  </button>
+                </div>
+                {showInfoTooltip && (
+                  <div className="absolute left-0 top-full mt-2 z-50 max-w-xs rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95">
+                    <p>Aelix Score represents the total engagement earned by your shared posts.</p>
+                    <ul className="list-disc pl-4 space-y-0.5 mt-1">
+                      <li>View a shared post (+1)</li>
+                      <li>Play shared content (+1)</li>
+                      <li>Visit the original source (+1)</li>
+                    </ul>
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground">
                   Display your Aelix Score on your profile
                 </p>
@@ -264,13 +395,28 @@ const EditProfile = () => {
             </AlertDialog>
           </div>
 
+          <div className="space-y-2">
+            <Label>Share Profile</Label>
+            <p className="text-sm text-muted-foreground mb-2">
+              Copy your profile link or share it with others.
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={handleShareProfile}
+            >
+              <Share2 className="h-4 w-4 mr-2" />
+              Share Profile
+            </Button>
+          </div>
+
           <Button type="submit" className="w-full">
             Save Changes
           </Button>
         </form>
       </main>
 
-      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
       
       <CreatePostDialog 
         open={isCreateDialogOpen} 
