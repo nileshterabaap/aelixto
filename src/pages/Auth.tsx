@@ -404,6 +404,20 @@ const Auth = () => {
     }
   };
 
+  // While the initial Supabase session probe is running, render nothing so
+  // the splash screen (kept alive in main.tsx) covers the wait. Otherwise
+  // signed-in users would see the auth form flash for ~1s before the
+  // navigate("/") fires.
+  const [sessionChecked, setSessionChecked] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    supabase.auth.getSession().then(() => {
+      if (!cancelled) setSessionChecked(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
+  if (!sessionChecked || user) return null;
+
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-background p-5 overflow-hidden">
       <div className="relative w-full max-w-md">
