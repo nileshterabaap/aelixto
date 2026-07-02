@@ -1,5 +1,5 @@
 import { Header } from "@/components/Header";
-import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
+import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Heart, MessageCircle, Repeat2, Bell, Shield } from "lucide-react";
@@ -8,8 +8,6 @@ import { useNotifications, type Notification } from "@/hooks/useNotifications";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 const getNotificationIcon = (type: string) => {
   switch (type) {
@@ -48,8 +46,6 @@ const NotificationItem = ({
   notification: Notification; 
   onClick: () => void;
 }) => {
-  const [busy, setBusy] = useState<"delete" | "keep" | null>(null);
-  const [resolved, setResolved] = useState<"deleted" | "kept" | null>(null);
   const { icon: Icon, bgColor, iconColor } = getNotificationIcon(notification.type);
   const message = getNotificationMessage(notification.type);
   const actorName = notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
@@ -59,44 +55,15 @@ const NotificationItem = ({
     | 'report_outcome'
     | 'post_removed'
     | 'account_warning'
-    | 'source_removed'
     | undefined;
   const isAuthorRemoval = reportKind === 'post_removed';
   const isAccountWarning = reportKind === 'account_warning';
-  const isSourceRemoved = reportKind === 'source_removed';
-  const sourcePlatform = (notification.metadata?.platform as string | undefined) || '';
-  const originalAuthor =
-    (notification.metadata?.original_author as string | undefined) ||
-    (notification.metadata?.post_snapshot as { original_author?: string } | undefined)?.original_author ||
-    '';
   const snapshot = notification.metadata?.post_snapshot as
     | { title?: string; content?: string; thumbnail_url?: string }
     | undefined;
   
   const handleClick = () => {
-    if (busy) return;
     onClick();
-  };
-
-  const handleDeletePost = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (busy || !notification.post_id) return;
-    setBusy("delete");
-    const { error } = await supabase.from("posts").delete().eq("id", notification.post_id);
-    if (error) {
-      toast.error("Couldn't delete the post");
-      setBusy(null);
-      return;
-    }
-    toast.success("Post deleted from your profile");
-    setResolved("deleted");
-    setBusy(null);
-  };
-
-  const handleKeepPost = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (busy) return;
-    setResolved("kept");
   };
 
   return (
@@ -116,9 +83,7 @@ const NotificationItem = ({
           {isReportOutcome ? (
             <p className="text-sm">
               <span className="font-semibold">
-                {isSourceRemoved
-                  ? 'Your post was removed'
-                  : isAccountWarning
+                {isAccountWarning
                   ? 'Account warning'
                   : isAuthorRemoval
                   ? 'Your post was removed'
@@ -127,9 +92,7 @@ const NotificationItem = ({
                   : 'Report reviewed'}
               </span>{' '}
               <span className="text-muted-foreground">
-                {isSourceRemoved
-                  ? `— the original ${sourcePlatform ? sourcePlatform.charAt(0).toUpperCase() + sourcePlatform.slice(1) + ' ' : ''}post was deleted or made private at the source.`
-                  : isAccountWarning
+                {isAccountWarning
                   ? '— a report against your account was upheld. Repeated violations may lead to account action.'
                   : isAuthorRemoval
                   ? '— it was reported and found to violate our community guidelines.'
@@ -138,41 +101,7 @@ const NotificationItem = ({
                   : "— thanks for the report. We didn't find a violation this time."}
               </span>
             </p>
-          ) : null}
-          {isSourceRemoved && (originalAuthor || snapshot?.title) && (
-            <p className="text-xs text-muted-foreground mt-1 truncate">
-              {originalAuthor ? <>by <span className="font-medium text-foreground">@{originalAuthor}</span></> : null}
-              {originalAuthor && snapshot?.title ? ' · ' : ''}
-              {snapshot?.title ? <span className="italic">"{snapshot.title.slice(0, 60)}{snapshot.title.length > 60 ? '…' : ''}"</span> : null}
-            </p>
-          )}
-          {isSourceRemoved && notification.post_id && (
-            <div className="flex gap-2 mt-3">
-              {resolved === "deleted" ? (
-                <span className="text-xs text-muted-foreground">Removed from your profile.</span>
-              ) : resolved === "kept" ? (
-                <span className="text-xs text-muted-foreground">Kept on your profile.</span>
-              ) : (
-                <>
-                  <button
-                    onClick={handleDeletePost}
-                    disabled={busy !== null}
-                    className="text-xs font-medium px-3 py-1.5 rounded-full bg-destructive text-destructive-foreground hover:opacity-90 transition disabled:opacity-50"
-                  >
-                    {busy === "delete" ? "Deleting…" : "Delete post"}
-                  </button>
-                  <button
-                    onClick={handleKeepPost}
-                    disabled={busy !== null}
-                    className="text-xs font-medium px-3 py-1.5 rounded-full bg-muted hover:bg-muted/70 transition disabled:opacity-50"
-                  >
-                    Keep
-                  </button>
-                </>
-              )}
-            </div>
-          )}
-          {!isReportOutcome && (
+          ) : (
             <p className="text-sm">
               <span className="font-semibold">{actorName}</span>{' '}
               <span className="text-muted-foreground">{message}</span>
@@ -213,7 +142,6 @@ const NotificationSkeleton = () => (
 
 const Notifications = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const { notifications, isLoading, markAllRead, refetch } = useNotifications();
   const navigate = useNavigate();
 
@@ -276,6 +204,7 @@ const Notifications = () => {
         </main>
       </PullToRefresh>
 
+      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
 
       <CreatePostDialog 
         open={isCreateDialogOpen} 

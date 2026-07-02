@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
-import RedditEmbed from "@/components/embeds/RedditEmbed";
+import { RedditPostEmbed } from "./RedditPostEmbed";
 import { ArticleContentEmbed } from "./ArticleContentEmbed";
 import { LinkPreviewCard } from "./LinkPreviewCard";
 
@@ -91,9 +91,7 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
           console.error('[ArticleEmbed] Error:', fetchError);
         }
 
-        let unfurledData = result && (result as UnfurlResult).meta
-          ? (result as UnfurlResult)
-          : null;
+        let unfurledData = result as UnfurlResult | null;
 
         // If unfurl failed or returned a poor title (just the domain), enhance with OG data
         const titleLooksLikeDomain = unfurledData?.meta?.title && (
@@ -113,15 +111,13 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
               const ogTitle = ogData.meta?.title || ogData.title;
               const ogImage = ogData.meta?.image || ogData.image;
               const ogDescription = ogData.meta?.description || ogData.description;
-              const ogFinalUrl = ogData.meta?.finalUrl || ogData.finalUrl || cleanedUrl;
-              const ogType = ogData.og_type || ogData.meta?.og_type;
               
               if (!unfurledData) {
-                let domain = ogFinalUrl;
-                try { domain = new URL(ogFinalUrl).hostname; } catch {}
+                let domain = cleanedUrl;
+                try { domain = new URL(cleanedUrl).hostname; } catch {}
                 unfurledData = {
-                  kind: ogType === 'article' ? 'medium-article' : 'generic-article',
-                  resolvedUrl: ogFinalUrl,
+                  kind: 'generic-article',
+                  resolvedUrl: cleanedUrl,
                   site: { name: domain.replace('www.', ''), domain, favicon: '' },
                   meta: { title: ogTitle || domain, description: ogDescription || '', image: ogImage || null, publishedTime: null },
                   content: { html: '' },
@@ -203,12 +199,9 @@ export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
   // Reddit posts - use official Reddit embed (no fallback card)
   if (rendererType === 'reddit' && data.kind === 'reddit-post') {
     return (
-      <RedditEmbed
-        url={data.resolvedUrl}
-        title={data.meta.title}
-        thumbnailUrl={data.meta.image}
-        description={data.meta.description}
-      />
+      <div data-embed-status="ready">
+        <RedditPostEmbed url={data.resolvedUrl} data={data} />
+      </div>
     );
   }
 

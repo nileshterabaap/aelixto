@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
+import { BottomNav } from "@/components/BottomNav";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,10 +16,8 @@ import { useStartConversation } from "@/hooks/useStartConversation";
 import { ProfilePlatformTabs } from "@/components/profile/ProfilePlatformTabs";
 import { ProfilePlatformGrid } from "@/components/profile/ProfilePlatformGrid";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { FollowListDialog, getFollowVisibility } from "@/components/profile/FollowListDialog";
+import { FollowListDialog } from "@/components/profile/FollowListDialog";
 import { ProfileOptionsMenu } from "@/components/profile/ProfileOptionsMenu";
-import { AuthCTABar } from "@/components/AuthCTABar";
-import { Lock } from "lucide-react";
 
 interface UserProfileProps {
   usernameOverride?: string;
@@ -31,7 +29,6 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const navigate = useNavigate();
   const { user } = useSession();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
   const [followListOpen, setFollowListOpen] = useState(false);
 
@@ -54,65 +51,14 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
     },
   });
 
+  // Only show the skeleton when we truly have no cached data yet.
+  const loading = isLoading && !profile;
+
   const { isFollowing, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
   const [isFollowedByTarget, setIsFollowedByTarget] = useState(false);
-
-  const isPrivate = !!(profile?.settings as { is_private?: boolean } | null)?.is_private;
-  const canViewPosts = !isPrivate || isMe || isFollowing;
-
-  const { data: mutualsData } = useQuery({
-    queryKey: ["mutuals", profile?.user_id, user?.id],
-    enabled: !!profile && !!user && !isMe,
-    queryFn: async (): Promise<{ username: string; display_name: string | null; total_count: number }[] | null> => {
-      const { data, error } = await supabase
-        .rpc("get_mutual_followers_with_count", {
-          viewer_id: user!.id,
-          profile_owner_id: profile!.user_id,
-        });
-      if (error) throw error;
-      return (data as unknown as { username: string; display_name: string | null; total_count: number }[]) || null;
-    },
-  });
-
-  // Preload cover + avatar so we don't reveal the page mid-paint.
-  const [coverReady, setCoverReady] = useState(false);
-  const [avatarReady, setAvatarReady] = useState(false);
-
-  useEffect(() => {
-    if (!profile) { setCoverReady(false); return; }
-    if (!profile.cover_url) { setCoverReady(true); return; }
-    setCoverReady(false);
-    const img = new Image();
-    let done = false;
-    const finish = () => { if (!done) { done = true; setCoverReady(true); } };
-    img.onload = finish;
-    img.onerror = finish;
-    img.src = profile.cover_url;
-    if (img.complete) finish();
-    const t = setTimeout(finish, 2500);
-    return () => { clearTimeout(t); img.onload = null; img.onerror = null; };
-  }, [profile?.user_id, profile?.cover_url]);
-
-  useEffect(() => {
-    if (!profile) { setAvatarReady(false); return; }
-    if (!profile.avatar_url) { setAvatarReady(true); return; }
-    setAvatarReady(false);
-    const img = new Image();
-    let done = false;
-    const finish = () => { if (!done) { done = true; setAvatarReady(true); } };
-    img.onload = finish;
-    img.onerror = finish;
-    img.src = profile.avatar_url;
-    if (img.complete) finish();
-    const t = setTimeout(finish, 2500);
-    return () => { clearTimeout(t); img.onload = null; img.onerror = null; };
-  }, [profile?.user_id, profile?.avatar_url]);
-
-  const contentReady = !!profile && !tabsLoading && coverReady && avatarReady;
-  const showSkeleton = !contentReady;
 
   // Check if the target user follows the current user
   useEffect(() => {
@@ -131,7 +77,68 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
     await Promise.all([refetchProfile(), refreshFollow()]);
   }, [refetchProfile, refreshFollow]);
 
-  if (!isLoading && !profile) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background pb-20">
+        <main className="mx-auto max-w-2xl">
+          {/* Cover Skeleton */}
+          <div className="relative h-[400px] bg-gradient-to-r from-purple-500/20 to-pink-500/20 animate-shimmer" />
+          
+          {/* Profile Content */}
+          <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
+            {/* Avatar and Stats Container */}
+            <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
+              {/* Left Stats */}
+              <div className="text-center flex-shrink-0 w-20 -ml-2">
+                <div className="h-7 w-14 bg-muted rounded-md mb-1 mx-auto animate-shimmer" />
+                <div className="h-3 w-16 bg-muted rounded-md mx-auto animate-shimmer" />
+              </div>
+              
+              {/* Avatar - Centered */}
+              <div className="absolute left-1/2 -translate-x-1/2 -mt-20">
+                <div className="h-[140px] w-[140px] rounded-full bg-muted border-[8px] border-background animate-shimmer" />
+              </div>
+              
+              {/* Right Stats */}
+              <div className="text-center flex-shrink-0 w-20 -mr-2">
+                <div className="h-7 w-14 bg-muted rounded-md mb-1 mx-auto animate-shimmer" />
+                <div className="h-3 w-16 bg-muted rounded-md mx-auto animate-shimmer" />
+              </div>
+            </div>
+
+            {/* Aelix Score */}
+            <div className="flex justify-center mt-4 mb-4">
+              <div className="border-2 border-muted rounded-[16px] px-10 py-2">
+                <div className="h-7 w-16 bg-muted rounded-md mb-1 mx-auto animate-shimmer" />
+                <div className="h-2 w-20 bg-muted rounded-md mx-auto animate-shimmer" />
+              </div>
+            </div>
+
+            {/* Bio Skeleton */}
+            <div className="text-center px-4 mb-6">
+              <div className="h-4 w-3/4 bg-muted rounded-md mx-auto mb-2 animate-shimmer" />
+              <div className="h-4 w-1/2 bg-muted rounded-md mx-auto animate-shimmer" />
+            </div>
+
+            {/* Button Skeleton */}
+            <div className="h-12 w-full bg-muted rounded-full mb-6 animate-shimmer" />
+
+            {/* Platform Buttons Skeleton */}
+            <div className="overflow-x-auto no-scrollbar mb-8">
+              <div className="flex gap-3">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="min-w-[80px] h-16 bg-muted rounded-full animate-shimmer" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </main>
+        <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
+      </div>
+    );
+  }
+
+  if (!profile) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -144,59 +151,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
 
   return (
-    <div className="min-h-screen bg-background pb-20 relative">
-      {/* Full-page skeleton overlay — crossfades out once content is ready */}
-      <div
-        aria-hidden={!showSkeleton}
-        className="absolute inset-0 z-30 pb-20 pointer-events-none transition-opacity duration-500 ease-out"
-        style={{ opacity: showSkeleton ? 1 : 0 }}
-      >
-        <div className="mx-auto max-w-2xl">
-          <div className="relative h-[400px] bg-gradient-to-r from-purple-500/20 to-pink-500/20 animate-shimmer" />
-          <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
-            <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
-              <div className="text-center flex-shrink-0 w-20 -ml-2">
-                <div className="h-7 w-14 bg-muted rounded-md mb-1 mx-auto animate-shimmer" />
-                <div className="h-3 w-16 bg-muted rounded-md mx-auto animate-shimmer" />
-              </div>
-              <div className="absolute left-1/2 -translate-x-1/2 -mt-20">
-                <div className="h-[140px] w-[140px] rounded-full bg-muted border-[8px] border-background animate-shimmer" />
-              </div>
-              <div className="text-center flex-shrink-0 w-20 -mr-2">
-                <div className="h-7 w-14 bg-muted rounded-md mb-1 mx-auto animate-shimmer" />
-                <div className="h-3 w-16 bg-muted rounded-md mx-auto animate-shimmer" />
-              </div>
-            </div>
-            <div className="flex justify-center mt-4 mb-4">
-              <div className="border-2 border-muted rounded-[16px] px-10 py-2">
-                <div className="h-7 w-16 bg-muted rounded-md mb-1 mx-auto animate-shimmer" />
-                <div className="h-2 w-20 bg-muted rounded-md mx-auto animate-shimmer" />
-              </div>
-            </div>
-            <div className="text-center px-4 mb-6">
-              <div className="h-4 w-3/4 bg-muted rounded-md mx-auto mb-2 animate-shimmer" />
-              <div className="h-4 w-1/2 bg-muted rounded-md mx-auto animate-shimmer" />
-            </div>
-            <div className="h-12 w-full bg-muted rounded-full mb-6 animate-shimmer" />
-            <div className="overflow-x-auto no-scrollbar mb-8">
-              <div className="flex gap-3">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="min-w-[80px] h-16 bg-muted rounded-full animate-shimmer" />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {profile ? (
-      <div
-        className="transition-[opacity,filter] duration-500 ease-out"
-        style={{
-          opacity: contentReady ? 1 : 0,
-          filter: contentReady ? 'blur(0px)' : 'blur(8px)',
-        }}
-      >
+    <div className="min-h-screen bg-background pb-20">
       <PullToRefresh onRefresh={handleRefresh}>
       <main className="mx-auto max-w-2xl">
         {/* Cover Image with Header Overlay */}
@@ -295,7 +250,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
           {/* Bio */}
           {profile.bio && (
-            <p className={`text-center text-base mb-6 px-4 whitespace-pre-wrap ${!(profile.settings as { aelix_score_enabled?: boolean })?.aelix_score_enabled ? 'mt-6' : ''}`}>{profile.bio}</p>
+            <p className={`text-center italic text-base mb-6 px-4 ${!(profile.settings as { aelix_score_enabled?: boolean })?.aelix_score_enabled ? 'mt-6' : ''}`}>"{profile.bio}"</p>
           )}
 
           {/* Spacer when no bio and no aelix score */}
@@ -303,34 +258,12 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             <div className="mt-6" />
           )}
 
-          {/* Mutual followers line */}
-          {!isMe && user && mutualsData && mutualsData.length > 0 && (
-            <p className="text-center text-sm text-muted-foreground mb-4 px-4">
-              {(() => {
-                const followersVis = getFollowVisibility((profile?.settings as Record<string, any>) || null, "followers");
-                const total = mutualsData[0]?.total_count ?? mutualsData.length;
-                if (followersVis === "no_one") {
-                  return `Followed by ${total} mutual${total !== 1 ? "s" : ""}`;
-                }
-                const names = mutualsData.slice(0, 2).map((m) => m.display_name || m.username);
-                if (total === 1) {
-                  return `Followed by ${names[0]}`;
-                }
-                if (total === 2) {
-                  return `Followed by ${names[0]} and ${names[1]}`;
-                }
-                const others = total - 2;
-                return `Followed by ${names[0]}, ${names[1]} and ${others} other${others !== 1 ? "s" : ""}`;
-              })()}
-            </p>
-          )}
-
           {/* Action Buttons - Edit or Follow/Message */}
           {isMe ? (
             <Button 
               variant="outline" 
               className="w-full rounded-full py-4 text-sm font-bold border-2 mb-6 hover:bg-muted active:scale-[0.96] transition-transform duration-200"
-              onClick={() => navigate('/edit-profile')}
+              onClick={() => window.location.href = 'https://aelixto.com/edit-profile'}
             >
               Edit Profile
             </Button>
@@ -360,7 +293,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           ) : null}
 
           {/* Dynamic Platform Buttons */}
-          {tabs.length > 0 && canViewPosts && (
+          {tabs.length > 0 && (
             <div className="overflow-x-auto no-scrollbar mb-8">
               <div className="flex gap-3 min-w-max">
                 {tabs.map((tab) => (
@@ -387,15 +320,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             </div>
           )}
 
-          {!canViewPosts ? (
-            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-              <div className="h-16 w-16 rounded-full border-2 border-foreground flex items-center justify-center mb-4">
-                <Lock className="h-7 w-7" />
-              </div>
-              <p className="text-base font-semibold mb-1">This account is private</p>
-              <p className="text-sm text-muted-foreground">Follow @{profile.username} to see their posts.</p>
-            </div>
-          ) : !tabsLoading && tabs.length > 0 ? (
+          {!tabsLoading && tabs.length > 0 ? (
             <ProfilePlatformGrid userId={profile.user_id} activeTab={activeTab} tabs={tabs} onTabChange={setActiveTab} />
           ) : !tabsLoading ? (
             <p className="text-center text-muted-foreground py-12 text-base">
@@ -405,11 +330,9 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
         </div>
       </main>
       </PullToRefresh>
-      </div>
-      ) : null}
 
-      {user ? null : <AuthCTABar />}
-
+      <BottomNav onCreatePost={() => setIsCreateDialogOpen(true)} />
+      
       <CreatePostDialog 
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen}
