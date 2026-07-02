@@ -376,6 +376,24 @@ export const PlatformPostViewer = ({
                 ref={(el) => {
                   if (el) postRefs.current.set(post.id, el);
                   else postRefs.current.delete(post.id);
+                  // Synchronously scroll to the tapped post the moment its
+                  // node mounts — before paint, before profile hydrates.
+                  // This eliminates the "wrong post opens for 5-7s" bug.
+                  if (
+                    el &&
+                    post.id === targetPostId &&
+                    !initialAnchorDoneRef.current &&
+                    !userScrolledRef.current
+                  ) {
+                    const container = scrollContainerRef.current;
+                    if (container) {
+                      const targetRect = el.getBoundingClientRect();
+                      const containerRect = container.getBoundingClientRect();
+                      container.scrollTop =
+                        container.scrollTop + (targetRect.top - containerRect.top);
+                      initialAnchorDoneRef.current = true;
+                    }
+                  }
                 }}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
