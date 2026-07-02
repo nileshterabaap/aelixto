@@ -89,7 +89,9 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
     },
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 0,
+      // Match useFollowingFeed's own staleTime so warm returns to "/" render
+      // the cached feed instantly instead of triggering a refetch skeleton.
+      staleTime: 30 * 1000,
   });
 };
 
