@@ -13,8 +13,7 @@ import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
 
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 import { SwipeableView } from "@/components/SwipeableView";
 const Index = () => {
@@ -26,47 +25,6 @@ const Index = () => {
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
   const { observePost } = useMarkPostSeen(user?.id);
-
-  // How many people does this user follow? Used to differentiate the
-  // "Nothing here yet" (no follows) vs "No posts yet" (follows have no posts) states.
-  const seenFeedStorageKey = user?.id ? `aelixto-has-had-feed:${user.id}` : null;
-  const [hasHadFeedPosts, setHasHadFeedPosts] = useState(false);
-
-  useEffect(() => {
-    if (!seenFeedStorageKey) {
-      setHasHadFeedPosts(false);
-      return;
-    }
-    setHasHadFeedPosts(window.localStorage.getItem(seenFeedStorageKey) === "1");
-  }, [seenFeedStorageKey]);
-
-  const { data: followingCount, isLoading: followingCountLoading, isError: followingCountError } = useQuery({
-    queryKey: ["my-following-count", user?.id],
-    enabled: !!user?.id,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_following_count" as any);
-      if (error) throw error;
-      return Number(data ?? 0);
-    },
-  });
-
-  // Has the viewer seen any posts? Used to differentiate "no posts yet"
-  // (follows haven't posted anything) from "all caught up" (everything seen).
-  const { data: hasSeenAnyPosts } = useQuery({
-    queryKey: ["has-seen-any-posts", user?.id],
-    enabled: !!user?.id,
-    staleTime: 0,
-    refetchOnMount: "always",
-    queryFn: async () => {
-      const { count } = await (supabase as any)
-        .from("post_seen")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", user!.id)
-        .limit(1);
-      return (count ?? 0) > 0;
-    },
-  });
   
   
   // Demo feed for signed-out users
@@ -105,9 +63,6 @@ const Index = () => {
         mediaType: post.media_type as "image" | "video" | "none",
         mediaUrl: post.media_url || undefined,
         thumbnailUrl: post.thumbnail_url || undefined,
-        preview_text: post.preview_text,
-        preview_title: post.preview_title,
-        preview_image_url: post.preview_image_url,
         platform: post.platform as
           | "youtube"
           | "instagram"
@@ -145,10 +100,6 @@ const Index = () => {
       mediaType: post.media_type as "image" | "video" | "none",
       mediaUrl: post.media_url || undefined,
       thumbnailUrl: post.thumbnail_url || undefined,
-      preview_text: post.preview_text,
-      preview_title: post.preview_title,
-      preview_image_url: post.preview_image_url,
-      suggested_height: post.suggested_height,
       platform: post.platform as
         | "youtube"
         | "instagram"
@@ -186,21 +137,12 @@ const Index = () => {
   useEffect(() => {
     if (allPosts.length > 0) {
       hasRenderedOnce.current = true;
-      if (seenFeedStorageKey) {
-        window.localStorage.setItem(seenFeedStorageKey, "1");
-        setHasHadFeedPosts(true);
-        queryClient.setQueryData(["has-seen-any-posts", user?.id], true);
-      }
     }
-  }, [allPosts.length, queryClient, seenFeedStorageKey, user?.id]);
+  }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] }),
-      queryClient.invalidateQueries({ queryKey: ["my-following-count", user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ["has-seen-any-posts", user?.id] }),
-    ]);
-  }, [queryClient, showDemoFeed, user?.id]);
+    await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
+  }, [queryClient, showDemoFeed]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
@@ -226,15 +168,8 @@ const Index = () => {
   // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
   const shouldShowSkeleton = !hasRenderedOnce.current && (sessionLoading || loading) && allPosts.length === 0;
-  const hasKnownSeenPosts = Boolean(hasSeenAnyPosts || hasHadFeedPosts);
-  const shouldWaitForEmptyState =
-    !showDemoFeed &&
-    followingEmpty &&
-    !hasKnownSeenPosts &&
-    (followingCountLoading || followingCount === undefined) &&
-    !followingCountError;
 
-  if (shouldShowSkeleton || shouldWaitForEmptyState) {
+  if (shouldShowSkeleton) {
     return (
       <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
         <div className="min-h-screen bg-background pb-20">
@@ -259,38 +194,21 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
-            followingCount === 0 && !hasKnownSeenPosts && !followingCountError ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <h2 className="text-xl font-semibold">Nothing here yet 👀</h2>
-                <p className="text-sm text-muted-foreground mt-2">
-                  No algorithm should decide your feed..
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  only your follows do.
-                </p>
-                <Link
-                  to="/discover"
-                  className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
-                >
-                  Discover people to follow
-                </Link>
-              </div>
-            ) : hasKnownSeenPosts ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <CheckCircle2 className="h-10 w-10 text-primary mb-3" strokeWidth={1.5} />
-                <h2 className="text-xl font-semibold">You're all caught up</h2>
-                <p className="text-sm text-muted-foreground mt-2">
-                  You've seen all recent posts from people you follow.
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <h2 className="text-xl font-semibold">No posts yet</h2>
-                <p className="text-sm text-muted-foreground mt-2">
-                  The people you follow haven't posted anything yet.
-                </p>
-              </div>
-            )
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <h2 className="text-xl font-semibold">Nothing here yet 👀</h2>
+              <p className="text-sm text-muted-foreground mt-2">
+                No algorithm should decide your feed..
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                only your follows do.
+              </p>
+              <Link
+                to="/discover"
+                className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
+              >
+                Discover people to follow
+              </Link>
+            </div>
           ) : (
             <div className="space-y-6">
               {allPosts.map((post, index) => (

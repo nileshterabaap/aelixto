@@ -44,7 +44,6 @@ import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
-import { getOriginalPostCaption } from "@/lib/originalCaption";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -483,28 +482,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         {detectedPlatform !== 'instagram' && post.content && (
           <CollapsibleCaption content={post.content} />
         )}
-
-        {/* Original post caption fetched from the source link (Facebook /
-            Threads / Reddit etc.). Always rendered below the user's caption
-            and above the embed, with the same collapsible "... more" toggle. */}
-        {(() => {
-          const originalCaption = getOriginalPostCaption({
-            previewText,
-            title: post.title,
-            userCaption: post.content,
-            platform: detectedPlatform,
-          });
-          if (!originalCaption) return null;
-          // Reddit and Threads official iframes already render the post
-          // caption inside the embed, so skip the duplicate above.
-          if (detectedPlatform === 'reddit' || detectedPlatform === 'threads' || detectedPlatform === 'twitter') return null;
-          return (
-            <CollapsibleCaption
-              content={originalCaption}
-              className="text-sm mb-3 text-muted-foreground"
-            />
-          );
-        })()}
 
         {/* Feature flag check - show disabled message if embed is disabled */}
         {!embedEnabled && (

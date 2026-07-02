@@ -1,4 +1,4 @@
-import { useState, memo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
+import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
 import type { Post } from '@/data/demoData';
@@ -11,7 +11,6 @@ import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
 import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
-import { openExternalUrl } from '@/lib/openExternalUrl';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -149,44 +148,14 @@ export const HydratedEmbed = memo(({
   const forceUniversalRenderer =
     r.kind === 'raw' &&
     !!mediaUrl &&
-    (platformHint === 'facebook' ||
-      platformHint === 'threads' ||
+    (platformHint === 'threads' ||
       platformHint === 'linkedin' ||
       platformHint === 'instagram' ||
-      lowerUrl.includes('facebook.com/') ||
-      lowerUrl.includes('fb.watch/') ||
-      lowerUrl.includes('fb.me/') ||
       lowerUrl.includes('threads.net/') ||
       lowerUrl.includes('threads.com/') ||
       lowerUrl.includes('linkedin.com/') ||
       lowerUrl.includes('instagram.com/') ||
       lowerUrl.includes('instagr.am/'));
-
-  const isFacebookPost =
-    platformHint === 'facebook' ||
-    lowerUrl.includes('facebook.com/') ||
-    lowerUrl.includes('fb.watch/') ||
-    lowerUrl.includes('fb.me/');
-
-  const isFacebookVideoLike =
-    isFacebookPost &&
-    (mediaTypeHint === 'video' ||
-      String((post as any).media_kind || '').toLowerCase() === 'video' ||
-      lowerUrl.includes('/reel/') ||
-      lowerUrl.includes('/videos/') ||
-      lowerUrl.includes('/watch/') ||
-      lowerUrl.includes('/share/v/') ||
-      lowerUrl.includes('fb.watch/'));
-
-  const isLinkedInPost =
-    platformHint === 'linkedin' || lowerUrl.includes('linkedin.com/');
-
-  const isLinkedInVideoLike =
-    isLinkedInPost &&
-    (mediaTypeHint === 'video' ||
-      String((post as any).media_kind || '').toLowerCase() === 'video' ||
-      lowerUrl.includes('/video/') ||
-      lowerUrl.includes('/videos/'));
 
   useEffect(() => {
     if (!shouldHydrate) return;
@@ -201,13 +170,6 @@ export const HydratedEmbed = memo(({
   const handleOriginalVisit = useCallback(() => {
     markOriginalVisit(post.id);
   }, [post.id]);
-
-  const handleExternalOriginalClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
-    handleOriginalVisit();
-    if (!mediaUrl) return;
-    event.preventDefault();
-    void openExternalUrl(mediaUrl);
-  }, [handleOriginalVisit, mediaUrl]);
   
   // For YouTube, prefer their thumbnail
   const effectiveThumbnail = post.platform === 'youtube' && r.url 
@@ -234,61 +196,6 @@ export const HydratedEmbed = memo(({
             loading="eager"
             decoding="async"
           />
-        </ImageViewTracker>
-      </div>
-    );
-  }
-
-  // Facebook photo posts render more reliably as the fetched media itself.
-  // The plugin iframe reserves a reactions/footer area that creates the blank
-  // strip the user reported; videos still use the iframe/player path.
-  if (shouldHydrate && isFacebookPost && effectiveThumbnail && !isFacebookVideoLike) {
-    return (
-      <div ref={embedContainerRef} className="w-full" data-embed-status="ready">
-        <ImageViewTracker postId={post.id}>
-          <a
-            href={mediaUrl || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleExternalOriginalClick}
-            className="block w-full overflow-hidden bg-muted"
-          >
-            <img
-              src={effectiveThumbnail}
-              alt="Facebook post content"
-              className="w-full h-auto object-contain"
-              loading="eager"
-              decoding="async"
-            />
-          </a>
-        </ImageViewTracker>
-      </div>
-    );
-  }
-
-  // LinkedIn image posts: mirror the Facebook treatment — the official
-  // LinkedIn embed iframe leaves a tall blank strip below the media for the
-  // reactions/comments stub. Rendering the fetched preview image directly
-  // gives a tight, flexible card just like Facebook image posts.
-  if (shouldHydrate && isLinkedInPost && effectiveThumbnail && !isLinkedInVideoLike) {
-    return (
-      <div ref={embedContainerRef} className="w-full" data-embed-status="ready">
-        <ImageViewTracker postId={post.id}>
-          <a
-            href={mediaUrl || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleExternalOriginalClick}
-            className="block w-full overflow-hidden bg-muted"
-          >
-            <img
-              src={effectiveThumbnail}
-              alt="LinkedIn post content"
-              className="w-full h-auto object-contain"
-              loading="eager"
-              decoding="async"
-            />
-          </a>
         </ImageViewTracker>
       </div>
     );

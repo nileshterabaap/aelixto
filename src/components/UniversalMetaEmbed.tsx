@@ -4,30 +4,6 @@ import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
-import { openExternalUrl } from '@/lib/openExternalUrl';
-
-/**
- * Small pill-shaped overlay button rendered on top of an embed iframe so
- * the user can always open the original post on its source platform, even
- * when the iframe swallows every tap. Positioned so it never covers the
- * platform's native Play button (top-right corner).
- */
-const OpenOriginalPill = ({ url, label }: { url: string; label: string }) => {
-  if (!url) return null;
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        void openExternalUrl(url);
-      }}
-      className="absolute top-2 right-2 z-10 rounded-full bg-black/55 backdrop-blur-sm text-white text-[11px] font-medium px-2.5 py-1 shadow-sm active:scale-95 transition-transform pointer-events-auto"
-      aria-label={label}
-    >
-      {label}
-    </button>
-  );
-};
 
 const THREADS_MIN_HEIGHT = 220;
 const THREADS_MAX_HEIGHT = 1400;
@@ -205,12 +181,10 @@ const InstagramIframeEmbed = ({
   src,
   postId,
   suggestedHeight,
-  expandedUrl,
 }: {
   src: string;
   postId?: string | null;
   suggestedHeight?: number | null;
-  expandedUrl?: string;
 }) => {
   const [visible, setVisible] = useState(() => {
     // Older saved Instagram heights may have come from /embed/captioned/ and
@@ -267,7 +241,6 @@ const InstagramIframeEmbed = ({
           display: 'block',
         }}
       />
-      {expandedUrl && <OpenOriginalPill url={expandedUrl} label="Open on Instagram" />}
     </div>
   );
 };
@@ -290,36 +263,14 @@ const FacebookIframeEmbed = ({
   suggestedHeight?: number | null;
 }) => {
   const [failed, setFailed] = useState(false);
+  const [height, setHeight] = useState(() =>
+    suggestedHeight && suggestedHeight >= 200 ? Math.min(1400, suggestedHeight) : 320
+  );
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
-  // Unified interaction: tap the iframe's Play region plays the video
-  // natively. To open the original post, the user taps the "Open on
-  // Facebook" pill overlay rendered outside the iframe. No focus-steal
-  // detection or double-tap-to-open — those were inconsistent and hijacked
-  // the play button on some devices.
 
   const srcMatch = html.match(/src="([^"]+)"/);
   const iframeSrc = srcMatch ? srcMatch[1] : '';
-
-  // Detect video vs static post — image posts get a tighter cap so there's
-  // no large blank strip below the photo before our action bar.
-  const isVideo = /\/(video\.php|reel|videos|watch)/i.test(iframeSrc) || /fb\.watch/i.test(iframeSrc);
-  const MAX_HEIGHT = isVideo ? 1400 : 640;
-  const DEFAULT_HEIGHT = isVideo ? 520 : 360;
-  const MIN_HEIGHT = 160;
-  // For image posts, the Facebook plugin appends a reactions/like/share footer
-  // (~120-150px) that creates a large blank strip above Aelix's own action
-  // bar. Render the iframe at full measured height but clip the wrapper so
-  // only the media area shows.
-  const FB_FOOTER_TRIM = isVideo ? 0 : 130;
-  const MAX_TRUSTED_SUGGESTED = isVideo ? 1400 : 760;
-
-  const [height, setHeight] = useState(() => {
-    if (suggestedHeight && suggestedHeight >= MIN_HEIGHT && suggestedHeight <= MAX_TRUSTED_SUGGESTED) {
-      return Math.min(MAX_HEIGHT, suggestedHeight);
-    }
-    return DEFAULT_HEIGHT;
-  });
 
   // Listen for Facebook's cross-origin resize messages. FB plugins post a
   // few different shapes (`{type:"resize",height}`, nested xdArbiter payloads,
@@ -333,13 +284,13 @@ const FacebookIframeEmbed = ({
       if (!origin.includes('facebook.com')) return;
       const next = parseThreadsHeightFromMessage(event.data);
       if (!next || next < 80) return;
-      const clamped = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.round(next)));
+      const clamped = Math.min(1400, Math.max(200, Math.round(next)));
       setHeight((prev) => (Math.abs(prev - clamped) > 4 ? clamped : prev));
       persistHeight(clamped);
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [MAX_HEIGHT]);
+  }, []);
 
   // Fallback: if iframe doesn't render in 12s, show OG card
   useEffect(() => {
@@ -367,11 +318,7 @@ const FacebookIframeEmbed = ({
   return (
     <div
       className="relative w-full overflow-hidden"
-      style={{
-        touchAction: 'pan-y',
-        width: '100%',
-        height: `${Math.max(MIN_HEIGHT, height - FB_FOOTER_TRIM)}px`,
-      }}
+      style={{ touchAction: 'pan-y' }}
     >
       <iframe
         ref={iframeRef}
@@ -380,20 +327,15 @@ const FacebookIframeEmbed = ({
         allowFullScreen
         allow="encrypted-media"
         loading="lazy"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         onError={() => setFailed(true)}
         style={{
           border: 'none',
-          position: 'absolute',
-          top: 0,
-          left: 0,
           width: '100%',
           height: `${height}px`,
           overflow: 'hidden',
           display: 'block',
         }}
       />
-      <OpenOriginalPill url={expandedUrl} label="Open on Facebook" />
     </div>
   );
 };
@@ -411,12 +353,10 @@ const LinkedInIframeEmbed = ({
   src,
   postId,
   suggestedHeight,
-  expandedUrl,
 }: {
   src: string;
   postId?: string | null;
   suggestedHeight?: number | null;
-  expandedUrl?: string;
 }) => {
   const [height, setHeight] = useState(() =>
     suggestedHeight && suggestedHeight >= LI_MIN_HEIGHT
@@ -452,9 +392,8 @@ const LinkedInIframeEmbed = ({
         src={src}
         scrolling="no"
         allowFullScreen
-        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+        allow="encrypted-media"
         loading="lazy"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         style={{
           border: 'none',
           width: '100%',
@@ -462,7 +401,6 @@ const LinkedInIframeEmbed = ({
           display: 'block',
         }}
       />
-      {expandedUrl && <OpenOriginalPill url={expandedUrl} label="Open on LinkedIn" />}
     </div>
   );
 };
@@ -618,10 +556,7 @@ const normalizeFacebookUrl = (raw: string): string => {
     .replace(/^https?:\/\/lm\.facebook\.com\//, 'https://www.facebook.com/')
     .replace(/^https?:\/\/l\.facebook\.com\//, 'https://www.facebook.com/');
 
-  // 2) If it's a login redirect, extract the actual post URL from "next" parameter.
-  // Facebook photo/share links often route anonymous server-side expansion
-  // through /login/?next=<story.php...>; that does NOT mean the post is
-  // private. The plugins can render the next URL, but never the login URL.
+  // 2) If it's a login redirect, extract the actual post URL from "next" parameter
   try {
     const u = new URL(url);
     if (u.hostname.endsWith('facebook.com') && u.pathname.includes('/login') && u.searchParams.get('next')) {
@@ -719,7 +654,7 @@ const buildLinkedInEmbed = (url: string): string | null => {
     const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
     if (feedMatch) {
       const urn = feedMatch[1];
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
@@ -729,13 +664,13 @@ const buildLinkedInEmbed = (url: string): string | null => {
       const id = postMatch[1];
       const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
       const type = typeMatch ? typeMatch[1] : 'ugcPost';
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
 
     // Pattern 3: /posts/username_slug-share-ID-hash
     const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
     if (shareMatch) {
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through to null
@@ -816,7 +751,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
 
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
       // Double tap detected
-      void openExternalUrl(embedUrl);
+      window.open(embedUrl, '_blank', 'noopener,noreferrer');
     }
 
     lastTapRef.current = now;
@@ -873,17 +808,12 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             if (!expandError && expandData?.finalUrl) {
               finalUrl = expandData.finalUrl;
               urlForEmbed = finalUrl;
+              
 
-              // A Facebook /login/?next=<post> expansion is still usable after
-              // normalizeFacebookUrl extracts the real post URL. Only fallback
-              // when there is no next= target to embed.
+              // If expanded URL is a login redirect or has login in title, use fallback
               if (finalUrl.includes('/login/') && platform === 'facebook') {
-                try {
-                  const fbLogin = new URL(finalUrl);
-                  shouldShowFallback = !fbLogin.searchParams.get('next');
-                } catch {
-                  shouldShowFallback = true;
-                }
+                
+                shouldShowFallback = true;
               }
 
               if (expandData?.title?.toLowerCase().includes('log in to facebook')) {
@@ -1011,7 +941,6 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             src={iframeSrc}
             postId={postId}
             suggestedHeight={suggestedHeight}
-            expandedUrl={expandedUrl}
           />
         );
       }
@@ -1036,7 +965,6 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             src={iframeSrc}
             postId={postId}
             suggestedHeight={suggestedHeight}
-            expandedUrl={expandedUrl}
           />
         );
       }

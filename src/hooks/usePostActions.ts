@@ -3,16 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 
-interface UsePostActionsOptions {
-  isRepost?: boolean;
-  onDeleted?: () => void;
-}
-
-export const usePostActions = (
-  postId: string,
-  userId: string | undefined,
-  options: UsePostActionsOptions = {}
-) => {
+export const usePostActions = (postId: string, userId: string | undefined) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { decrement: decrementDailyCount } = useDailyPostLimit();
@@ -153,20 +144,6 @@ export const usePostActions = (
     mutationFn: async () => {
       if (!userId) throw new Error("Not authenticated");
 
-      if (options.isRepost) {
-        const { data, error } = await supabase
-          .from("reposts")
-          .delete()
-          .eq("post_id", postId)
-          .eq("user_id", userId)
-          .select("id");
-
-        if (error) throw error;
-        if (!data || data.length === 0) throw new Error("Repost not found or not owned");
-
-        return { createdAt: undefined as string | undefined, deletedRepost: true };
-      }
-
       // Fetch created_at first so we can decide whether to refund the daily credit
       const { data: existing } = await supabase
         .from("posts")
@@ -175,17 +152,15 @@ export const usePostActions = (
         .eq("user_id", userId)
         .maybeSingle();
 
-      const { data: deletedRows, error } = await supabase
+      const { error } = await supabase
         .from("posts")
         .delete()
         .eq("id", postId)
-        .eq("user_id", userId)
-        .select("id");
+        .eq("user_id", userId);
 
       if (error) throw error;
-      if (!deletedRows || deletedRows.length === 0) throw new Error("Post not found or not owned");
 
-      return { createdAt: existing?.created_at as string | undefined, deletedRepost: false };
+      return { createdAt: existing?.created_at as string | undefined };
     },
     onSuccess: (result) => {
       // Refund the daily post credit only if the post was created today (same local day)
@@ -209,13 +184,9 @@ export const usePostActions = (
       queryClient.invalidateQueries({ queryKey: ["user-posts"] });
       queryClient.invalidateQueries({ queryKey: ["profile-posts"] });
 
-      options.onDeleted?.();
-
       toast({
-        title: result?.deletedRepost ? "Repost removed" : "Post deleted",
-        description: result?.deletedRepost
-          ? "Removed from your profile."
-          : refunded
+        title: "Post deleted",
+        description: refunded
           ? "Your post has been removed. Daily credit refunded."
           : "Your post has been removed.",
       });

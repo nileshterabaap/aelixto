@@ -116,76 +116,20 @@ serve(async (req) => {
       const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : 1;
       sizing = { media_kind: 'image', aspect_ratio: clampAR(ar), suggested_height: null };
     }
-    // Facebook - use official oEmbed API first, then the public plugin HTML.
-    // Direct Facebook pages often return a login wall to server-side fetches;
-    // the plugin endpoint still exposes public post captions/media.
+    // Facebook - use official oEmbed API with Meta token
     else if (platform === 'facebook') {
-      let targetUrl = url;
-      // Expand Facebook share URLs
-      if (targetUrl.includes('facebook.com/share/') || targetUrl.includes('fb.watch') || targetUrl.includes('fb.me')) {
-        try {
-          const res = await fetch(targetUrl, { method: 'GET', redirect: 'follow', headers: { 'User-Agent': 'facebookexternalhit/1.1' } });
-          targetUrl = extractFacebookNextUrl(res.url) || res.url;
-        } catch (e) { console.error('[fetch-post-preview] FB expansion failed', e); }
-      }
-
-      const useThumb = async (imageUrl: string | null | undefined) => {
-        if (!imageUrl || isGenericPlaceholderImage(imageUrl)) return;
-        thumbnailUrl = isPreviewOnly ? imageUrl : await storeThumbnailPermanently(postId, imageUrl);
-      };
-
-      const isJunk = (t: string | null) => !cleanFacebookCaption(t);
-
-      const oembedData = await fetchFacebookOembed(targetUrl);
+      const oembedData = await fetchFacebookOembed(url);
       if (oembedData?.thumbnail_url) {
-        await useThumb(oembedData.thumbnail_url);
+        thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
       }
-      if (oembedData?.title) {
-        const cleanedTitle = cleanFacebookCaption(oembedData.title);
-        previewText = cleanedTitle;
-        previewTitle = cleanedTitle;
-      }
-      oembedThumbW = oembedData?.thumbnail_width ?? null;
-      oembedThumbH = oembedData?.thumbnail_height ?? null;
-
-      // Fallback: scrape OG metadata
-      if (!thumbnailUrl || !previewText) {
-        const ogData = await scrapeOgData(targetUrl, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)');
-        if (!thumbnailUrl && ogData.image && !isGenericPlaceholderImage(ogData.image)) {
-          await useThumb(ogData.image);
-        }
-        if (!previewText || isJunk(previewText)) {
-          const candidate = cleanFacebookCaption(ogData.description) || cleanFacebookCaption(ogData.title);
-          if (candidate) previewText = candidate;
-        }
-        if (!previewTitle || isJunk(previewTitle)) {
-          const cleanTitle = cleanFacebookCaption(ogData.title);
-          if (cleanTitle) previewTitle = cleanTitle;
-        }
-      }
-
-      // Final fallback: public Facebook plugin page. This is the path that
-      // recovers captions from data-testid="post_message" plus scontent images
-      // when both Graph oEmbed and OG scraping are blocked by login walls.
-      if (!thumbnailUrl || isJunk(previewText)) {
-        const pluginData = await scrapeFacebookPlugin(targetUrl, url);
-        if (!thumbnailUrl && pluginData.image) {
-          await useThumb(pluginData.image);
-        }
-        if (isJunk(previewText) && pluginData.caption) {
-          previewText = pluginData.caption;
-        }
-        if (isJunk(previewTitle) && pluginData.title) {
-          previewTitle = pluginData.title;
-        }
-        if (oembedThumbW === null) oembedThumbW = pluginData.imageWidth;
-        if (oembedThumbH === null) oembedThumbH = pluginData.imageHeight;
-      }
-
-      const isReel = /\/reel\//i.test(targetUrl);
-      const isVideo = /\/videos?\//i.test(targetUrl);
-      const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : (isReel ? 9 / 16 : (isVideo ? 16 / 9 : 4 / 5));
-      sizing = { media_kind: isVideo || isReel ? 'video' : 'image', aspect_ratio: clampAR(ar), suggested_height: null };
+      // /reel/ → 9:16 vertical, /videos/ → 16:9, else 4:5 portrait photo card
+      const isReel = /\/reel\//i.test(url);
+      const isVideo = /\/videos?\//i.test(url);
+      sizing = {
+        media_kind: 'video',
+        aspect_ratio: isReel ? 9 / 16 : (isVideo ? 16 / 9 : 4 / 5),
+        suggested_height: null,
+      };
     }
     // Reddit special handling
     else if (platform === 'reddit') {
@@ -195,39 +139,6 @@ serve(async (req) => {
       previewTitle = redditData.title;
       previewText = redditData.description || redditData.title;
       sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
-    }
-    // LinkedIn — OG description is short. The public embed page exposes the
-    // full post commentary (with paragraph breaks) for any URN ID we can
-    // extract from the share URL.
-    else if (platform === 'linkedin') {
-      const ogData = await scrapeOgData(url, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)');
-      thumbnailUrl = ogData.image && !isGenericPlaceholderImage(ogData.image) ? ogData.image : null;
-      previewText = ogData.description || ogData.title || null;
-      if (ogData.title) previewTitle = ogData.title;
-
-      const liEmbed = await fetchLinkedInEmbedCaption(url);
-      if (liEmbed.caption) {
-        // Prefer the embed caption when it has paragraph breaks or is longer
-        // than the OG description (which LinkedIn truncates near ~200 chars).
-        const prev = (previewText || '').trim();
-        if (!prev || liEmbed.caption.length > prev.length + 40 || liEmbed.caption.includes('\n')) {
-          previewText = liEmbed.caption;
-        }
-      }
-      if (!thumbnailUrl && liEmbed.image) {
-        thumbnailUrl = isPreviewOnly ? liEmbed.image : await storeThumbnailPermanently(postId, liEmbed.image);
-      }
-
-      const hasVideo = ogData.hasVideo;
-      const dims = ogData.imageWidth && ogData.imageHeight ? { w: ogData.imageWidth, h: ogData.imageHeight } : null;
-      const ar = dims ? clampAR(dims.w / dims.h) : null;
-      if (hasVideo) {
-        sizing = { media_kind: 'video', aspect_ratio: ar ?? 16 / 9, suggested_height: null };
-      } else if (thumbnailUrl) {
-        sizing = { media_kind: 'image', aspect_ratio: ar ?? 4 / 5, suggested_height: null };
-      } else {
-        sizing = { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(previewText) };
-      }
     }
     // Article handling — try Medium RSS first (because Medium blocks the
     // normal HTML fetch for some posts), then fall back to the universal
@@ -340,12 +251,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({
-        thumbnail_url: thumbnailUrl,
-        preview_image_url: thumbnailUrl,
-        title: previewTitle,
-        preview_text: previewText,
-      }),
+      JSON.stringify({ thumbnail_url: thumbnailUrl, title: previewTitle, preview_text: previewText }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
@@ -406,7 +312,7 @@ async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: strin
 }
 
 // Fetch Facebook thumbnail using official oEmbed API
-async function fetchFacebookOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null; thumbnail_width: number | null; thumbnail_height: number | null } | null> {
+async function fetchFacebookOembed(url: string): Promise<{ thumbnail_url: string | null } | null> {
   const metaToken = Deno.env.get('META_APP_TOKEN');
   
   if (!metaToken) {
@@ -441,256 +347,11 @@ async function fetchFacebookOembed(url: string): Promise<{ thumbnail_url: string
       }
     }
 
-    return { thumbnail_url: thumbnailUrl, title: data.title || data.author_name || null, thumbnail_width: typeof data.thumbnail_width === "number" ? data.thumbnail_width : null, thumbnail_height: typeof data.thumbnail_height === "number" ? data.thumbnail_height : null };
+    return { thumbnail_url: thumbnailUrl };
   } catch (error) {
     console.error('[fetch-post-preview] Facebook oEmbed error:', error);
     return null;
   }
-}
-
-function extractFacebookNextUrl(raw: string): string | null {
-  try {
-    const parsed = new URL(raw);
-    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return null;
-    const next = parsed.searchParams.get('next');
-    if (!next) return null;
-    const nextUrl = new URL(decodeURIComponent(next));
-    if (!/(^|\.)facebook\.com$/i.test(nextUrl.hostname)) return null;
-    // Facebook share redirects add volatile rdid before share_url; the public
-    // plugin rejects otherwise-valid story.php URLs when that param is present.
-    nextUrl.searchParams.delete('rdid');
-    const looksLikePost =
-      /\/story\.php/i.test(nextUrl.pathname) ||
-      /\/permalink\.php/i.test(nextUrl.pathname) ||
-      /\/(?:photo|photos|posts|videos?|watch|reel)\b/i.test(nextUrl.pathname) ||
-      nextUrl.searchParams.has('story_fbid') ||
-      nextUrl.searchParams.has('fbid') ||
-      nextUrl.searchParams.has('v');
-    return looksLikePost ? nextUrl.toString() : null;
-  } catch {
-    return null;
-  }
-}
-
-async function scrapeFacebookPlugin(url: string, fallbackUrl?: string): Promise<{ caption: string | null; image: string | null; title: string | null; imageWidth: number | null; imageHeight: number | null }> {
-  const empty = { caption: null, image: null, title: null, imageWidth: null, imageHeight: null };
-  const hrefs = [...new Set(([url, fallbackUrl].filter(Boolean) as string[]).flatMap(getFacebookPluginHrefs))];
-  const endpoints = hrefs.flatMap((href) => [
-    `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
-    `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
-  ]);
-
-  for (const pluginUrl of endpoints) {
-    try {
-      const response = await fetch(pluginUrl, {
-        redirect: 'follow',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-      });
-      if (!response.ok) continue;
-
-      const html = await response.text();
-      const meta = extractArticleMetadata(html, pluginUrl);
-      const imageInfo = extractFacebookPluginImage(html, pluginUrl);
-      const caption = extractFacebookPluginCaption(html) || cleanFacebookCaption(meta.description);
-      const title = cleanFacebookCaption(meta.title);
-
-      if (caption || imageInfo.image || meta.image) {
-        return {
-          caption,
-          image: imageInfo.image || meta.image,
-          title,
-          imageWidth: imageInfo.width,
-          imageHeight: imageInfo.height,
-        };
-      }
-    } catch (error) {
-      console.error('[fetch-post-preview] Facebook plugin scrape error:', error);
-    }
-  }
-
-  return empty;
-}
-
-function normalizeFacebookPluginHref(raw: string): string {
-  try {
-    const parsed = new URL(raw);
-    if (/(^|\.)facebook\.com$/i.test(parsed.hostname)) {
-      parsed.searchParams.delete('rdid');
-      parsed.searchParams.delete('mibextid');
-      parsed.searchParams.delete('__cft__');
-      parsed.searchParams.delete('__tn__');
-    }
-    return parsed.toString();
-  } catch {
-    return raw;
-  }
-}
-
-function getFacebookPluginHrefs(raw: string): string[] {
-  const normalized = normalizeFacebookPluginHref(raw);
-  const candidates = [normalized];
-  try {
-    const parsed = new URL(normalized);
-    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return candidates;
-
-    let storyId = parsed.searchParams.get('story_fbid') || parsed.searchParams.get('fbid');
-    let pageId = parsed.searchParams.get('id');
-    const postId = parsed.searchParams.get('post_id');
-    if (postId?.includes('_')) {
-      const [postPageId, postStoryId] = postId.split('_');
-      pageId = pageId || postPageId;
-      storyId = storyId || postStoryId;
-    }
-    const pathPost = parsed.pathname.match(/^\/(\d+)\/posts\/(\d+)/i);
-    if (pathPost) {
-      pageId = pageId || pathPost[1];
-      storyId = storyId || pathPost[2];
-    }
-
-    if (storyId && pageId) {
-      candidates.push(`https://www.facebook.com/story.php?story_fbid=${encodeURIComponent(storyId)}&id=${encodeURIComponent(pageId)}`);
-      candidates.push(`https://www.facebook.com/permalink.php?story_fbid=${encodeURIComponent(storyId)}&id=${encodeURIComponent(pageId)}`);
-      candidates.push(`https://www.facebook.com/${encodeURIComponent(pageId)}/posts/${encodeURIComponent(storyId)}`);
-    }
-  } catch {
-    // keep normalized URL only
-  }
-  return candidates;
-}
-
-function extractFacebookPluginCaption(html: string): string | null {
-  const candidates: string[] = [];
-  const markerRegex = /data-testid=["']post_message["']/gi;
-  let marker: RegExpExecArray | null;
-  while ((marker = markerRegex.exec(html)) !== null) {
-    const start = html.lastIndexOf('<', marker.index);
-    const chunkStart = start >= 0 ? start : marker.index;
-    const nextMessage = html.indexOf('data-testid="post_message"', marker.index + 1);
-    const footerOffset = html.slice(marker.index).search(/(?:data-testid=["']UFI2CommentsCount["']|<form\b|aria-label=["']Like["'])/i);
-    const nextFooter = footerOffset >= 0 ? marker.index + footerOffset : -1;
-    const hardEnd = nextMessage > marker.index ? nextMessage : -1;
-    const softEnd = nextFooter > marker.index ? nextFooter : -1;
-    const end = [hardEnd, softEnd, chunkStart + 8000].filter((n) => n > chunkStart).sort((a, b) => a - b)[0] || chunkStart + 8000;
-    candidates.push(html.slice(chunkStart, Math.min(html.length, end)));
-  }
-
-  // Some plugin responses contain server-rendered text without the test id but
-  // keep it inside userContent/message containers.
-  const legacy = html.match(/<(?:div|span)[^>]+(?:userContent|post-message|post_message)[^>]*>([\s\S]*?)<\/(?:div|span)>/i)?.[0];
-  if (legacy) candidates.push(legacy);
-
-  for (const candidate of candidates) {
-    const cleaned = cleanFacebookCaption(stripHtml(candidate));
-    if (cleaned) return cleaned;
-  }
-  return null;
-}
-
-function cleanFacebookCaption(text: string | null | undefined): string | null {
-  if (!text) return null;
-  let cleaned = stripFacebookBootstrapTail(decodeHtmlEntities(text))
-    .replace(/\s+/g, ' ')
-    .replace(/(?:^|\s)(?:See more|See Translation|See translation)(?:\s|$)/gi, ' ')
-    .trim();
-  cleaned = cleaned.replace(/^Facebook\s*[-–—:]?\s*/i, '').trim();
-  const lower = cleaned.toLowerCase();
-  if (
-    !cleaned ||
-    lower === 'facebook' ||
-    lower.includes('log in to facebook') ||
-    lower.includes('see posts, photos and more on facebook') ||
-    isPageBootstrapDump(cleaned)
-  ) return null;
-  return cleaned.slice(0, 4000);
-}
-
-function stripFacebookBootstrapTail(value: string): string {
-  const markers = [
-    'function envFlush',
-    'ServerJSQueue.add',
-    'requireLazy',
-    'Bootloader',
-    'DTSGInitialData',
-    'window.Env',
-    'ajaxpipe_token',
-    'enableBootload',
-    'bumpVultureJSHash',
-    'AsyncRequest',
-    'IntlQtEventFalcoEvent',
-  ];
-  let earliest = -1;
-  for (const marker of markers) {
-    const idx = value.indexOf(marker);
-    if (idx >= 0 && (earliest === -1 || idx < earliest)) earliest = idx;
-  }
-  return earliest >= 0 ? value.slice(0, earliest).trim() : value;
-}
-
-function isPageBootstrapDump(value: string): boolean {
-  const stripped = stripFacebookBootstrapTail(value).trim();
-  if (stripped && stripped !== value.trim()) return false;
-  const text = value.slice(0, 4000);
-  const markers = [
-    'requireLazy',
-    'Bootloader',
-    'ServerJSQueue',
-    'envFlush',
-    'ajaxpipe_token',
-    'enableBootload',
-    'window.Env',
-    'bumpVultureJSHash',
-    'AsyncRequest',
-    'IntlQtEventFalcoEvent',
-    'DTSGInitialData',
-  ];
-  if (markers.some((marker) => text.includes(marker))) return true;
-  if (text.length > 120) {
-    const codey = (text.match(/[{}\[\]"`]/g) || []).length;
-    if (codey / text.length > 0.18) return true;
-  }
-  return false;
-}
-
-function extractFacebookPluginImage(html: string, baseUrl: string): { image: string | null; width: number | null; height: number | null } {
-  const images: Array<{ url: string; width: number | null; height: number | null; score: number }> = [];
-  const imgRegex = /<img\b[^>]*>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = imgRegex.exec(html)) !== null) {
-    const tag = match[0];
-    const raw =
-      tag.match(/\s(?:data-src|src)=['"]([^'"]+)['"]/i)?.[1] ||
-      tag.match(/\s(?:data-src|src)=([^\s>]+)/i)?.[1];
-    if (!raw) continue;
-    const resolved = resolveUrl(decodeHtmlEntities(raw).replace(/\\\//g, '/'), baseUrl);
-    if (!resolved) continue;
-    const lower = resolved.toLowerCase();
-    if (!/(scontent|fbcdn)\./i.test(lower) && !lower.includes('scontent-')) continue;
-    if (lower.includes('emoji') || lower.includes('rsrc.php') || lower.includes('static.xx.fbcdn.net')) continue;
-    if (!isLikelyRealContentImage(resolved)) continue;
-
-    const width = readAttrNumber(tag, 'width');
-    const height = readAttrNumber(tag, 'height');
-    const area = width && height ? width * height : 0;
-    let score = area;
-    if (/\/v\/t(?:39|45|51|15|1\.)/i.test(lower)) score += 10000;
-    if (lower.includes('_n.jpg') || lower.includes('_n.png') || lower.includes('_n.webp')) score += 5000;
-    if (lower.includes('p100x100') || lower.includes('s100x100') || lower.includes('cp0_dst')) score -= 20000;
-    images.push({ url: resolved, width, height, score });
-  }
-
-  images.sort((a, b) => b.score - a.score);
-  const best = images[0];
-  return { image: best?.url || null, width: best?.width || null, height: best?.height || null };
-}
-
-function readAttrNumber(tag: string, attr: string): number | null {
-  const escaped = attr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const value = tag.match(new RegExp(`\\s${escaped}=["']?(\\d+)`, 'i'))?.[1];
-  const num = value ? parseInt(value, 10) : NaN;
-  return Number.isFinite(num) && num > 0 ? num : null;
 }
 
 // Store thumbnail permanently to avoid CDN expiration
@@ -770,9 +431,7 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
         return {
           thumbnail_url: thumbnail,
           title: typeof post?.title === 'string' ? post.title : oembedData.title,
-          description: typeof post?.selftext === 'string' && post.selftext.trim()
-            ? post.selftext
-            : (typeof post?.title === 'string' ? post.title : null),
+          description: typeof post?.selftext === 'string' && post.selftext.trim() ? post.selftext : oembedData.description,
           post_data: post ?? null,
         };
       }
@@ -785,7 +444,7 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
   return {
     thumbnail_url: ogData.image && !isMisleadingRedditThumbnail(ogData.image) ? ogData.image : null,
     title: oembedData.title || ogData.title,
-    description: ogData.description || oembedData.title,
+    description: oembedData.description || ogData.description,
     post_data: null,
   };
 }
@@ -986,11 +645,7 @@ function isMisleadingRedditThumbnail(url: string): boolean {
 
 function isGenericPlaceholderImage(url: string): boolean {
   const lower = url.toLowerCase();
-  return lower.includes('images.unsplash.com') ||
-    lower.includes('source.unsplash.com') ||
-    lower.includes('/images/login/qrcodeloginpizza') ||
-    lower.includes('static.xx.fbcdn.net') ||
-    lower.includes('/rsrc.php/');
+  return lower.includes('images.unsplash.com') || lower.includes('source.unsplash.com');
 }
 
 function stripHtml(text: string): string {
@@ -1330,168 +985,4 @@ function resolveUrl(maybeRelative: string, baseUrl: string): string | null {
   } catch {
     return null;
   }
-}
-
-// LinkedIn — extract activity / share / ugcPost ID from any post URL flavour.
-function extractLinkedInUrn(url: string): string | null {
-  if (!url) return null;
-  // urn:li:activity:1234... already in the URL
-  const direct = url.match(/urn(?::|%3A)li(?::|%3A)(activity|share|ugcPost)(?::|%3A)(\d{6,})/i);
-  if (direct) return `urn:li:${direct[1]}:${direct[2]}`;
-  // /posts/<slug>-activity-1234567890-abcd
-  const activity = url.match(/-(activity|share|ugcPost)-(\d{6,})/i);
-  if (activity) return `urn:li:${activity[1]}:${activity[2]}`;
-  // /feed/update/urn:li:.../
-  const update = url.match(/\/feed\/update\/(urn:li:[a-zA-Z]+:\d+)/i);
-  if (update) return update[1];
-  return null;
-}
-
-async function fetchLinkedInEmbedCaption(url: string): Promise<{ caption: string | null; image: string | null }> {
-  const urn = extractLinkedInUrn(url);
-  if (!urn) return { caption: null, image: null };
-  const embedUrl = `https://www.linkedin.com/embed/feed/update/${urn}`;
-  try {
-    const res = await fetch(embedUrl, {
-      redirect: 'follow',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-    });
-    if (!res.ok) return { caption: null, image: null };
-    const html = await res.text();
-
-    // LinkedIn nests commentary inside many spans/divs; a non-greedy match on
-    // the first `</div>` truncates the post. Extract by finding the opening
-    // commentary container and walking tags to its matching close.
-    let caption: string | null = null;
-
-    const containerStarts = [
-      /<div\b[^>]*class="[^"]*feed-shared-update-v2__commentary[^"]*"[^>]*>/i,
-      /<div\b[^>]*class="[^"]*attributed-text-segment-list__container[^"]*"[^>]*>/i,
-      /<div\b[^>]*class="[^"]*attributed-text-segment-list__content[^"]*"[^>]*>/i,
-      /<div\b[^>]*data-test-id="main-feed-activity-card__commentary"[^>]*>/i,
-      /<p\b[^>]*class="[^"]*commentary[^"]*"[^>]*>/i,
-    ];
-    for (const re of containerStarts) {
-      const m = html.match(re);
-      if (!m || m.index === undefined) continue;
-      const inner = extractBalancedTag(html, m.index, m[0].startsWith('<p') ? 'p' : 'div');
-      if (!inner) continue;
-      const text = htmlBlockToText(inner);
-      if (text && text.length >= 2) { caption = text; break; }
-    }
-
-    if (!caption) {
-      // Some embed responses ship the post payload as escaped JSON inside an
-      // <code> tag. The full commentary text is on a "text" field.
-      const codeBlocks = html.match(/<code[^>]*>([\s\S]*?)<\/code>/gi) || [];
-      for (const block of codeBlocks) {
-        const json = decodeHtmlEntities(block.replace(/<\/?code[^>]*>/gi, '')).trim();
-        if (!json.startsWith('{') && !json.startsWith('[')) continue;
-        try {
-          const parsed = JSON.parse(json);
-          const found = findCommentaryText(parsed);
-          if (found && found.length > (caption?.length || 0)) caption = found;
-        } catch { /* ignore */ }
-      }
-    }
-
-    if (!caption) {
-      const ogDesc = html.match(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']+)["']/i)?.[1];
-      if (ogDesc) caption = decodeHtmlEntities(ogDesc).trim();
-    }
-
-    // Hero/preview image from the embed page (avoids generic LinkedIn logo).
-    let image: string | null = null;
-    const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)?.[1];
-    if (ogImage) image = decodeHtmlEntities(ogImage).trim();
-
-    return { caption: caption || null, image: image || null };
-  } catch (error) {
-    console.error('[fetch-post-preview] LinkedIn embed scrape failed:', error);
-    return { caption: null, image: null };
-  }
-}
-
-function htmlBlockToText(snippet: string): string {
-  return decodeHtmlEntities(
-    snippet
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<\/p\s*>/gi, '\n\n')
-      .replace(/<\/div\s*>/gi, '\n')
-      .replace(/<[^>]+>/g, '')
-  )
-    .replace(/\r\n?/g, '\n')
-    .replace(/[ \t]+\n/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
-}
-
-// Walk an HTML string starting at the index of an opening tag and return the
-// inner content up to its matching closing tag, accounting for nesting.
-function extractBalancedTag(html: string, openIndex: number, tagName: string): string | null {
-  const openRe = new RegExp(`<${tagName}\\b[^>]*>`, 'gi');
-  const closeRe = new RegExp(`</${tagName}\\s*>`, 'gi');
-  openRe.lastIndex = openIndex;
-  const openMatch = openRe.exec(html);
-  if (!openMatch) return null;
-  const innerStart = openMatch.index + openMatch[0].length;
-  let depth = 1;
-  openRe.lastIndex = innerStart;
-  closeRe.lastIndex = innerStart;
-  while (depth > 0) {
-    const nextOpen = openRe.exec(html);
-    const nextClose = closeRe.exec(html);
-    if (!nextClose) return null;
-    if (nextOpen && nextOpen.index < nextClose.index) {
-      depth += 1;
-      closeRe.lastIndex = nextOpen.index + nextOpen[0].length;
-      continue;
-    }
-    depth -= 1;
-    if (depth === 0) return html.slice(innerStart, nextClose.index);
-    openRe.lastIndex = nextClose.index + nextClose[0].length;
-  }
-  return null;
-}
-
-// Recursively search a parsed JSON payload for the longest plausible
-// commentary string. LinkedIn embed payloads expose post text on fields like
-// `text`, `commentary`, or `attributedText.text`.
-function findCommentaryText(value: unknown, depth = 0): string | null {
-  if (depth > 6 || value === null || value === undefined) return null;
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return trimmed.length > 40 ? trimmed : null;
-  }
-  if (Array.isArray(value)) {
-    let best: string | null = null;
-    for (const item of value) {
-      const found = findCommentaryText(item, depth + 1);
-      if (found && (!best || found.length > best.length)) best = found;
-    }
-    return best;
-  }
-  if (typeof value === 'object') {
-    const obj = value as Record<string, unknown>;
-    const preferredKeys = ['text', 'commentary', 'commentaryV2', 'attributedText'];
-    let best: string | null = null;
-    for (const key of preferredKeys) {
-      if (key in obj) {
-        const found = findCommentaryText(obj[key], depth + 1);
-        if (found && (!best || found.length > best.length)) best = found;
-      }
-    }
-    if (best) return best;
-    for (const key of Object.keys(obj)) {
-      if (preferredKeys.includes(key)) continue;
-      const found = findCommentaryText(obj[key], depth + 1);
-      if (found && (!best || found.length > best.length)) best = found;
-    }
-    return best;
-  }
-  return null;
 }

@@ -67,9 +67,7 @@ const decodeHtmlEntities = (text: string): string => {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)));
+    .replace(/&nbsp;/g, ' ');
 };
 
 function resolveUrl(maybeRelative: string, baseUrl: string): string | null {
@@ -302,242 +300,6 @@ async function fetchRedditOembed(targetUrl: string): Promise<{ title: string | n
   }
 }
 
-function extractFacebookNextUrl(raw: string): string | null {
-  try {
-    const parsed = new URL(raw);
-    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return null;
-    const next = parsed.searchParams.get('next');
-    if (!next) return null;
-    const nextUrl = new URL(decodeURIComponent(next));
-    if (!/(^|\.)facebook\.com$/i.test(nextUrl.hostname)) return null;
-    // rdid breaks Facebook's public plugin for story.php image posts.
-    nextUrl.searchParams.delete('rdid');
-    const looksLikePost =
-      /\/story\.php/i.test(nextUrl.pathname) ||
-      /\/permalink\.php/i.test(nextUrl.pathname) ||
-      /\/(?:photo|photos|posts|videos?|watch|reel)\b/i.test(nextUrl.pathname) ||
-      nextUrl.searchParams.has('story_fbid') ||
-      nextUrl.searchParams.has('fbid') ||
-      nextUrl.searchParams.has('v');
-    return looksLikePost ? nextUrl.toString() : null;
-  } catch {
-    return null;
-  }
-}
-
-function cleanFacebookCaption(text: string | null | undefined): string | null {
-  if (!text) return null;
-  let cleaned = stripFacebookBootstrapTail(decodeHtmlEntities(text))
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/(?:^|\s)(?:See more|See Translation|See translation)(?:\s|$)/gi, ' ')
-    .trim();
-  cleaned = cleaned.replace(/^Facebook\s*[-–—:]?\s*/i, '').trim();
-  const lower = cleaned.toLowerCase();
-  if (
-    !cleaned ||
-    lower === 'facebook' ||
-    lower.includes('log in to facebook') ||
-    lower.includes('see posts, photos and more on facebook') ||
-    isPageBootstrapDump(cleaned)
-  ) return null;
-  return cleaned.slice(0, 4000);
-}
-
-function stripFacebookBootstrapTail(value: string): string {
-  const markers = [
-    'function envFlush',
-    'ServerJSQueue.add',
-    'requireLazy',
-    'Bootloader',
-    'DTSGInitialData',
-    'window.Env',
-    'ajaxpipe_token',
-    'enableBootload',
-    'bumpVultureJSHash',
-    'AsyncRequest',
-    'IntlQtEventFalcoEvent',
-  ];
-  let earliest = -1;
-  for (const marker of markers) {
-    const idx = value.indexOf(marker);
-    if (idx >= 0 && (earliest === -1 || idx < earliest)) earliest = idx;
-  }
-  return earliest >= 0 ? value.slice(0, earliest).trim() : value;
-}
-
-function isPageBootstrapDump(value: string): boolean {
-  const stripped = stripFacebookBootstrapTail(value).trim();
-  if (stripped && stripped !== value.trim()) return false;
-  const text = value.slice(0, 4000);
-  const markers = [
-    'requireLazy',
-    'Bootloader',
-    'ServerJSQueue',
-    'envFlush',
-    'ajaxpipe_token',
-    'enableBootload',
-    'window.Env',
-    'bumpVultureJSHash',
-    'AsyncRequest',
-    'IntlQtEventFalcoEvent',
-    'DTSGInitialData',
-  ];
-  if (markers.some((marker) => text.includes(marker))) return true;
-  if (text.length > 120) {
-    const codey = (text.match(/[{}\[\]"`]/g) || []).length;
-    if (codey / text.length > 0.18) return true;
-  }
-  return false;
-}
-
-function extractFacebookPluginCaption(html: string): string | null {
-  const candidates: string[] = [];
-  const markerRegex = /data-testid=["']post_message["']/gi;
-  let marker: RegExpExecArray | null;
-  while ((marker = markerRegex.exec(html)) !== null) {
-    const start = html.lastIndexOf('<', marker.index);
-    const chunkStart = start >= 0 ? start : marker.index;
-    const nextMessage = html.indexOf('data-testid="post_message"', marker.index + 1);
-    const footerOffset = html.slice(marker.index).search(/(?:data-testid=["']UFI2CommentsCount["']|<form\b|aria-label=["']Like["'])/i);
-    const nextFooter = footerOffset >= 0 ? marker.index + footerOffset : -1;
-    const hardEnd = nextMessage > marker.index ? nextMessage : -1;
-    const softEnd = nextFooter > marker.index ? nextFooter : -1;
-    const end = [hardEnd, softEnd, chunkStart + 8000].filter((n) => n > chunkStart).sort((a, b) => a - b)[0] || chunkStart + 8000;
-    candidates.push(html.slice(chunkStart, Math.min(html.length, end)));
-  }
-
-  const legacy = html.match(/<(?:div|span)[^>]+(?:userContent|post-message|post_message)[^>]*>([\s\S]*?)<\/(?:div|span)>/i)?.[0];
-  if (legacy) candidates.push(legacy);
-
-  for (const candidate of candidates) {
-    const cleaned = cleanFacebookCaption(stripHtml(candidate));
-    if (cleaned) return cleaned;
-  }
-  return null;
-}
-
-function readAttrNumber(tag: string, attr: string): number | null {
-  const escaped = attr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const value = tag.match(new RegExp(`\\s${escaped}=["']?(\\d+)`, 'i'))?.[1];
-  const num = value ? parseInt(value, 10) : NaN;
-  return Number.isFinite(num) && num > 0 ? num : null;
-}
-
-function isFacebookPlaceholderImage(url: string): boolean {
-  const lower = url.toLowerCase();
-  return lower.includes('/images/login/qrcodeloginpizza') || lower.includes('static.xx.fbcdn.net') || lower.includes('/rsrc.php/');
-}
-
-function extractFacebookPluginImage(html: string, baseUrl: string): string | null {
-  const images: Array<{ url: string; score: number }> = [];
-  const imgRegex = /<img\b[^>]*>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = imgRegex.exec(html)) !== null) {
-    const tag = match[0];
-    const raw =
-      tag.match(/\s(?:data-src|src)=['"]([^'"]+)['"]/i)?.[1] ||
-      tag.match(/\s(?:data-src|src)=([^\s>]+)/i)?.[1];
-    if (!raw) continue;
-    const resolved = resolveUrl(decodeHtmlEntities(raw).replace(/\\\//g, '/'), baseUrl);
-    if (!resolved) continue;
-    const lower = resolved.toLowerCase();
-    if ((!/(scontent|fbcdn)\./i.test(lower) && !lower.includes('scontent-')) || isFacebookPlaceholderImage(resolved)) continue;
-    if (!isLikelyRealContentImage(resolved)) continue;
-
-    const width = readAttrNumber(tag, 'width');
-    const height = readAttrNumber(tag, 'height');
-    const area = width && height ? width * height : 0;
-    let score = area;
-    if (/\/v\/t(?:39|45|51|15|1\.)/i.test(lower)) score += 10000;
-    if (lower.includes('_n.jpg') || lower.includes('_n.png') || lower.includes('_n.webp')) score += 5000;
-    if (lower.includes('p100x100') || lower.includes('s100x100') || lower.includes('cp0_dst')) score -= 20000;
-    images.push({ url: resolved, score });
-  }
-  images.sort((a, b) => b.score - a.score);
-  return images[0]?.url || null;
-}
-
-async function scrapeFacebookPlugin(url: string, fallbackUrl?: string): Promise<{ title: string | null; image: string | null; description: string | null; finalUrl: string }> {
-  const hrefs = [...new Set(([url, fallbackUrl].filter(Boolean) as string[]).flatMap(getFacebookPluginHrefs))];
-  const endpoints = hrefs.flatMap((href) => [
-    `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
-    `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
-  ]);
-
-  for (const pluginUrl of endpoints) {
-    try {
-      const response = await fetch(pluginUrl, {
-        redirect: 'follow',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-      });
-      if (!response.ok) continue;
-      const html = await response.text();
-      const meta = extractArticleMetadata(html, pluginUrl);
-      const caption = extractFacebookPluginCaption(html) || cleanFacebookCaption(meta.description);
-      const image = extractFacebookPluginImage(html, pluginUrl) || (meta.image && !isFacebookPlaceholderImage(meta.image) ? meta.image : null);
-      const title = cleanFacebookCaption(meta.title);
-      if (caption || image || title) {
-        return { title, image, description: caption, finalUrl: url };
-      }
-    } catch (error) {
-      console.log('[fetch-og] Facebook plugin scrape failed:', error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  return { title: null, image: null, description: null, finalUrl: url };
-}
-
-function normalizeFacebookPluginHref(raw: string): string {
-  try {
-    const parsed = new URL(raw);
-    if (/(^|\.)facebook\.com$/i.test(parsed.hostname)) {
-      parsed.searchParams.delete('rdid');
-      parsed.searchParams.delete('mibextid');
-      parsed.searchParams.delete('__cft__');
-      parsed.searchParams.delete('__tn__');
-    }
-    return parsed.toString();
-  } catch {
-    return raw;
-  }
-}
-
-function getFacebookPluginHrefs(raw: string): string[] {
-  const normalized = normalizeFacebookPluginHref(raw);
-  const candidates = [normalized];
-  try {
-    const parsed = new URL(normalized);
-    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return candidates;
-
-    let storyId = parsed.searchParams.get('story_fbid') || parsed.searchParams.get('fbid');
-    let pageId = parsed.searchParams.get('id');
-    const postId = parsed.searchParams.get('post_id');
-    if (postId?.includes('_')) {
-      const [postPageId, postStoryId] = postId.split('_');
-      pageId = pageId || postPageId;
-      storyId = storyId || postStoryId;
-    }
-    const pathPost = parsed.pathname.match(/^\/(\d+)\/posts\/(\d+)/i);
-    if (pathPost) {
-      pageId = pageId || pathPost[1];
-      storyId = storyId || pathPost[2];
-    }
-
-    if (storyId && pageId) {
-      candidates.push(`https://www.facebook.com/story.php?story_fbid=${encodeURIComponent(storyId)}&id=${encodeURIComponent(pageId)}`);
-      candidates.push(`https://www.facebook.com/permalink.php?story_fbid=${encodeURIComponent(storyId)}&id=${encodeURIComponent(pageId)}`);
-      candidates.push(`https://www.facebook.com/${encodeURIComponent(pageId)}/posts/${encodeURIComponent(storyId)}`);
-    }
-  } catch {
-    // keep normalized URL only
-  }
-  return candidates;
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -597,35 +359,6 @@ serve(async (req) => {
         }
       } catch (e) {
         console.log('[fetch-og] Spotify oEmbed failed, falling back to HTML');
-      }
-    }
-
-    if (urlLower.includes('facebook.com') || urlLower.includes('fb.watch') || urlLower.includes('fb.me')) {
-      let facebookUrl = targetUrl;
-      if (urlLower.includes('/share/') || urlLower.includes('fb.watch') || urlLower.includes('fb.me')) {
-        try {
-          const expanded = await fetch(targetUrl, {
-            method: 'GET',
-            redirect: 'follow',
-            headers: { 'User-Agent': 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)' },
-          });
-          facebookUrl = extractFacebookNextUrl(expanded.url) || expanded.url || targetUrl;
-        } catch (e) {
-          console.log('[fetch-og] Facebook expansion failed:', e instanceof Error ? e.message : String(e));
-        }
-      }
-
-      const pluginData = await scrapeFacebookPlugin(facebookUrl, targetUrl);
-      if (pluginData.title || pluginData.image || pluginData.description) {
-        console.log('[fetch-og] Facebook plugin success:', {
-          title: pluginData.title?.slice(0, 80),
-          hasImage: !!pluginData.image,
-          hasDescription: !!pluginData.description,
-        });
-        return new Response(
-          JSON.stringify({ ...pluginData, og_type: 'facebook' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
       }
     }
     
@@ -766,9 +499,9 @@ serve(async (req) => {
             console.log('[fetch-og] Twitter syndication success:', thumbnail?.substring(0, 60));
             return new Response(
               JSON.stringify({ 
-                title: tweet.user?.name ? `@${tweet.user.screen_name}` : 'X', 
+                title: tweet.text?.substring(0, 100) || 'Tweet', 
                 image: thumbnail, 
-                description: tweet.text?.substring(0, 4000) || '',
+                description: tweet.user?.name ? `@${tweet.user.screen_name}` : 'View on X',
                 finalUrl: targetUrl 
               }),
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
