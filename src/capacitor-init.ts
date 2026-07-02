@@ -20,11 +20,37 @@ export async function initCapacitorPlugins() {
   };
 
   const originalWindowOpen = window.open.bind(window);
+  // Hosts of embedded content whose in-iframe popups (LinkedIn video player,
+  // Facebook lightboxes, IG image viewer, etc.) MUST NOT be redirected to the
+  // native app — otherwise tapping "Play" inside these embeds kicks the user
+  // out of Aelixto. Only user-initiated <a target="_blank"> and openExternalUrl
+  // calls should reach the native browser/app.
+  const EMBED_HOSTS = [
+    "linkedin.com",
+    "www.linkedin.com",
+    "facebook.com",
+    "www.facebook.com",
+    "m.facebook.com",
+    "instagram.com",
+    "www.instagram.com",
+    "tiktok.com",
+    "www.tiktok.com",
+    "twitter.com",
+    "x.com",
+    "threads.net",
+    "threads.com",
+  ];
+  const isEmbedHost = (host: string) => EMBED_HOSTS.some((h) => host === h || host.endsWith("." + h));
+
   window.open = ((url?: string | URL, target?: string, features?: string) => {
     if (url) {
       try {
         const next = new URL(String(url), window.location.href);
-        if ((next.protocol === "http:" || next.protocol === "https:") && next.origin !== window.location.origin) {
+        if (
+          (next.protocol === "http:" || next.protocol === "https:") &&
+          next.origin !== window.location.origin &&
+          !isEmbedHost(next.hostname)
+        ) {
           void openNativeExternal(next.href);
           return null;
         }
