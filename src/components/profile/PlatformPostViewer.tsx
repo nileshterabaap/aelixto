@@ -98,13 +98,12 @@ export const PlatformPostViewer = ({
     },
   });
   const [portalReady, setPortalReady] = useState(false);
-  // Gate the inner content for one paint so the modal's enter animation
-  // (opacity/scale) always plays visibly — otherwise, when profile + posts
-  // are cached, content commits on the same frame as the modal mounts and
-  // the user perceives an instant jump with no transition.
-  const [contentReady, setContentReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  // Fires exactly once when the tapped target post is first attached to
+  // the DOM — used to synchronously scroll the container to that post
+  // BEFORE the browser paints, so post #0 never flashes.
+  const initialAnchorDoneRef = useRef(false);
   // Persist scroll-locked state across effect re-runs. Without this, if
   // `posts`/`profileData`/etc change after the user has already started
   // scrolling, the anchoring effect re-runs with userScrolled=false and
@@ -115,6 +114,7 @@ export const PlatformPostViewer = ({
   // (e.g. user tapped a different grid item).
   useEffect(() => {
     userScrolledRef.current = false;
+    initialAnchorDoneRef.current = false;
   }, [initialPostId]);
   const initialIdx = useMemo(
     () => {
@@ -140,16 +140,10 @@ export const PlatformPostViewer = ({
     };
   }, []);
 
-  // Reveal content shortly after mount so the entry animation always plays.
-  useEffect(() => {
-    const t = window.setTimeout(() => setContentReady(true), 180);
-    return () => window.clearTimeout(t);
-  }, []);
-
   // Anchor scroll to the tapped post and keep it anchored while posts above
   // hydrate. Stops anchoring once the user scrolls.
   useLayoutEffect(() => {
-    if (!portalReady || !contentReady || !targetPostId || !profileData) return;
+    if (!portalReady || !targetPostId) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -253,7 +247,7 @@ export const PlatformPostViewer = ({
       container.removeEventListener("scroll", onScroll);
       container.removeEventListener("load", onAnyLoad, true);
     };
-  }, [portalReady, contentReady, targetPostId, posts, initialIdx, activeTab, profileData]);
+  }, [portalReady, targetPostId, posts, initialIdx, activeTab]);
 
   // Mark all visible posts as seen when viewing profile posts
   useEffect(() => {
@@ -290,10 +284,10 @@ export const PlatformPostViewer = ({
 
   const currentTab = tabs.find(t => t.key === activeTab);
 
-  // Gate post rendering until profile is loaded so the author header never
-  // flashes "Unknown". Also wait for one paint after mount so the modal's
-  // enter animation has a chance to play (otherwise cached opens look instant).
-  const profileReady = !!profileData && contentReady;
+  // Render immediately — the profile header hydrates async without gating
+  // the tapped post. Waiting on `profileData` used to delay first paint by
+  // hundreds of ms and caused the "wrong post opens" bug on cold taps.
+  const profileReady = true;
 
   const viewer = (
     <motion.div
