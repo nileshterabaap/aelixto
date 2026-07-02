@@ -104,6 +104,16 @@ export const PlatformPostViewer = ({
   // the DOM — used to synchronously scroll the container to that post
   // BEFORE the browser paints, so post #0 never flashes.
   const initialAnchorDoneRef = useRef(false);
+  // Hide the tapped target post until its first iframe/image has fully
+  // loaded so users don't see a 1-frame flash of an unhydrated embed
+  // (most noticeable on Instagram). Falls back after 700ms so slow
+  // embeds never leave the post invisible.
+  const [targetReady, setTargetReady] = useState(false);
+  useEffect(() => {
+    setTargetReady(false);
+    const t = window.setTimeout(() => setTargetReady(true), 700);
+    return () => window.clearTimeout(t);
+  }, [initialPostId]);
   // Persist scroll-locked state across effect re-runs. Without this, if
   // `posts`/`profileData`/etc change after the user has already started
   // scrolling, the anchoring effect re-runs with userScrolled=false and
@@ -393,10 +403,36 @@ export const PlatformPostViewer = ({
                         container.scrollTop + (targetRect.top - containerRect.top);
                       initialAnchorDoneRef.current = true;
                     }
+                    // Reveal the target post as soon as its first iframe
+                    // or image has loaded — kills the tap-flicker on
+                    // Instagram / Facebook / LinkedIn embeds.
+                    const reveal = () => setTargetReady(true);
+                    const scan = () => {
+                      const media = el.querySelector("iframe, img") as HTMLIFrameElement | HTMLImageElement | null;
+                      if (!media) return false;
+                      if ((media as HTMLImageElement).complete) {
+                        reveal();
+                        return true;
+                      }
+                      media.addEventListener("load", reveal, { once: true });
+                      return true;
+                    };
+                    if (!scan()) {
+                      const mo = new MutationObserver(() => {
+                        if (scan()) mo.disconnect();
+                      });
+                      mo.observe(el, { childList: true, subtree: true });
+                      window.setTimeout(() => mo.disconnect(), 1500);
+                    }
                   }
                 }}
-                initial={{ opacity: 0, y: 6 }}
+                initial={post.id === targetPostId ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
+                style={
+                  post.id === targetPostId && !targetReady
+                    ? { opacity: 0 }
+                    : undefined
+                }
                 transition={{
                   duration: 0.28,
                   delay: Math.min(Math.abs(idx - initialIdx), 4) * 0.04,
