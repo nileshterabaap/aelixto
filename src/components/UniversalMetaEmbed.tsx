@@ -411,10 +411,12 @@ const LinkedInIframeEmbed = ({
   src,
   postId,
   suggestedHeight,
+  expandedUrl,
 }: {
   src: string;
   postId?: string | null;
   suggestedHeight?: number | null;
+  expandedUrl?: string;
 }) => {
   const [height, setHeight] = useState(() =>
     suggestedHeight && suggestedHeight >= LI_MIN_HEIGHT
@@ -460,6 +462,7 @@ const LinkedInIframeEmbed = ({
           display: 'block',
         }}
       />
+      {expandedUrl && <OpenOriginalPill url={expandedUrl} label="Open on LinkedIn" />}
     </div>
   );
 };
