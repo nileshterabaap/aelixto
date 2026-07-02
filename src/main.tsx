@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { initCapacitorPlugins } from "./capacitor-init";
+import { supabase } from "./integrations/supabase/client";
 
 const unregisterAppServiceWorkers = async () => {
   if (!("serviceWorker" in navigator)) return;
@@ -41,10 +42,25 @@ void unregisterAppServiceWorkers();
 
 createRoot(document.getElementById("root")!).render(<App />);
 
-// Dismiss splash after a brief delay to ensure first paint
-requestAnimationFrame(() => {
+// Keep the splash screen visible until Supabase has probed the local
+// session. Otherwise React commits with `user=null`, `Index` bounces to
+// `/auth`, and the user sees a 1-2s flash of the signup form before
+// re-navigating home. Hard-cap the wait at 1200ms so a stalled probe never
+// leaves the splash stuck.
+const dismissSplashAfterSessionProbe = async () => {
+  try {
+    await Promise.race([
+      supabase.auth.getSession(),
+      new Promise((resolve) => setTimeout(resolve, 1200)),
+    ]);
+  } catch {
+    /* ignore — splash still dismisses below */
+  }
   requestAnimationFrame(() => {
-    dismissSplash();
-    initCapacitorPlugins();
+    requestAnimationFrame(() => {
+      dismissSplash();
+      initCapacitorPlugins();
+    });
   });
-});
+};
+void dismissSplashAfterSessionProbe();

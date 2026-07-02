@@ -23,6 +23,8 @@ export const localStoragePersister = createSyncStoragePersister({
                  key === 'user-profile' ||
                  key === 'user-platform-tabs' ||
                  key === 'platform-posts' ||
+                 key === 'viewer-profile' ||
+                 key === 'my-following-count' ||
                  key === 'saved-posts' ||
                  key === 'collections' ||
                  key === 'post-drafts';

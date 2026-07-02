@@ -6,6 +6,29 @@ import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { openExternalUrl } from '@/lib/openExternalUrl';
 
+/**
+ * Small pill-shaped overlay button rendered on top of an embed iframe so
+ * the user can always open the original post on its source platform, even
+ * when the iframe swallows every tap. Positioned so it never covers the
+ * platform's native Play button (top-right corner).
+ */
+const OpenOriginalPill = ({ url, label }: { url: string; label: string }) => {
+  if (!url) return null;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        void openExternalUrl(url);
+      }}
+      className="absolute top-2 right-2 z-10 rounded-full bg-black/55 backdrop-blur-sm text-white text-[11px] font-medium px-2.5 py-1 shadow-sm active:scale-95 transition-transform pointer-events-auto"
+      aria-label={label}
+    >
+      {label}
+    </button>
+  );
+};
+
 const THREADS_MIN_HEIGHT = 220;
 const THREADS_MAX_HEIGHT = 1400;
 const THREADS_DEFAULT_HEIGHT = 280;
@@ -182,10 +205,12 @@ const InstagramIframeEmbed = ({
   src,
   postId,
   suggestedHeight,
+  expandedUrl,
 }: {
   src: string;
   postId?: string | null;
   suggestedHeight?: number | null;
+  expandedUrl?: string;
 }) => {
   const [visible, setVisible] = useState(() => {
     // Older saved Instagram heights may have come from /embed/captioned/ and
@@ -242,6 +267,7 @@ const InstagramIframeEmbed = ({
           display: 'block',
         }}
       />
+      {expandedUrl && <OpenOriginalPill url={expandedUrl} label="Open on Instagram" />}
     </div>
   );
 };
@@ -266,25 +292,11 @@ const FacebookIframeEmbed = ({
   const [failed, setFailed] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
-  const lastTapRef = useRef<number>(0);
-
-  // Cross-origin iframe taps can't be observed directly, but tapping the
-  // iframe steals focus from the window. Detect two rapid focus-steals as a
-  // double tap → open original. Single tap still pauses/resumes natively.
-  useEffect(() => {
-    const onBlur = () => {
-      if (document.activeElement !== iframeRef.current) return;
-      const now = Date.now();
-      if (now - lastTapRef.current < 400 && now - lastTapRef.current > 0) {
-        void openExternalUrl(expandedUrl);
-        lastTapRef.current = 0;
-        return;
-      }
-      lastTapRef.current = now;
-    };
-    window.addEventListener('blur', onBlur);
-    return () => window.removeEventListener('blur', onBlur);
-  }, [expandedUrl]);
+  // Unified interaction: tap the iframe's Play region plays the video
+  // natively. To open the original post, the user taps the "Open on
+  // Facebook" pill overlay rendered outside the iframe. No focus-steal
+  // detection or double-tap-to-open — those were inconsistent and hijacked
+  // the play button on some devices.
 
   const srcMatch = html.match(/src="([^"]+)"/);
   const iframeSrc = srcMatch ? srcMatch[1] : '';
@@ -361,8 +373,6 @@ const FacebookIframeEmbed = ({
         height: `${Math.max(MIN_HEIGHT, height - FB_FOOTER_TRIM)}px`,
       }}
     >
-      {/* Transparent overlay catches double-tap to open original; single taps
-          pass through to the iframe so pause/resume continues to work. */}
       <iframe
         ref={iframeRef}
         src={iframeSrc}
@@ -383,6 +393,7 @@ const FacebookIframeEmbed = ({
           display: 'block',
         }}
       />
+      <OpenOriginalPill url={expandedUrl} label="Open on Facebook" />
     </div>
   );
 };
@@ -400,10 +411,12 @@ const LinkedInIframeEmbed = ({
   src,
   postId,
   suggestedHeight,
+  expandedUrl,
 }: {
   src: string;
   postId?: string | null;
   suggestedHeight?: number | null;
+  expandedUrl?: string;
 }) => {
   const [height, setHeight] = useState(() =>
     suggestedHeight && suggestedHeight >= LI_MIN_HEIGHT
@@ -449,6 +462,7 @@ const LinkedInIframeEmbed = ({
           display: 'block',
         }}
       />
+      {expandedUrl && <OpenOriginalPill url={expandedUrl} label="Open on LinkedIn" />}
     </div>
   );
 };
@@ -997,6 +1011,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             src={iframeSrc}
             postId={postId}
             suggestedHeight={suggestedHeight}
+            expandedUrl={expandedUrl}
           />
         );
       }
@@ -1021,6 +1036,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             src={iframeSrc}
             postId={postId}
             suggestedHeight={suggestedHeight}
+            expandedUrl={expandedUrl}
           />
         );
       }
