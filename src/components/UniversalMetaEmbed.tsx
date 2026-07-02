@@ -1011,6 +1011,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             src={iframeSrc}
             postId={postId}
             suggestedHeight={suggestedHeight}
+            expandedUrl={expandedUrl}
           />
         );
       }
@@ -1035,6 +1036,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             src={iframeSrc}
             postId={postId}
             suggestedHeight={suggestedHeight}
+            expandedUrl={expandedUrl}
           />
         );
       }
