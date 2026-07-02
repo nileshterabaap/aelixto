@@ -1,31 +1,23 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQueryClient } from "@tanstack/react-query";
 
 interface UseFollowOptions {
   /** Seed the initial follow state so the UI doesn't flicker while the
    *  network round-trip resolves. Pass the value from a list query
    *  (e.g. search_profiles.is_following). */
   initialIsFollowing?: boolean;
-  initialIsRequested?: boolean;
-  initialFollowsMe?: boolean;
   /** Skip the initial network refresh entirely. Use when the caller
    *  already has authoritative data and only needs follow/unfollow
    *  mutations + counts on demand. */
   skipInitialRefresh?: boolean;
-  enableRealtime?: boolean;
 }
 
 export function useFollow(targetUserId?: string, options: UseFollowOptions = {}) {
-  const { initialIsFollowing, initialIsRequested, initialFollowsMe, skipInitialRefresh, enableRealtime = !skipInitialRefresh } = options;
-  const queryClient = useQueryClient();
+  const { initialIsFollowing, skipInitialRefresh } = options;
   const [loading, setLoading] = useState(false);
   const [isFollowing, setIsFollowing] = useState<boolean | null>(
     initialIsFollowing ?? null
   );
-  const [isRequested, setIsRequested] = useState<boolean>(false);
-  const [followsMe, setFollowsMe] = useState<boolean>(initialFollowsMe ?? false);
-  const realtimeChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const [counts, setCounts] = useState<{ followers: number; following: number }>({ 
     followers: 0, 
     following: 0 
@@ -51,8 +43,6 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
 
       // Check if current user follows this profile
       let myFollow = null;
-      let myRequest = null;
-      let theirFollow = null;
       if (user) {
         const { data } = await supabase
           .from("follows")
@@ -61,20 +51,6 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
           .eq("following_id", targetUserId)
           .maybeSingle();
         myFollow = data;
-        const { data: reqRow } = await supabase
-          .from("follow_requests")
-          .select("id")
-          .eq("requester_id", user.id)
-          .eq("target_id", targetUserId)
-          .maybeSingle();
-        myRequest = reqRow;
-        const { data: backRow } = await supabase
-          .from("follows")
-          .select("id")
-          .eq("follower_id", targetUserId)
-          .eq("following_id", user.id)
-          .maybeSingle();
-        theirFollow = backRow;
       }
 
       setCounts({
@@ -82,8 +58,6 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
         following: followingCount ?? 0,
       });
       setIsFollowing(!!myFollow);
-      setIsRequested(!!myRequest && !myFollow);
-      setFollowsMe(!!theirFollow);
     } catch (error) {
       console.error("Error refreshing follow data:", error);
     }
@@ -94,44 +68,8 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
     refresh();
   }, [refresh, skipInitialRefresh]);
 
-  useEffect(() => {
-    setIsFollowing(initialIsFollowing ?? null);
-    setIsRequested(initialIsRequested ?? false);
-    setFollowsMe(initialFollowsMe ?? false);
-  }, [initialIsFollowing, initialIsRequested, initialFollowsMe, targetUserId]);
-
-  useEffect(() => {
-    if (!targetUserId || !enableRealtime) return;
-    let cancelled = false;
-
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (cancelled) return;
-      const currentUserId = user?.id;
-      if (!currentUserId) return;
-
-      const channel = supabase
-        .channel(`follow-state-${currentUserId}-${targetUserId}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'follows', filter: `follower_id=eq.${currentUserId}` }, refresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'follows', filter: `following_id=eq.${currentUserId}` }, refresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_requests', filter: `requester_id=eq.${currentUserId}` }, refresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'follow_requests', filter: `target_id=eq.${currentUserId}` }, refresh)
-        .subscribe();
-
-      realtimeChannelRef.current = channel;
-    });
-
-    return () => {
-      cancelled = true;
-      const channel = realtimeChannelRef.current;
-      if (channel) {
-        supabase.removeChannel(channel);
-        realtimeChannelRef.current = null;
-      }
-    };
-  }, [enableRealtime, refresh, targetUserId]);
-
   const follow = useCallback(async () => {
-    if (!targetUserId || isFollowing || isRequested) return;
+    if (!targetUserId || isFollowing) return;
     setLoading(true);
     
     try {
@@ -141,32 +79,28 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
         return;
       }
 
-      const { data, error } = await supabase.rpc("request_or_follow", { _target: targetUserId });
+      // Optimistic update
+      setIsFollowing(true);
+      setCounts(prev => ({ ...prev, followers: prev.followers + 1 }));
+
+      const { error } = await supabase
+        .from("follows")
+        .insert({ follower_id: user.id, following_id: targetUserId });
+      
       if (error) throw error;
-      const result = (data as string) || "";
-      if (result === "requested") {
-        setIsRequested(true);
-        setIsFollowing(false);
-      } else if (result === "following") {
-        setIsFollowing(true);
-        setIsRequested(false);
-        setCounts(prev => ({ ...prev, followers: prev.followers + 1 }));
-      }
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["notification-count"] });
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
-      queryClient.invalidateQueries({ queryKey: ["user-search"] });
       await refresh();
     } catch (error) {
       console.error("Error following:", error);
+      // Revert optimistic update
+      setIsFollowing(false);
+      setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
     } finally {
       setLoading(false);
     }
-  }, [targetUserId, isFollowing, isRequested, refresh, queryClient]);
+  }, [targetUserId, isFollowing, refresh]);
 
   const unfollow = useCallback(async () => {
-    if (!targetUserId || (!isFollowing && !isRequested)) return;
+    if (!targetUserId || !isFollowing) return;
     setLoading(true);
     
     try {
@@ -176,27 +110,27 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
         return;
       }
 
-      const wasFollowing = isFollowing;
+      // Optimistic update
       setIsFollowing(false);
-      setIsRequested(false);
-      if (wasFollowing) {
-        setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
-      }
+      setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
 
-      const { error } = await supabase.rpc("cancel_follow_or_request", { _target: targetUserId });
+      const { error } = await supabase
+        .from("follows")
+        .delete()
+        .eq("follower_id", user.id)
+        .eq("following_id", targetUserId);
+      
       if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["notification-count"] });
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
-      queryClient.invalidateQueries({ queryKey: ["user-search"] });
       await refresh();
     } catch (error) {
       console.error("Error unfollowing:", error);
+      // Revert optimistic update
+      setIsFollowing(true);
+      setCounts(prev => ({ ...prev, followers: prev.followers + 1 }));
     } finally {
       setLoading(false);
     }
-  }, [targetUserId, isFollowing, isRequested, refresh, queryClient]);
+  }, [targetUserId, isFollowing, refresh]);
 
-  return { isFollowing, isRequested, followsMe, follow, unfollow, loading, counts, refresh };
+  return { isFollowing, follow, unfollow, loading, counts, refresh };
 }

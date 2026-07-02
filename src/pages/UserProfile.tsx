@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { formatCompactCount } from "@/lib/formatCount";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
@@ -55,10 +54,11 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
     },
   });
 
-  const { isFollowing, isRequested, followsMe, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
+  const { isFollowing, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
+  const [isFollowedByTarget, setIsFollowedByTarget] = useState(false);
 
   const isPrivate = !!(profile?.settings as { is_private?: boolean } | null)?.is_private;
   const canViewPosts = !isPrivate || isMe || isFollowing;
@@ -114,6 +114,19 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const contentReady = !!profile && !tabsLoading && coverReady && avatarReady;
   const showSkeleton = !contentReady;
 
+  // Check if the target user follows the current user
+  useEffect(() => {
+    if (!user || !profile?.user_id || isMe) return;
+    setIsFollowedByTarget(false);
+    supabase
+      .from("follows")
+      .select("id")
+      .eq("follower_id", profile.user_id)
+      .eq("following_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => setIsFollowedByTarget(!!data));
+  }, [user, profile?.user_id, isMe]);
+
   const handleRefresh = useCallback(async () => {
     await Promise.all([refetchProfile(), refreshFollow()]);
   }, [refetchProfile, refreshFollow]);
@@ -139,7 +152,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
         style={{ opacity: showSkeleton ? 1 : 0 }}
       >
         <div className="mx-auto max-w-2xl">
-          <div className="relative h-[400px] profile-cover-fallback animate-shimmer" />
+          <div className="relative h-[400px] bg-gradient-to-r from-purple-500/20 to-pink-500/20 animate-shimmer" />
           <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
             <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
               <div className="text-center flex-shrink-0 w-20 -ml-2">
@@ -187,7 +200,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
       <PullToRefresh onRefresh={handleRefresh}>
       <main className="mx-auto max-w-2xl">
         {/* Cover Image with Header Overlay */}
-        <div className="relative h-[400px] profile-cover-fallback">
+        <div className="relative h-[400px] bg-gradient-to-r from-purple-500 to-pink-500">
           {profile.cover_url && (
             <img
               src={profile.cover_url}
@@ -227,9 +240,10 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                   targetUserId={profile.user_id}
                   username={profile.username}
                   displayName={profile.display_name}
-                  isFollowedByTarget={followsMe}
+                  isFollowedByTarget={isFollowedByTarget}
                   onBlocked={() => navigate('/')}
                   onRemovedFollower={() => {
+                    setIsFollowedByTarget(false);
                     refreshFollow();
                   }}
                 />
@@ -273,7 +287,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           {(profile.settings as { aelix_score_enabled?: boolean })?.aelix_score_enabled && (
             <div className="flex justify-center mt-4 mb-4">
               <div className="border-2 border-foreground rounded-[16px] px-10 py-2">
-                <div className="text-2xl font-bold text-center leading-none mb-0.5">{formatCompactCount(profile.aelix_score)}</div>
+                <div className="text-2xl font-bold text-center leading-none mb-0.5">{profile.aelix_score.toLocaleString()}</div>
                 <div className="text-[9px] font-bold text-center tracking-[0.15em] uppercase">Aelix Score</div>
               </div>
             </div>
@@ -293,7 +307,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           {!isMe && user && mutualsData && mutualsData.length > 0 && (
             <p className="text-center text-sm text-muted-foreground mb-4 px-4">
               {(() => {
-                const followersVis = getFollowVisibility((profile?.settings as Record<string, unknown>) || null, "followers");
+                const followersVis = getFollowVisibility((profile?.settings as Record<string, any>) || null, "followers");
                 const total = mutualsData[0]?.total_count ?? mutualsData.length;
                 if (followersVis === "no_one") {
                   return `Followed by ${total} mutual${total !== 1 ? "s" : ""}`;
@@ -324,14 +338,14 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             <div className="flex gap-3 mb-6">
               <Button 
                 disabled={followLoading}
-                onClick={() => ((isFollowing || isRequested) ? unfollow() : follow())}
+                onClick={() => (isFollowing ? unfollow() : follow())}
                 className={`flex-1 rounded-full py-4 text-sm font-bold border-2 ${
-                  (isFollowing || isRequested)
+                  isFollowing 
                     ? 'bg-foreground text-background hover:bg-foreground/90' 
                     : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
               >
-                {isFollowing ? 'Following' : isRequested ? 'Asked' : followsMe ? 'Follow Back' : 'Follow'}
+                {isFollowing ? 'Following' : 'Follow'}
               </Button>
               <Button
                 disabled={conversationLoading}

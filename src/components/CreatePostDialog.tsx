@@ -9,11 +9,6 @@ import { ArrowLeft, Link2, Loader2, Sparkles, X, Check } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
-import {
-  extractRootDomain,
-  getDomainOverride,
-  recordDomainClassification,
-} from "@/lib/domainClassification";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 
@@ -85,22 +80,18 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           }
         }
       } else if (linkUrl.includes("reddit.com") || linkUrl.includes("redd.it")) {
-        // Reddit's og:image is frequently the generic orange logo
-        // (share.redd.it/preview/post/...). Use fetch-post-preview which
-        // pulls the real post thumbnail from Reddit's JSON API so the
-        // create-time preview and the saved post both render the actual
-        // media instead of a typographic fallback.
-        console.log('[CreatePostDialog] Fetching Reddit preview via fetch-post-preview');
+        console.log('[CreatePostDialog] Fetching Reddit thumbnail via edge function');
         try {
-          const { data: previewData, error } = await supabase.functions.invoke('fetch-post-preview', {
-            body: { url: linkUrl, platform: 'reddit', previewOnly: true }
+          const { data: ogData, error } = await supabase.functions.invoke('fetch-og', {
+            body: { url: linkUrl }
           });
-          if (!error && previewData) {
-            videoTitle = previewData.title || "";
-            thumbnail = previewData.thumbnail_url || "";
+          if (!error && ogData) {
+            videoTitle = ogData.title || "";
+            thumbnail = ogData.image || "";
+            if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
           }
         } catch (error) {
-          console.error('[CreatePostDialog] Reddit preview fetch failed:', error);
+          console.error('[CreatePostDialog] Reddit fetch failed:', error);
         }
       } else if (linkUrl.includes("instagram.com") || linkUrl.includes("facebook.com") || linkUrl.includes("fb.watch") || linkUrl.includes("fb.me")) {
         const platform = linkUrl.includes("instagram.com") ? "instagram" : "facebook";
@@ -242,53 +233,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
   };
 
-  const promptSectionFeedback = (
-    postId: string | undefined,
-    url: string,
-    currentType: "article" | "external"
-  ) => {
-    if (!postId) return;
-    const domain = extractRootDomain(url);
-    if (!domain) return;
-    const otherType: "article" | "external" =
-      currentType === "article" ? "external" : "article";
-    const otherLabel = otherType === "article" ? "Articles" : "External";
-    const currentLabel = currentType === "article" ? "Articles" : "External";
-
-    const id = toast(
-      `Posted to ${currentLabel}. Wrong section?`,
-      {
-        description: `Move it to ${otherLabel} — Aelixto will remember ${domain} for next time.`,
-        duration: 12000,
-        action: {
-          label: `Move to ${otherLabel}`,
-          onClick: async () => {
-            try {
-              const { error } = await supabase
-                .from("posts")
-                .update({ platform: otherType })
-                .eq("id", postId);
-              if (error) throw error;
-              await recordDomainClassification(domain, otherType);
-              toast.success(`Moved to ${otherLabel}. Aelixto will remember.`);
-            } catch (e: any) {
-              toast.error(e?.message || "Couldn't move the post.");
-            }
-          },
-        },
-        cancel: {
-          label: "Keep here",
-          onClick: async () => {
-            // Confirming the current placement also teaches the system.
-            try { await recordDomainClassification(domain, currentType); } catch {}
-          },
-        },
-      }
-    );
-    return id;
-  };
-
-  const handlePost = async () => {
+  const handlePost = () => {
     if (!linkUrl.trim()) return;
 
     if (limitReached) {
@@ -297,15 +242,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
 
     // Use centralised classification
-    let platform = classifyUrl(linkUrl, ogType);
-
-    // Apply user-learned override for unknown sites (article vs external).
-    if (platform === "article" || platform === "external") {
-      const domain = extractRootDomain(linkUrl);
-      const override = await getDomainOverride(domain);
-      if (override) platform = override;
-    }
-
+    const platform = classifyUrl(linkUrl, ogType);
     const mediaType = deriveMediaType(linkUrl, platform);
 
     // Final safety net — never publish a card with nothing to show.
@@ -351,11 +288,8 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
     }, {
-      onSuccess: (created: any) => {
+      onSuccess: () => {
         incrementDailyCount();
-        if (platform === "article" || platform === "external") {
-          promptSectionFeedback(created?.id, linkUrl, platform);
-        }
       },
     });
 

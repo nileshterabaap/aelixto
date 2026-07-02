@@ -280,30 +280,6 @@ export type Database = {
         }
         Relationships: []
       }
-      domain_classifications: {
-        Row: {
-          content_type: string
-          domain: string
-          updated_at: string
-          updated_by: string | null
-          vote_count: number
-        }
-        Insert: {
-          content_type: string
-          domain: string
-          updated_at?: string
-          updated_by?: string | null
-          vote_count?: number
-        }
-        Update: {
-          content_type?: string
-          domain?: string
-          updated_at?: string
-          updated_by?: string | null
-          vote_count?: number
-        }
-        Relationships: []
-      }
       email_send_log: {
         Row: {
           created_at: string
@@ -388,27 +364,6 @@ export type Database = {
           id?: string
           token?: string
           used_at?: string | null
-        }
-        Relationships: []
-      }
-      follow_requests: {
-        Row: {
-          created_at: string
-          id: string
-          requester_id: string
-          target_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          requester_id: string
-          target_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          requester_id?: string
-          target_id?: string
         }
         Relationships: []
       }
@@ -1141,10 +1096,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      cancel_follow_or_request: {
-        Args: { _target: string }
-        Returns: undefined
-      }
       create_short_link: { Args: { p_target_path: string }; Returns: string }
       delete_email: {
         Args: { message_id: number; queue_name: string }
@@ -1159,7 +1110,6 @@ export type Database = {
       get_following_feed: {
         Args: { cursor?: string; limit_count: number }
         Returns: {
-          aspect_ratio: number
           comments_count: number
           content: string
           created_at: string
@@ -1168,7 +1118,6 @@ export type Database = {
           is_public: boolean
           is_repost: boolean
           likes_count: number
-          media_kind: string
           media_type: string
           media_url: string
           platform: string
@@ -1177,93 +1126,19 @@ export type Database = {
           preview_title: string
           profile_avatar_url: string
           profile_display_name: string
+          profile_id: string
           profile_username: string
+          reposted_at: string
           reposted_by_user_id: string
           reposted_by_username: string
           reposts_count: number
           saves_count: number
-          suggested_height: number
           thumbnail_url: string
           title: string
           user_id: string
         }[]
       }
-      get_following_feed_v2:
-        | {
-            Args: { cursor_key?: string; limit_count: number }
-            Returns: {
-              aspect_ratio: number
-              comments_count: number
-              content: string
-              created_at: string
-              embed_html: string
-              feed_cursor: string
-              id: string
-              is_public: boolean
-              is_repost: boolean
-              likes_count: number
-              media_kind: string
-              media_type: string
-              media_url: string
-              platform: string
-              preview_image_url: string
-              preview_text: string
-              preview_title: string
-              profile_avatar_url: string
-              profile_display_name: string
-              profile_id: string
-              profile_username: string
-              reposted_at: string
-              reposted_by_user_id: string
-              reposted_by_username: string
-              reposts_count: number
-              saves_count: number
-              suggested_height: number
-              thumbnail_url: string
-              title: string
-              user_id: string
-            }[]
-          }
-        | {
-            Args: {
-              cursor_key?: string
-              limit_count: number
-              refresh_seed?: string
-            }
-            Returns: {
-              aspect_ratio: number
-              comments_count: number
-              content: string
-              created_at: string
-              embed_html: string
-              feed_cursor: string
-              id: string
-              is_public: boolean
-              is_repost: boolean
-              likes_count: number
-              media_kind: string
-              media_type: string
-              media_url: string
-              platform: string
-              preview_image_url: string
-              preview_text: string
-              preview_title: string
-              profile_avatar_url: string
-              profile_display_name: string
-              profile_id: string
-              profile_username: string
-              reposted_at: string
-              reposted_by_user_id: string
-              reposted_by_username: string
-              reposts_count: number
-              saves_count: number
-              suggested_height: number
-              thumbnail_url: string
-              title: string
-              user_id: string
-            }[]
-          }
-      get_following_feed_v3: {
+      get_following_feed_v2: {
         Args: { cursor_key?: string; limit_count: number }
         Returns: {
           aspect_ratio: number
@@ -1352,7 +1227,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      has_unseen_following_feed_posts: { Args: never; Returns: boolean }
       is_conversation_participant: {
         Args: { _conversation_id: string; _user_id: string }
         Returns: boolean
@@ -1374,168 +1248,13 @@ export type Database = {
           read_ct: number
         }[]
       }
-      record_domain_classification: {
-        Args: { _content_type: string; _domain: string }
-        Returns: undefined
-      }
-      refresh_following_feed: {
-        Args: { limit_count: number; seen_post_ids?: string[] }
-        Returns: {
-          comments_count: number
-          content: string
-          created_at: string
-          embed_html: string
-          id: string
-          is_public: boolean
-          is_repost: boolean
-          likes_count: number
-          media_type: string
-          media_url: string
-          platform: string
-          preview_image_url: string
-          preview_text: string
-          preview_title: string
-          profile_avatar_url: string
-          profile_display_name: string
-          profile_id: string
-          profile_username: string
-          reposted_at: string
-          reposted_by_user_id: string
-          reposted_by_username: string
-          reposts_count: number
-          saves_count: number
-          thumbnail_url: string
-          title: string
-          user_id: string
-        }[]
-      }
-      refresh_following_feed_v1: {
-        Args: { limit_count: number; seen_post_ids?: string[] }
-        Returns: {
-          aspect_ratio: number
-          comments_count: number
-          content: string
-          created_at: string
-          embed_html: string
-          feed_cursor: string
-          id: string
-          is_public: boolean
-          is_repost: boolean
-          likes_count: number
-          media_kind: string
-          media_type: string
-          media_url: string
-          platform: string
-          preview_image_url: string
-          preview_text: string
-          preview_title: string
-          profile_avatar_url: string
-          profile_display_name: string
-          profile_id: string
-          profile_username: string
-          reposted_at: string
-          reposted_by_user_id: string
-          reposted_by_username: string
-          reposts_count: number
-          saves_count: number
-          suggested_height: number
-          thumbnail_url: string
-          title: string
-          user_id: string
-        }[]
-      }
-      refresh_following_feed_v2: {
-        Args: {
-          limit_count: number
-          seen_post_ids?: string[]
-          since_time?: string
-        }
-        Returns: {
-          aspect_ratio: number
-          comments_count: number
-          content: string
-          created_at: string
-          embed_html: string
-          feed_cursor: string
-          id: string
-          is_public: boolean
-          is_repost: boolean
-          likes_count: number
-          media_kind: string
-          media_type: string
-          media_url: string
-          platform: string
-          preview_image_url: string
-          preview_text: string
-          preview_title: string
-          profile_avatar_url: string
-          profile_display_name: string
-          profile_id: string
-          profile_username: string
-          reposted_at: string
-          reposted_by_user_id: string
-          reposted_by_username: string
-          reposts_count: number
-          saves_count: number
-          suggested_height: number
-          thumbnail_url: string
-          title: string
-          user_id: string
-        }[]
-      }
-      refresh_following_feed_v3: {
-        Args: {
-          limit_count: number
-          seen_post_ids?: string[]
-          since_time?: string
-        }
-        Returns: {
-          aspect_ratio: number
-          comments_count: number
-          content: string
-          created_at: string
-          embed_html: string
-          feed_cursor: string
-          id: string
-          is_public: boolean
-          is_repost: boolean
-          likes_count: number
-          media_kind: string
-          media_type: string
-          media_url: string
-          platform: string
-          preview_image_url: string
-          preview_text: string
-          preview_title: string
-          profile_avatar_url: string
-          profile_display_name: string
-          profile_id: string
-          profile_username: string
-          reposted_at: string
-          reposted_by_user_id: string
-          reposted_by_username: string
-          reposts_count: number
-          saves_count: number
-          suggested_height: number
-          thumbnail_url: string
-          title: string
-          user_id: string
-        }[]
-      }
-      request_or_follow: { Args: { _target: string }; Returns: string }
-      respond_to_follow_request: {
-        Args: { _approve: boolean; _requester: string }
-        Returns: string
-      }
       search_profiles: {
         Args: { cursor?: string; limit_count: number; q: string }
         Returns: {
           avatar_url: string
           display_name: string
-          follows_me: boolean
           id: string
           is_following: boolean
-          is_requested: boolean
           user_id: string
           username: string
         }[]
