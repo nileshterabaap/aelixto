@@ -205,10 +205,12 @@ const InstagramIframeEmbed = ({
   src,
   postId,
   suggestedHeight,
+  expandedUrl,
 }: {
   src: string;
   postId?: string | null;
   suggestedHeight?: number | null;
+  expandedUrl?: string;
 }) => {
   const [visible, setVisible] = useState(() => {
     // Older saved Instagram heights may have come from /embed/captioned/ and
@@ -265,6 +267,7 @@ const InstagramIframeEmbed = ({
           display: 'block',
         }}
       />
+      {expandedUrl && <OpenOriginalPill url={expandedUrl} label="Open on Instagram" />}
     </div>
   );
 };
