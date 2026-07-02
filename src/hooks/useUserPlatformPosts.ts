@@ -26,7 +26,7 @@ export interface PlatformPost {
   profile_avatar_url?: string | null;
 }
 
-const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook", "reddit", "threads", "linkedin", "tiktok", "article", "medium"]);
+const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook", "reddit", "threads", "tiktok", "article", "medium"]);
 const inflightBackfills = new Set<string>();
 
 const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
@@ -70,7 +70,7 @@ async function backfillThumbnail(post: PlatformPost) {
   // article) we can skip backfill when text is already usable.
   const imageFirstPlatform =
     platform === "reddit" || platform === "instagram" ||
-    platform === "facebook" || platform === "linkedin" || platform === "tiktok" || platform === "pinterest";
+    platform === "facebook" || platform === "tiktok" || platform === "pinterest";
   if (!post.thumbnail_url && !imageFirstPlatform && hasUsableTextThumbnail(post)) return;
 
   const key = `${post.id}:${platform}`;
@@ -207,7 +207,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
 
     const imageFirstPlatform =
       platformLower === "reddit" || platformLower === "instagram" ||
-      platformLower === "facebook" || platformLower === "linkedin" || platformLower === "tiktok" || platformLower === "pinterest";
+      platformLower === "facebook" || platformLower === "tiktok" || platformLower === "pinterest";
     const missing = items.filter((p) => {
       if (!p.media_url) return false;
       const noThumb = !p.thumbnail_url || isGenericPlaceholderThumbnail(p.thumbnail_url);

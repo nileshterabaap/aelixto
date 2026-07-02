@@ -735,55 +735,30 @@ function decodeHtmlEntities(text: string): string {
 }
 
 async function scrapeOgData(url: string, userAgent?: string): Promise<{ image: string | null; title: string | null; description: string | null; imageWidth: number | null; imageHeight: number | null; videoWidth: number | null; videoHeight: number | null; hasVideo: boolean }> {
-  const empty = { image: null, title: null, description: null, imageWidth: null, imageHeight: null, videoWidth: null, videoHeight: null, hasVideo: false };
-  const buildHeaders = (ua: string) => ({
-    'User-Agent': ua,
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Connection': 'keep-alive',
-    'Upgrade-Insecure-Requests': '1',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
-    'Cache-Control': 'max-age=0',
-  });
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent':
+          userAgent ||
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      redirect: 'follow',
+    });
 
-  const userAgents = userAgent
-    ? [userAgent]
-    : [
-        // Some article/news sites reject Googlebot/browser UAs from cloud IPs
-        // but still serve complete Open Graph metadata to social/link unfurlers.
-        'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
-        'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)',
-        'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      ];
-
-  for (const ua of userAgents) {
-    try {
-      const response = await fetch(url, {
-        headers: buildHeaders(ua),
-        redirect: 'follow',
-      });
-
-      if (!response.ok) {
-        console.log('[fetch-post-preview] OG scrape UA failed:', ua, response.status);
-        continue;
-      }
-
-      const html = await response.text();
-      const meta = extractArticleMetadata(html, response.url || url);
-      const sizing = extractSizingFromHtml(html);
-      if (meta.title || meta.image || meta.description) {
-        return { ...meta, ...sizing };
-      }
-    } catch (error) {
-      console.error('[fetch-post-preview] Scraping UA error:', ua, error);
+    if (!response.ok) {
+      return { image: null, title: null, description: null, imageWidth: null, imageHeight: null, videoWidth: null, videoHeight: null, hasVideo: false };
     }
-  }
 
-  return empty;
+    const html = await response.text();
+    const meta = extractArticleMetadata(html, response.url || url);
+    const sizing = extractSizingFromHtml(html);
+    return { ...meta, ...sizing };
+  } catch (error) {
+    console.error('[fetch-post-preview] Scraping error:', error);
+    return { image: null, title: null, description: null, imageWidth: null, imageHeight: null, videoWidth: null, videoHeight: null, hasVideo: false };
+  }
 }
 
 function extractSizingFromHtml(html: string): { imageWidth: number | null; imageHeight: number | null; videoWidth: number | null; videoHeight: number | null; hasVideo: boolean } {

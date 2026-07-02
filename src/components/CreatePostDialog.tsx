@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
@@ -16,8 +16,6 @@ import {
 } from "@/lib/domainClassification";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
-import { measureEmbedHeight } from "@/lib/measureEmbedHeight";
-import { estimateEmbedHeight } from "@/lib/estimateEmbedHeight";
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -41,14 +39,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
   const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
-  // Height measured offscreen at create-time so the very first viewer
-  // (including the creator) opens the card at its real size — no blank space.
-  const measuredHeightRef = useRef<number | null>(null);
-  const measurePromiseRef = useRef<Promise<number | null> | null>(null);
-  // Original post body fetched from the source link (Facebook/Reddit/Threads/etc.).
-  // Stored separately from the user's caption and saved as posts.preview_text so
-  // it renders inside the embedded card without ever touching the user's own caption.
-  const fetchedPreviewTextRef = useRef<string | null>(null);
 
   // Hydrate from existing draft when opening
   useEffect(() => {
@@ -177,52 +167,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             if (!videoTitle && ogData.title) videoTitle = ogData.title;
             if (ogData.image) thumbnail = ogData.image;
             if (ogData.og_type) { setOgType(ogData.og_type); detectedOgType = ogData.og_type; }
-            // Capture the original post body for platforms whose text lives in
-            // OG description (Facebook, Reddit, Threads). Stored separately from
-            // the user's caption — never overwrites what the user typed.
-            if (!fetchedPreviewTextRef.current && ogData.description) {
-              const lower = linkUrl.toLowerCase();
-              const wantsAutoCaption =
-                lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ||
-                lower.includes('reddit.com') ||
-                lower.includes('threads.net') || lower.includes('threads.com');
-              if (wantsAutoCaption) {
-                const desc = String(ogData.description).trim();
-                if (desc && !/^view on |^posted by u\//i.test(desc)) {
-                  fetchedPreviewTextRef.current = desc.slice(0, 4000);
-                }
-              }
-            }
           } else {
             console.error('[CreatePostDialog] OG fetch error:', error);
           }
         } catch (error) {
           console.error('[CreatePostDialog] Failed to fetch OG data:', error);
-        }
-      }
-
-      // For Facebook/Reddit/Threads: even when a thumbnail was already found
-      // by the platform-specific branch above, we still need a separate OG
-      // pass to grab the post body. Stored as preview_text — independent of
-      // the user's caption.
-      if (!fetchedPreviewTextRef.current) {
-        const lower = linkUrl.toLowerCase();
-        const wantsAutoCaption =
-          lower.includes('facebook.com') || lower.includes('fb.watch') || lower.includes('fb.me') ||
-          lower.includes('reddit.com') ||
-          lower.includes('threads.net') || lower.includes('threads.com');
-        if (wantsAutoCaption) {
-          try {
-            const { data: ogData2 } = await supabase.functions.invoke('fetch-og', {
-              body: { url: linkUrl }
-            });
-            const desc = ogData2?.description ? String(ogData2.description).trim() : '';
-            if (desc && !/^view on |^posted by u\//i.test(desc)) {
-              fetchedPreviewTextRef.current = desc.slice(0, 4000);
-            }
-          } catch (e) {
-            console.warn('[CreatePostDialog] Preview text fetch skipped:', e);
-          }
         }
       }
       
@@ -288,18 +237,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       }
 
       setStep(2);
-
-      // Kick off offscreen measurement in the background. Works best for
-      // Threads + Facebook (they postMessage their rendered height). For
-      // other platforms this resolves null and the viewer-time persistence
-      // takes over on first scroll.
-      measuredHeightRef.current = null;
-      measurePromiseRef.current = measureEmbedHeight(linkUrl)
-        .then((h) => {
-          measuredHeightRef.current = h;
-          return h;
-        })
-        .catch(() => null);
     } finally {
       setIsLoadingPreview(false);
     }
@@ -405,36 +342,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     });
 
     setSubmitState("post");
-
-    // Give the offscreen measurement up to ~1.2s extra to settle, then
-    // post with whatever height we have (or null = fall back to defaults).
-    let suggestedHeight: number | null = measuredHeightRef.current;
-    if (suggestedHeight === null && measurePromiseRef.current) {
-      suggestedHeight = await Promise.race([
-        measurePromiseRef.current,
-        new Promise<number | null>((r) => window.setTimeout(() => r(null), 1200)),
-      ]);
-    }
-
-    // Fallback: if the platform didn't broadcast a height (Instagram,
-    // TikTok, LinkedIn, Pinterest, etc.) compute a content-aware estimate
-    // from the data we already have (caption length, thumbnail, platform).
-    // This gives the very first viewer a card sized close to the real
-    // content instead of a generic 380px stub.
-    if (suggestedHeight === null) {
-      try {
-        suggestedHeight = estimateEmbedHeight({
-          platform,
-          url: linkUrl,
-          caption: caption,
-          title: title,
-          thumbnailUrl: thumbnailUrl,
-        });
-      } catch {
-        suggestedHeight = null;
-      }
-    }
-
     createPost.mutate({
       title: title.trim() || undefined,
       content: caption.trim() || "",
@@ -443,8 +350,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       platform: platform,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
-      suggested_height: suggestedHeight,
-      preview_text: fetchedPreviewTextRef.current || undefined,
     }, {
       onSuccess: (created: any) => {
         incrementDailyCount();
@@ -499,9 +404,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setOgType(null);
     setDraftId(null);
     setSubmitState(null);
-    fetchedPreviewTextRef.current = null;
-    measuredHeightRef.current = null;
-    measurePromiseRef.current = null;
     onOpenChange(false);
   };
 
