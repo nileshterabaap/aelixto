@@ -266,25 +266,11 @@ const FacebookIframeEmbed = ({
   const [failed, setFailed] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
-  const lastTapRef = useRef<number>(0);
-
-  // Cross-origin iframe taps can't be observed directly, but tapping the
-  // iframe steals focus from the window. Detect two rapid focus-steals as a
-  // double tap → open original. Single tap still pauses/resumes natively.
-  useEffect(() => {
-    const onBlur = () => {
-      if (document.activeElement !== iframeRef.current) return;
-      const now = Date.now();
-      if (now - lastTapRef.current < 400 && now - lastTapRef.current > 0) {
-        void openExternalUrl(expandedUrl);
-        lastTapRef.current = 0;
-        return;
-      }
-      lastTapRef.current = now;
-    };
-    window.addEventListener('blur', onBlur);
-    return () => window.removeEventListener('blur', onBlur);
-  }, [expandedUrl]);
+  // Unified interaction: tap the iframe's Play region plays the video
+  // natively. To open the original post, the user taps the "Open on
+  // Facebook" pill overlay rendered outside the iframe. No focus-steal
+  // detection or double-tap-to-open — those were inconsistent and hijacked
+  // the play button on some devices.
 
   const srcMatch = html.match(/src="([^"]+)"/);
   const iframeSrc = srcMatch ? srcMatch[1] : '';
@@ -361,8 +347,6 @@ const FacebookIframeEmbed = ({
         height: `${Math.max(MIN_HEIGHT, height - FB_FOOTER_TRIM)}px`,
       }}
     >
-      {/* Transparent overlay catches double-tap to open original; single taps
-          pass through to the iframe so pause/resume continues to work. */}
       <iframe
         ref={iframeRef}
         src={iframeSrc}
@@ -383,6 +367,7 @@ const FacebookIframeEmbed = ({
           display: 'block',
         }}
       />
+      <OpenOriginalPill url={expandedUrl} label="Open on Facebook" />
     </div>
   );
 };
