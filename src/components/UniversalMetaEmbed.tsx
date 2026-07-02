@@ -6,6 +6,29 @@ import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { openExternalUrl } from '@/lib/openExternalUrl';
 
+/**
+ * Small pill-shaped overlay button rendered on top of an embed iframe so
+ * the user can always open the original post on its source platform, even
+ * when the iframe swallows every tap. Positioned so it never covers the
+ * platform's native Play button (top-right corner).
+ */
+const OpenOriginalPill = ({ url, label }: { url: string; label: string }) => {
+  if (!url) return null;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        void openExternalUrl(url);
+      }}
+      className="absolute top-2 right-2 z-10 rounded-full bg-black/55 backdrop-blur-sm text-white text-[11px] font-medium px-2.5 py-1 shadow-sm active:scale-95 transition-transform pointer-events-auto"
+      aria-label={label}
+    >
+      {label}
+    </button>
+  );
+};
+
 const THREADS_MIN_HEIGHT = 220;
 const THREADS_MAX_HEIGHT = 1400;
 const THREADS_DEFAULT_HEIGHT = 280;
