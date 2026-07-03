@@ -1,4 +1,4 @@
-import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, memo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
 import type { Post } from '@/data/demoData';
@@ -11,6 +11,7 @@ import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
 import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
+import { openExternalUrl } from '@/lib/openExternalUrl';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -174,7 +175,10 @@ export const HydratedEmbed = memo(({
       lowerUrl.includes('/reel/') ||
       lowerUrl.includes('/videos/') ||
       lowerUrl.includes('/watch/') ||
+      lowerUrl.includes('/watch?') ||
+      lowerUrl.includes('/watch.') ||
       lowerUrl.includes('/share/v/') ||
+      lowerUrl.includes('/share/r/') ||
       lowerUrl.includes('fb.watch/'));
 
   const isLinkedInPost =
@@ -185,7 +189,30 @@ export const HydratedEmbed = memo(({
     (mediaTypeHint === 'video' ||
       String((post as any).media_kind || '').toLowerCase() === 'video' ||
       lowerUrl.includes('/video/') ||
-      lowerUrl.includes('/videos/'));
+      lowerUrl.includes('/videos/') ||
+      // LinkedIn CDN video-thumbnail hints. When the fetched thumbnail is a
+      // video poster from media.licdn.com, treat this as a video so it renders
+      // in the iframe player instead of the photo-only branch (which strips
+      // the play button and hijacks taps to open LinkedIn).
+      (typeof thumbnailUrl === 'string' && (
+        thumbnailUrl.includes('/vc/') ||
+        thumbnailUrl.includes('dms-video') ||
+        thumbnailUrl.includes('video-thumbnail') ||
+        thumbnailUrl.includes('/videocover/')
+      )));
+
+  // Only take the LinkedIn photo-card branch when the server has *positively*
+  // classified the post as an image. LinkedIn's OG data almost never marks
+  // native videos as video (no `og:video`, no `/vc/` thumbnail path), so
+  // defaulting to "image whenever a thumbnail exists" was hijacking real
+  // video posts into a tap-to-redirect card. Fall through to the iframe
+  // player (UniversalMetaEmbed) whenever we're not sure — that's what worked
+  // before the photo-card change and it keeps the Play button visible.
+  const isConfirmedLinkedInImage =
+    isLinkedInPost &&
+    !isLinkedInVideoLike &&
+    (mediaTypeHint === 'image' ||
+      String((post as any).media_kind || '').toLowerCase() === 'image');
 
   useEffect(() => {
     if (!shouldHydrate) return;
@@ -200,6 +227,13 @@ export const HydratedEmbed = memo(({
   const handleOriginalVisit = useCallback(() => {
     markOriginalVisit(post.id);
   }, [post.id]);
+
+  const handleExternalOriginalClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
+    handleOriginalVisit();
+    if (!mediaUrl) return;
+    event.preventDefault();
+    void openExternalUrl(mediaUrl);
+  }, [handleOriginalVisit, mediaUrl]);
   
   // For YouTube, prefer their thumbnail
   const effectiveThumbnail = post.platform === 'youtube' && r.url 
@@ -242,7 +276,7 @@ export const HydratedEmbed = memo(({
             href={mediaUrl || '#'}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={handleOriginalVisit}
+            onClick={handleExternalOriginalClick}
             className="block w-full overflow-hidden bg-muted"
           >
             <img
@@ -262,7 +296,9 @@ export const HydratedEmbed = memo(({
   // LinkedIn embed iframe leaves a tall blank strip below the media for the
   // reactions/comments stub. Rendering the fetched preview image directly
   // gives a tight, flexible card just like Facebook image posts.
-  if (shouldHydrate && isLinkedInPost && effectiveThumbnail && !isLinkedInVideoLike) {
+  // Guarded by `isConfirmedLinkedInImage` so videos still hit the iframe
+  // player below.
+  if (shouldHydrate && isConfirmedLinkedInImage && effectiveThumbnail) {
     return (
       <div ref={embedContainerRef} className="w-full" data-embed-status="ready">
         <ImageViewTracker postId={post.id}>
@@ -270,7 +306,7 @@ export const HydratedEmbed = memo(({
             href={mediaUrl || '#'}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={handleOriginalVisit}
+            onClick={handleExternalOriginalClick}
             className="block w-full overflow-hidden bg-muted"
           >
             <img
