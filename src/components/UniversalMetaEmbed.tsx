@@ -460,58 +460,31 @@ const FacebookIframeEmbed = ({
 };
 
 /**
- * LinkedIn iframe that adapts to its content height. LinkedIn's embed
- * occasionally posts resize messages from linkedin.com; in all other cases
- * we seed from the persisted suggestedHeight and self-heal at view time.
+ * LinkedIn iframe restored to a fixed, internally scrollable viewport.
+ * LinkedIn cards can be taller than the Aelixto post card, so the iframe
+ * itself must scroll instead of expanding the outer feed item.
  */
-const LI_MIN_HEIGHT = 260;
-const LI_MAX_HEIGHT = 1400;
-const LI_DEFAULT_HEIGHT = 460;
+const LI_VIEWPORT_HEIGHT = 760;
 
 const LinkedInIframeEmbed = ({
   src,
-  postId,
-  suggestedHeight,
-  expandedUrl,
 }: {
   src: string;
   postId?: string | null;
   suggestedHeight?: number | null;
   expandedUrl?: string;
 }) => {
-  const [height, setHeight] = useState(() =>
-    suggestedHeight && suggestedHeight >= LI_MIN_HEIGHT
-      ? Math.min(LI_MAX_HEIGHT, suggestedHeight)
-      : LI_DEFAULT_HEIGHT
-  );
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const persistHeight = usePersistEmbedHeight(postId);
-
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      const iframeWindow = iframeRef.current?.contentWindow;
-      if (!iframeWindow || event.source !== iframeWindow) return;
-      const origin = event.origin || '';
-      if (!origin.includes('linkedin.com')) return;
-      const next = parseThreadsHeightFromMessage(event.data);
-      if (!next) return;
-      const clamped = Math.min(LI_MAX_HEIGHT, Math.max(LI_MIN_HEIGHT, Math.round(next)));
-      setHeight((prev) => (Math.abs(prev - clamped) > 4 ? clamped : prev));
-      persistHeight(clamped);
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, []);
 
   return (
     <div
-      className="relative w-full overflow-hidden"
-      style={{ width: '100%', height: `${height}px`, touchAction: 'pan-y' }}
+      className="relative w-full overflow-hidden bg-background"
+      style={{ width: '100%', height: `${LI_VIEWPORT_HEIGHT}px`, minHeight: `${LI_VIEWPORT_HEIGHT}px`, touchAction: 'pan-y' }}
     >
       <iframe
         ref={iframeRef}
         src={src}
-        scrolling="no"
+        scrolling="auto"
         allowFullScreen
         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
         loading="lazy"
@@ -520,7 +493,9 @@ const LinkedInIframeEmbed = ({
           border: 'none',
           width: '100%',
           height: '100%',
+          minHeight: `${LI_VIEWPORT_HEIGHT}px`,
           display: 'block',
+          background: 'hsl(var(--background))',
         }}
       />
     </div>
@@ -1066,14 +1041,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
       if (isLinkedInIframe) {
         const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
         const iframeSrc = srcMatch ? srcMatch[1] : '';
-        return (
-          <LinkedInIframeEmbed
-            src={iframeSrc}
-            postId={postId}
-            suggestedHeight={suggestedHeight}
-            expandedUrl={expandedUrl}
-          />
-        );
+        return <LinkedInIframeEmbed src={iframeSrc} />;
       }
 
       if (isTikTokIframe) {
