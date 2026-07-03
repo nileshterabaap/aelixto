@@ -195,7 +195,7 @@ const ThreadsIframeEmbed = ({
 const IG_BOTTOM_CONTROLS_TRIM = 112;
 const IG_MIN_VISIBLE = 260;
 const IG_MAX_VISIBLE = 1000;
-const IG_DEFAULT_VISIBLE = 560;
+const IG_DEFAULT_VISIBLE = 460;
 const IG_MAX_TRUSTED_SUGGESTED_HEIGHT = 900;
 
 const clampIgVisible = (h: number) =>
@@ -212,17 +212,71 @@ const InstagramIframeEmbed = ({
   suggestedHeight?: number | null;
   expandedUrl?: string;
 }) => {
+  const isReel = /\/reel\//i.test(src);
+  const estimateVisibleHeight = useCallback((width?: number | null) => {
+    if (!width || width < 240) return isReel ? 640 : IG_DEFAULT_VISIBLE;
+    // Use a conservative media-only estimate for the first paint. Instagram's
+    // real MEASURE height will correct this, but starting below the footer line
+    // guarantees their native actions never flash before trimming settles.
+    const mediaEstimate = isReel ? width * 1.72 + 56 : width * 1.25 + 58;
+    return clampIgVisible(mediaEstimate);
+  }, [isReel]);
+
   const [visible, setVisible] = useState(() => {
     // Older saved Instagram heights may have come from /embed/captioned/ and
     // can be 1000px+. Ignore those stale captioned values; the live /embed/
     // MEASURE message will replace the fallback almost immediately.
     if (suggestedHeight && suggestedHeight <= IG_MAX_TRUSTED_SUGGESTED_HEIGHT) {
-      return clampIgVisible(suggestedHeight - IG_BOTTOM_CONTROLS_TRIM);
+      return Math.min(
+        clampIgVisible(suggestedHeight - IG_BOTTOM_CONTROLS_TRIM),
+        estimateVisibleHeight(null)
+      );
     }
-    return IG_DEFAULT_VISIBLE;
+    return estimateVisibleHeight(null);
   });
+  const [ready, setReady] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const measuredRef = useRef(false);
+  const revealTimerRef = useRef<number | null>(null);
   const persistHeight = usePersistEmbedHeight(postId);
+
+  const reveal = useCallback(() => {
+    if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = window.setTimeout(() => setReady(true), 140);
+  }, []);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const updateEstimate = () => {
+      if (measuredRef.current) return;
+      const next = estimateVisibleHeight(root.getBoundingClientRect().width);
+      setVisible((prev) => (Math.abs(prev - next) > 4 ? next : prev));
+    };
+
+    updateEstimate();
+    const ro = new ResizeObserver(updateEstimate);
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [estimateVisibleHeight]);
+
+  useEffect(() => {
+    if (!ready) return;
+    rootRef.current?.dispatchEvent(new CustomEvent('embedReady', { bubbles: true }));
+  }, [ready]);
+
+  useEffect(() => {
+    // Hard fallback: if Instagram withholds MEASURE on a slow/device-specific
+    // load, reveal the conservative cropped state instead of ever exposing the
+    // full footer/actions area.
+    const fallback = window.setTimeout(() => setReady(true), 2200);
+    return () => {
+      window.clearTimeout(fallback);
+      if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -234,19 +288,25 @@ const InstagramIframeEmbed = ({
       const full = parseThreadsHeightFromMessage(event.data);
       if (!full || full < IG_MIN_VISIBLE) return;
 
+      measuredRef.current = true;
       const nextVisible = clampIgVisible(full - IG_BOTTOM_CONTROLS_TRIM);
       setVisible((prev) => (Math.abs(prev - nextVisible) > 4 ? nextVisible : prev));
       // Persist the FULL /embed/ iframe height. Render-time trims only the IG
       // controls/footer, and the live message keeps old captioned values healed.
       persistHeight(Math.round(full));
+      reveal();
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, []);
+  }, [persistHeight, reveal]);
 
   return (
     <div
-      className="relative w-full overflow-hidden"
+      ref={rootRef}
+      data-embed-status={ready ? 'ready' : 'loading'}
+      className={`relative w-full overflow-hidden bg-muted/70 ${
+        ready ? '' : 'before:absolute before:inset-0 before:z-[1] before:bg-gradient-to-r before:from-transparent before:via-background/70 before:to-transparent before:animate-shimmer'
+      }`}
       style={{ width: '100%', height: `${visible}px`, touchAction: 'pan-y' }}
     >
       <iframe
@@ -265,6 +325,9 @@ const InstagramIframeEmbed = ({
           height: `${visible + IG_BOTTOM_CONTROLS_TRIM}px`,
           overflow: 'hidden',
           display: 'block',
+          opacity: ready ? 1 : 0,
+          pointerEvents: ready ? 'auto' : 'none',
+          transition: 'opacity 180ms ease-out',
         }}
       />
     </div>
