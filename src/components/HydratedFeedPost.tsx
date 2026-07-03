@@ -520,15 +520,15 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       )}
 
-      {/* Real card — mirrors the profile grid thumbnail reveal: pure opacity
-          fade with the same 300ms duration. No blur → sharpen step. */}
+      {/* Real card — hidden until embed loads, fades in blurred, then sharpens */}
       <div
         ref={cardMeasureRef}
         className={`overflow-hidden rounded-xl ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',
-          transition: 'opacity 300ms ease-out',
+          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : 'blur(4px)'),
+          transition: 'opacity 250ms ease-in-out, filter 400ms ease-out',
         }}
       >
     <Card className="glass-post-card overflow-hidden rounded-[2rem]">
@@ -594,7 +594,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       </div>
 
       {/* Caption */}
-      {post.content?.trim() && (
+      {detectedPlatform !== 'instagram' && post.content?.trim() && (
         <div className="px-5 pb-3">
           <CollapsibleCaption content={post.content} />
         </div>
@@ -603,12 +603,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {(() => {
         if (!originalPostCaption) return null;
-        // Reddit's own embed already renders the post title/body and a
-        // "Read more" toggle. Showing the same text above the iframe
-        // duplicates it, so skip the original caption for Reddit.
-        // Reddit/Threads/X embeds render the post text inside the iframe;
-        // showing the original caption above duplicates it.
-        if (detectedPlatform === 'reddit' || detectedPlatform === 'threads' || detectedPlatform === 'twitter') return null;
         return (
           <div className="px-5 pb-3">
             <CollapsibleCaption

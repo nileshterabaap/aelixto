@@ -1,44 +1,12 @@
-## Problems
+Success probability: 82%.
 
-**LinkedIn videos still redirect on tap**
-`src/components/HydratedEmbed.tsx` has a LinkedIn "image card" branch that renders a plain `<img>` wrapped in an `<a>` whenever the server returned a thumbnail and the post is not confirmed as a video. LinkedIn's OG scrape almost never marks native videos as video (no `og:video` tag, poster URLs don't always contain `dms-video`/`/vc/`), so real videos hit this image branch → tap opens LinkedIn. Facebook works because its metadata is more reliable.
-
-**Reddit posts and thumbnails not rendering**
-Regression appeared alongside the recent Facebook/LinkedIn edits. Need to inspect edge-function logs and the current Reddit code path to identify what broke (candidates: `fetchRedditPreview` returning null after related refactors, `isMisleadingRedditThumbnail` over-filtering, or the RedditEmbed iframe sandbox/embed URL). Fix will be scoped to Reddit only.
-
-## Fixes
-
-1. **LinkedIn client-side gate — flip the default**
-   In `src/components/HydratedEmbed.tsx`, only take the LinkedIn photo branch when we have **positive** confirmation the post is an image:
-   - `post.media_kind === 'image'` (server-set) **AND** not a video signal.
-   Otherwise fall through to `UniversalMetaEmbed` (iframe player with Play button), which is what worked before the recent photo-card change.
-   Keep the existing Facebook photo branch untouched.
-
-2. **LinkedIn server-side video detection — broaden**
-   In `supabase/functions/fetch-post-preview/index.ts` LinkedIn branch, also mark as video when the URL/OG signals a video post even without `og:video`:
-   - `og:type` starts with `video`
-   - `twitter:player` present
-   - Any `<video>` tag detected in the fetched HTML
-   - LinkedIn URL patterns: `/video/`, `-video-activity-`, `urn:li:ugcPost` with video content-type header
-   Redeploy the function.
-
-3. **Reddit diagnosis + fix**
-   - Pull recent `fetch-post-preview` logs filtered by `reddit` to see the actual failure (auth token, canonical resolve, or JSON fetch).
-   - Verify `RedditEmbed` iframe still loads by reproducing in Playwright against the preview.
-   - Likely repair points (apply the one that matches the log):
-     a. `fetchRedditPreview` — ensure it still returns `thumbnail_url` when the OAuth token call fails (fallback to old.reddit JSON path).
-     b. `isMisleadingRedditThumbnail` — loosen if it is now rejecting valid `i.redd.it`/`preview.redd.it` URLs.
-     c. `RedditEmbed` iframe `sandbox` — restore `allow-popups-to-escape-sandbox` if Reddit's widget needs it for hydration.
-   - Redeploy `fetch-post-preview` if edited.
-
-## Verification
-
-- Playwright against localhost preview: load one LinkedIn video post → Play button visible, tap plays inline (no redirect). Load one LinkedIn image post → renders as tight photo card. Load one Reddit link → iframe renders with post + thumbnail; if iframe fails, OG fallback card shows the real thumbnail.
-- Confirm Facebook video + photo behaviors unchanged.
-
-## Constraints
-
-- No changes to feed order, PTR, Aelix score, or mark-as-seen.
-- No changes to Instagram embed (locked working state).
-
-Success probability: 85%.
+Plan:
+1. Patch only the LinkedIn caption path in `fetch-post-preview` and the caption rendering gate; do not touch PTR, Aelix score, feed order, seen logic, auth, or post card sizing.
+2. Make LinkedIn caption extraction more complete by reading the embed page more broadly:
+   - keep the existing `attributed-text-segment-list__content` extraction;
+   - add fallbacks for LinkedIn's escaped JSON/embed markup where full commentary is often stored outside the first matched `<div>`;
+   - preserve paragraph breaks when converting HTML/escaped text to plain caption text.
+3. Fix the current hydration condition so LinkedIn posts can refresh if the stored caption is obviously clipped (`...` / `…`) or much shorter than the newly fetched caption, not only when caption is missing.
+4. Store the improved caption back into `preview_text` through the existing backend function update, so old LinkedIn posts self-heal after they render once.
+5. Keep `CollapsibleCaption` behavior as-is (`... more` still expands), but ensure it receives the full source caption with paragraph gaps.
+6. Deploy only the changed backend function after code changes, then do one targeted function test with a LinkedIn URL if one is available in current data/logs; otherwise validate the extraction logic structurally without affecting live feed behavior.

@@ -83,7 +83,6 @@ const isJunkSourceCaption = (value: string) => {
     /^facebook$/i.test(text) ||
     /^x$/i.test(text) ||
     /^tweet$/i.test(text) ||
-    / on Threads$/i.test(text) ||
     isPageBootstrapDump(text)
   );
 };
