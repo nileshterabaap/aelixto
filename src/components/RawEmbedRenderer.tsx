@@ -124,7 +124,6 @@ const decodeBlockquoteEntities = (html: string): string => {
 interface RawEmbedRendererProps {
   embedHtml: string;
   onError?: () => void;
-  onOriginalVisit?: () => void;
 }
 
 // Sanitize embed HTML using DOMPurify to prevent XSS attacks
@@ -136,7 +135,7 @@ const stripInstagramCaption = (html: string): string => {
 
 const sanitizeEmbedHtml = (html: string): string => {
   // First strip Instagram caption attribute
-  const processedHtml = stripInstagramCaption(html);
+  let processedHtml = stripInstagramCaption(html);
   
   return DOMPurify.sanitize(processedHtml, {
     ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img', 'svg', 'path', 'title', 'section'],
@@ -222,7 +221,7 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'threads' | 't
   return 'unknown';
 };
 
-export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit }: RawEmbedRendererProps) => {
+export const RawEmbedRenderer = ({ embedHtml, onError }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<number>(0);
   const hasProcessedRef = useRef(false);
@@ -257,7 +256,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit }: RawEmb
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
       const url = getEmbedUrl();
       if (url) {
-        onOriginalVisit?.();
         window.open(url, '_blank', 'noopener,noreferrer');
       }
     }

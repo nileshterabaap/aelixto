@@ -14,14 +14,11 @@ import facebookIcon from "@/assets/platforms/facebook.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import redditIcon from "@/assets/platforms/reddit.svg";
 import tiktokIcon from "@/assets/platforms/tiktok.svg";
-import pinterestIcon from "@/assets/platforms/pinterest.svg";
-import articlesIcon from "@/assets/platforms/articles.svg";
 
 const PLATFORM_ICONS: Record<string, string> = {
   instagram: instagramIcon, youtube: youtubeIcon, x: xIcon, twitter: xIcon,
   spotify: spotifyIcon, medium: mediumIcon, threads: threadsIcon,
   facebook: facebookIcon, linkedin: linkedinIcon, reddit: redditIcon, tiktok: tiktokIcon,
-  pinterest: pinterestIcon, article: articlesIcon,
 };
 
 const PLATFORM_GRADIENTS: Record<string, string> = {

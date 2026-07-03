@@ -24,20 +24,9 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const AppleIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-    <path d="M16.365 1.43c0 1.14-.42 2.22-1.19 3.02-.82.87-2.17 1.55-3.27 1.46-.14-1.11.43-2.28 1.16-3.03.82-.85 2.24-1.48 3.3-1.45zM20.5 17.14c-.55 1.27-.81 1.83-1.52 2.95-.98 1.55-2.37 3.48-4.09 3.5-1.53.01-1.92-.99-4-.98-2.08.01-2.51 1-4.04.98-1.72-.02-3.03-1.77-4.02-3.32C.09 15.9-.2 10.87 1.62 8.19c1.29-1.9 3.33-3.02 5.24-3.02 1.95 0 3.17 1.07 4.78 1.07 1.56 0 2.51-1.07 4.77-1.07 1.71 0 3.51.93 4.79 2.55-4.21 2.31-3.52 8.33-.7 9.42z"/>
-  </svg>
-);
-
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  // Hide Apple sign-in on Android. Apple's guidelines require the native
-  // Apple sheet on iOS, and non-Apple platforms should not offer this option
-  // (matches how other apps behave).
-  const showApple =
-    !(Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
@@ -82,20 +71,12 @@ const Auth = () => {
     }
     setUsernameStatus("checking");
     const timer = setTimeout(async () => {
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("username", usernameValue.toLowerCase())
-          .maybeSingle();
-        if (error) {
-          setUsernameStatus("idle");
-          return;
-        }
-        setUsernameStatus(data ? "taken" : "available");
-      } catch {
-        setUsernameStatus("idle");
-      }
+      const { data } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", usernameValue.toLowerCase())
+        .maybeSingle();
+      setUsernameStatus(data ? "taken" : "available");
     }, 500);
     return () => clearTimeout(timer);
   }, [usernameValue]);
@@ -284,25 +265,6 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     const isNative = Capacitor.isNativePlatform();
     if (isNative) {
-      // 1) Try TRUE native Google Sign-In (system account picker, no browser tab).
-      try {
-        const { GoogleAuth } = await import("@codetrix-studio/capacitor-google-auth");
-        try { await GoogleAuth.initialize(); } catch { /* already initialized */ }
-        const gUser = await GoogleAuth.signIn();
-        const idToken = (gUser as { authentication?: { idToken?: string } })?.authentication?.idToken;
-        if (idToken) {
-          const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: idToken });
-          if (error) {
-            toast({ title: "Google sign-in failed", description: error.message, variant: "destructive" });
-            return;
-          }
-          return; // success — onAuthStateChange navigates
-        }
-        // No idToken → fall through to Custom Tabs fallback below.
-      } catch (nativeErr) {
-        console.warn("Native GoogleAuth failed, falling back to Custom Tabs", nativeErr);
-      }
-
       // Native flow (APK/AAB):
       // 1. Open Chrome Custom Tab to the OAuth broker.
       // 2. Broker finishes and redirects to our /~auth-bridge web page.
@@ -365,63 +327,14 @@ const Auth = () => {
       return;
     }
 
-    // Web flow.
-    try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/auth`,
-      });
-      if (result.error) {
-        console.error("Google sign-in error", result.error);
-        toast({
-          title: "Google sign-in failed",
-          description: result.error.message || "Please try again.",
-          variant: "destructive",
-        });
-      }
-    } catch (e) {
-      console.error("Google sign-in threw", e);
-      toast({
-        title: "Google sign-in failed",
-        description: (e as Error)?.message || "Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleAppleSignIn = async () => {
-    try {
-      const result = await lovable.auth.signInWithOAuth("apple", {
-        redirect_uri: `${window.location.origin}/auth`,
-      });
-      if (result.error) {
-        toast({
-          title: "Apple sign-in failed",
-          description: result.error.message || "Please try again.",
-          variant: "destructive",
-        });
-      }
-    } catch (e) {
-      toast({
-        title: "Apple sign-in failed",
-        description: (e as Error)?.message || "Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // While the initial Supabase session probe is running, render nothing so
-  // the splash screen (kept alive in main.tsx) covers the wait. Otherwise
-  // signed-in users would see the auth form flash for ~1s before the
-  // navigate("/") fires.
-  const [sessionChecked, setSessionChecked] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    supabase.auth.getSession().then(() => {
-      if (!cancelled) setSessionChecked(true);
+    // Web flow — unchanged.
+    const { error } = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: `${window.location.origin}/`,
     });
-    return () => { cancelled = true; };
-  }, []);
-  if (!sessionChecked || user) return null;
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-background p-5 overflow-hidden">
@@ -505,7 +418,7 @@ const Auth = () => {
                   id="username"
                   name="username"
                   type="text"
-                  placeholder="Username"
+                  placeholder="coolcreator"
                   value={usernameValue}
                   onChange={(e) => setUsernameValue(e.target.value.replace(/\s/g, ""))}
                 />
@@ -521,11 +434,11 @@ const Auth = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-email">Email</Label>
-                <Input id="signup-email" name="signup-email" type="email" placeholder="Email" required />
+                <Input id="signup-email" name="signup-email" type="email" placeholder="you@example.com" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-password">Password</Label>
-                <Input id="signup-password" name="signup-password" type="password" placeholder="Password" required minLength={6} />
+                <Input id="signup-password" name="signup-password" type="password" placeholder="••••••••" required minLength={6} />
               </div>
               <Button
                 type="submit"
@@ -554,19 +467,6 @@ const Auth = () => {
                 <GoogleIcon />
                 Continue with Google
               </Button>
-
-              {showApple && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
-                  onClick={handleAppleSignIn}
-                  disabled={loading}
-                >
-                  <AppleIcon />
-                  Continue with Apple
-                </Button>
-              )}
             </form>
           </TabsContent>
 
@@ -581,7 +481,7 @@ const Auth = () => {
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  placeholder="Email or username"
+                  placeholder="you@example.com or @username"
                   value={signinIdentifier}
                   onChange={(e) => setSigninIdentifier(e.target.value)}
                   required
@@ -589,7 +489,7 @@ const Auth = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signin-password">Password</Label>
-                <Input id="signin-password" name="signin-password" type="password" placeholder="Password" required />
+                <Input id="signin-password" name="signin-password" type="password" placeholder="••••••••" required />
               </div>
               <Button
                 type="submit"
@@ -634,19 +534,6 @@ const Auth = () => {
                 <GoogleIcon />
                 Continue with Google
               </Button>
-
-              {showApple && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
-                  onClick={handleAppleSignIn}
-                  disabled={loading}
-                >
-                  <AppleIcon />
-                  Continue with Apple
-                </Button>
-              )}
             </form>
           </TabsContent>
         </Tabs>

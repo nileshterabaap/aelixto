@@ -3,35 +3,10 @@ import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
-import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
-import { openExternalUrl } from '@/lib/openExternalUrl';
 
-/**
- * Small pill-shaped overlay button rendered on top of an embed iframe so
- * the user can always open the original post on its source platform, even
- * when the iframe swallows every tap. Positioned so it never covers the
- * platform's native Play button (top-right corner).
- */
-const OpenOriginalPill = ({ url, label }: { url: string; label: string }) => {
-  if (!url) return null;
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        void openExternalUrl(url);
-      }}
-      className="absolute top-2 right-2 z-10 rounded-full bg-black/55 backdrop-blur-sm text-white text-[11px] font-medium px-2.5 py-1 shadow-sm active:scale-95 transition-transform pointer-events-auto"
-      aria-label={label}
-    >
-      {label}
-    </button>
-  );
-};
-
-const THREADS_MIN_HEIGHT = 220;
+const THREADS_MIN_HEIGHT = 260;
 const THREADS_MAX_HEIGHT = 1400;
-const THREADS_DEFAULT_HEIGHT = 280;
+const THREADS_DEFAULT_HEIGHT = 520;
 
 const clampThreadsHeight = (height: number) =>
   Math.min(THREADS_MAX_HEIGHT, Math.max(THREADS_MIN_HEIGHT, Math.round(height)));
@@ -92,24 +67,15 @@ const ThreadsIframeEmbed = ({
   src,
   expandedUrl,
   fallbackData,
-  postId,
-  suggestedHeight,
 }: {
   src: string;
   expandedUrl: string;
   fallbackData: { title?: string; image?: string; description?: string } | null;
-  postId?: string | null;
-  suggestedHeight?: number | null;
 }) => {
   const [failed, setFailed] = useState(false);
-  const [height, setHeight] = useState(() =>
-    suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
-      ? Math.min(THREADS_MAX_HEIGHT, suggestedHeight)
-      : THREADS_DEFAULT_HEIGHT
-  );
+  const [height, setHeight] = useState(THREADS_DEFAULT_HEIGHT);
   const [hasLoaded, setHasLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const persistHeight = usePersistEmbedHeight(postId);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -125,7 +91,6 @@ const ThreadsIframeEmbed = ({
 
       const clampedHeight = clampThreadsHeight(nextHeight);
       setHeight((prev) => (Math.abs(prev - clampedHeight) > 2 ? clampedHeight : prev));
-      persistHeight(clampedHeight);
     };
 
     window.addEventListener('message', handleMessage);
@@ -181,158 +146,6 @@ const ThreadsIframeEmbed = ({
     </div>
   );
 };
-
-/**
- * Instagram iframe that adapts its visible height per post.
- *
- * Instagram's direct /embed/ iframe sends an exact MEASURE height for the
- * rendered card. The previous large trim was based on /embed/captioned/ and
- * caused exactly the two failures the user reported: short posts kept a huge
- * blank area, while medium posts were cropped. Use the live /embed/ height and
- * only trim the Instagram controls/comment footer so the media is complete and
- * Instagram's duplicate action buttons don't show above Aelix's own actions.
- */
-const IG_BOTTOM_CONTROLS_TRIM = 112;
-const IG_MIN_VISIBLE = 260;
-const IG_MAX_VISIBLE = 1000;
-const IG_DEFAULT_VISIBLE = 460;
-const IG_MAX_TRUSTED_SUGGESTED_HEIGHT = 900;
-
-const clampIgVisible = (h: number) =>
-  Math.min(IG_MAX_VISIBLE, Math.max(IG_MIN_VISIBLE, Math.round(h)));
-
-const InstagramIframeEmbed = ({
-  src,
-  postId,
-  suggestedHeight,
-  expandedUrl,
-}: {
-  src: string;
-  postId?: string | null;
-  suggestedHeight?: number | null;
-  expandedUrl?: string;
-}) => {
-  const isReel = /\/reel\//i.test(src);
-  const estimateVisibleHeight = useCallback((width?: number | null) => {
-    if (!width || width < 240) return isReel ? 640 : IG_DEFAULT_VISIBLE;
-    // Use a conservative media-only estimate for the first paint. Instagram's
-    // real MEASURE height will correct this, but starting below the footer line
-    // guarantees their native actions never flash before trimming settles.
-    const mediaEstimate = isReel ? width * 1.72 + 56 : width * 1.25 + 58;
-    return clampIgVisible(mediaEstimate);
-  }, [isReel]);
-
-  const [visible, setVisible] = useState(() => {
-    // Older saved Instagram heights may have come from /embed/captioned/ and
-    // can be 1000px+. Ignore those stale captioned values; the live /embed/
-    // MEASURE message will replace the fallback almost immediately.
-    if (suggestedHeight && suggestedHeight <= IG_MAX_TRUSTED_SUGGESTED_HEIGHT) {
-      return Math.min(
-        clampIgVisible(suggestedHeight - IG_BOTTOM_CONTROLS_TRIM),
-        estimateVisibleHeight(null)
-      );
-    }
-    return estimateVisibleHeight(null);
-  });
-  const [ready, setReady] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const measuredRef = useRef(false);
-  const revealTimerRef = useRef<number | null>(null);
-  const persistHeight = usePersistEmbedHeight(postId);
-
-  const reveal = useCallback(() => {
-    if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
-    revealTimerRef.current = window.setTimeout(() => setReady(true), 140);
-  }, []);
-
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-
-    const updateEstimate = () => {
-      if (measuredRef.current) return;
-      const next = estimateVisibleHeight(root.getBoundingClientRect().width);
-      setVisible((prev) => (Math.abs(prev - next) > 4 ? next : prev));
-    };
-
-    updateEstimate();
-    const ro = new ResizeObserver(updateEstimate);
-    ro.observe(root);
-    return () => ro.disconnect();
-  }, [estimateVisibleHeight]);
-
-  useEffect(() => {
-    if (!ready) return;
-    rootRef.current?.dispatchEvent(new CustomEvent('embedReady', { bubbles: true }));
-  }, [ready]);
-
-  useEffect(() => {
-    // Hard fallback: if Instagram withholds MEASURE on a slow/device-specific
-    // load, reveal the conservative cropped state instead of ever exposing the
-    // full footer/actions area.
-    const fallback = window.setTimeout(() => setReady(true), 2200);
-    return () => {
-      window.clearTimeout(fallback);
-      if (revealTimerRef.current) window.clearTimeout(revealTimerRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      const iframeWindow = iframeRef.current?.contentWindow;
-      if (!iframeWindow || event.source !== iframeWindow) return;
-      const origin = event.origin || '';
-      if (!origin.includes('instagram.com') && !origin.includes('cdninstagram.com')) return;
-
-      const full = parseThreadsHeightFromMessage(event.data);
-      if (!full || full < IG_MIN_VISIBLE) return;
-
-      measuredRef.current = true;
-      const nextVisible = clampIgVisible(full - IG_BOTTOM_CONTROLS_TRIM);
-      setVisible((prev) => (Math.abs(prev - nextVisible) > 4 ? nextVisible : prev));
-      // Persist the FULL /embed/ iframe height. Render-time trims only the IG
-      // controls/footer, and the live message keeps old captioned values healed.
-      persistHeight(Math.round(full));
-      reveal();
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, [persistHeight, reveal]);
-
-  return (
-    <div
-      ref={rootRef}
-      data-embed-status={ready ? 'ready' : 'loading'}
-      className={`relative w-full overflow-hidden bg-muted/70 ${
-        ready ? '' : 'before:absolute before:inset-0 before:z-[1] before:bg-gradient-to-r before:from-transparent before:via-background/70 before:to-transparent before:animate-shimmer'
-      }`}
-      style={{ width: '100%', height: `${visible}px`, touchAction: 'pan-y' }}
-    >
-      <iframe
-        ref={iframeRef}
-        src={src}
-        scrolling="no"
-        allowFullScreen
-        allow="encrypted-media; autoplay"
-        loading="lazy"
-        style={{
-          border: 'none',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: `${visible + IG_BOTTOM_CONTROLS_TRIM}px`,
-          overflow: 'hidden',
-          display: 'block',
-          opacity: ready ? 1 : 0,
-          pointerEvents: ready ? 'auto' : 'none',
-          transition: 'opacity 180ms ease-out',
-        }}
-      />
-    </div>
-  );
-};
 /**
  * Facebook iframe that auto-sizes to its content height.
  * Falls back to a generous min-height, then listens for the Facebook
@@ -342,66 +155,36 @@ const FacebookIframeEmbed = ({
   html,
   expandedUrl,
   fallbackData,
-  postId,
-  suggestedHeight,
 }: {
   html: string;
   expandedUrl: string;
   fallbackData: { title?: string; image?: string; description?: string } | null;
-  postId?: string | null;
-  suggestedHeight?: number | null;
 }) => {
   const [failed, setFailed] = useState(false);
+  const [height, setHeight] = useState(520); // sensible default
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const persistHeight = usePersistEmbedHeight(postId);
-  // Unified interaction: tap the iframe's Play region plays the video
-  // natively. To open the original post, the user taps the "Open on
-  // Facebook" pill overlay rendered outside the iframe. No focus-steal
-  // detection or double-tap-to-open — those were inconsistent and hijacked
-  // the play button on some devices.
 
   const srcMatch = html.match(/src="([^"]+)"/);
   const iframeSrc = srcMatch ? srcMatch[1] : '';
 
-  // Detect video vs static post — image posts get a tighter cap so there's
-  // no large blank strip below the photo before our action bar.
-  const isVideo = /\/(video\.php|reel|videos|watch)/i.test(iframeSrc) || /fb\.watch/i.test(iframeSrc);
-  const MAX_HEIGHT = isVideo ? 1400 : 640;
-  const DEFAULT_HEIGHT = isVideo ? 520 : 360;
-  const MIN_HEIGHT = 160;
-  // For image posts, the Facebook plugin appends a reactions/like/share footer
-  // (~120-150px) that creates a large blank strip above Aelix's own action
-  // bar. Render the iframe at full measured height but clip the wrapper so
-  // only the media area shows.
-  const FB_FOOTER_TRIM = isVideo ? 0 : 130;
-  const MAX_TRUSTED_SUGGESTED = isVideo ? 1400 : 760;
-
-  const [height, setHeight] = useState(() => {
-    if (suggestedHeight && suggestedHeight >= MIN_HEIGHT && suggestedHeight <= MAX_TRUSTED_SUGGESTED) {
-      return Math.min(MAX_HEIGHT, suggestedHeight);
-    }
-    return DEFAULT_HEIGHT;
-  });
-
-  // Listen for Facebook's cross-origin resize messages. FB plugins post a
-  // few different shapes (`{type:"resize",height}`, nested xdArbiter payloads,
-  // `frame.height`, etc.) — use the generic extractor so we catch them all
-  // and snap the container to the real rendered height (kills blank space).
+  // Listen for Facebook's cross-origin resize messages
   useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      const iframeWindow = iframeRef.current?.contentWindow;
-      if (!iframeWindow || event.source !== iframeWindow) return;
-      const origin = event.origin || '';
-      if (!origin.includes('facebook.com')) return;
-      const next = parseThreadsHeightFromMessage(event.data);
-      if (!next || next < 80) return;
-      const clamped = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.round(next)));
-      setHeight((prev) => (Math.abs(prev - clamped) > 4 ? clamped : prev));
-      persistHeight(clamped);
+    const handler = (e: MessageEvent) => {
+      if (typeof e.data === 'string') {
+        try {
+          const parsed = JSON.parse(e.data);
+          // Facebook plugin sends {"type":"resize","height":XXX}
+          if (parsed?.type === 'resize' && typeof parsed.height === 'number' && parsed.height > 50) {
+            setHeight(parsed.height);
+          }
+        } catch {
+          // not JSON, ignore
+        }
+      }
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [MAX_HEIGHT]);
+  }, []);
 
   // Fallback: if iframe doesn't render in 12s, show OG card
   useEffect(() => {
@@ -429,11 +212,7 @@ const FacebookIframeEmbed = ({
   return (
     <div
       className="relative w-full overflow-hidden"
-      style={{
-        touchAction: 'pan-y',
-        width: '100%',
-        height: `${Math.max(MIN_HEIGHT, height - FB_FOOTER_TRIM)}px`,
-      }}
+      style={{ touchAction: 'pan-y' }}
     >
       <iframe
         ref={iframeRef}
@@ -442,13 +221,9 @@ const FacebookIframeEmbed = ({
         allowFullScreen
         allow="encrypted-media"
         loading="lazy"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         onError={() => setFailed(true)}
         style={{
           border: 'none',
-          position: 'absolute',
-          top: 0,
-          left: 0,
           width: '100%',
           height: `${height}px`,
           overflow: 'hidden',
@@ -459,178 +234,8 @@ const FacebookIframeEmbed = ({
   );
 };
 
-/**
- * LinkedIn iframe that adapts to its content height. LinkedIn's embed
- * occasionally posts resize messages from linkedin.com; in all other cases
- * we seed from the persisted suggestedHeight and self-heal at view time.
- */
-const LI_MIN_HEIGHT = 260;
-const LI_MAX_HEIGHT = 1400;
-const LI_DEFAULT_HEIGHT = 460;
-
-const LinkedInIframeEmbed = ({
-  src,
-  postId,
-  suggestedHeight,
-  expandedUrl,
-  aspectRatio,
-}: {
-  src: string;
-  postId?: string | null;
-  suggestedHeight?: number | null;
-  expandedUrl?: string;
-  aspectRatio?: number | null;
-}) => {
-  const [height, setHeight] = useState(() =>
-    suggestedHeight && suggestedHeight >= LI_MIN_HEIGHT
-      ? Math.min(LI_MAX_HEIGHT, suggestedHeight)
-      : LI_DEFAULT_HEIGHT
-  );
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState<number>(0);
-  const persistHeight = usePersistEmbedHeight(postId);
-
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      const iframeWindow = iframeRef.current?.contentWindow;
-      if (!iframeWindow || event.source !== iframeWindow) return;
-      const origin = event.origin || '';
-      if (!origin.includes('linkedin.com')) return;
-      const next = parseThreadsHeightFromMessage(event.data);
-      if (!next) return;
-      const clamped = Math.min(LI_MAX_HEIGHT, Math.max(LI_MIN_HEIGHT, Math.round(next)));
-      setHeight((prev) => (Math.abs(prev - clamped) > 4 ? clamped : prev));
-      persistHeight(clamped);
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, []);
-
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const update = () => setContainerWidth(el.getBoundingClientRect().width);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-
-  // LinkedIn's embed layout is symmetric around the video:
-  //   [author bar ~60] [caption C] [video Vh] [caption C] [reactions ~60]
-  // The top and bottom chrome are the same height (the caption is duplicated
-  // above and below the video). Cropping the container to just Vh and
-  // vertically centering the full iframe hides both the author/caption band
-  // above AND the caption/reactions band below — so only the video shows.
-  // This is resilient to any video size because Vh is derived from the
-  // measured container width and the post's aspect ratio.
-  const ratio =
-    typeof aspectRatio === 'number' && aspectRatio > 0.2 && aspectRatio < 5
-      ? aspectRatio
-      : 16 / 9;
-  const videoHeight = containerWidth > 0 ? containerWidth / ratio : 0;
-  const canCrop = videoHeight > 0 && height > videoHeight + 120;
-  const visibleHeight = canCrop ? Math.round(videoHeight) : height;
-  const topOffset = canCrop ? -Math.round((height - videoHeight) / 2) : 0;
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative w-full overflow-hidden"
-      style={{ width: '100%', height: `${visibleHeight}px`, touchAction: 'pan-y' }}
-    >
-      <iframe
-        ref={iframeRef}
-        src={src}
-        scrolling="no"
-        allowFullScreen
-        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-        loading="lazy"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
-        style={{
-          border: 'none',
-          position: 'absolute',
-          left: 0,
-          top: `${topOffset}px`,
-          width: '100%',
-          height: `${height}px`,
-          display: 'block',
-        }}
-      />
-    </div>
-  );
-};
-
-/**
- * TikTok iframe that adapts to content height. TikTok's /embed/v2/ posts
- * cross-origin messages with the rendered card height.
- */
-const TT_MIN_HEIGHT = 480;
-const TT_MAX_HEIGHT = 900;
-const TT_DEFAULT_HEIGHT = 740;
-
-const TikTokIframeEmbed = ({
-  src,
-  postId,
-  suggestedHeight,
-}: {
-  src: string;
-  postId?: string | null;
-  suggestedHeight?: number | null;
-}) => {
-  const [height, setHeight] = useState(() =>
-    suggestedHeight && suggestedHeight >= TT_MIN_HEIGHT
-      ? Math.min(TT_MAX_HEIGHT, suggestedHeight)
-      : TT_DEFAULT_HEIGHT
-  );
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const persistHeight = usePersistEmbedHeight(postId);
-
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      const iframeWindow = iframeRef.current?.contentWindow;
-      if (!iframeWindow || event.source !== iframeWindow) return;
-      const origin = event.origin || '';
-      if (!origin.includes('tiktok.com')) return;
-      const next = parseThreadsHeightFromMessage(event.data);
-      if (!next) return;
-      const clamped = Math.min(TT_MAX_HEIGHT, Math.max(TT_MIN_HEIGHT, Math.round(next)));
-      setHeight((prev) => (Math.abs(prev - clamped) > 4 ? clamped : prev));
-      persistHeight(clamped);
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, []);
-
-  return (
-    <div
-      className="relative w-full overflow-hidden"
-      style={{ width: '100%', height: `${height}px`, touchAction: 'pan-y' }}
-    >
-      <iframe
-        ref={iframeRef}
-        src={src}
-        scrolling="no"
-        allowFullScreen
-        allow="encrypted-media; autoplay"
-        loading="lazy"
-        style={{
-          border: 'none',
-          width: '100%',
-          height: '100%',
-          display: 'block',
-        }}
-      />
-    </div>
-  );
-};
-
 interface UniversalMetaEmbedProps {
   url: string;
-  postId?: string | null;
-  suggestedHeight?: number | null;
-  aspectRatio?: number | null;
 }
 
 // Cache resolved embeds to avoid re-processing when navigating between tabs/pages
@@ -714,10 +319,7 @@ const normalizeFacebookUrl = (raw: string): string => {
     .replace(/^https?:\/\/lm\.facebook\.com\//, 'https://www.facebook.com/')
     .replace(/^https?:\/\/l\.facebook\.com\//, 'https://www.facebook.com/');
 
-  // 2) If it's a login redirect, extract the actual post URL from "next" parameter.
-  // Facebook photo/share links often route anonymous server-side expansion
-  // through /login/?next=<story.php...>; that does NOT mean the post is
-  // private. The plugins can render the next URL, but never the login URL.
+  // 2) If it's a login redirect, extract the actual post URL from "next" parameter
   try {
     const u = new URL(url);
     if (u.hostname.endsWith('facebook.com') && u.pathname.includes('/login') && u.searchParams.get('next')) {
@@ -815,7 +417,7 @@ const buildLinkedInEmbed = (url: string): string | null => {
     const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
     if (feedMatch) {
       const urn = feedMatch[1];
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
     }
 
     // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
@@ -825,13 +427,13 @@ const buildLinkedInEmbed = (url: string): string | null => {
       const id = postMatch[1];
       const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
       const type = typeMatch ? typeMatch[1] : 'ugcPost';
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
     }
 
     // Pattern 3: /posts/username_slug-share-ID-hash
     const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
     if (shareMatch) {
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}?collapsed=1" width="100%" frameborder="0" allowfullscreen="" style="border:none;overflow:hidden;display:block;aspect-ratio:4/5;" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through to null
@@ -839,20 +441,15 @@ const buildLinkedInEmbed = (url: string): string | null => {
   return null;
 };
 
-// Build Threads embed using direct iframe to the /embed page.
-//
-// Note: Threads' /embed page does NOT post resize messages, and their
-// official SDK (embed.js) doesn't reliably re-process blockquotes in SPAs
-// (no public process() API). The direct-iframe approach renders the actual
-// post content; we use a conservative default height + create-time
-// measurement + persistEmbedHeight to keep blank space minimal.
+// Build Threads embed HTML using direct iframe (reliable in SPAs, no SDK needed)
 const buildThreadsEmbed = (url: string): string | null => {
   try {
     const u = new URL(url);
     const postMatch = u.pathname.match(/\/@([^/]+)\/post\/([A-Za-z0-9_-]+)/);
     if (postMatch) {
-      const embedSrc = `https://www.threads.net${u.pathname.replace(/\/$/, '')}/embed`;
-      return `<iframe src="${embedSrc}" style="border:0;width:100%;overflow:hidden;background:transparent;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+      const cleanPath = u.pathname.replace(/\/$/, '');
+      const embedUrl = `https://www.threads.net${cleanPath}/embed`.replace('threads.com', 'threads.net');
+      return `<iframe src="${embedUrl}" style="border:none;position:absolute;top:0;left:0;right:0;width:100%;max-width:100%;height:600px;display:block;margin:0;padding:0;background:transparent;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
@@ -868,7 +465,7 @@ const buildTikTokEmbed = (url: string): string | null => {
     const videoMatch = u.pathname.match(/\/@[^/]+\/video\/(\d+)/);
     if (videoMatch) {
       const videoId = videoMatch[1];
-      return `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" style="border:none;width:100%;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" style="border:none;width:100%;height:740px;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
@@ -877,7 +474,7 @@ const buildTikTokEmbed = (url: string): string | null => {
 };
 
 
-export const UniversalMetaEmbed = ({ url, postId, suggestedHeight, aspectRatio }: UniversalMetaEmbedProps) => {
+export const UniversalMetaEmbed = ({ url }: UniversalMetaEmbedProps) => {
   const cached = embedCache.get(url);
 
   const [embedHtml, setEmbedHtml] = useState<string | null>(cached?.embedHtml ?? null);
@@ -912,7 +509,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight, aspectRatio }
 
     if (timeSinceLastTap < 300 && timeSinceLastTap > 0) {
       // Double tap detected
-      void openExternalUrl(embedUrl);
+      window.open(embedUrl, '_blank', 'noopener,noreferrer');
     }
 
     lastTapRef.current = now;
@@ -969,17 +566,12 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight, aspectRatio }
             if (!expandError && expandData?.finalUrl) {
               finalUrl = expandData.finalUrl;
               urlForEmbed = finalUrl;
+              
 
-              // A Facebook /login/?next=<post> expansion is still usable after
-              // normalizeFacebookUrl extracts the real post URL. Only fallback
-              // when there is no next= target to embed.
+              // If expanded URL is a login redirect or has login in title, use fallback
               if (finalUrl.includes('/login/') && platform === 'facebook') {
-                try {
-                  const fbLogin = new URL(finalUrl);
-                  shouldShowFallback = !fbLogin.searchParams.get('next');
-                } catch {
-                  shouldShowFallback = true;
-                }
+                
+                shouldShowFallback = true;
               }
 
               if (expandData?.title?.toLowerCase().includes('log in to facebook')) {
@@ -1084,8 +676,6 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight, aspectRatio }
       const isInstagramIframe = embedHtml.includes('instagram.com');
       const isThreadsIframe = embedHtml.includes('threads.net');
       const isFacebookIframe = embedHtml.includes('facebook.com/plugins/');
-      const isLinkedInIframe = embedHtml.includes('linkedin.com/embed');
-      const isTikTokIframe = embedHtml.includes('tiktok.com/embed');
 
       if (isFacebookIframe) {
         return (
@@ -1093,48 +683,37 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight, aspectRatio }
             html={sanitizedHtml}
             expandedUrl={expandedUrl}
             fallbackData={fallbackData}
-            postId={postId}
-            suggestedHeight={suggestedHeight}
-          />
-        );
-      }
-
-      if (isLinkedInIframe) {
-        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
-        const iframeSrc = srcMatch ? srcMatch[1] : '';
-        return (
-          <LinkedInIframeEmbed
-            src={iframeSrc}
-            postId={postId}
-            suggestedHeight={suggestedHeight}
-            expandedUrl={expandedUrl}
-            aspectRatio={aspectRatio ?? null}
-          />
-        );
-      }
-
-      if (isTikTokIframe) {
-        const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
-        const iframeSrc = srcMatch ? srcMatch[1] : '';
-        return (
-          <TikTokIframeEmbed
-            src={iframeSrc}
-            postId={postId}
-            suggestedHeight={suggestedHeight}
           />
         );
       }
 
       if (isInstagramIframe) {
+        // Extract the src URL from the sanitized iframe HTML
         const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
         const iframeSrc = srcMatch ? srcMatch[1] : '';
+
         return (
-          <InstagramIframeEmbed
-            src={iframeSrc}
-            postId={postId}
-            suggestedHeight={suggestedHeight}
-            expandedUrl={expandedUrl}
-          />
+          <div
+            className="relative w-full overflow-hidden"
+            style={{ aspectRatio: '3 / 5', touchAction: 'pan-y' }}
+          >
+            <iframe
+              src={iframeSrc}
+              scrolling="no"
+              allowFullScreen
+              allow="encrypted-media; autoplay"
+              loading="lazy"
+              style={{
+                border: 'none',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: 'calc(100% + 500px)',
+                overflow: 'hidden',
+              }}
+            />
+          </div>
         );
       }
 
@@ -1148,8 +727,6 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight, aspectRatio }
             src={iframeSrc}
             expandedUrl={expandedUrl}
             fallbackData={fallbackData}
-            postId={postId}
-            suggestedHeight={suggestedHeight}
           />
         );
       }

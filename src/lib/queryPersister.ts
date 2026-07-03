@@ -23,8 +23,6 @@ export const localStoragePersister = createSyncStoragePersister({
                  key === 'user-profile' ||
                  key === 'user-platform-tabs' ||
                  key === 'platform-posts' ||
-                 key === 'viewer-profile' ||
-                 key === 'my-following-count' ||
                  key === 'saved-posts' ||
                  key === 'collections' ||
                  key === 'post-drafts';
@@ -40,5 +38,5 @@ export const localStoragePersister = createSyncStoragePersister({
 export const persistOptions = {
   persister: localStoragePersister,
   maxAge: MAX_AGE,
-  buster: 'v2-feed-fresh', // Clears older persisted feed empties after seen-state fixes
+  buster: 'v6-unified-thumbnail-preview-fields', // Clears stale profile/saved grid snapshots so preview metadata renders everywhere
 };
