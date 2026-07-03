@@ -259,36 +259,6 @@ export const HydratedEmbed = memo(({
     );
   }
 
-  // LinkedIn image posts: mirror the Facebook treatment — the official
-  // LinkedIn embed iframe leaves a tall blank strip below the media for the
-  // reactions/comments stub. Rendering the fetched preview image directly
-  // gives a tight, flexible card just like Facebook image posts.
-  // Guarded by `isConfirmedLinkedInImage` so videos still hit the iframe
-  // player below.
-  if (shouldHydrate && isConfirmedLinkedInImage && effectiveThumbnail) {
-    return (
-      <div ref={embedContainerRef} className="w-full" data-embed-status="ready">
-        <ImageViewTracker postId={post.id}>
-          <a
-            href={mediaUrl || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleExternalOriginalClick}
-            className="block w-full overflow-hidden bg-muted"
-          >
-            <img
-              src={effectiveThumbnail}
-              alt="LinkedIn post content"
-              className="w-full h-auto object-contain"
-              loading="eager"
-              decoding="async"
-            />
-          </a>
-        </ImageViewTracker>
-      </div>
-    );
-  }
-  
   // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
   if (!shouldHydrate) {
     return (
