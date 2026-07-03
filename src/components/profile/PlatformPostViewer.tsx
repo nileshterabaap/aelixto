@@ -105,13 +105,13 @@ export const PlatformPostViewer = ({
   // BEFORE the browser paints, so post #0 never flashes.
   const initialAnchorDoneRef = useRef(false);
   // Hide the tapped target post until its first iframe/image has fully
-  // loaded so users don't see a 1-frame flash of an unhydrated embed
-  // (most noticeable on Instagram). Falls back after 700ms so slow
-  // embeds never leave the post invisible.
+  // rendered AND its height has stabilised so users don't see the
+  // Instagram "tall footer → trimmed" flash. Falls back after 1400ms so
+  // slow embeds never leave the post invisible.
   const [targetReady, setTargetReady] = useState(false);
   useEffect(() => {
     setTargetReady(false);
-    const t = window.setTimeout(() => setTargetReady(true), 700);
+    const t = window.setTimeout(() => setTargetReady(true), 1400);
     return () => window.clearTimeout(t);
   }, [initialPostId]);
   // Persist scroll-locked state across effect re-runs. Without this, if
