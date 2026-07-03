@@ -1,64 +1,44 @@
-## Goal
+## Problems
 
-When a post's source (Instagram, TikTok, YouTube, Facebook, Threads, X, Pinterest, Reddit, LinkedIn, etc.) is deleted or made private — so the embed renders a "link broken / post removed" fallback — automatically delete that post from Aelixto and send the original poster a notification with the thumbnail preview on the right side (matching existing notification styling).
+**LinkedIn videos still redirect on tap**
+`src/components/HydratedEmbed.tsx` has a LinkedIn "image card" branch that renders a plain `<img>` wrapped in an `<a>` whenever the server returned a thumbnail and the post is not confirmed as a video. LinkedIn's OG scrape almost never marks native videos as video (no `og:video` tag, poster URLs don't always contain `dms-video`/`/vc/`), so real videos hit this image branch → tap opens LinkedIn. Facebook works because its metadata is more reliable.
 
-## Why this can't be done in the browser
+**Reddit posts and thumbnails not rendering**
+Regression appeared alongside the recent Facebook/LinkedIn edits. Need to inspect edge-function logs and the current Reddit code path to identify what broke (candidates: `fetchRedditPreview` returning null after related refactors, `isMisleadingRedditThumbnail` over-filtering, or the RedditEmbed iframe sandbox/embed URL). Fix will be scoped to Reddit only.
 
-The embed iframes (instagram.com, youtube.com, …) are cross-origin, so we cannot read their DOM to detect "Sorry, this post isn't available" messages from the client. Any client-side guess would produce false positives (slow networks, ad-blockers, transient failures) and wrongly delete real posts.
+## Fixes
 
-The reliable signal is **server-side**: re-resolve each post's source URL via the official oEmbed / metadata endpoints. A consistent 404 / "not found" response means the source post is gone.
+1. **LinkedIn client-side gate — flip the default**
+   In `src/components/HydratedEmbed.tsx`, only take the LinkedIn photo branch when we have **positive** confirmation the post is an image:
+   - `post.media_kind === 'image'` (server-set) **AND** not a video signal.
+   Otherwise fall through to `UniversalMetaEmbed` (iframe player with Play button), which is what worked before the recent photo-card change.
+   Keep the existing Facebook photo branch untouched.
 
-## Approach
+2. **LinkedIn server-side video detection — broaden**
+   In `supabase/functions/fetch-post-preview/index.ts` LinkedIn branch, also mark as video when the URL/OG signals a video post even without `og:video`:
+   - `og:type` starts with `video`
+   - `twitter:player` present
+   - Any `<video>` tag detected in the fetched HTML
+   - LinkedIn URL patterns: `/video/`, `-video-activity-`, `urn:li:ugcPost` with video content-type header
+   Redeploy the function.
 
-### 1. New edge function: `validate-post-source`
-For a given `postId`, fetch the canonical validation endpoint for its platform:
+3. **Reddit diagnosis + fix**
+   - Pull recent `fetch-post-preview` logs filtered by `reddit` to see the actual failure (auth token, canonical resolve, or JSON fetch).
+   - Verify `RedditEmbed` iframe still loads by reproducing in Playwright against the preview.
+   - Likely repair points (apply the one that matches the log):
+     a. `fetchRedditPreview` — ensure it still returns `thumbnail_url` when the OAuth token call fails (fallback to old.reddit JSON path).
+     b. `isMisleadingRedditThumbnail` — loosen if it is now rejecting valid `i.redd.it`/`preview.redd.it` URLs.
+     c. `RedditEmbed` iframe `sandbox` — restore `allow-popups-to-escape-sandbox` if Reddit's widget needs it for hydration.
+   - Redeploy `fetch-post-preview` if edited.
 
-- instagram → `graph.facebook.com/v18.0/instagram_oembed` (existing META token) — 404 / `error.code 24` = removed
-- facebook → `graph.facebook.com/v18.0/oembed_post` — same
-- youtube → `youtube.com/oembed?url=…` — 404 / 401 = removed/private
-- tiktok → `tiktok.com/oembed?url=…` — 404
-- threads / x / linkedin / pinterest / reddit → HEAD request to the post URL; treat HTTP 404 / 410 as removed. Reddit also: `…/.json` returning `{}` or "removed" flag
-- spotify / articles → skip (Spotify items rarely 404; articles handled by existing unfurl)
+## Verification
 
-Return `{ status: "ok" | "removed" | "unknown" }`. Only `removed` triggers deletion. `unknown` (timeouts, rate-limits, 5xx) never deletes.
+- Playwright against localhost preview: load one LinkedIn video post → Play button visible, tap plays inline (no redirect). Load one LinkedIn image post → renders as tight photo card. Load one Reddit link → iframe renders with post + thumbnail; if iframe fails, OG fallback card shows the real thumbnail.
+- Confirm Facebook video + photo behaviors unchanged.
 
-### 2. Confirmation gate (false-positive protection)
-A post is only deleted when it returns `removed` on **two consecutive checks at least 6 hours apart**. We add a `posts.broken_check_count` int + `posts.broken_first_seen_at` timestamp. First removal hit just records; second hit deletes.
+## Constraints
 
-### 3. New edge function: `sweep-broken-posts` (cron)
-Runs hourly via pg_cron. Selects ~100 posts ordered by `last_validated_at` ascending (oldest first), calls `validate-post-source` for each, updates counters, and when threshold is hit:
-- captures the post's `thumbnail_url`, `platform`, `caption`/`title`, `media_url`
-- inserts a row into `notifications` with `type = 'post_removed'`, `actor_user_id = null`, `target_user_id = post.user_id`, payload `{ thumbnail_url, platform, original_url, caption }`
-- deletes the post (cascade removes likes/reposts/comments/saves as already configured)
-- triggers existing push-notification pipeline
+- No changes to feed order, PTR, Aelix score, or mark-as-seen.
+- No changes to Instagram embed (locked working state).
 
-### 4. Notification UI
-Existing `NotificationItem` already renders a right-side thumbnail when payload has `thumbnail_url`. Add a new branch for `type === 'post_removed'`:
-
-> "Your <Instagram> post was removed because the original was deleted or made private." — with the platform logo + cached thumbnail on the right exactly like engagement notifications.
-
-Tappable: opens a small sheet explaining why, no destination link.
-
-### 5. Manual trigger on viewer
-When `HydratedEmbed` mounts an Instagram/Facebook/Threads embed and the **`RawEmbedRenderer` onError** fires (which we already track via `rawEmbedFailed`), fire a one-shot `validate-post-source` call for that postId. This shortcuts the cron for posts the author is actively looking at, but still goes through the same 2-strike gate — no immediate deletion.
-
-## Files
-
-New:
-- `supabase/functions/validate-post-source/index.ts`
-- `supabase/functions/sweep-broken-posts/index.ts`
-- migration: add `broken_check_count`, `broken_first_seen_at`, `last_validated_at` to `posts`; add `post_removed` to notification type enum; schedule hourly cron for `sweep-broken-posts`
-- `src/components/notifications/PostRemovedNotification.tsx`
-
-Edited:
-- `src/components/notifications/NotificationItem.tsx` — route `post_removed` to new component
-- `src/components/HydratedEmbed.tsx` — on `handleRawEmbedError`, call `validate-post-source` once per session per postId
-
-## Out of scope / safeguards
-
-- No client-side "guess" deletion — only server validation deletes.
-- Posts from platforms we cannot reliably probe (Spotify, generic articles) are never auto-deleted.
-- Transient failures (5xx, network, rate-limit) are recorded as `unknown` and do not advance the strike counter.
-- Author can still manually delete; nothing changes for healthy posts.
-
-Approve and I'll implement.
+Success probability: 85%.

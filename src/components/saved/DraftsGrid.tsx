@@ -24,11 +24,14 @@ import facebookIcon from "@/assets/platforms/facebook.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import redditIcon from "@/assets/platforms/reddit.svg";
 import tiktokIcon from "@/assets/platforms/tiktok.svg";
+import pinterestIcon from "@/assets/platforms/pinterest.svg";
+import articlesIcon from "@/assets/platforms/articles.svg";
 
 const PLATFORM_ICONS: Record<string, string> = {
   instagram: instagramIcon, youtube: youtubeIcon, x: xIcon, twitter: xIcon,
   spotify: spotifyIcon, medium: mediumIcon, threads: threadsIcon,
   facebook: facebookIcon, linkedin: linkedinIcon, reddit: redditIcon, tiktok: tiktokIcon,
+  pinterest: pinterestIcon, article: articlesIcon,
 };
 
 interface DraftsGridProps {
@@ -45,6 +48,7 @@ function DraftCard({
   onDelete: () => void;
 }) {
   const [imgError, setImgError] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
   const platform = (draft.platform || "").toLowerCase();
   const icon = PLATFORM_ICONS[platform];
   const src = !imgError && draft.thumbnail_url ? maybeProxy(draft.thumbnail_url, 480) : null;
@@ -56,13 +60,19 @@ function DraftCard({
         className="relative overflow-hidden rounded-2xl aspect-square bg-muted/50 w-full"
       >
         {src ? (
-          <img
-            src={src}
-            alt=""
-            onError={() => setImgError(true)}
-            className="w-full h-full object-cover"
-            loading="lazy"
-          />
+          <>
+            {!imgLoaded && (
+              <div className="absolute inset-0 bg-muted/70 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/40 before:to-transparent before:animate-shimmer" />
+            )}
+            <img
+              src={src}
+              alt=""
+              onError={() => setImgError(true)}
+              onLoad={() => setImgLoaded(true)}
+              loading="lazy"
+              className={`w-full h-full object-cover transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
+            />
+          </>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-muted">
             <FileText className="w-8 h-8 text-muted-foreground/60 mb-1" />
@@ -76,9 +86,6 @@ function DraftCard({
             <img src={icon} alt="" className="w-3.5 h-3.5 invert" />
           </div>
         )}
-        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
-          <span className="text-[10px] font-medium text-white uppercase tracking-wide">Draft</span>
-        </div>
       </button>
       <button
         onClick={(e) => { e.stopPropagation(); onDelete(); }}
