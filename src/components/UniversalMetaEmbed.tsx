@@ -468,9 +468,6 @@ const LI_VIEWPORT_HEIGHT = 760;
 
 const LinkedInIframeEmbed = ({
   src,
-  postId,
-  suggestedHeight,
-  expandedUrl,
 }: {
   src: string;
   postId?: string | null;
