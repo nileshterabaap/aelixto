@@ -594,7 +594,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       </div>
 
       {/* Caption */}
-      {detectedPlatform !== 'instagram' && post.content?.trim() && (
+      {post.content?.trim() && (
         <div className="px-5 pb-3">
           <CollapsibleCaption content={post.content} />
         </div>
