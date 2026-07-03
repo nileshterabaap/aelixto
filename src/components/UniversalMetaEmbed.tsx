@@ -1041,14 +1041,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
       if (isLinkedInIframe) {
         const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
         const iframeSrc = srcMatch ? srcMatch[1] : '';
-        return (
-          <LinkedInIframeEmbed
-            src={iframeSrc}
-            postId={postId}
-            suggestedHeight={suggestedHeight}
-            expandedUrl={expandedUrl}
-          />
-        );
+        return <LinkedInIframeEmbed src={iframeSrc} />;
       }
 
       if (isTikTokIframe) {
