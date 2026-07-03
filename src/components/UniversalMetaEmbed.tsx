@@ -267,7 +267,6 @@ const InstagramIframeEmbed = ({
           display: 'block',
         }}
       />
-      {expandedUrl && <OpenOriginalPill url={expandedUrl} label="Open on Instagram" />}
     </div>
   );
 };
@@ -393,7 +392,6 @@ const FacebookIframeEmbed = ({
           display: 'block',
         }}
       />
-      <OpenOriginalPill url={expandedUrl} label="Open on Facebook" />
     </div>
   );
 };
@@ -462,7 +460,6 @@ const LinkedInIframeEmbed = ({
           display: 'block',
         }}
       />
-      {expandedUrl && <OpenOriginalPill url={expandedUrl} label="Open on LinkedIn" />}
     </div>
   );
 };
