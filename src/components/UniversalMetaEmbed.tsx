@@ -630,6 +630,7 @@ interface UniversalMetaEmbedProps {
   url: string;
   postId?: string | null;
   suggestedHeight?: number | null;
+  aspectRatio?: number | null;
 }
 
 // Cache resolved embeds to avoid re-processing when navigating between tabs/pages
