@@ -520,15 +520,15 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       )}
 
-      {/* Real card — hidden until embed loads, fades in blurred, then sharpens */}
+      {/* Real card — mirrors the profile grid thumbnail reveal: pure opacity
+          fade with the same 300ms duration. No blur → sharpen step. */}
       <div
         ref={cardMeasureRef}
         className={`overflow-hidden rounded-xl ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',
-          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : 'blur(4px)'),
-          transition: 'opacity 250ms ease-in-out, filter 400ms ease-out',
+          transition: 'opacity 300ms ease-out',
         }}
       >
     <Card className="glass-post-card overflow-hidden rounded-[2rem]">
