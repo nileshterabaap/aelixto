@@ -227,7 +227,7 @@ serve(async (req) => {
       const ar = dims ? clampAR(dims.w / dims.h) : null;
       const linkedInVideoHint =
         hasVideo ||
-        (thumbnailUrl && /(\/vc\/|dms-video|video-thumbnail|\/videocover\/|\/playlist\/vid\/|thumbnail-with-play-button|\/vid\/)/i.test(thumbnailUrl)) ||
+        (thumbnailUrl && /(\/vc\/|dms-video|video-thumbnail|\/videocover\/)/i.test(thumbnailUrl)) ||
         // LinkedIn URL patterns that strongly imply a native video.
         /\/video\//i.test(url) ||
         /-video-activity-/i.test(url) ||

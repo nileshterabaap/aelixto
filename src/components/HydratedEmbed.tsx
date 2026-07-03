@@ -198,10 +198,7 @@ export const HydratedEmbed = memo(({
         thumbnailUrl.includes('/vc/') ||
         thumbnailUrl.includes('dms-video') ||
         thumbnailUrl.includes('video-thumbnail') ||
-        thumbnailUrl.includes('/videocover/') ||
-        thumbnailUrl.includes('/playlist/vid/') ||
-        thumbnailUrl.includes('thumbnail-with-play-button') ||
-        thumbnailUrl.includes('/vid/')
+        thumbnailUrl.includes('/videocover/')
       )));
 
   // Only take the LinkedIn photo-card branch when the server has *positively*
