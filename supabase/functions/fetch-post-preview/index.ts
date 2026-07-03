@@ -227,7 +227,11 @@ serve(async (req) => {
       const ar = dims ? clampAR(dims.w / dims.h) : null;
       const linkedInVideoHint =
         hasVideo ||
-        (thumbnailUrl && /(\/vc\/|dms-video|video-thumbnail|\/videocover\/)/i.test(thumbnailUrl));
+        (thumbnailUrl && /(\/vc\/|dms-video|video-thumbnail|\/videocover\/)/i.test(thumbnailUrl)) ||
+        // LinkedIn URL patterns that strongly imply a native video.
+        /\/video\//i.test(url) ||
+        /-video-activity-/i.test(url) ||
+        /:video:/i.test(url);
       if (linkedInVideoHint) {
         sizing = { media_kind: 'video', aspect_ratio: ar ?? 16 / 9, suggested_height: null };
       } else if (thumbnailUrl) {
