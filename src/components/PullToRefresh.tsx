@@ -48,12 +48,13 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     const handleTouchStart = (event: TouchEvent) => {
       if (refreshing) return;
       if (shouldIgnorePullTarget(event.target)) return;
-      if (!isAtTop()) return;
-
       const touch = event.touches[0];
       if (!touch) return;
 
       touchStartY.current = touch.clientY;
+      // Allow starting the gesture from any scroll position.
+      // We'll begin the actual pull only once the user reaches the top
+      // while still dragging downward (Instagram-style).
       pulling.current = true;
     };
 
@@ -66,11 +67,19 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       const diff = touch.clientY - touchStartY.current;
 
       if (diff > 0 && isAtTop()) {
-        const dampened = Math.min(MAX_PULL, diff * 0.5 * (1 - diff / (diff + 300)));
+        // Re-anchor the start position the moment we hit the top, so the
+        // pull distance is measured from "top reached", not from finger-down.
+        const anchored = touch.clientY - touchStartY.current;
+        const dampened = Math.min(MAX_PULL, anchored * 0.5 * (1 - anchored / (anchored + 300)));
         pullY.set(dampened);
         return;
       }
 
+      if (!isAtTop()) {
+        // User is still scrolling normally — re-anchor so when they hit the
+        // top mid-gesture the pull starts cleanly from 0.
+        touchStartY.current = touch.clientY;
+      }
       pullY.set(0);
     };
 

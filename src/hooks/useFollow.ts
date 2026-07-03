@@ -30,6 +30,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
     followers: 0, 
     following: 0 
   });
+  const [countsReady, setCountsReady] = useState<boolean>(false);
 
   const refresh = useCallback(async () => {
     if (!targetUserId) return;
@@ -84,6 +85,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
       setIsFollowing(!!myFollow);
       setIsRequested(!!myRequest && !myFollow);
       setFollowsMe(!!theirFollow);
+      setCountsReady(true);
     } catch (error) {
       console.error("Error refreshing follow data:", error);
     }
@@ -198,5 +200,5 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
     }
   }, [targetUserId, isFollowing, isRequested, refresh, queryClient]);
 
-  return { isFollowing, isRequested, followsMe, follow, unfollow, loading, counts, refresh };
+  return { isFollowing, isRequested, followsMe, follow, unfollow, loading, counts, countsReady, refresh };
 }
