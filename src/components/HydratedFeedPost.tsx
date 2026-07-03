@@ -593,9 +593,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       </div>
 
-      {/* Caption — hidden for LinkedIn: the LinkedIn embed card renders the
-          post text itself, so showing it above duplicates the caption. */}
-      {post.content?.trim() && detectedPlatform !== 'linkedin' && (
+      {/* Caption */}
+      {post.content?.trim() && (
         <div className="px-5 pb-3">
           <CollapsibleCaption content={post.content} />
         </div>
