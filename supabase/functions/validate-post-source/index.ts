@@ -159,17 +159,18 @@ export async function validate(platform: string | null, url: string | null): Pro
     }
 
     // ===== Generic (Threads, X, LinkedIn, Pinterest, Quora, articles) =====
-    // These platforms aggressively block non-browser User-Agents and frequently
-    // return 404/403/410 to anonymous server fetches even when the post is
-    // public and embeddable. We cannot reliably distinguish "removed" from
-    // "bot-blocked" without an official API/token, so always return "unknown"
-    // and never fire a false "post removed" notification for these platforms.
     if (
       p === "threads" || p === "x" || p === "twitter" || p === "linkedin" ||
       p === "pinterest" || p === "quora" || p === "medium" || p === "article" || p === "external" ||
       /threads\.(net|com)|x\.com|twitter\.com|linkedin\.com|pinterest\.com|pin\.it|quora\.com|medium\.com/i.test(url)
     ) {
-      return "unknown";
+      // HEAD first; some hosts disallow HEAD so fall back to GET on 405
+      let r = await fetchWithTimeout(url, { method: "HEAD", headers: { "User-Agent": UA } });
+      if (r.status === 405 || r.status === 403) {
+        r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } });
+      }
+      if (r.status === 404 || r.status === 410) return "removed";
+      return "unknown"; // 200 doesn't guarantee the post still exists (most platforms redirect to a "not found" page with 200)
     }
 
     return "unknown";
