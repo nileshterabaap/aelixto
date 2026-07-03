@@ -183,7 +183,11 @@ serve(async (req) => {
       }
 
       const isReel = /\/reel\//i.test(targetUrl);
-      const isVideo = /\/videos?\//i.test(targetUrl);
+      const isVideo =
+        /\/videos?\//i.test(targetUrl) ||
+        /\/watch(\/|\?)/i.test(targetUrl) ||
+        /\/share\/v\//i.test(targetUrl) ||
+        /(^|\/\/|\.)fb\.watch\//i.test(targetUrl);
       const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : (isReel ? 9 / 16 : (isVideo ? 16 / 9 : 4 / 5));
       sizing = { media_kind: isVideo || isReel ? 'video' : 'image', aspect_ratio: clampAR(ar), suggested_height: null };
     }
@@ -221,7 +225,10 @@ serve(async (req) => {
       const hasVideo = ogData.hasVideo;
       const dims = ogData.imageWidth && ogData.imageHeight ? { w: ogData.imageWidth, h: ogData.imageHeight } : null;
       const ar = dims ? clampAR(dims.w / dims.h) : null;
-      if (hasVideo) {
+      const linkedInVideoHint =
+        hasVideo ||
+        (thumbnailUrl && /(\/vc\/|dms-video|video-thumbnail|\/videocover\/)/i.test(thumbnailUrl));
+      if (linkedInVideoHint) {
         sizing = { media_kind: 'video', aspect_ratio: ar ?? 16 / 9, suggested_height: null };
       } else if (thumbnailUrl) {
         sizing = { media_kind: 'image', aspect_ratio: ar ?? 4 / 5, suggested_height: null };
@@ -1156,7 +1163,8 @@ function extractSizingFromHtml(html: string): { imageWidth: number | null; image
   const hasVideo = !!tolerantMeta('og:video')
     || !!tolerantMeta('og:video:secure_url')
     || !!tolerantMeta('og:video:url')
-    || (tolerantMeta('twitter:card')?.toLowerCase() === 'player');
+    || (tolerantMeta('twitter:card')?.toLowerCase() === 'player')
+    || (tolerantMeta('og:type')?.toLowerCase().startsWith('video') ?? false);
   return {
     imageWidth: metaNum('og:image:width'),
     imageHeight: metaNum('og:image:height'),

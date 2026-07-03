@@ -175,7 +175,10 @@ export const HydratedEmbed = memo(({
       lowerUrl.includes('/reel/') ||
       lowerUrl.includes('/videos/') ||
       lowerUrl.includes('/watch/') ||
+      lowerUrl.includes('/watch?') ||
+      lowerUrl.includes('/watch.') ||
       lowerUrl.includes('/share/v/') ||
+      lowerUrl.includes('/share/r/') ||
       lowerUrl.includes('fb.watch/'));
 
   const isLinkedInPost =
@@ -186,7 +189,17 @@ export const HydratedEmbed = memo(({
     (mediaTypeHint === 'video' ||
       String((post as any).media_kind || '').toLowerCase() === 'video' ||
       lowerUrl.includes('/video/') ||
-      lowerUrl.includes('/videos/'));
+      lowerUrl.includes('/videos/') ||
+      // LinkedIn CDN video-thumbnail hints. When the fetched thumbnail is a
+      // video poster from media.licdn.com, treat this as a video so it renders
+      // in the iframe player instead of the photo-only branch (which strips
+      // the play button and hijacks taps to open LinkedIn).
+      (typeof thumbnailUrl === 'string' && (
+        thumbnailUrl.includes('/vc/') ||
+        thumbnailUrl.includes('dms-video') ||
+        thumbnailUrl.includes('video-thumbnail') ||
+        thumbnailUrl.includes('/videocover/')
+      )));
 
   useEffect(() => {
     if (!shouldHydrate) return;
