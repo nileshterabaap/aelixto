@@ -465,6 +465,11 @@ const FacebookIframeEmbed = ({
  * itself must scroll instead of expanding the outer feed item.
  */
 const LI_VIEWPORT_HEIGHT = 760;
+// LinkedIn's embed appends a reactions count row + Like/Comment/Share bar
+// at the bottom of its content. Clip those from the visible viewport so
+// only the media/post body shows above Aelix's own action bar. The iframe
+// itself remains internally scrollable — the trim just hides the tail.
+const LI_FOOTER_TRIM = 210;
 
 const LinkedInIframeEmbed = ({
   src,
@@ -491,9 +496,12 @@ const LinkedInIframeEmbed = ({
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         style={{
           border: 'none',
+          position: 'absolute',
+          top: 0,
+          left: 0,
           width: '100%',
-          height: '100%',
-          minHeight: `${LI_VIEWPORT_HEIGHT}px`,
+          height: `${LI_VIEWPORT_HEIGHT + LI_FOOTER_TRIM}px`,
+          minHeight: `${LI_VIEWPORT_HEIGHT + LI_FOOTER_TRIM}px`,
           display: 'block',
           background: 'hsl(var(--background))',
         }}
