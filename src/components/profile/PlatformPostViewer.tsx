@@ -448,7 +448,6 @@ export const PlatformPostViewer = ({
                   }}
                   userId={user?.id}
                   startHydrated={true}
-                  onDeleted={onClose}
                 />
               </motion.div>
             ))
