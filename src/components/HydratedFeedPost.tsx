@@ -609,15 +609,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         // Reddit/Threads/X embeds render the post text inside the iframe;
         // showing the original caption above duplicates it.
         if (detectedPlatform === 'reddit' || detectedPlatform === 'threads' || detectedPlatform === 'twitter') return null;
-        // LinkedIn's iframe player also renders the author's caption
-        // natively. Only suppress our copy when we're routing to the
-        // iframe — image posts (rendered as a plain <img>) still need it.
-        if (detectedPlatform === 'linkedin') {
-          const mediaKind = String((post as any).media_kind || '').toLowerCase();
-          const mediaType = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
-          const isConfirmedImage = mediaKind === 'image' || mediaType === 'image';
-          if (!isConfirmedImage) return null;
-        }
         return (
           <div className="px-5 pb-3">
             <CollapsibleCaption

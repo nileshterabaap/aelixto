@@ -1,31 +1,44 @@
-## Problem
+## Problems
 
-LinkedIn posts show the source caption twice: once as the "original caption" block that Aelixto renders above the embed (via `getOriginalPostCaption` in `HydratedFeedPost.tsx`), and again inside LinkedIn's own iframe player (`UniversalMetaEmbed`), which always renders the author's post text as part of the LinkedIn card.
+**LinkedIn videos still redirect on tap**
+`src/components/HydratedEmbed.tsx` has a LinkedIn "image card" branch that renders a plain `<img>` wrapped in an `<a>` whenever the server returned a thumbnail and the post is not confirmed as a video. LinkedIn's OG scrape almost never marks native videos as video (no `og:video` tag, poster URLs don't always contain `dms-video`/`/vc/`), so real videos hit this image branch → tap opens LinkedIn. Facebook works because its metadata is more reliable.
 
-Facebook doesn't have this issue because Facebook posts are routed to the direct-image branch in `HydratedEmbed.tsx` (no native caption is drawn). LinkedIn posts that are videos / non-confirmed-images fall through to the iframe player, which owns the caption — so ours becomes a duplicate.
+**Reddit posts and thumbnails not rendering**
+Regression appeared alongside the recent Facebook/LinkedIn edits. Need to inspect edge-function logs and the current Reddit code path to identify what broke (candidates: `fetchRedditPreview` returning null after related refactors, `isMisleadingRedditThumbnail` over-filtering, or the RedditEmbed iframe sandbox/embed URL). Fix will be scoped to Reddit only.
 
-## Fix
+## Fixes
 
-In `src/components/HydratedFeedPost.tsx`, extend the "skip original caption above the embed" guard that already covers `reddit`, `threads`, and `twitter` to also cover `linkedin` when the embed will render as an iframe (i.e. not the confirmed-image branch).
+1. **LinkedIn client-side gate — flip the default**
+   In `src/components/HydratedEmbed.tsx`, only take the LinkedIn photo branch when we have **positive** confirmation the post is an image:
+   - `post.media_kind === 'image'` (server-set) **AND** not a video signal.
+   Otherwise fall through to `UniversalMetaEmbed` (iframe player with Play button), which is what worked before the recent photo-card change.
+   Keep the existing Facebook photo branch untouched.
 
-Concretely:
+2. **LinkedIn server-side video detection — broaden**
+   In `supabase/functions/fetch-post-preview/index.ts` LinkedIn branch, also mark as video when the URL/OG signals a video post even without `og:video`:
+   - `og:type` starts with `video`
+   - `twitter:player` present
+   - Any `<video>` tag detected in the fetched HTML
+   - LinkedIn URL patterns: `/video/`, `-video-activity-`, `urn:li:ugcPost` with video content-type header
+   Redeploy the function.
 
-1. Compute an `isLinkedInIframeBranch` flag alongside `detectedPlatform`:
-   - `detectedPlatform === 'linkedin'` AND the post is **not** a confirmed image (mirror the `isConfirmedLinkedInImage` check used in `HydratedEmbed.tsx`: `media_kind !== 'image'` and `mediaType !== 'image'`).
-2. In the `originalPostCaption` render block (around the current `if (detectedPlatform === 'reddit' || 'threads' || 'twitter') return null;`), also return `null` when `isLinkedInIframeBranch` is true.
-3. Leave the confirmed LinkedIn image branch untouched — that branch renders a plain `<img>` with no native caption, so the Aelixto caption above is still needed there.
-
-No changes to:
-- `HydratedEmbed.tsx` LinkedIn routing (still image branch for confirmed images, iframe otherwise).
-- `originalCaption.ts` extraction logic.
-- User's own caption (`post.content`) — still rendered above as normal.
-- Facebook, Instagram, PTR, Aelix score, mark-as-seen, feed order.
+3. **Reddit diagnosis + fix**
+   - Pull recent `fetch-post-preview` logs filtered by `reddit` to see the actual failure (auth token, canonical resolve, or JSON fetch).
+   - Verify `RedditEmbed` iframe still loads by reproducing in Playwright against the preview.
+   - Likely repair points (apply the one that matches the log):
+     a. `fetchRedditPreview` — ensure it still returns `thumbnail_url` when the OAuth token call fails (fallback to old.reddit JSON path).
+     b. `isMisleadingRedditThumbnail` — loosen if it is now rejecting valid `i.redd.it`/`preview.redd.it` URLs.
+     c. `RedditEmbed` iframe `sandbox` — restore `allow-popups-to-escape-sandbox` if Reddit's widget needs it for hydration.
+   - Redeploy `fetch-post-preview` if edited.
 
 ## Verification
 
-- Load a LinkedIn video/text post in the preview: only one copy of the caption is visible (the one inside the LinkedIn iframe).
-- Load a LinkedIn image post: caption still appears above the image (no iframe present to duplicate it).
-- Facebook video + photo posts unchanged.
-- No regression to Instagram, Threads, X, Reddit caption rendering.
+- Playwright against localhost preview: load one LinkedIn video post → Play button visible, tap plays inline (no redirect). Load one LinkedIn image post → renders as tight photo card. Load one Reddit link → iframe renders with post + thumbnail; if iframe fails, OG fallback card shows the real thumbnail.
+- Confirm Facebook video + photo behaviors unchanged.
 
-Success probability: 88%.
+## Constraints
+
+- No changes to feed order, PTR, Aelix score, or mark-as-seen.
+- No changes to Instagram embed (locked working state).
+
+Success probability: 85%.
