@@ -473,11 +473,13 @@ const LinkedInIframeEmbed = ({
   postId,
   suggestedHeight,
   expandedUrl,
+  aspectRatio,
 }: {
   src: string;
   postId?: string | null;
   suggestedHeight?: number | null;
   expandedUrl?: string;
+  aspectRatio?: number | null;
 }) => {
   const [height, setHeight] = useState(() =>
     suggestedHeight && suggestedHeight >= LI_MIN_HEIGHT
@@ -485,6 +487,8 @@ const LinkedInIframeEmbed = ({
       : LI_DEFAULT_HEIGHT
   );
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
   const persistHeight = usePersistEmbedHeight(postId);
 
   useEffect(() => {
@@ -503,10 +507,38 @@ const LinkedInIframeEmbed = ({
     return () => window.removeEventListener('message', handler);
   }, []);
 
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => setContainerWidth(el.getBoundingClientRect().width);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // LinkedIn's embed layout is symmetric around the video:
+  //   [author bar ~60] [caption C] [video Vh] [caption C] [reactions ~60]
+  // The top and bottom chrome are the same height (the caption is duplicated
+  // above and below the video). Cropping the container to just Vh and
+  // vertically centering the full iframe hides both the author/caption band
+  // above AND the caption/reactions band below — so only the video shows.
+  // This is resilient to any video size because Vh is derived from the
+  // measured container width and the post's aspect ratio.
+  const ratio =
+    typeof aspectRatio === 'number' && aspectRatio > 0.2 && aspectRatio < 5
+      ? aspectRatio
+      : 16 / 9;
+  const videoHeight = containerWidth > 0 ? containerWidth / ratio : 0;
+  const canCrop = videoHeight > 0 && height > videoHeight + 120;
+  const visibleHeight = canCrop ? Math.round(videoHeight) : height;
+  const topOffset = canCrop ? -Math.round((height - videoHeight) / 2) : 0;
+
   return (
     <div
+      ref={containerRef}
       className="relative w-full overflow-hidden"
-      style={{ width: '100%', height: `${height}px`, touchAction: 'pan-y' }}
+      style={{ width: '100%', height: `${visibleHeight}px`, touchAction: 'pan-y' }}
     >
       <iframe
         ref={iframeRef}
@@ -518,8 +550,11 @@ const LinkedInIframeEmbed = ({
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         style={{
           border: 'none',
+          position: 'absolute',
+          left: 0,
+          top: `${topOffset}px`,
           width: '100%',
-          height: '100%',
+          height: `${height}px`,
           display: 'block',
         }}
       />
@@ -595,6 +630,7 @@ interface UniversalMetaEmbedProps {
   url: string;
   postId?: string | null;
   suggestedHeight?: number | null;
+  aspectRatio?: number | null;
 }
 
 // Cache resolved embeds to avoid re-processing when navigating between tabs/pages
@@ -841,7 +877,7 @@ const buildTikTokEmbed = (url: string): string | null => {
 };
 
 
-export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMetaEmbedProps) => {
+export const UniversalMetaEmbed = ({ url, postId, suggestedHeight, aspectRatio }: UniversalMetaEmbedProps) => {
   const cached = embedCache.get(url);
 
   const [embedHtml, setEmbedHtml] = useState<string | null>(cached?.embedHtml ?? null);
@@ -1072,6 +1108,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             postId={postId}
             suggestedHeight={suggestedHeight}
             expandedUrl={expandedUrl}
+            aspectRatio={aspectRatio ?? null}
           />
         );
       }
