@@ -33,6 +33,11 @@ const AppleIcon = () => (
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  // Hide Apple sign-in on Android. Apple's guidelines require the native
+  // Apple sheet on iOS, and non-Apple platforms should not offer this option
+  // (matches how other apps behave).
+  const showApple =
+    !(Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
@@ -550,16 +555,18 @@ const Auth = () => {
                 Continue with Google
               </Button>
 
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
-                onClick={handleAppleSignIn}
-                disabled={loading}
-              >
-                <AppleIcon />
-                Continue with Apple
-              </Button>
+              {showApple && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
+                  onClick={handleAppleSignIn}
+                  disabled={loading}
+                >
+                  <AppleIcon />
+                  Continue with Apple
+                </Button>
+              )}
             </form>
           </TabsContent>
 
@@ -628,16 +635,18 @@ const Auth = () => {
                 Continue with Google
               </Button>
 
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
-                onClick={handleAppleSignIn}
-                disabled={loading}
-              >
-                <AppleIcon />
-                Continue with Apple
-              </Button>
+              {showApple && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
+                  onClick={handleAppleSignIn}
+                  disabled={loading}
+                >
+                  <AppleIcon />
+                  Continue with Apple
+                </Button>
+              )}
             </form>
           </TabsContent>
         </Tabs>
