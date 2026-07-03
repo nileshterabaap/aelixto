@@ -181,39 +181,6 @@ export const HydratedEmbed = memo(({
       lowerUrl.includes('/share/r/') ||
       lowerUrl.includes('fb.watch/'));
 
-  const isLinkedInPost =
-    platformHint === 'linkedin' || lowerUrl.includes('linkedin.com/');
-
-  const isLinkedInVideoLike =
-    isLinkedInPost &&
-    (mediaTypeHint === 'video' ||
-      String((post as any).media_kind || '').toLowerCase() === 'video' ||
-      lowerUrl.includes('/video/') ||
-      lowerUrl.includes('/videos/') ||
-      // LinkedIn CDN video-thumbnail hints. When the fetched thumbnail is a
-      // video poster from media.licdn.com, treat this as a video so it renders
-      // in the iframe player instead of the photo-only branch (which strips
-      // the play button and hijacks taps to open LinkedIn).
-      (typeof thumbnailUrl === 'string' && (
-        thumbnailUrl.includes('/vc/') ||
-        thumbnailUrl.includes('dms-video') ||
-        thumbnailUrl.includes('video-thumbnail') ||
-        thumbnailUrl.includes('/videocover/')
-      )));
-
-  // Only take the LinkedIn photo-card branch when the server has *positively*
-  // classified the post as an image. LinkedIn's OG data almost never marks
-  // native videos as video (no `og:video`, no `/vc/` thumbnail path), so
-  // defaulting to "image whenever a thumbnail exists" was hijacking real
-  // video posts into a tap-to-redirect card. Fall through to the iframe
-  // player (UniversalMetaEmbed) whenever we're not sure — that's what worked
-  // before the photo-card change and it keeps the Play button visible.
-  const isConfirmedLinkedInImage =
-    isLinkedInPost &&
-    !isLinkedInVideoLike &&
-    (mediaTypeHint === 'image' ||
-      String((post as any).media_kind || '').toLowerCase() === 'image');
-
   useEffect(() => {
     if (!shouldHydrate) return;
     rememberHydratedPost(post.id);
