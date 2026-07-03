@@ -877,7 +877,7 @@ const buildTikTokEmbed = (url: string): string | null => {
 };
 
 
-export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMetaEmbedProps) => {
+export const UniversalMetaEmbed = ({ url, postId, suggestedHeight, aspectRatio }: UniversalMetaEmbedProps) => {
   const cached = embedCache.get(url);
 
   const [embedHtml, setEmbedHtml] = useState<string | null>(cached?.embedHtml ?? null);
@@ -1108,6 +1108,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             postId={postId}
             suggestedHeight={suggestedHeight}
             expandedUrl={expandedUrl}
+            aspectRatio={aspectRatio ?? null}
           />
         );
       }
