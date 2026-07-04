@@ -608,7 +608,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         // duplicates it, so skip the original caption for Reddit.
         // Reddit/Threads/X embeds render the post text inside the iframe;
         // showing the original caption above duplicates it.
-        if (detectedPlatform === 'reddit' || detectedPlatform === 'threads' || detectedPlatform === 'twitter' || detectedPlatform === 'linkedin') return null;
+        if (detectedPlatform === 'reddit' || detectedPlatform === 'threads' || detectedPlatform === 'twitter' || detectedPlatform === 'linkedin' || detectedPlatform === 'tiktok') return null;
         return (
           <div className="px-5 pb-3">
             <CollapsibleCaption
