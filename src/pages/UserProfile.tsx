@@ -55,10 +55,11 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
     },
   });
 
-  const { isFollowing, isRequested, followsMe, follow, unfollow, loading: followLoading, counts, countsReady, refresh: refreshFollow } = useFollow(profile?.user_id);
+  const { isFollowing, isRequested, follow, unfollow, loading: followLoading, counts, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
+  const [isFollowedByTarget, setIsFollowedByTarget] = useState(false);
 
   const isPrivate = !!(profile?.settings as { is_private?: boolean } | null)?.is_private;
   const canViewPosts = !isPrivate || isMe || isFollowing;
@@ -111,8 +112,21 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
     return () => { clearTimeout(t); img.onload = null; img.onerror = null; };
   }, [profile?.user_id, profile?.avatar_url]);
 
-  const contentReady = !!profile && !tabsLoading && coverReady && avatarReady && countsReady;
+  const contentReady = !!profile && !tabsLoading && coverReady && avatarReady;
   const showSkeleton = !contentReady;
+
+  // Check if the target user follows the current user
+  useEffect(() => {
+    if (!user || !profile?.user_id || isMe) return;
+    setIsFollowedByTarget(false);
+    supabase
+      .from("follows")
+      .select("id")
+      .eq("follower_id", profile.user_id)
+      .eq("following_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => setIsFollowedByTarget(!!data));
+  }, [user, profile?.user_id, isMe]);
 
   const handleRefresh = useCallback(async () => {
     await Promise.all([refetchProfile(), refreshFollow()]);
@@ -139,7 +153,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
         style={{ opacity: showSkeleton ? 1 : 0 }}
       >
         <div className="mx-auto max-w-2xl">
-          <div className="relative h-[400px] profile-cover-fallback animate-shimmer" />
+          <div className="relative h-[400px] bg-gradient-to-r from-purple-500/20 to-pink-500/20 animate-shimmer" />
           <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
             <div className="flex items-center justify-between -mt-[130px] pt-4 relative px-4">
               <div className="text-center flex-shrink-0 w-20 -ml-2">
@@ -187,7 +201,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
       <PullToRefresh onRefresh={handleRefresh}>
       <main className="mx-auto max-w-2xl">
         {/* Cover Image with Header Overlay */}
-        <div className="relative h-[400px] profile-cover-fallback">
+        <div className="relative h-[400px] bg-gradient-to-r from-purple-500 to-pink-500">
           {profile.cover_url && (
             <img
               src={profile.cover_url}
@@ -227,9 +241,10 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                   targetUserId={profile.user_id}
                   username={profile.username}
                   displayName={profile.display_name}
-                  isFollowedByTarget={followsMe}
+                  isFollowedByTarget={isFollowedByTarget}
                   onBlocked={() => navigate('/')}
                   onRemovedFollower={() => {
+                    setIsFollowedByTarget(false);
                     refreshFollow();
                   }}
                 />
@@ -293,7 +308,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           {!isMe && user && mutualsData && mutualsData.length > 0 && (
             <p className="text-center text-sm text-muted-foreground mb-4 px-4">
               {(() => {
-                const followersVis = getFollowVisibility((profile?.settings as Record<string, unknown>) || null, "followers");
+                const followersVis = getFollowVisibility((profile?.settings as Record<string, any>) || null, "followers");
                 const total = mutualsData[0]?.total_count ?? mutualsData.length;
                 if (followersVis === "no_one") {
                   return `Followed by ${total} mutual${total !== 1 ? "s" : ""}`;
@@ -331,7 +346,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                     : 'bg-primary text-primary-foreground hover:bg-primary/90'
                 }`}
               >
-                {isFollowing ? 'Following' : isRequested ? 'Asked' : followsMe ? 'Follow Back' : 'Follow'}
+                {isFollowing ? 'Following' : isRequested ? 'Requested' : 'Follow'}
               </Button>
               <Button
                 disabled={conversationLoading}

@@ -67,8 +67,6 @@ export const useCreatePost = () => {
       platform?: string;
       embed_html?: string;
       thumbnail_url?: string;
-      suggested_height?: number | null;
-      preview_text?: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -84,24 +82,14 @@ export const useCreatePost = () => {
           platform: newPost.platform || null,
           embed_html: newPost.embed_html || null,
           thumbnail_url: newPost.thumbnail_url || null,
-          suggested_height: newPost.suggested_height ?? null,
-          preview_text: newPost.preview_text || null,
         })
-        .select(`
-          *,
-          profiles!posts_user_id_fkey (
-            username,
-            display_name,
-            avatar_url,
-            settings
-          )
-        `)
+        .select()
         .single();
 
       if (error) throw error;
       return data;
     },
-    onSuccess: async (createdPost: any) => {
+    onSuccess: async () => {
       await queryClient.cancelQueries({ queryKey: ["posts"] });
       await queryClient.cancelQueries({ queryKey: ["following-feed"] });
       await queryClient.cancelQueries({ queryKey: ["platform-posts"] });
@@ -109,6 +97,7 @@ export const useCreatePost = () => {
       await queryClient.cancelQueries({ queryKey: ["user-posts"] });
 
       queryClient.removeQueries({ queryKey: ["posts"] });
+      queryClient.removeQueries({ queryKey: ["following-feed"] });
       queryClient.removeQueries({ queryKey: ["platform-posts"] });
       queryClient.removeQueries({ queryKey: ["user-platform-tabs"] });
       queryClient.removeQueries({ queryKey: ["user-posts"] });
