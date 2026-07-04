@@ -40,6 +40,8 @@ import { PostReportMenu } from "@/components/PostReportMenu";
 import { getOriginalPostCaption } from "@/lib/originalCaption";
 import { supabase } from "@/integrations/supabase/client";
 import { markEmbedReady, startEmbedWatch } from "@/lib/embedReadiness";
+import { openExternalUrl } from "@/lib/openExternalUrl";
+import { markOriginalVisit } from "@/hooks/useOriginalVisitTracker";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
@@ -573,11 +575,30 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
         <div className="flex items-center gap-2 shrink-0 text-foreground">
           {platform && (
-            <img 
-              src={platform.icon} 
-              alt={platform.name}
-              className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' ? 'w-6 h-6' : 'w-8 h-8'}`}
-            />
+            mediaUrl ? (
+              <button
+                type="button"
+                aria-label={`Open on ${platform.name}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  markOriginalVisit(post.id);
+                  void openExternalUrl(mediaUrl);
+                }}
+                className="p-0 bg-transparent border-0 cursor-pointer"
+              >
+                <img
+                  src={platform.icon}
+                  alt={platform.name}
+                  className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' ? 'w-6 h-6' : 'w-8 h-8'}`}
+                />
+              </button>
+            ) : (
+              <img
+                src={platform.icon}
+                alt={platform.name}
+                className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' ? 'w-6 h-6' : 'w-8 h-8'}`}
+              />
+            )
           )}
           {post.isRealPost && !!userId && (post as any).user_id === userId && (
             <DropdownMenu>
