@@ -61,17 +61,11 @@ export function useOriginalVisitTracker(
     };
 
     const scheduleOriginalFromPlayableDwell = () => {
-      if (!trackPlayableInteraction || firedRef.current || originalDwellTimerRef.current) return;
-      originalDwellTimerRef.current = setTimeout(() => {
-        originalDwellTimerRef.current = null;
-        // Cross-origin Instagram/TikTok/etc. controls do not reliably bubble
-        // their "open original" tap to the parent page. If a playable embed has
-        // focus long enough to be watched, record the original-platform
-        // engagement so reels don't get stuck at impression/play only.
-        if (playFiredRef.current && document.visibilityState === 'visible') {
-          fireOriginal();
-        }
-      }, 3500);
+      // Intentionally a no-op: "Visited the original source" must only fire
+      // when the user actually leaves the app for the source platform (anchor
+      // click, tab hidden, blur to iframe on non-playable). Watching a video
+      // inline should count as Play (+1) only, not Play + Visit.
+      return;
     };
 
     const isInsideIframe = (node: EventTarget | null): boolean => {
