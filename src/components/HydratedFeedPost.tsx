@@ -160,6 +160,18 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setIsHydrated(true);
   }, [isNearViewport, isHydrated]);
 
+  // Once hydration begins, start a slow-embed watchdog so the feed can
+  // demote this post if its embed doesn't finish loading in time.
+  useEffect(() => {
+    if (!isHydrated || alreadyRevealed) return;
+    startEmbedWatch(post.id);
+  }, [isHydrated, alreadyRevealed, post.id]);
+
+  // If a post was pre-revealed from cache, treat it as ready immediately.
+  useEffect(() => {
+    if (alreadyRevealed) markEmbedReady(post.id);
+  }, [alreadyRevealed, post.id]);
+
   // Unified embed detection: detect when embed content is ready or error
   // Single 4s fallback timeout for ALL platforms
   useEffect(() => {
