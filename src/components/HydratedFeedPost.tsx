@@ -39,6 +39,7 @@ import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
 import { getOriginalPostCaption } from "@/lib/originalCaption";
 import { supabase } from "@/integrations/supabase/client";
+import { markEmbedReady, startEmbedWatch } from "@/lib/embedReadiness";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
