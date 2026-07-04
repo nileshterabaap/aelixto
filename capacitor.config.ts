@@ -25,6 +25,14 @@ const config: CapacitorConfig = {
       backgroundColor: "#FFFFFF",
       overlaysWebView: false,
     },
+    GoogleAuth: {
+      // Web Client ID from Google Cloud Console (OAuth 2.0 → Web application).
+      // NOTE: even on Android, GoogleAuth needs the WEB client ID, not the Android one.
+      // Replace this placeholder with your actual Web Client ID.
+      scopes: ["profile", "email"],
+      serverClientId: "660089311336-km4o1a2jo9vfenrlotn1vpk0epj18ntd.apps.googleusercontent.com",
+      forceCodeForRefreshToken: true,
+    },
   },
 };
 

@@ -155,23 +155,25 @@ export default function SavedPosts() {
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="container max-w-2xl mx-auto px-4 py-6 animate-fade-in">
-          <h1 className="text-2xl font-bold mb-4">Saved</h1>
-
           {/* Tabs */}
-          <div className="flex gap-1 mb-6 bg-muted rounded-xl p-1">
-            {(["all", "collections", "drafts"] as const).map((tab) => (
+          <div className="flex gap-1 mb-6 bg-muted/60 rounded-full p-1.5">
+            {([
+              { key: "drafts", label: "Drafts" },
+              { key: "all", label: "Saved" },
+              { key: "collections", label: "Collection" },
+            ] as const).map(({ key, label }) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${
-                  activeTab === tab
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground"
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`flex-1 py-2.5 text-[15px] rounded-full transition-all ${
+                  activeTab === key
+                    ? "bg-background text-foreground shadow-sm font-semibold"
+                    : "text-muted-foreground font-medium"
                 }`}
               >
-                {tab === "drafts" && drafts.length > 0
+                {key === "drafts" && drafts.length > 0
                   ? `Drafts (${drafts.length})`
-                  : tab}
+                  : label}
               </button>
             ))}
           </div>

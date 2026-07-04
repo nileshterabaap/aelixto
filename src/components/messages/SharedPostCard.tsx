@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { markPostSeenImmediate } from "@/hooks/useMarkPostSeen";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { getThumbnailText } from "@/lib/getThumbnailText";
 import { getPostThumb } from "@/lib/getPostThumb";
@@ -31,6 +32,14 @@ export const SharedPostCard = ({ postId, isOwn }: SharedPostCardProps) => {
   const navigate = useNavigate();
   const [post, setPost] = useState<PostPreview | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const handleOpen = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.id) markPostSeenImmediate(user.id, postId);
+    } catch {}
+    navigate(`/post/${postId}`);
+  };
 
   useEffect(() => {
     fetchPost();
@@ -78,7 +87,7 @@ export const SharedPostCard = ({ postId, isOwn }: SharedPostCardProps) => {
     return (
       <div
         className="w-56 rounded-xl border border-border/50 bg-muted/30 p-3 cursor-pointer"
-        onClick={() => navigate(`/post/${postId}`)}
+        onClick={handleOpen}
       >
         <p className="text-xs text-muted-foreground">Post unavailable</p>
       </div>
@@ -105,7 +114,7 @@ export const SharedPostCard = ({ postId, isOwn }: SharedPostCardProps) => {
     <div
       className="w-56 rounded-xl overflow-hidden border border-border/30 cursor-pointer active:scale-[0.98] transition-transform"
       style={{ backgroundColor: isOwn ? "hsl(var(--primary) / 0.15)" : "hsl(var(--muted))" }}
-      onClick={() => navigate(`/post/${postId}`)}
+      onClick={handleOpen}
     >
       {imageUrl ? (
         <div className="w-full aspect-square bg-black/10 overflow-hidden">

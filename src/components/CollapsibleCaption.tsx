@@ -43,12 +43,13 @@ export const CollapsibleCaption = ({
     <p className={className}>
       <span
         ref={textRef}
-        style={!isExpanded ? { 
+        style={!isExpanded ? {
           display: '-webkit-box',
           WebkitLineClamp: maxLines,
           WebkitBoxOrient: 'vertical',
-          overflow: 'hidden'
-        } : undefined}
+          overflow: 'hidden',
+          whiteSpace: 'pre-line',
+        } : { whiteSpace: 'pre-line' }}
       >
         {parsedContent}
       </span>

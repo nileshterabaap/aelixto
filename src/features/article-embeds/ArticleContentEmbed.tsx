@@ -2,6 +2,35 @@ import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackArticleOpen, trackExternalVisit } from "@/hooks/useViewTracking";
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+
+// Quora (and a few other) CDNs hotlink-block direct <img> requests from
+// third-party origins. Route those through our img-proxy edge function so
+// the hero thumbnail actually renders in the feed.
+function proxiedImage(src: string | null | undefined): string | null {
+  if (!src) return null;
+  try {
+    const u = new URL(src);
+    const needsProxy = /quoracdn\.net$|\.quoracdn\.net$|qph\.|licdn\.com$|\.licdn\.com$/i.test(u.hostname);
+    if (!needsProxy || !SUPABASE_URL) return src;
+    return `${SUPABASE_URL}/functions/v1/img-proxy?u=${encodeURIComponent(src)}`;
+  } catch {
+    return src;
+  }
+}
+
+// Quora often returns generic error strings in the scraped body when it
+// blocks the scraper. Treat those (and other obvious non-excerpts) as empty
+// so the card collapses to title + image + CTA instead of showing junk.
+const JUNK_EXCERPT_RE = /(something went wrong|wait a moment and try again|sign in|sign up|all related|more answers|you (must )?log ?in|enable javascript|are you a robot|access denied)/i;
+function cleanExcerpt(text: string | null | undefined): string {
+  if (!text) return "";
+  const t = text.trim();
+  if (!t) return "";
+  if (JUNK_EXCERPT_RE.test(t)) return "";
+  return t;
+}
+
 // --- Helpers: safe DOM parsing on reader HTML (r.jina.ai result) ---
 // Safe entity decoding using DOMParser instead of innerHTML assignment
 function decodeEntities(s: string): string {
@@ -137,7 +166,7 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
   // Parse HTML and extract lead paragraph + hero image using DOM
   const parseContent = () => {
     // Fallback values - ALWAYS prioritize meta.image from edge function
-    let excerpt = data.meta.description || '';
+    let excerpt = cleanExcerpt(data.meta.description);
     let heroImage = data.meta.image || null;
     
     console.log('[ArticleContentEmbed] Initial meta.image:', data.meta.image);
@@ -153,7 +182,8 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
         
         // Use lead paragraph if found, otherwise keep meta description
         if (lead) {
-          excerpt = summarize(lead);
+          const cleaned = cleanExcerpt(lead);
+          if (cleaned) excerpt = summarize(cleaned);
         }
         
         // Only try to extract image from HTML if we don't have one from meta
@@ -175,28 +205,36 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
   };
   
   const { excerpt, heroImage } = parseContent();
+  const displayImage = proxiedImage(heroImage);
+  const isCompact = !excerpt;
 
   return (
     <article className="rounded-2xl overflow-hidden border border-border bg-card hover:shadow-lg transition-all">
       {/* Content */}
-      <div className="p-5 space-y-4">
+      <div className={isCompact ? "p-4 space-y-3" : "p-5 space-y-4"}>
         {/* Title */}
-        <h3 className="text-xl font-bold leading-tight text-foreground">
+        <h3 className={`${isCompact ? "text-lg" : "text-xl"} font-bold leading-tight text-foreground`}>
           {data.meta.title}
         </h3>
 
         {/* Thumbnail */}
-        {heroImage && (
-          <div className="relative w-full h-48 rounded-xl overflow-hidden bg-muted mx-auto">
+        {displayImage && (
+          <div className={`relative w-full ${isCompact ? "h-40" : "h-48"} rounded-xl overflow-hidden bg-muted mx-auto`}>
             <img
-              src={heroImage}
+              src={displayImage}
               alt={data.meta.title}
               className="w-full h-full object-cover object-center"
               loading="lazy"
               width="400"
-              height="192"
+              height={isCompact ? 160 : 192}
               onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
+                const img = e.target as HTMLImageElement;
+                // If the proxied image fails, try the raw URL as a last resort
+                if (heroImage && img.src !== heroImage) {
+                  img.src = heroImage;
+                } else {
+                  img.style.display = 'none';
+                }
               }}
             />
           </div>

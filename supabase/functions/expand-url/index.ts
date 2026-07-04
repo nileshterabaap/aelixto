@@ -99,6 +99,61 @@ async function resolveRedditAppShareUrl(parsedTarget: URL): Promise<string | nul
   return bodyRedirect ? bodyRedirect.replace(/&amp;/g, '&') : null;
 }
 
+async function resolveFacebookShareUrl(targetUrl: string): Promise<string | null> {
+  const agents = [
+    'Mozilla/5.0 (AelixtoBot/1.0)',
+    'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+  ];
+
+  for (const ua of agents) {
+    try {
+      const response = await fetch(targetUrl, {
+        method: 'GET',
+        redirect: 'follow',
+        headers: {
+          'User-Agent': ua,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      });
+      const candidate = extractFacebookNextUrl(response.url) || response.url;
+      if (candidate && candidate !== targetUrl && !/\/login\//i.test(candidate)) {
+        return candidate;
+      }
+    } catch (e) {
+      console.warn('[expand-url] Facebook share expansion attempt failed:', e);
+    }
+  }
+
+  return null;
+}
+
+function extractFacebookNextUrl(raw: string): string | null {
+  try {
+    const parsed = new URL(raw);
+    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return null;
+    const next = parsed.searchParams.get('next');
+    if (!next) return null;
+    const decoded = decodeURIComponent(next);
+    const nextUrl = new URL(decoded);
+    if (!/(^|\.)facebook\.com$/i.test(nextUrl.hostname)) return null;
+    // Facebook share redirects add volatile rdid params that make the public
+    // plugin reject otherwise-valid photo/story URLs.
+    nextUrl.searchParams.delete('rdid');
+    const looksLikePost =
+      /\/story\.php/i.test(nextUrl.pathname) ||
+      /\/permalink\.php/i.test(nextUrl.pathname) ||
+      /\/(?:photo|photos|posts|videos?|watch|reel)\b/i.test(nextUrl.pathname) ||
+      nextUrl.searchParams.has('story_fbid') ||
+      nextUrl.searchParams.has('fbid') ||
+      nextUrl.searchParams.has('v');
+    return looksLikePost ? nextUrl.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -129,6 +184,21 @@ serve(async (req) => {
     const isRedditShortShare =
       /^(?:www\.)?reddit\.com$/i.test(parsedTarget.hostname) &&
       /^\/(?:r|user)\/[^/]+\/s\/[^/]+\/?$/i.test(parsedTarget.pathname);
+    const isFacebookShare =
+      /(?:^|\.)facebook\.com$/i.test(parsedTarget.hostname) &&
+      /^\/share\//i.test(parsedTarget.pathname);
+
+    if (isFacebookShare) {
+      const facebookFinalUrl = await resolveFacebookShareUrl(targetUrl);
+      if (facebookFinalUrl) {
+        console.log('[expand-url] Final URL:', facebookFinalUrl);
+        return new Response(
+          JSON.stringify({ finalUrl: facebookFinalUrl }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     if (isRedditShortShare) {
       const redditFinalUrl = await resolveRedditAppShareUrl(parsedTarget);
       if (redditFinalUrl) {
@@ -154,6 +224,11 @@ serve(async (req) => {
     let finalUrl = redirectLocation && /^https?:\/\//i.test(redirectLocation)
       ? redirectLocation
       : response.url;
+
+    const facebookNextUrl = extractFacebookNextUrl(finalUrl);
+    if (facebookNextUrl) {
+      finalUrl = facebookNextUrl;
+    }
 
     console.log('[expand-url] Final URL:', finalUrl);
 
