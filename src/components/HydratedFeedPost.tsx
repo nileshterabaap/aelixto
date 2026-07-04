@@ -39,6 +39,7 @@ import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
 import { getOriginalPostCaption } from "@/lib/originalCaption";
 import { supabase } from "@/integrations/supabase/client";
+import { markEmbedReady, startEmbedWatch } from "@/lib/embedReadiness";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
@@ -158,6 +159,18 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     if (isHydrated || !isNearViewport) return;
     setIsHydrated(true);
   }, [isNearViewport, isHydrated]);
+
+  // Once hydration begins, start a slow-embed watchdog so the feed can
+  // demote this post if its embed doesn't finish loading in time.
+  useEffect(() => {
+    if (!isHydrated || alreadyRevealed) return;
+    startEmbedWatch(post.id);
+  }, [isHydrated, alreadyRevealed, post.id]);
+
+  // If a post was pre-revealed from cache, treat it as ready immediately.
+  useEffect(() => {
+    if (alreadyRevealed) markEmbedReady(post.id);
+  }, [alreadyRevealed, post.id]);
 
   // Unified embed detection: detect when embed content is ready or error
   // Single 4s fallback timeout for ALL platforms
@@ -327,6 +340,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   // Unified reveal sequence: when embedState becomes 'ready', reveal card and sharpen
   useEffect(() => {
     if (embedState !== 'ready' || alreadyRevealed) return;
+    // Broadcast readiness so the feed can stop treating this post as a reorder candidate.
+    markEmbedReady(post.id);
     let cancelled = false;
 
     // Remove skeleton quickly

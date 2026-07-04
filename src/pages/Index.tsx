@@ -17,6 +17,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 import { SwipeableView } from "@/components/SwipeableView";
+import { markScrolledPast, reorderBySlowness, subscribeEmbedReadiness } from "@/lib/embedReadiness";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -169,11 +170,49 @@ const Index = () => {
   }, [followingPosts, showDemoFeed]);
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
-  
+
+  // Subscribe to embed readiness so the feed reflows when slow posts time out
+  // or when previously-slow posts finish loading.
+  const [readinessTick, setReadinessTick] = useState(0);
+  useEffect(() => subscribeEmbedReadiness(() => setReadinessTick((t) => t + 1)), []);
+
+  // Reordered feed: posts whose embeds are still loading past the slow threshold
+  // sink below faster ones, but only for posts the user hasn't already committed
+  // to (rendered successfully or scrolled past).
+  const displayPosts = useMemo(
+    () => reorderBySlowness(allPosts as Array<{ id: string } & Record<string, any>>),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allPosts, readinessTick]
+  ) as typeof allPosts;
+
+  // Mark posts as "scrolled past" so they lock in place and never reshuffle
+  // under the user's eyes once they've moved beyond them.
+  const pastObserverRef = useRef<IntersectionObserver | null>(null);
+  useEffect(() => {
+    pastObserverRef.current = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = entry.target.getAttribute("data-feed-item-id");
+          if (!id) continue;
+          // boundingClientRect.bottom < 0 means the whole item is above the viewport top.
+          if (!entry.isIntersecting && entry.boundingClientRect.bottom < 0) {
+            markScrolledPast(id);
+          }
+        }
+      },
+      { rootMargin: "0px", threshold: 0 }
+    );
+    return () => pastObserverRef.current?.disconnect();
+  }, []);
+  const observeForPast = useCallback((el: HTMLElement | null) => {
+    const obs = pastObserverRef.current;
+    if (!obs || !el) return;
+    obs.observe(el);
+  }, []);
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
-    useMemo(() => allPosts.map((p) => p.id), [allPosts])
+    useMemo(() => displayPosts.map((p) => p.id), [displayPosts])
   );
 
   useEffect(() => {
@@ -207,7 +246,7 @@ const Index = () => {
   // attached to that specific post so nothing fetches until it's actually
   // needed — and no loader is ever shown.
   const PREFETCH_OFFSET = 7;
-  const prefetchTriggerIndex = Math.max(0, allPosts.length - PREFETCH_OFFSET);
+  const prefetchTriggerIndex = Math.max(0, displayPosts.length - PREFETCH_OFFSET);
   const prefetchSentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!hasMore || showDemoFeed) return;
@@ -221,7 +260,7 @@ const Index = () => {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
+  }, [hasMore, loadMore, showDemoFeed, displayPosts.length, prefetchTriggerIndex]);
 
   // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
@@ -293,12 +332,13 @@ const Index = () => {
             )
           ) : (
             <div className="space-y-6">
-              {allPosts.map((post, index) => (
+              {displayPosts.map((post, index) => (
                 <div 
                   key={post.id} 
                   ref={(el) => {
                     registerItem(post.id)(el);
                     if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
+                    if (el) observeForPast(el);
                     if (index === prefetchTriggerIndex) {
                       prefetchSentinelRef.current = el;
                     }
