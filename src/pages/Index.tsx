@@ -180,10 +180,10 @@ const Index = () => {
   // sink below faster ones, but only for posts the user hasn't already committed
   // to (rendered successfully or scrolled past).
   const displayPosts = useMemo(
-    () => reorderBySlowness(allPosts),
+    () => reorderBySlowness(allPosts as Array<{ id: string } & Record<string, any>>),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [allPosts, readinessTick]
-  );
+  ) as typeof allPosts;
 
   // Mark posts as "scrolled past" so they lock in place and never reshuffle
   // under the user's eyes once they've moved beyond them.
