@@ -328,6 +328,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   // Unified reveal sequence: when embedState becomes 'ready', reveal card and sharpen
   useEffect(() => {
     if (embedState !== 'ready' || alreadyRevealed) return;
+    // Broadcast readiness so the feed can stop treating this post as a reorder candidate.
+    markEmbedReady(post.id);
     let cancelled = false;
 
     // Remove skeleton quickly
