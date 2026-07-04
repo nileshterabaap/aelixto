@@ -32,7 +32,13 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const navigate = useNavigate();
   const { user } = useSession();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
+  useCreatePostTrigger(useCallback(() => {
+    if (!user) {
+      navigate("/auth");
+      return;
+    }
+    setIsCreateDialogOpen(true);
+  }, [user, navigate]));
   const [followListType, setFollowListType] = useState<"followers" | "following">("followers");
   const [followListOpen, setFollowListOpen] = useState(false);
 
