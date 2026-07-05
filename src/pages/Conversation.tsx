@@ -64,6 +64,14 @@ const Conversation = () => {
     scrollToBottom();
   }, [messages]);
 
+  // When user triggers reply (via swipe or menu), scroll to bottom so the
+  // reply banner + input remain visible above the keyboard.
+  useEffect(() => {
+    if (replyTo) {
+      requestAnimationFrame(() => scrollToBottom());
+    }
+  }, [replyTo]);
+
   // Close menu on outside tap
   useEffect(() => {
     const handleOutside = (e: MouseEvent | TouchEvent) => {
@@ -593,6 +601,15 @@ const Conversation = () => {
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               className="flex-1"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="sentences"
+              spellCheck={false}
+              name="message"
+              type="text"
+              inputMode="text"
+              data-form-type="other"
+              data-lpignore="true"
             />
             <Button
               size="icon"
