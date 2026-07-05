@@ -258,6 +258,21 @@ a:active:not(:disabled) {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Press-in tap: element stays visibly pressed while held, then releases.
+   Use on grid thumbnails and message rows instead of the bouncy tap. */
+.press-in {
+  transition: transform 180ms cubic-bezier(0.2, 0, 0, 1),
+              opacity 180ms cubic-bezier(0.2, 0, 0, 1);
+  -webkit-tap-highlight-color: transparent;
+  transform-origin: center;
+}
+.press-in:active:not(:disabled) {
+  transform: scale(0.96);
+  opacity: 0.9;
+  animation: none !important;
+  transition: transform 80ms ease-out, opacity 80ms ease-out;
+}
+
 /* Global iframe freeze during scroll — prevents iframes from intercepting
    touch events which causes 1-2s scroll input delay on mobile */
 .scroll-freezing-iframes iframe {
