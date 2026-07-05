@@ -80,7 +80,7 @@ const Messages = () => {
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: Math.min(i * 0.06, 0.5), ease: [0.4, 0, 0.2, 1] }}
-                    className={`flex items-center gap-4 p-4 rounded-lg cursor-pointer transition-colors hover:bg-accent ${
+                    className={`press-in flex items-center gap-4 p-4 rounded-lg cursor-pointer transition-colors hover:bg-accent ${
                       hasUnread ? "bg-accent/50" : ""
                     }`}
                     onClick={() => navigate(`/conversation/${conversation.id}`)}
