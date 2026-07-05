@@ -110,7 +110,11 @@ const Conversation = () => {
 
   const handleSend = async () => {
     if (!newMessage.trim()) return;
-    await sendMessage(newMessage);
+    let content = newMessage;
+    if (replyTo) {
+      content = `↪️__REPLY__:${replyTo.id}\n${newMessage}`;
+    }
+    await sendMessage(content);
     setNewMessage("");
     setReplyTo(null);
   };
@@ -142,6 +146,12 @@ const Conversation = () => {
     const da = new Date(a);
     const db = new Date(b);
     return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
+  };
+
+  const parseReply = (content: string): { replyToId: string | null; body: string } => {
+    const m = content.match(/^↪️__REPLY__:([a-f0-9-]{36})\n([\s\S]*)$/);
+    if (m) return { replyToId: m[1], body: m[2] };
+    return { replyToId: null, body: content };
   };
 
   // Long press handlers
