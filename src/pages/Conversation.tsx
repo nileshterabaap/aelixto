@@ -39,6 +39,8 @@ const Conversation = () => {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   // Swipe-to-reply state
   const swipeRef = useRef<{
     id: string;
@@ -152,6 +154,29 @@ const Conversation = () => {
     const m = content.match(/^↪️__REPLY__:([a-f0-9-]{36})\n([\s\S]*)$/);
     if (m) return { replyToId: m[1], body: m[2] };
     return { replyToId: null, body: content };
+  };
+
+  const scrollToMessage = useCallback((id: string) => {
+    const el = messageRefs.current[id];
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightId(id);
+    window.setTimeout(() => setHighlightId((cur) => (cur === id ? null : cur)), 1400);
+  }, []);
+
+  const getDisplayName = (id: string | undefined) => {
+    if (!id) return '';
+    if (id === user?.id) return 'yourself';
+    return otherUser?.display_name || otherUser?.username || '';
+  };
+
+  const isPostShareContent = (body: string) => {
+    const trimmed = body.trim();
+    return /^https?:\/\/.+\/post\/[a-f0-9-]{36}$/.test(trimmed);
+  };
+  const extractPostId = (body: string) => {
+    const m = body.trim().match(/\/post\/([a-f0-9-]{36})$/);
+    return m ? m[1] : null;
   };
 
   // Long press handlers
