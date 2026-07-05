@@ -196,6 +196,14 @@ export const useConversations = () => {
         };
       }) || [];
 
+      // Sort by last message time (most recent first). Fall back to
+      // conversation.updated_at if there are no messages yet.
+      conversationsWithDetails.sort((a, b) => {
+        const aTime = new Date(a.last_message?.created_at || a.updated_at).getTime();
+        const bTime = new Date(b.last_message?.created_at || b.updated_at).getTime();
+        return bTime - aTime;
+      });
+
       // Preload avatars so they appear together with the list (avoid pop-in)
       const avatarUrls = conversationsWithDetails
         .map(c => c.other_user.avatar_url)
