@@ -211,7 +211,11 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-3xl px-0 pb-8 max-h-[70vh]">
+      <SheetContent
+        side="bottom"
+        className="rounded-t-3xl px-0 pb-8 max-h-[70vh]"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <SheetHeader className="px-5 pb-3">
           <SheetTitle className="text-center text-base font-semibold">Share</SheetTitle>
         </SheetHeader>
