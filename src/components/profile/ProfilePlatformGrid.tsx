@@ -112,7 +112,7 @@ function PostCard({ post, onClick }: {
     return (
       <button
         onClick={onClick}
-        className={`relative overflow-hidden rounded-2xl ${aspect} block w-full bg-muted/70`}
+        className={`press-in relative overflow-hidden rounded-2xl ${aspect} block w-full bg-muted/70`}
       >
         <TextCardThumbnail
           platform={post.platform}
@@ -130,7 +130,7 @@ function PostCard({ post, onClick }: {
   return (
     <button
       onClick={onClick}
-      className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} block w-full bg-muted/70 group`}
+      className={`press-in relative overflow-hidden rounded-2xl ${getAspectRatio()} block w-full bg-muted/70 group`}
     >
       {!imageLoaded && (
         <div
