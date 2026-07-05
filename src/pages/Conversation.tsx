@@ -231,7 +231,7 @@ const Conversation = () => {
   // Actions
   const handleCopy = () => {
     if (!menu.message) return;
-    navigator.clipboard.writeText(menu.message.content);
+    navigator.clipboard.writeText(parseReply(menu.message.content).body);
     toast({ description: "Copied to clipboard" });
     setMenu({ message: null, x: 0, y: 0 });
   };
@@ -245,16 +245,20 @@ const Conversation = () => {
   const handleEditStart = () => {
     if (!menu.message) return;
     setEditingId(menu.message.id);
-    setEditText(menu.message.content);
+    setEditText(parseReply(menu.message.content).body);
     setMenu({ message: null, x: 0, y: 0 });
   };
 
   const handleEditSave = async () => {
     if (!editingId || !editText.trim()) return;
+    const original = messages.find(m => m.id === editingId);
+    const prefix = original ? (parseReply(original.content).replyToId
+      ? `↪️__REPLY__:${parseReply(original.content).replyToId}\n`
+      : '') : '';
     try {
       const { error } = await supabase
         .from('messages')
-        .update({ content: editText.trim() })
+        .update({ content: prefix + editText.trim() })
         .eq('id', editingId)
         .eq('sender_id', user!.id);
       if (error) throw error;
