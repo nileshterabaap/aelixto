@@ -337,8 +337,11 @@ const Conversation = () => {
         <div className="container max-w-2xl mx-auto w-full px-4 py-4 space-y-1 animate-fade-in mt-auto">
           {messages.map((message, idx) => {
             const isOwn = message.sender_id === user?.id;
-            const postMatch = message.content.match(/\/post\/([a-f0-9-]{36})$/);
-            const isPostShare = postMatch && message.content.trim().match(/^https?:\/\/.+\/post\/[a-f0-9-]{36}$/);
+            const { replyToId, body } = parseReply(message.content);
+            const repliedMessage = replyToId ? messages.find(m => m.id === replyToId) : null;
+            const repliedBody = repliedMessage ? parseReply(repliedMessage.content).body : null;
+            const postMatch = body.match(/\/post\/([a-f0-9-]{36})$/);
+            const isPostShare = postMatch && body.trim().match(/^https?:\/\/.+\/post\/[a-f0-9-]{36}$/);
             const isEditing = editingId === message.id;
             const prev = idx > 0 ? messages[idx - 1] : null;
             const senderChanged = !prev || prev.sender_id !== message.sender_id;
@@ -432,23 +435,39 @@ const Conversation = () => {
                     </div>
                   </div>
                 ) : (
-                  <div
-                    className={`max-w-[70%] rounded-lg px-3 py-1.5 ${
-                      isOwn
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-foreground'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap break-words">
-                      {message.content}
-                      <span
-                        className={`float-right ml-2 text-[10px] leading-none select-none relative top-[6px] ${
-                          isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                  <div className={`max-w-[70%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                    {replyToId && (
+                      <div
+                        className={`text-[11px] rounded-t-lg px-2.5 py-1 border-l-2 max-w-full truncate ${
+                          isOwn
+                            ? 'bg-primary/10 border-primary/60 text-muted-foreground'
+                            : 'bg-muted/60 border-muted-foreground/40 text-muted-foreground'
                         }`}
+                        style={{ marginBottom: -4 }}
                       >
-                        {formatTime(message.created_at)}
-                      </span>
-                    </p>
+                        <span className="line-clamp-1">
+                          {repliedBody ? repliedBody : 'Message unavailable'}
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      className={`rounded-lg px-3 py-1.5 ${
+                        isOwn
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-foreground'
+                      } ${replyToId ? (isOwn ? 'rounded-tr-md' : 'rounded-tl-md') : ''}`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap break-words">
+                        {body}
+                        <span
+                          className={`float-right ml-2 text-[10px] leading-none select-none relative top-[6px] ${
+                            isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                          }`}
+                        >
+                          {formatTime(message.created_at)}
+                        </span>
+                      </p>
+                    </div>
                   </div>
                 )}
                   </div>
