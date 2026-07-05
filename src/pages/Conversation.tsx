@@ -468,26 +468,47 @@ const Conversation = () => {
                   </div>
                 ) : (
                   <div className={`max-w-[70%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                    {replyToId && (
-                      <div
-                        className={`text-[11px] rounded-t-lg px-2.5 py-1 border-l-2 max-w-full truncate ${
-                          isOwn
-                            ? 'bg-primary/10 border-primary/60 text-muted-foreground'
-                            : 'bg-muted/60 border-muted-foreground/40 text-muted-foreground'
-                        }`}
-                        style={{ marginBottom: -4 }}
-                      >
-                        <span className="line-clamp-1">
-                          {repliedBody ? repliedBody : 'Message unavailable'}
-                        </span>
-                      </div>
-                    )}
+                    {replyToId && repliedMessage && (() => {
+                      const repliedIsPost = isPostShareContent(repliedBody || '');
+                      const repliedPostId = repliedIsPost ? extractPostId(repliedBody || '') : null;
+                      const authorLabel = message.sender_id === repliedMessage.sender_id
+                        ? (isOwn ? 'You replied to yourself' : `${getDisplayName(message.sender_id)} replied to themselves`)
+                        : (isOwn ? `You replied to ${getDisplayName(repliedMessage.sender_id)}` : 'Replied to you');
+                      return (
+                        <>
+                          <span className={`text-[11px] text-muted-foreground mb-1 px-1 ${isOwn ? 'text-right' : 'text-left'}`}>
+                            {authorLabel}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => scrollToMessage(repliedMessage.id)}
+                            className={`max-w-full flex ${isOwn ? 'justify-end' : 'justify-start'} focus:outline-none`}
+                            style={{ marginBottom: -10 }}
+                          >
+                            {repliedIsPost && repliedPostId ? (
+                              <div className="opacity-60 pointer-events-none scale-90 origin-bottom">
+                                <SharedPostCard postId={repliedPostId} isOwn={isOwn} />
+                              </div>
+                            ) : (
+                              <div
+                                className={`rounded-2xl px-3 py-1.5 text-sm opacity-60 max-w-full ${
+                                  isOwn ? 'bg-primary/40 text-primary-foreground' : 'bg-muted text-foreground'
+                                }`}
+                                style={{ paddingBottom: 14 }}
+                              >
+                                <span className="line-clamp-2 break-words">{repliedBody}</span>
+                              </div>
+                            )}
+                          </button>
+                        </>
+                      );
+                    })()}
                     <div
                       className={`rounded-lg px-3 py-1.5 ${
                         isOwn
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-muted text-foreground'
-                      } ${replyToId ? (isOwn ? 'rounded-tr-md' : 'rounded-tl-md') : ''}`}
+                      } ${replyToId && repliedMessage ? 'relative z-10' : ''}`}
                     >
                       <p className="text-sm whitespace-pre-wrap break-words">
                         {body}
