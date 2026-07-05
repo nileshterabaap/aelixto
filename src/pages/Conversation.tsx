@@ -386,9 +386,12 @@ const Conversation = () => {
                   </div>
                 )}
                 <div
+                  ref={(el) => { messageRefs.current[message.id] = el; }}
                   className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${
                     senderChanged && !showDaySeparator ? 'mt-2' : ''
-                  } relative`}
+                  } relative transition-colors duration-500 rounded-lg ${
+                    highlightId === message.id ? 'bg-primary/10' : ''
+                  }`}
                   onTouchStart={(e) => handleTouchStart(message, e)}
                   onTouchMove={(e) => handleTouchMove(e)}
                   onTouchEnd={handleTouchEnd}
