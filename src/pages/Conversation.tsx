@@ -110,7 +110,11 @@ const Conversation = () => {
 
   const handleSend = async () => {
     if (!newMessage.trim()) return;
-    await sendMessage(newMessage);
+    let content = newMessage;
+    if (replyTo) {
+      content = `↪️__REPLY__:${replyTo.id}\n${newMessage}`;
+    }
+    await sendMessage(content);
     setNewMessage("");
     setReplyTo(null);
   };
@@ -142,6 +146,12 @@ const Conversation = () => {
     const da = new Date(a);
     const db = new Date(b);
     return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
+  };
+
+  const parseReply = (content: string): { replyToId: string | null; body: string } => {
+    const m = content.match(/^↪️__REPLY__:([a-f0-9-]{36})\n([\s\S]*)$/);
+    if (m) return { replyToId: m[1], body: m[2] };
+    return { replyToId: null, body: content };
   };
 
   // Long press handlers
@@ -221,7 +231,7 @@ const Conversation = () => {
   // Actions
   const handleCopy = () => {
     if (!menu.message) return;
-    navigator.clipboard.writeText(menu.message.content);
+    navigator.clipboard.writeText(parseReply(menu.message.content).body);
     toast({ description: "Copied to clipboard" });
     setMenu({ message: null, x: 0, y: 0 });
   };
@@ -235,16 +245,20 @@ const Conversation = () => {
   const handleEditStart = () => {
     if (!menu.message) return;
     setEditingId(menu.message.id);
-    setEditText(menu.message.content);
+    setEditText(parseReply(menu.message.content).body);
     setMenu({ message: null, x: 0, y: 0 });
   };
 
   const handleEditSave = async () => {
     if (!editingId || !editText.trim()) return;
+    const original = messages.find(m => m.id === editingId);
+    const prefix = original ? (parseReply(original.content).replyToId
+      ? `↪️__REPLY__:${parseReply(original.content).replyToId}\n`
+      : '') : '';
     try {
       const { error } = await supabase
         .from('messages')
-        .update({ content: editText.trim() })
+        .update({ content: prefix + editText.trim() })
         .eq('id', editingId)
         .eq('sender_id', user!.id);
       if (error) throw error;
@@ -327,8 +341,11 @@ const Conversation = () => {
         <div className="container max-w-2xl mx-auto w-full px-4 py-4 space-y-1 animate-fade-in mt-auto">
           {messages.map((message, idx) => {
             const isOwn = message.sender_id === user?.id;
-            const postMatch = message.content.match(/\/post\/([a-f0-9-]{36})$/);
-            const isPostShare = postMatch && message.content.trim().match(/^https?:\/\/.+\/post\/[a-f0-9-]{36}$/);
+            const { replyToId, body } = parseReply(message.content);
+            const repliedMessage = replyToId ? messages.find(m => m.id === replyToId) : null;
+            const repliedBody = repliedMessage ? parseReply(repliedMessage.content).body : null;
+            const postMatch = body.match(/\/post\/([a-f0-9-]{36})$/);
+            const isPostShare = postMatch && body.trim().match(/^https?:\/\/.+\/post\/[a-f0-9-]{36}$/);
             const isEditing = editingId === message.id;
             const prev = idx > 0 ? messages[idx - 1] : null;
             const senderChanged = !prev || prev.sender_id !== message.sender_id;
@@ -422,23 +439,39 @@ const Conversation = () => {
                     </div>
                   </div>
                 ) : (
-                  <div
-                    className={`max-w-[70%] rounded-lg px-3 py-1.5 ${
-                      isOwn
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-foreground'
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap break-words">
-                      {message.content}
-                      <span
-                        className={`float-right ml-2 text-[10px] leading-none select-none relative top-[6px] ${
-                          isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                  <div className={`max-w-[70%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                    {replyToId && (
+                      <div
+                        className={`text-[11px] rounded-t-lg px-2.5 py-1 border-l-2 max-w-full truncate ${
+                          isOwn
+                            ? 'bg-primary/10 border-primary/60 text-muted-foreground'
+                            : 'bg-muted/60 border-muted-foreground/40 text-muted-foreground'
                         }`}
+                        style={{ marginBottom: -4 }}
                       >
-                        {formatTime(message.created_at)}
-                      </span>
-                    </p>
+                        <span className="line-clamp-1">
+                          {repliedBody ? repliedBody : 'Message unavailable'}
+                        </span>
+                      </div>
+                    )}
+                    <div
+                      className={`rounded-lg px-3 py-1.5 ${
+                        isOwn
+                          ? 'bg-primary text-primary-foreground'
+                          : 'bg-muted text-foreground'
+                      } ${replyToId ? (isOwn ? 'rounded-tr-md' : 'rounded-tl-md') : ''}`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap break-words">
+                        {body}
+                        <span
+                          className={`float-right ml-2 text-[10px] leading-none select-none relative top-[6px] ${
+                            isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                          }`}
+                        >
+                          {formatTime(message.created_at)}
+                        </span>
+                      </p>
+                    </div>
                   </div>
                 )}
                   </div>
@@ -495,7 +528,7 @@ const Conversation = () => {
       {replyTo && (
         <div className="bg-muted/50 border-t border-border px-4 py-2 flex items-center justify-between">
           <div className="text-xs text-muted-foreground truncate flex-1">
-            Replying to: <span className="text-foreground">{replyTo.content}</span>
+            Replying to: <span className="text-foreground">{parseReply(replyTo.content).body}</span>
           </div>
           <button onClick={() => setReplyTo(null)} className="text-xs text-muted-foreground ml-2">✕</button>
         </div>
