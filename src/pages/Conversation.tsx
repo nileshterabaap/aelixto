@@ -528,7 +528,7 @@ const Conversation = () => {
       {replyTo && (
         <div className="bg-muted/50 border-t border-border px-4 py-2 flex items-center justify-between">
           <div className="text-xs text-muted-foreground truncate flex-1">
-            Replying to: <span className="text-foreground">{replyTo.content}</span>
+            Replying to: <span className="text-foreground">{parseReply(replyTo.content).body}</span>
           </div>
           <button onClick={() => setReplyTo(null)} className="text-xs text-muted-foreground ml-2">✕</button>
         </div>
