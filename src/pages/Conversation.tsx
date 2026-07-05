@@ -39,6 +39,18 @@ const Conversation = () => {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  // Swipe-to-reply state
+  const swipeRef = useRef<{
+    id: string;
+    x: number;
+    y: number;
+    dir: 1 | -1; // 1 = swipe right (other's msg), -1 = swipe left (own msg)
+    active: boolean;
+    cancelled: boolean;
+  } | null>(null);
+  const [swipe, setSwipe] = useState<{ id: string; dx: number } | null>(null);
+  const SWIPE_TRIGGER = 55;
+  const SWIPE_MAX = 90;
 
   useEffect(() => {
     if (conversationId && user) {
@@ -135,9 +147,56 @@ const Conversation = () => {
   // Long press handlers
   const handleTouchStart = useCallback((msg: Message, e: React.TouchEvent) => {
     const touch = e.touches[0];
+    swipeRef.current = {
+      id: msg.id,
+      x: touch.clientX,
+      y: touch.clientY,
+      dir: msg.sender_id === user?.id ? -1 : 1,
+      active: false,
+      cancelled: false,
+    };
     longPressTimer.current = setTimeout(() => {
       setMenu({ message: msg, x: touch.clientX, y: touch.clientY });
     }, 500);
+  }, [user?.id]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    const s = swipeRef.current;
+    if (!s || s.cancelled) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - s.x;
+    const dy = touch.clientY - s.y;
+    const rawDx = s.dir === 1 ? Math.max(0, dx) : Math.min(0, dx);
+
+    if (!s.active) {
+      // Cancel if vertical scroll dominates
+      if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(rawDx)) {
+        s.cancelled = true;
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+        }
+        setSwipe(null);
+        return;
+      }
+      if (Math.abs(rawDx) > 8) {
+        s.active = true;
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+        }
+      } else {
+        return;
+      }
+    }
+
+    // Rubber-band beyond max
+    let display = rawDx;
+    if (Math.abs(rawDx) > SWIPE_MAX) {
+      const overflow = Math.abs(rawDx) - SWIPE_MAX;
+      display = (SWIPE_MAX + overflow * 0.25) * Math.sign(rawDx);
+    }
+    setSwipe({ id: s.id, dx: display });
   }, []);
 
   const handleTouchEnd = useCallback(() => {
@@ -145,7 +204,14 @@ const Conversation = () => {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
-  }, []);
+    const s = swipeRef.current;
+    if (s?.active && swipe && swipe.id === s.id && Math.abs(swipe.dx) >= SWIPE_TRIGGER) {
+      const msg = messages.find(m => m.id === s.id);
+      if (msg) setReplyTo(msg);
+    }
+    swipeRef.current = null;
+    setSwipe(null);
+  }, [swipe, messages]);
 
   const handleContextMenu = useCallback((msg: Message, e: React.MouseEvent) => {
     e.preventDefault();
@@ -280,12 +346,52 @@ const Conversation = () => {
                 <div
                   className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${
                     senderChanged && !showDaySeparator ? 'mt-2' : ''
-                  }`}
+                  } relative`}
                   onTouchStart={(e) => handleTouchStart(message, e)}
+                  onTouchMove={(e) => handleTouchMove(e)}
                   onTouchEnd={handleTouchEnd}
-                  onTouchMove={handleTouchEnd}
+                  onTouchCancel={handleTouchEnd}
                   onContextMenu={(e) => handleContextMenu(message, e)}
                 >
+                  {/* Reply icon revealed during swipe */}
+                  {swipe?.id === message.id && (
+                    <div
+                      className={`absolute top-1/2 -translate-y-1/2 flex items-center justify-center rounded-full transition-colors ${
+                        isOwn ? 'right-2' : 'left-2'
+                      }`}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        opacity: Math.min(1, Math.abs(swipe.dx) / SWIPE_TRIGGER),
+                        background:
+                          Math.abs(swipe.dx) >= SWIPE_TRIGGER
+                            ? 'hsl(var(--primary) / 0.15)'
+                            : 'hsl(var(--muted))',
+                      }}
+                    >
+                      <Reply
+                        className="h-4 w-4"
+                        style={{
+                          color:
+                            Math.abs(swipe.dx) >= SWIPE_TRIGGER
+                              ? 'hsl(var(--primary))'
+                              : 'hsl(var(--muted-foreground))',
+                        }}
+                      />
+                    </div>
+                  )}
+                  <div
+                    className="w-full flex"
+                    style={{
+                      justifyContent: isOwn ? 'flex-end' : 'flex-start',
+                      transform:
+                        swipe?.id === message.id
+                          ? `translate3d(${swipe.dx}px, 0, 0)`
+                          : undefined,
+                      transition: swipe?.id === message.id ? 'none' : 'transform 180ms ease',
+                      touchAction: 'pan-y',
+                    }}
+                  >
                 {isPostShare && postMatch ? (
                   <SharedPostCard postId={postMatch[1]} isOwn={isOwn} />
                 ) : isEditing ? (
@@ -335,6 +441,7 @@ const Conversation = () => {
                     </p>
                   </div>
                 )}
+                  </div>
                 </div>
               </div>
             );

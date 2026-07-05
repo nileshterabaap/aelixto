@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
 import { onMessageThreadRead } from '@/lib/messageReadEvents';
+import { preloadImageWithPromise } from '@/lib/preloadImages';
 
 export interface ConversationWithDetails {
   id: string;
@@ -194,6 +195,17 @@ export const useConversations = () => {
           unread_count: unreadCount,
         };
       }) || [];
+
+      // Preload avatars so they appear together with the list (avoid pop-in)
+      const avatarUrls = conversationsWithDetails
+        .map(c => c.other_user.avatar_url)
+        .filter((u): u is string => !!u);
+      if (avatarUrls.length > 0) {
+        await Promise.race([
+          Promise.all(avatarUrls.map(u => preloadImageWithPromise(u))),
+          new Promise<void>(resolve => setTimeout(resolve, 1200)),
+        ]);
+      }
 
       setConversations(conversationsWithDetails);
       if (cacheKey) {

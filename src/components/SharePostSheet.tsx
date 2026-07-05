@@ -37,6 +37,7 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
   useEffect(() => {
     if (!open || !user) return;
     setSent({});
+    setSending({});
     setSearchQuery("");
     setSearchResults([]);
     fetchRecentChats();
@@ -225,12 +226,6 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 rounded-xl bg-muted/50 border-none h-10"
               autoFocus={false}
-              readOnly={false}
-              inputMode="none"
-              onFocus={(e) => {
-                // Allow keyboard only after explicit tap — re-enable inputMode
-                e.currentTarget.inputMode = "text";
-              }}
             />
           </div>
         </div>
