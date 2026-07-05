@@ -8,7 +8,6 @@ import { buildShortUrl, buildPostPath } from "@/lib/shortUrl";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { useToast } from "@/hooks/use-toast";
-import { preloadImageWithPromise } from "@/lib/preloadImages";
 
 interface SharePostSheetProps {
   open: boolean;
@@ -28,13 +27,11 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
   const { user } = useSession();
   const { toast } = useToast();
   const [recentChats, setRecentChats] = useState<ShareableUser[]>([]);
-  const [people, setPeople] = useState<Array<{ userId: string; username: string; displayName: string | null; avatarUrl: string | null }>>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Array<{ userId: string; username: string; displayName: string | null; avatarUrl: string | null }>>([]);
   const [sending, setSending] = useState<Record<string, boolean>>({});
   const [sent, setSent] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
-  const [searchFocused, setSearchFocused] = useState(false);
 
   // Fetch recent conversations when sheet opens
   useEffect(() => {
@@ -43,8 +40,6 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
     setSending({});
     setSearchQuery("");
     setSearchResults([]);
-    setPeople([]);
-    setSearchFocused(false);
     fetchRecentChats();
   }, [open, user]);
 
@@ -58,30 +53,7 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
         .eq("user_id", user.id);
 
       if (!participantData?.length) {
-        const { data: allProfiles } = await supabase.rpc("search_profiles", {
-          q: "",
-          limit_count: 20,
-        });
-
-        const peopleList = (allProfiles || [])
-          .filter((p: any) => p.user_id !== user.id)
-          .map((p: any) => ({
-            userId: p.user_id,
-            username: p.username,
-            displayName: p.display_name,
-            avatarUrl: p.avatar_url,
-          }));
-
-        const avatarUrls = peopleList.map((p) => p.avatarUrl).filter((u): u is string => !!u);
-        if (avatarUrls.length > 0) {
-          await Promise.race([
-            Promise.all(avatarUrls.map((u) => preloadImageWithPromise(u))),
-            new Promise<void>((resolve) => setTimeout(resolve, 900)),
-          ]);
-        }
-
         setRecentChats([]);
-        setPeople(peopleList);
         setLoading(false);
         return;
       }
@@ -124,31 +96,7 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
         })
         .filter(Boolean) as ShareableUser[];
 
-      const { data: allProfiles } = await supabase.rpc("search_profiles", {
-        q: "",
-        limit_count: 20,
-      });
-
-      const chatUserIds = new Set(chats.map((chat) => chat.userId));
-      const peopleList = (allProfiles || [])
-        .filter((p: any) => p.user_id !== user.id && !chatUserIds.has(p.user_id))
-        .map((p: any) => ({
-          userId: p.user_id,
-          username: p.username,
-          displayName: p.display_name,
-          avatarUrl: p.avatar_url,
-        }));
-
-      const avatarUrls = [...chats, ...peopleList].map((p) => p.avatarUrl).filter((u): u is string => !!u);
-      if (avatarUrls.length > 0) {
-        await Promise.race([
-          Promise.all(avatarUrls.map((u) => preloadImageWithPromise(u))),
-          new Promise<void>((resolve) => setTimeout(resolve, 900)),
-        ]);
-      }
-
       setRecentChats(chats);
-      setPeople(peopleList);
     } catch (err) {
       console.error("Error fetching recent chats:", err);
     } finally {
@@ -259,7 +207,7 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
     toast({ title: "Link copied!" });
   };
 
-  const displayList = searchQuery.trim() ? searchResults : [...recentChats, ...people];
+  const displayList = searchQuery.trim() ? searchResults : recentChats;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -267,7 +215,6 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
         side="bottom"
         className="rounded-t-3xl px-0 pb-8 max-h-[70vh]"
         onOpenAutoFocus={(e) => e.preventDefault()}
-        onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <SheetHeader className="px-5 pb-3">
           <SheetTitle className="text-center text-base font-semibold">Share</SheetTitle>
@@ -283,9 +230,6 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 rounded-xl bg-muted/50 border-none h-10"
               autoFocus={false}
-              readOnly={!searchFocused}
-              onFocus={() => setSearchFocused(true)}
-              onTouchStart={() => setSearchFocused(true)}
             />
           </div>
         </div>
@@ -310,7 +254,7 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
           )}
 
           {!loading && displayList.length === 0 && !searchQuery.trim() && (
-            <p className="text-center text-sm text-muted-foreground py-8">No people found</p>
+            <p className="text-center text-sm text-muted-foreground py-8">No recent chats</p>
           )}
 
           {!loading && displayList.length === 0 && searchQuery.trim() && (
