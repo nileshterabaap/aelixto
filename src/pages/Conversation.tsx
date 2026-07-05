@@ -601,6 +601,15 @@ const Conversation = () => {
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               className="flex-1"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="sentences"
+              spellCheck={false}
+              name="message"
+              type="text"
+              inputMode="text"
+              data-form-type="other"
+              data-lpignore="true"
             />
             <Button
               size="icon"
