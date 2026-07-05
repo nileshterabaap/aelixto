@@ -39,6 +39,8 @@ const Conversation = () => {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   // Swipe-to-reply state
   const swipeRef = useRef<{
     id: string;
@@ -152,6 +154,29 @@ const Conversation = () => {
     const m = content.match(/^↪️__REPLY__:([a-f0-9-]{36})\n([\s\S]*)$/);
     if (m) return { replyToId: m[1], body: m[2] };
     return { replyToId: null, body: content };
+  };
+
+  const scrollToMessage = useCallback((id: string) => {
+    const el = messageRefs.current[id];
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setHighlightId(id);
+    window.setTimeout(() => setHighlightId((cur) => (cur === id ? null : cur)), 1400);
+  }, []);
+
+  const getDisplayName = (id: string | undefined) => {
+    if (!id) return '';
+    if (id === user?.id) return 'yourself';
+    return otherUser?.display_name || otherUser?.username || '';
+  };
+
+  const isPostShareContent = (body: string) => {
+    const trimmed = body.trim();
+    return /^https?:\/\/.+\/post\/[a-f0-9-]{36}$/.test(trimmed);
+  };
+  const extractPostId = (body: string) => {
+    const m = body.trim().match(/\/post\/([a-f0-9-]{36})$/);
+    return m ? m[1] : null;
   };
 
   // Long press handlers
@@ -361,9 +386,12 @@ const Conversation = () => {
                   </div>
                 )}
                 <div
+                  ref={(el) => { messageRefs.current[message.id] = el; }}
                   className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${
                     senderChanged && !showDaySeparator ? 'mt-2' : ''
-                  } relative`}
+                  } relative transition-colors duration-500 rounded-lg ${
+                    highlightId === message.id ? 'bg-primary/10' : ''
+                  }`}
                   onTouchStart={(e) => handleTouchStart(message, e)}
                   onTouchMove={(e) => handleTouchMove(e)}
                   onTouchEnd={handleTouchEnd}
@@ -440,26 +468,47 @@ const Conversation = () => {
                   </div>
                 ) : (
                   <div className={`max-w-[70%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                    {replyToId && (
-                      <div
-                        className={`text-[11px] rounded-t-lg px-2.5 py-1 border-l-2 max-w-full truncate ${
-                          isOwn
-                            ? 'bg-primary/10 border-primary/60 text-muted-foreground'
-                            : 'bg-muted/60 border-muted-foreground/40 text-muted-foreground'
-                        }`}
-                        style={{ marginBottom: -4 }}
-                      >
-                        <span className="line-clamp-1">
-                          {repliedBody ? repliedBody : 'Message unavailable'}
-                        </span>
-                      </div>
-                    )}
+                    {replyToId && repliedMessage && (() => {
+                      const repliedIsPost = isPostShareContent(repliedBody || '');
+                      const repliedPostId = repliedIsPost ? extractPostId(repliedBody || '') : null;
+                      const authorLabel = message.sender_id === repliedMessage.sender_id
+                        ? (isOwn ? 'You replied to yourself' : `${getDisplayName(message.sender_id)} replied to themselves`)
+                        : (isOwn ? `You replied to ${getDisplayName(repliedMessage.sender_id)}` : 'Replied to you');
+                      return (
+                        <>
+                          <span className={`text-[11px] text-muted-foreground mb-1 px-1 ${isOwn ? 'text-right' : 'text-left'}`}>
+                            {authorLabel}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => scrollToMessage(repliedMessage.id)}
+                            className={`max-w-full flex ${isOwn ? 'justify-end' : 'justify-start'} focus:outline-none`}
+                            style={{ marginBottom: -10 }}
+                          >
+                            {repliedIsPost && repliedPostId ? (
+                              <div className="opacity-60 pointer-events-none scale-90 origin-bottom">
+                                <SharedPostCard postId={repliedPostId} isOwn={isOwn} />
+                              </div>
+                            ) : (
+                              <div
+                                className={`rounded-2xl px-3 py-1.5 text-sm opacity-60 max-w-full ${
+                                  isOwn ? 'bg-primary/40 text-primary-foreground' : 'bg-muted text-foreground'
+                                }`}
+                                style={{ paddingBottom: 14 }}
+                              >
+                                <span className="line-clamp-2 break-words">{repliedBody}</span>
+                              </div>
+                            )}
+                          </button>
+                        </>
+                      );
+                    })()}
                     <div
                       className={`rounded-lg px-3 py-1.5 ${
                         isOwn
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-muted text-foreground'
-                      } ${replyToId ? (isOwn ? 'rounded-tr-md' : 'rounded-tl-md') : ''}`}
+                      } ${replyToId && repliedMessage ? 'relative z-10' : ''}`}
                     >
                       <p className="text-sm whitespace-pre-wrap break-words">
                         {body}
