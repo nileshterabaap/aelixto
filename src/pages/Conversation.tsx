@@ -594,31 +594,43 @@ const Conversation = () => {
       {/* Input */}
       <div className="sticky bottom-0 bg-background border-t border-border">
         <div className="container max-w-2xl mx-auto px-4 py-4">
-          <div className="flex gap-2">
+          <form
+            autoComplete="off"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend();
+            }}
+            className="flex gap-2"
+          >
             <Input
               placeholder="Type a message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               className="flex-1"
+              // type="search" + autocomplete off suppresses Chrome Android's
+              // key/location/card autofill toolbar above the keyboard.
+              type="search"
+              enterKeyHint="send"
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="sentences"
               spellCheck={false}
-              name="message"
-              type="text"
+              name={`msg-${conversationId ?? "new"}`}
               inputMode="text"
               data-form-type="other"
               data-lpignore="true"
+              aria-autocomplete="none"
             />
             <Button
+              type="submit"
               size="icon"
               onClick={handleSend}
               disabled={!newMessage.trim()}
             >
               <Send className="h-5 w-5" />
             </Button>
-          </div>
+          </form>
         </div>
       </div>
     </div>

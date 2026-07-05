@@ -58,9 +58,16 @@ const Messages = () => {
             <div className="space-y-1">
               {conversations.map((conversation, i) => {
                 const hasUnread = conversation.unread_count > 0;
-                const lastContent = conversation.last_message?.content || "";
-                const isPostShare = /^https?:\/\/.+\/post\/[a-f0-9-]{36}$/.test(lastContent.trim());
-                const displayContent = isPostShare ? "Sent a post" : lastContent;
+                const rawContent = conversation.last_message?.content || "";
+                // Strip reply prefix: "↪️__REPLY__:<uuid>\n<body>"
+                const replyStripped = rawContent.replace(
+                  /^↪️__REPLY__:[a-f0-9-]{36}\n?/,
+                  ""
+                );
+                const isPostShare = /^https?:\/\/.+\/post\/[a-f0-9-]{36}$/.test(
+                  replyStripped.trim()
+                );
+                const displayContent = isPostShare ? "Sent a post" : replyStripped;
                 const lastMessagePreview = conversation.last_message
                   ? conversation.last_message.sender_id === user?.id
                     ? `You: ${displayContent}`
