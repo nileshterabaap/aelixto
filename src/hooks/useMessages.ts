@@ -80,6 +80,50 @@ export const useMessages = (conversationId: string | null) => {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`
+        },
+        (payload) => {
+          const deletedId = (payload.old as Message)?.id;
+          if (!deletedId) return;
+          setMessages(prev => {
+            const next = prev.filter(m => m.id !== deletedId);
+            if (cacheKey) {
+              try {
+                window.localStorage.setItem(cacheKey, JSON.stringify(next.slice(-100)));
+              } catch { /* ignore */ }
+            }
+            return next;
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`
+        },
+        (payload) => {
+          const updated = payload.new as Message;
+          if (!updated?.id) return;
+          setMessages(prev => {
+            const next = prev.map(m => (m.id === updated.id ? { ...m, ...updated } : m));
+            if (cacheKey) {
+              try {
+                window.localStorage.setItem(cacheKey, JSON.stringify(next.slice(-100)));
+              } catch { /* ignore */ }
+            }
+            return next;
+          });
+        }
+      )
       .subscribe();
 
     return () => {
