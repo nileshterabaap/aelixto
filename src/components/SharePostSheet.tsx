@@ -32,6 +32,7 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
   const [sending, setSending] = useState<Record<string, boolean>>({});
   const [sent, setSent] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
 
   // Fetch recent conversations when sheet opens
   useEffect(() => {
@@ -40,6 +41,7 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
     setSending({});
     setSearchQuery("");
     setSearchResults([]);
+    setSearchFocused(false);
     fetchRecentChats();
   }, [open, user]);
 
@@ -215,6 +217,7 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
         side="bottom"
         className="rounded-t-3xl px-0 pb-8 max-h-[70vh]"
         onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
       >
         <SheetHeader className="px-5 pb-3">
           <SheetTitle className="text-center text-base font-semibold">Share</SheetTitle>
@@ -230,6 +233,9 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 rounded-xl bg-muted/50 border-none h-10"
               autoFocus={false}
+              readOnly={!searchFocused}
+              onFocus={() => setSearchFocused(true)}
+              onTouchStart={() => setSearchFocused(true)}
             />
           </div>
         </div>
