@@ -213,7 +213,7 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
-        className="rounded-t-3xl px-0 pb-8 max-h-[70vh]"
+        className="rounded-t-3xl px-0 pb-8 max-h-[70vh] z-[90]"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <SheetHeader className="px-5 pb-3">
