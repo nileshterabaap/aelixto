@@ -205,6 +205,7 @@ export type Database = {
           conversation_id: string
           id: string
           joined_at: string
+          last_delivered_at: string | null
           last_read_at: string | null
           user_id: string
         }
@@ -212,6 +213,7 @@ export type Database = {
           conversation_id: string
           id?: string
           joined_at?: string
+          last_delivered_at?: string | null
           last_read_at?: string | null
           user_id: string
         }
@@ -219,6 +221,7 @@ export type Database = {
           conversation_id?: string
           id?: string
           joined_at?: string
+          last_delivered_at?: string | null
           last_read_at?: string | null
           user_id?: string
         }
@@ -1141,6 +1144,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      am_i_blocked_by: { Args: { _target: string }; Returns: boolean }
       are_blocked: { Args: { _a: string; _b: string }; Returns: boolean }
       can_view_follow_list: {
         Args: { _kind: string; _target: string; _viewer: string }
