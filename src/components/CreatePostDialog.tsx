@@ -513,6 +513,8 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       platform: platform,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
+      media_kind: isYouTubeShort ? "short" : undefined,
+      aspect_ratio: isYouTubeShort ? 9 / 16 : undefined,
       suggested_height: suggestedHeight,
       preview_text: fetchedPreviewTextRef.current || undefined,
     }, {
