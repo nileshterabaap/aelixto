@@ -537,6 +537,16 @@ const Conversation = () => {
                           }`}
                         >
                           {formatTime(message.created_at)}
+                          {isOwn && (() => {
+                            const state = getTickState(message);
+                            if (state === 'seen') {
+                              return <CheckCheck className="inline-block ml-1 h-3 w-3 text-sky-400 align-[-2px]" />;
+                            }
+                            if (state === 'delivered') {
+                              return <CheckCheck className="inline-block ml-1 h-3 w-3 align-[-2px] opacity-80" />;
+                            }
+                            return <Check className="inline-block ml-1 h-3 w-3 align-[-2px] opacity-80" />;
+                          })()}
                         </span>
                       </p>
                     </div>
