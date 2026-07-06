@@ -67,7 +67,8 @@ const isYouTubeShort = (
   aspectRatio?: number | null,
   mediaKind?: string | null,
 ) => {
-  if (url.includes('/shorts/')) return true;
+  const normalizedUrl = decodeURIComponent(url).toLowerCase();
+  if (normalizedUrl.includes('/shorts/')) return true;
   if (title && /#shorts?\b/i.test(title)) return true;
   if (content && /#shorts?\b/i.test(content)) return true;
   if (typeof aspectRatio === 'number' && aspectRatio > 0 && aspectRatio < 1) return true;
@@ -210,12 +211,14 @@ export const HydratedEmbed = memo(({
     void openExternalUrl(mediaUrl);
   }, [handleOriginalVisit, mediaUrl]);
   
+  const isYouTubePost = platformHint === 'youtube' || (!!r.url && /youtube\.com|youtu\.be/i.test(r.url));
+
   // For YouTube, prefer their thumbnail
-  const effectiveThumbnail = post.platform === 'youtube' && r.url 
+  const effectiveThumbnail = isYouTubePost && r.url 
     ? getYouTubeThumbnail(r.url) || thumbnailUrl 
     : thumbnailUrl;
   
-  const aspectClass = post.platform === 'youtube' && r.url && isYouTubeShort(
+  const aspectClass = isYouTubePost && r.url && isYouTubeShort(
     r.url,
     post.title,
     (post as any).content,
@@ -302,7 +305,7 @@ export const HydratedEmbed = memo(({
       <div className="w-full">
 
         {/* YouTube video */}
-        {r.kind === 'video' && post.platform === 'youtube' && r.url && (
+        {r.kind === 'video' && isYouTubePost && r.url && (
           <ImageViewTracker postId={post.id}>
             <div className={`w-full bg-black ${aspectClass}`}>
               <iframe
@@ -317,7 +320,7 @@ export const HydratedEmbed = memo(({
         )}
         
         {/* Non-YouTube video */}
-        {r.kind === 'video' && post.platform !== 'youtube' && r.url && (
+        {r.kind === 'video' && !isYouTubePost && r.url && (
           <ImageViewTracker postId={post.id}>
             <video 
               src={r.url} 

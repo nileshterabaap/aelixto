@@ -20,6 +20,8 @@ import { measureEmbedHeight } from "@/lib/measureEmbedHeight";
 import { estimateEmbedHeight } from "@/lib/estimateEmbedHeight";
 import { extractOriginalCaptionFromSourceTitle } from "@/lib/originalCaption";
 
+const isYouTubeShortUrl = (url: string) => decodeURIComponent(url).toLowerCase().includes('/shorts/');
+
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -438,6 +440,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
 
     const mediaType = deriveMediaType(linkUrl, platform);
+    const isYouTubeShort = platform === "youtube" && isYouTubeShortUrl(linkUrl);
 
     // Final safety net — never publish a card with nothing to show.
     if (!thumbnailUrl && !embedHtml && !title.trim()) {
@@ -511,6 +514,8 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       platform: platform,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
+      media_kind: isYouTubeShort ? "short" : undefined,
+      aspect_ratio: isYouTubeShort ? 9 / 16 : undefined,
       suggested_height: suggestedHeight,
       preview_text: fetchedPreviewTextRef.current || undefined,
     }, {
@@ -538,6 +543,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
     const platform = classifyUrl(linkUrl, ogType);
     const mediaType = deriveMediaType(linkUrl, platform);
+    const isYouTubeShort = platform === "youtube" && isYouTubeShortUrl(linkUrl);
     setSubmitState("draft");
     await saveDraft.mutateAsync({
       link_url: linkUrl,
