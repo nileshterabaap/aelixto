@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2, Check, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SharedPostCard } from "@/components/messages/SharedPostCard";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,7 @@ const Conversation = () => {
   const navigate = useNavigate();
   const { user } = useSession();
   const { toast } = useToast();
-  const { messages, loading, sendMessage } = useMessages(conversationId || null);
+  const { messages, loading, sendMessage, otherStatus } = useMessages(conversationId || null);
   const [newMessage, setNewMessage] = useState("");
   const [otherUser, setOtherUser] = useState<ConversationUser | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -325,6 +325,17 @@ const Conversation = () => {
   };
 
   const canUnsend = (msg: Message) => msg.sender_id === user?.id;
+
+  // Compute WhatsApp-style tick state for one of my messages
+  const getTickState = (msg: Message): 'sent' | 'delivered' | 'seen' => {
+    if (!otherStatus) return 'sent';
+    const created = new Date(msg.created_at).getTime();
+    const read = otherStatus.last_read_at ? new Date(otherStatus.last_read_at).getTime() : 0;
+    const delivered = otherStatus.last_delivered_at ? new Date(otherStatus.last_delivered_at).getTime() : 0;
+    if (read >= created) return 'seen';
+    if (delivered >= created) return 'delivered';
+    return 'sent';
+  };
 
   if (loading) {
     return (
