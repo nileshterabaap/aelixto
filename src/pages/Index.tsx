@@ -109,6 +109,9 @@ const Index = () => {
         preview_text: post.preview_text,
         preview_title: post.preview_title,
         preview_image_url: post.preview_image_url,
+        aspect_ratio: (post as any).aspect_ratio,
+        media_kind: (post as any).media_kind,
+        suggested_height: (post as any).suggested_height,
         platform: post.platform as
           | "youtube"
           | "instagram"
@@ -150,6 +153,8 @@ const Index = () => {
       preview_title: post.preview_title,
       preview_image_url: post.preview_image_url,
       suggested_height: post.suggested_height,
+      aspect_ratio: post.aspect_ratio,
+      media_kind: post.media_kind,
       platform: post.platform as
         | "youtube"
         | "instagram"
