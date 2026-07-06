@@ -20,6 +20,8 @@ import { measureEmbedHeight } from "@/lib/measureEmbedHeight";
 import { estimateEmbedHeight } from "@/lib/estimateEmbedHeight";
 import { extractOriginalCaptionFromSourceTitle } from "@/lib/originalCaption";
 
+const isYouTubeShortUrl = (url: string) => decodeURIComponent(url).toLowerCase().includes('/shorts/');
+
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
