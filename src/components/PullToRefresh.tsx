@@ -42,9 +42,6 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   }, []);
 
   useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-
     const handleTouchStart = (event: TouchEvent) => {
       if (refreshing) return;
       if (shouldIgnorePullTarget(event.target)) return;
@@ -108,16 +105,19 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       animate(pullY, 0, { type: "spring", stiffness: 350, damping: 28 });
     };
 
-    el.addEventListener("touchstart", handleTouchStart, { passive: true });
-    el.addEventListener("touchmove", handleTouchMove, { passive: true });
-    el.addEventListener("touchend", handleTouchEnd, { passive: true });
-    el.addEventListener("touchcancel", handleTouchEnd, { passive: true });
+    // Listen on window (capture phase) so touches over iframes, overlays,
+    // and embeds still trigger PTR — matching Instagram's "pull from anywhere".
+    const opts: AddEventListenerOptions = { passive: true, capture: true };
+    window.addEventListener("touchstart", handleTouchStart, opts);
+    window.addEventListener("touchmove", handleTouchMove, opts);
+    window.addEventListener("touchend", handleTouchEnd, opts);
+    window.addEventListener("touchcancel", handleTouchEnd, opts);
 
     return () => {
-      el.removeEventListener("touchstart", handleTouchStart);
-      el.removeEventListener("touchmove", handleTouchMove);
-      el.removeEventListener("touchend", handleTouchEnd);
-      el.removeEventListener("touchcancel", handleTouchEnd);
+      window.removeEventListener("touchstart", handleTouchStart, opts);
+      window.removeEventListener("touchmove", handleTouchMove, opts);
+      window.removeEventListener("touchend", handleTouchEnd, opts);
+      window.removeEventListener("touchcancel", handleTouchEnd, opts);
     };
   }, [isAtTop, onRefresh, pullY, refreshing]);
 
