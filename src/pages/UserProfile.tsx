@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCompactCount } from "@/lib/formatCount";
@@ -33,6 +33,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const { username: urlUsername } = useParams<{ username: string }>();
   const username = usernameOverride || urlUsername;
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useSession();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
@@ -365,6 +366,10 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                     .delete()
                     .eq("user_id", u.id)
                     .eq("blocked_user_id", profile.user_id);
+                  await queryClient.invalidateQueries({ queryKey: ["is-blocked", u.id, profile.user_id] });
+                  await queryClient.invalidateQueries({ queryKey: ["user-platform-tabs", profile.user_id] });
+                  await queryClient.invalidateQueries({ queryKey: ["platform-posts", profile.user_id] });
+                  await queryClient.invalidateQueries({ queryKey: ["following-feed"] });
                   await refetchBlocked();
                   await refreshFollow();
                 }}
