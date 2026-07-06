@@ -440,6 +440,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
 
     const mediaType = deriveMediaType(linkUrl, platform);
+    const isYouTubeShort = platform === "youtube" && isYouTubeShortUrl(linkUrl);
 
     // Final safety net — never publish a card with nothing to show.
     if (!thumbnailUrl && !embedHtml && !title.trim()) {

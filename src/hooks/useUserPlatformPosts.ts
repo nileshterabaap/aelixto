@@ -19,6 +19,9 @@ export interface PlatformPost {
   preview_text?: string | null;
   preview_title?: string | null;
   preview_image_url?: string | null;
+  media_kind?: string | null;
+  aspect_ratio?: number | null;
+  suggested_height?: number | null;
   is_public: boolean;
   is_repost: boolean;
   original_user_id: string | null;
@@ -160,7 +163,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       const { data: postDetails } = postIds.length
         ? await supabase
             .from("posts")
-            .select("id, title, content, thumbnail_url, preview_text, preview_title, preview_image_url")
+            .select("id, title, content, thumbnail_url, preview_text, preview_title, preview_image_url, media_kind, aspect_ratio, suggested_height")
             .in("id", postIds)
         : { data: [] };
 
