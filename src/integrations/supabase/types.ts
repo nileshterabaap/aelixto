@@ -1150,6 +1150,7 @@ export type Database = {
         Args: { _kind: string; _target: string; _viewer: string }
         Returns: boolean
       }
+      can_view_profile_posts: { Args: { _target: string }; Returns: boolean }
       cancel_follow_or_request: {
         Args: { _target: string }
         Returns: undefined
