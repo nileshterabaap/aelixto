@@ -138,6 +138,15 @@ export const useConversations = () => {
 
       const conversationIds = participantData.map(p => p.conversation_id);
 
+      // Bump delivered-at for all my participant rows so senders see 2 ticks
+      // once I've been online.
+      supabase
+        .from('conversation_participants')
+        .update({ last_delivered_at: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .in('conversation_id', conversationIds)
+        .then(() => { /* fire-and-forget */ });
+
       // Get conversation details
       const { data: conversationData, error: conversationError } = await supabase
         .from('conversations')
