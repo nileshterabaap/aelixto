@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MoreVertical, Ban, UserMinus, Copy, Share2, Flag } from "lucide-react";
+import { MoreVertical, Ban, UserMinus, Copy, Share2, Flag, ShieldOff } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ReportDialog } from "@/components/ReportDialog";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,9 @@ interface ProfileOptionsMenuProps {
   username: string;
   displayName?: string | null;
   isFollowedByTarget: boolean; // does this user follow ME?
+  isBlocked?: boolean;
   onBlocked?: () => void;
+  onUnblocked?: () => void;
   onRemovedFollower?: () => void;
 }
 
@@ -38,7 +40,9 @@ export const ProfileOptionsMenu = ({
   username,
   displayName,
   isFollowedByTarget,
+  isBlocked = false,
   onBlocked,
+  onUnblocked,
   onRemovedFollower,
 }: ProfileOptionsMenuProps) => {
   const queryClient = useQueryClient();
@@ -109,6 +113,31 @@ export const ProfileOptionsMenu = ({
     }
   };
 
+  const handleUnblock = async () => {
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase
+        .from("blocked_users")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("blocked_user_id", targetUserId);
+
+      if (error) throw error;
+
+      toast.success(`Unblocked @${username}`);
+      await queryClient.invalidateQueries();
+      onUnblocked?.();
+    } catch (error) {
+      console.error("Error unblocking user:", error);
+      toast.error("Failed to unblock user");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleRemoveFollower = async () => {
     setLoading(true);
     try {
@@ -172,13 +201,23 @@ export const ProfileOptionsMenu = ({
             <Flag className="h-4 w-4 mr-2" />
             Report @{username}
           </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={() => setBlockDialogOpen(true)}
-            className="text-destructive focus:text-destructive"
-          >
-            <Ban className="h-4 w-4 mr-2" />
-            Block @{username}
-          </DropdownMenuItem>
+          {isBlocked ? (
+            <DropdownMenuItem
+              onClick={handleUnblock}
+              disabled={loading}
+            >
+              <ShieldOff className="h-4 w-4 mr-2" />
+              Unblock @{username}
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem
+              onClick={() => setBlockDialogOpen(true)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Ban className="h-4 w-4 mr-2" />
+              Block @{username}
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
