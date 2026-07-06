@@ -1,35 +1,62 @@
-## Goal
-Make pull-to-refresh feel like Instagram: as long as the feed is scrolled to the top, dragging down from *anywhere* on the screen (over posts, embeds, thumbnails, whitespace) triggers the refresh — not just from the narrow area where touches currently reach the PTR container.
+## The problem
 
-## Why it feels tight today
-`src/components/PullToRefresh.tsx` attaches `touchstart/move/end` to its own inner `<div ref={containerRef}>`. Touches that land on:
-- YouTube / Instagram / Reddit iframes (which swallow or don't bubble touches)
-- The keep-alive wrappers / fixed overlays above the feed
-- Any element with its own `touch-action` or that stops propagation
+Right now **Block is only a label** — we insert a row into `blocked_users` and unfollow, but nothing in the app or database actually filters anything by it. That's why the blocked user can still find you, follow you, see your posts, and DM you.
 
-…never reach that inner div, so no pull is registered. That's why PTR only "catches" from certain spots.
+Same audit needed for the other privacy toggles (private account, hide likes, who-can-see-followers/following, who-can-comment/message/mention) — some are enforced, some aren't.
 
-## Changes (single file: `src/components/PullToRefresh.tsx`)
+Plus, the comment button is missing when a post is opened from the profile grid, Saved grid, or a shared post inside DMs.
 
-1. **Listen on `window` instead of the inner container.**
-   Attach `touchstart/touchmove/touchend/touchcancel` to `window` (capture phase, passive) so every touch on the feed screen is seen, regardless of which element (iframe, overlay, embed) is under the finger.
+---
 
-2. **Gate by "is the page at the top?" not by touch target.**
-   Keep the existing `isAtTop()` check (window scrollY + inner scroll containers both at 0). Drop the `shouldIgnorePullTarget` filter except for the bottom nav and the floating "Create post" button (so those stay tappable without accidental pulls).
+## Fix — 3 parts
 
-3. **Re-anchor the start Y once the user reaches the top mid-gesture** (already implemented) — keep as-is; it's what makes the pull feel natural when the finger is already moving.
+### 1. Make Block actually block (both directions)
 
-4. **Only activate on the feed route(s).**
-   Add an optional `enabled` prop (default `true`) that the caller passes. Feed screens (`Index`, `SavedPosts`, `Notifications`, `Discover`, `Messages`, `UserProfile`) already wrap their content in `<PullToRefresh>`, so no caller changes needed — the window listener is scoped to whichever `<PullToRefresh>` is currently mounted.
+Add a database helper `public.are_blocked(a uuid, b uuid)` (security definer) that returns true if **either** user has blocked the other, then enforce it everywhere via RLS + client filters:
 
-5. **Keep the visual behavior identical:** same threshold (55px), same damping curve, same spinner overlay, same content-drag animation. Only the *touch capture surface* widens.
+**Database (RLS)**
+- `profiles` SELECT — hide profile rows when either side blocked the other (so the profile page 404s, search returns nothing, avatars/usernames disappear).
+- `posts` SELECT — hide the blocked user's posts from you and yours from them (feed, profile grid, saved-post lookups, post-detail page).
+- `follows` INSERT + SELECT — cannot follow a blocker; existing follow rows between blocked pairs stop being visible (counts drop, follower/following lists hide them).
+- `follow_requests` INSERT — cannot send a request.
+- `messages` INSERT + `conversations` participants — cannot start a DM or send into an existing one; hide the conversation from both sides' inbox.
+- `comments`, `likes`, `saves`, `reposts` INSERT + SELECT — cannot interact; existing rows hidden.
+- `notifications` INSERT — no new notifications between blocked users.
 
-## Out of scope
-- No changes to refresh callbacks, feed ordering, or Mark-as-Seen logic.
-- No changes to the pages that consume `<PullToRefresh>`.
-- No new dependencies.
+**Client (defense in depth)**
+- Load blocked-user IDs once into a React Query cache and filter them out of: main feed, following feed, profile page (redirect to Not Found if blocked), user search, followers/following dialogs, notifications, conversation list, shared-post cards in DMs, mention suggestions.
+- `Block` action also removes existing follows both ways (already done) and cancels any pending follow requests.
 
-## Success criteria
-On the feed at scroll-top, dragging down from over a YouTube/IG embed, a thumbnail, or empty space all trigger the same pull animation and refresh — matching Instagram. Scrolling normally (not at top) still behaves normally.
+### 2. Audit + fix the other privacy settings
 
-Success probability: **90%**.
+Verify enforcement and add what's missing:
+
+| Setting | Status | Action |
+|---|---|---|
+| Private account | partial (client only) | Also enforce via RLS on `posts` SELECT + require accepted `follow_requests` |
+| Hide like counts | client-only | Keep as-is (display-only is standard) |
+| Who can see followers / following | client-only | Add RLS on `follows` SELECT using target's `settings` |
+| Who can comment | already checked via `useCanInteract` | Also enforce via RLS on `comments` INSERT |
+| Who can message | already checked | Also enforce via RLS on `messages` INSERT |
+| Who can mention | client-only | Enforce in mention-lookup query and notification insert |
+
+### 3. Add the missing comment button
+
+Tapping a post opened from the profile grid, Saved grid, or a shared-post card in DMs should open the same `CommentsDialog` used in the feed. Wire a comment button into:
+- `src/components/profile/PlatformPostViewer.tsx`
+- `src/components/saved/SavedPostViewer.tsx`
+- `src/components/messages/SharedPostCard.tsx` (tap the card → open post → comments accessible)
+
+---
+
+## Technical details
+
+- New SQL helper `public.are_blocked(uuid, uuid)` — `security definer`, `stable`, checks `blocked_users` in both directions. Used in every RLS policy above.
+- New SQL helper `public.can_see_follows(target uuid, viewer uuid, kind text)` — reads `profiles.settings->>who_can_see_followers` / `who_can_see_following`, returns bool. Used in `follows` SELECT policy.
+- Existing `useCanInteract` stays for pre-submit UX (disable button, show reason toast); RLS is the source of truth.
+- One React Query hook `useBlockedIdSet()` returns `Set<string>` for O(1) client filtering; invalidated on block/unblock.
+- No new dependencies. No schema changes to existing tables — only new policies + helpers.
+
+---
+
+**Success probability: 88%.**
