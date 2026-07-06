@@ -21,6 +21,7 @@ import { FollowListDialog, getFollowVisibility } from "@/components/profile/Foll
 import { ProfileOptionsMenu } from "@/components/profile/ProfileOptionsMenu";
 import { AuthCTABar } from "@/components/AuthCTABar";
 import { Lock } from "lucide-react";
+import { useIsBlocked } from "@/hooks/useIsBlocked";
 
 interface UserProfileProps {
   usernameOverride?: string;
@@ -57,6 +58,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
   const { isFollowing, isRequested, followsMe, follow, unfollow, loading: followLoading, counts, countsReady, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
+  const { isBlocked, refetch: refetchBlocked } = useIsBlocked(profile?.user_id);
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
 
@@ -228,7 +230,9 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                   username={profile.username}
                   displayName={profile.display_name}
                   isFollowedByTarget={followsMe}
+                  isBlocked={isBlocked}
                   onBlocked={() => navigate('/')}
+                  onUnblocked={() => { refetchBlocked(); refreshFollow(); }}
                   onRemovedFollower={() => {
                     refreshFollow();
                   }}
@@ -320,6 +324,25 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             >
               Edit Profile
             </Button>
+          ) : user && isBlocked ? (
+            <div className="mb-6">
+              <Button
+                onClick={async () => {
+                  const { data: { user: u } } = await supabase.auth.getUser();
+                  if (!u || !profile) return;
+                  await supabase
+                    .from("blocked_users")
+                    .delete()
+                    .eq("user_id", u.id)
+                    .eq("blocked_user_id", profile.user_id);
+                  await refetchBlocked();
+                  await refreshFollow();
+                }}
+                className="w-full rounded-full py-4 text-sm font-bold border-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Unblock
+              </Button>
+            </div>
           ) : user ? (
             <div className="flex gap-3 mb-6">
               <Button 
