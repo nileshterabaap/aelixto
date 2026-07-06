@@ -1141,6 +1141,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      are_blocked: { Args: { _a: string; _b: string }; Returns: boolean }
+      can_view_follow_list: {
+        Args: { _kind: string; _target: string; _viewer: string }
+        Returns: boolean
+      }
       cancel_follow_or_request: {
         Args: { _target: string }
         Returns: undefined
