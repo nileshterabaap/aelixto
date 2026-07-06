@@ -22,6 +22,8 @@ import { ProfileOptionsMenu } from "@/components/profile/ProfileOptionsMenu";
 import { AuthCTABar } from "@/components/AuthCTABar";
 import { Lock } from "lucide-react";
 import { useIsBlocked } from "@/hooks/useIsBlocked";
+import { useAmIBlockedBy } from "@/hooks/useAmIBlockedBy";
+import { Ban } from "lucide-react";
 
 interface UserProfileProps {
   usernameOverride?: string;
@@ -59,6 +61,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const { isFollowing, isRequested, followsMe, follow, unfollow, loading: followLoading, counts, countsReady, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
   const { isBlocked, refetch: refetchBlocked } = useIsBlocked(profile?.user_id);
+  const { amIBlockedBy, isLoading: amIBlockedByLoading } = useAmIBlockedBy(profile?.user_id);
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
 
@@ -126,6 +129,33 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Profile not found</p>
           <Button onClick={() => navigate('/')}>Go Home</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // If the profile owner has blocked me, show a minimal "blocked you" screen.
+  if (profile && !isMe && amIBlockedBy && !amIBlockedByLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="sticky top-0 z-10 bg-background border-b border-border">
+          <div className="container max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-bold truncate">@{profile.username}</h1>
+            </div>
+          </div>
+        </header>
+        <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
+          <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Ban className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">This user has blocked you</h2>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            You can't see their profile, posts, followers or activity.
+          </p>
         </div>
       </div>
     );
