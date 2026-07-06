@@ -540,6 +540,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
     const platform = classifyUrl(linkUrl, ogType);
     const mediaType = deriveMediaType(linkUrl, platform);
+    const isYouTubeShort = platform === "youtube" && isYouTubeShortUrl(linkUrl);
     setSubmitState("draft");
     await saveDraft.mutateAsync({
       link_url: linkUrl,
