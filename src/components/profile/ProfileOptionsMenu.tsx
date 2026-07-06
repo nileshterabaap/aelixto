@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { MoreVertical, Ban, UserMinus, Copy, Share2, Flag } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ReportDialog } from "@/components/ReportDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -40,6 +41,7 @@ export const ProfileOptionsMenu = ({
   onBlocked,
   onRemovedFollower,
 }: ProfileOptionsMenuProps) => {
+  const queryClient = useQueryClient();
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [removeFollowerDialogOpen, setRemoveFollowerDialogOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -93,6 +95,10 @@ export const ProfileOptionsMenu = ({
         .eq("following_id", user.id);
 
       toast.success(`Blocked @${username}`);
+      // Force everything that could be showing this user to refetch — the
+      // new RLS policies will now hide them from feed, search, profile,
+      // followers/following lists, notifications, and conversations.
+      await queryClient.invalidateQueries();
       onBlocked?.();
     } catch (error) {
       console.error("Error blocking user:", error);
