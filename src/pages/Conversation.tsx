@@ -540,12 +540,13 @@ const Conversation = () => {
                           {isOwn && (() => {
                             const state = getTickState(message);
                             if (state === 'seen') {
-                              return <CheckCheck className="inline-block ml-1 h-3 w-3 text-sky-400 align-[-2px]" />;
+                              // 2 solid ticks — full opacity (reads as "black/dark" on own bubble)
+                              return <CheckCheck className="inline-block ml-1 h-3 w-3 align-[-2px] text-primary-foreground" />;
                             }
                             if (state === 'delivered') {
-                              return <CheckCheck className="inline-block ml-1 h-3 w-3 align-[-2px] opacity-80" />;
+                              return <CheckCheck className="inline-block ml-1 h-3 w-3 align-[-2px] text-primary-foreground/50" />;
                             }
-                            return <Check className="inline-block ml-1 h-3 w-3 align-[-2px] opacity-80" />;
+                            return <Check className="inline-block ml-1 h-3 w-3 align-[-2px] text-primary-foreground/50" />;
                           })()}
                         </span>
                       </p>
