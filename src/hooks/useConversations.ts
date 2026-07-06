@@ -84,7 +84,17 @@ export const useConversations = () => {
           schema: 'public',
           table: 'messages'
         },
-        () => {
+        (payload) => {
+          // Mark incoming messages as delivered for the current user
+          const msg = (payload.new as { conversation_id?: string; sender_id?: string } | null) ?? null;
+          if (msg && msg.sender_id && msg.sender_id !== user.id && msg.conversation_id) {
+            supabase
+              .from('conversation_participants')
+              .update({ last_delivered_at: new Date().toISOString() })
+              .eq('conversation_id', msg.conversation_id)
+              .eq('user_id', user.id)
+              .then(() => { /* fire-and-forget */ });
+          }
           fetchConversations();
         }
       )
