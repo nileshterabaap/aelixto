@@ -31,7 +31,7 @@ export interface Post {
   } | null;
 }
 
-export const usePosts = () => {
+export const usePosts = (options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: ["posts"],
     queryFn: async () => {
@@ -45,11 +45,14 @@ export const usePosts = () => {
             settings
           )
         `)
-        .order("created_at", { ascending: false });
+        .eq("is_public", true)
+        .order("created_at", { ascending: false })
+        .limit(30);
 
       if (error) throw error;
       return data as unknown as Post[];
     },
+    enabled: options?.enabled ?? true,
     staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
     gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache
     refetchOnWindowFocus: false,
