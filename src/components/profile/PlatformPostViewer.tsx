@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
 import { PostSkeleton } from "@/components/PostSkeleton";
+import { AelixtoLoader } from "@/components/AelixtoLoader";
 import { motion } from "framer-motion";
 import { useSession } from "@/hooks/useSession";
 import { markPostsSeenImmediate } from "@/hooks/useMarkPostSeen";
@@ -104,6 +105,10 @@ export const PlatformPostViewer = ({
     },
   });
   const [portalReady, setPortalReady] = useState(false);
+  // Show the brand loader over the viewer until the tapped post has had a
+  // moment to hydrate its embed. Fades out smoothly.
+  const [loaderDone, setLoaderDone] = useState(false);
+  const [loaderGone, setLoaderGone] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   // Fires exactly once when the tapped target post is first attached to
@@ -149,6 +154,18 @@ export const PlatformPostViewer = ({
       document.body.style.overflow = previousOverflow;
     };
   }, []);
+
+  // Reset + auto-dismiss the loader whenever a new post is opened.
+  useEffect(() => {
+    setLoaderDone(false);
+    setLoaderGone(false);
+    const fadeAt = window.setTimeout(() => setLoaderDone(true), 1100);
+    const removeAt = window.setTimeout(() => setLoaderGone(true), 1700);
+    return () => {
+      window.clearTimeout(fadeAt);
+      window.clearTimeout(removeAt);
+    };
+  }, [initialPostId, activeTab]);
 
   // Anchor scroll to the tapped post and keep it anchored while posts above
   // hydrate. Stops anchoring once the user scrolls.
@@ -437,6 +454,16 @@ export const PlatformPostViewer = ({
           />
         ))}
       </div>
+
+      {/* Brand loader overlay — fades away once the post has had time to render */}
+      {!loaderGone && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center pointer-events-none bg-background/60 backdrop-blur-sm transition-opacity duration-500"
+          style={{ opacity: loaderDone ? 0 : 1 }}
+        >
+          <AelixtoLoader size={96} />
+        </div>
+      )}
     </motion.div>
   );
 
