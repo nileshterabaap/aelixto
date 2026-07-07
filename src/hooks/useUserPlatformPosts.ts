@@ -166,7 +166,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       const { data: postDetails } = postIds.length
         ? await supabase
             .from("posts")
-            .select("id, title, content, thumbnail_url, preview_text, preview_title, preview_image_url, media_kind, aspect_ratio, suggested_height, pinned_at, hide_counts, comments_disabled" as any)
+            .select("id, title, content, thumbnail_url, preview_text, preview_title, preview_image_url, media_kind, aspect_ratio, suggested_height, pinned_at, hide_counts, comments_disabled")
             .in("id", postIds)
         : { data: [] };
 
