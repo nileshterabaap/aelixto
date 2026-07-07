@@ -466,16 +466,23 @@ export const PlatformPostViewer = ({
                   ease: [0.22, 1, 0.36, 1],
                 }}
               >
-                <HydratedFeedPost
-                  post={transformPost(post, profileData)}
-                  onDeleted={() => {
-                    // Stay inside the viewer after deleting. Only close it
-                    // when this was the last post in the grid.
-                    if (posts.length <= 1) onClose();
-                  }}
-                  userId={user?.id}
-                  startHydrated={true}
-                />
+                <div className="relative">
+                  {post.id === targetPostId && !targetReady && (
+                    <div className="absolute inset-0 z-10">
+                      <PostSkeleton />
+                    </div>
+                  )}
+                  <HydratedFeedPost
+                    post={transformPost(post, profileData)}
+                    onDeleted={() => {
+                      // Stay inside the viewer after deleting. Only close it
+                      // when this was the last post in the grid.
+                      if (posts.length <= 1) onClose();
+                    }}
+                    userId={user?.id}
+                    startHydrated={true}
+                  />
+                </div>
               </motion.div>
             ))
           )}
