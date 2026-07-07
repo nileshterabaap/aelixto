@@ -793,21 +793,27 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
               transition: 'fill 200ms ease, color 200ms ease',
             }}
           />
-          {!(post as any).hide_likes && displayLikeCount > 0 && (
+          {!(post as any).hide_likes && !hideCounts && displayLikeCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground">{displayLikeCount}</span>
           )}
         </motion.button>
         <motion.button 
           onClick={() => {
+            if (commentsDisabled) return;
             setCommentsOpen(true);
             commentControls.start({ scale: [1, 1.2, 1], transition: { duration: 0.2, ease: 'easeOut' } });
           }}
+          disabled={commentsDisabled}
           animate={commentControls}
           whileTap={{ scale: 0.9 }}
-          className="action-btn p-1.5 flex items-center gap-1"
+          className={`action-btn p-1.5 flex items-center gap-1 ${commentsDisabled ? 'opacity-40' : ''}`}
         >
-          <MessageCircle className="h-6 w-6 stroke-[1.5] fill-none" />
-          {displayCommentCount > 0 && (
+          {commentsDisabled ? (
+            <MessageCircleOff className="h-6 w-6 stroke-[1.5] fill-none" />
+          ) : (
+            <MessageCircle className="h-6 w-6 stroke-[1.5] fill-none" />
+          )}
+          {!hideCounts && !commentsDisabled && displayCommentCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground">{displayCommentCount}</span>
           )}
         </motion.button>
@@ -824,7 +830,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
               transition: 'color 200ms ease',
             }}
           />
-          {displayRepostCount > 0 && (
+          {!hideCounts && displayRepostCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground">{displayRepostCount}</span>
           )}
         </motion.button>
