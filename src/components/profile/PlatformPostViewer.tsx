@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Post } from "@/data/demoData";
 import type { PlatformPost } from "@/hooks/useUserPlatformPosts";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
+import { getEmbedStatus, subscribeEmbedReadiness } from "@/lib/embedReadiness";
 
 interface PlatformPostViewerProps {
   userId: string;
@@ -117,8 +118,19 @@ export const PlatformPostViewer = ({
   const [targetReady, setTargetReady] = useState(false);
   useEffect(() => {
     setTargetReady(false);
-    const t = window.setTimeout(() => setTargetReady(true), 1400);
-    return () => window.clearTimeout(t);
+    // Keep the loader up until the embed genuinely marks itself ready.
+    // Safety cap at 10s so a broken embed can't trap the loader forever.
+    const check = () => {
+      if (getEmbedStatus(initialPostId) === "ready") {
+        setTargetReady(true);
+        return true;
+      }
+      return false;
+    };
+    if (check()) return;
+    const unsub = subscribeEmbedReadiness(() => { check(); });
+    const cap = window.setTimeout(() => setTargetReady(true), 10000);
+    return () => { unsub(); window.clearTimeout(cap); };
   }, [initialPostId]);
   // Persist scroll-locked state across effect re-runs. Without this, if
   // `posts`/`profileData`/etc change after the user has already started
