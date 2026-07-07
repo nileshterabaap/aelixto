@@ -110,16 +110,10 @@ export const PlatformPostViewer = ({
   // the DOM — used to synchronously scroll the container to that post
   // BEFORE the browser paints, so post #0 never flashes.
   const initialAnchorDoneRef = useRef(false);
-  // Hide the tapped target post until its first iframe/image has fully
-  // rendered AND its height has stabilised so users don't see the
-  // Instagram "tall footer → trimmed" flash. Falls back after 1400ms so
-  // slow embeds never leave the post invisible.
-  const [targetReady, setTargetReady] = useState(false);
-  useEffect(() => {
-    setTargetReady(false);
-    const t = window.setTimeout(() => setTargetReady(true), 1400);
-    return () => window.clearTimeout(t);
-  }, [initialPostId]);
+  // Show the tapped post immediately. We used to hide it until the embed
+  // height stabilised, but any missing signal (no iframe/img, blocked load,
+  // etc.) would leave it invisible forever — worse than a brief IG resize
+  // flash. Anchor scrolling below keeps the correct post in view.
   // Persist scroll-locked state across effect re-runs. Without this, if
   // `posts`/`profileData`/etc change after the user has already started
   // scrolling, the anchoring effect re-runs with userScrolled=false and
@@ -455,11 +449,7 @@ export const PlatformPostViewer = ({
                 }}
                 initial={post.id === targetPostId ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                style={
-                  post.id === targetPostId && !targetReady
-                    ? { opacity: 0 }
-                    : undefined
-                }
+                style={undefined}
                 transition={{
                   duration: 0.28,
                   delay: Math.min(Math.abs(idx - initialIdx), 4) * 0.04,
