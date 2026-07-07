@@ -23,6 +23,7 @@ import { AuthCTABar } from "@/components/AuthCTABar";
 import { Lock } from "lucide-react";
 import { useIsBlocked } from "@/hooks/useIsBlocked";
 import { useAmIBlockedBy } from "@/hooks/useAmIBlockedBy";
+import { AelixtoLoader } from "@/components/AelixtoLoader";
 import { Ban } from "lucide-react";
 
 interface UserProfileProps {
@@ -171,6 +172,10 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
         className="absolute inset-0 z-30 pb-20 pointer-events-none transition-opacity duration-500 ease-out"
         style={{ opacity: showSkeleton ? 1 : 0 }}
       >
+        {/* Centered morphing Aelixto logo — fades out with the rest of the skeleton */}
+        <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-40">
+          <AelixtoLoader size={96} />
+        </div>
         <div className="mx-auto max-w-2xl">
           <div className="relative h-[400px] profile-cover-fallback animate-shimmer" />
           <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
