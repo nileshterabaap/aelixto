@@ -774,9 +774,11 @@ export type Database = {
           broken_check_count: number
           broken_first_seen_at: string | null
           comments_count: number | null
+          comments_disabled: boolean
           content: string
           created_at: string
           embed_html: string | null
+          hide_counts: boolean
           id: string
           is_public: boolean
           last_validated_at: string | null
@@ -784,6 +786,7 @@ export type Database = {
           media_kind: string | null
           media_type: string | null
           media_url: string | null
+          pinned_at: string | null
           platform: string | null
           preview_image_url: string | null
           preview_text: string | null
@@ -801,9 +804,11 @@ export type Database = {
           broken_check_count?: number
           broken_first_seen_at?: string | null
           comments_count?: number | null
+          comments_disabled?: boolean
           content: string
           created_at?: string
           embed_html?: string | null
+          hide_counts?: boolean
           id?: string
           is_public?: boolean
           last_validated_at?: string | null
@@ -811,6 +816,7 @@ export type Database = {
           media_kind?: string | null
           media_type?: string | null
           media_url?: string | null
+          pinned_at?: string | null
           platform?: string | null
           preview_image_url?: string | null
           preview_text?: string | null
@@ -828,9 +834,11 @@ export type Database = {
           broken_check_count?: number
           broken_first_seen_at?: string | null
           comments_count?: number | null
+          comments_disabled?: boolean
           content?: string
           created_at?: string
           embed_html?: string | null
+          hide_counts?: boolean
           id?: string
           is_public?: boolean
           last_validated_at?: string | null
@@ -838,6 +846,7 @@ export type Database = {
           media_kind?: string | null
           media_type?: string | null
           media_url?: string | null
+          pinned_at?: string | null
           platform?: string | null
           preview_image_url?: string | null
           preview_text?: string | null
@@ -1339,9 +1348,11 @@ export type Database = {
           target_user: string
         }
         Returns: {
+          comments_disabled: boolean
           content: string
           created_at: string
           embed_html: string
+          hide_counts: boolean
           id: string
           is_public: boolean
           is_repost: boolean
@@ -1349,6 +1360,7 @@ export type Database = {
           media_type: string
           media_url: string
           original_user_id: string
+          pinned_at: string
           platform: string
           saves_count: number
           thumbnail_url: string
