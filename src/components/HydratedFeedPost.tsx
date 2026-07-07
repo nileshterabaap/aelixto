@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, RefreshCw } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, RefreshCw, Pin, PinOff, EyeOff, Eye, MessageCircleOff, MessageCircle as MessageCircleOn, Pencil } from "lucide-react";
 import { motion, useAnimation } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -7,8 +7,17 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
 import { EmbedSkeleton } from "@/components/EmbedSkeleton";
@@ -443,6 +452,16 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     : { isReposted: false, toggleRepost: () => {}, isReposting: false };
 
   const { isLiked, isSaved, toggleLike, toggleSave, deletePost, isDeleting } = postActions;
+  const togglePin = (postActions as any).togglePin as ((v: { pinned: boolean; platform?: string | null }) => void) | undefined;
+  const toggleHideCounts = (postActions as any).toggleHideCounts as ((v: boolean) => void) | undefined;
+  const toggleCommentsDisabled = (postActions as any).toggleCommentsDisabled as ((v: boolean) => void) | undefined;
+  const editCaption = (postActions as any).editCaption as ((v: string) => void) | undefined;
+  const isPinned = !!(post as any).pinned_at;
+  const hideCounts = !!(post as any).hide_counts;
+  const commentsDisabled = !!(post as any).comments_disabled;
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDraft, setEditDraft] = useState<string>(post.content || "");
+  useEffect(() => { setEditDraft(post.content || ""); }, [post.id, post.content]);
   const { isReposted, toggleRepost } = repostActions;
 
   useEffect(() => {
@@ -609,7 +628,53 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-background z-[100]">
+              <DropdownMenuContent align="end" className="bg-background z-[100] w-56">
+                {!post.isRepost && togglePin && (
+                  <DropdownMenuItem
+                    onClick={() => togglePin({ pinned: !isPinned, platform: (post as any).platform })}
+                    className="cursor-pointer"
+                  >
+                    {isPinned ? (
+                      <><PinOff className="h-4 w-4 mr-2" />Unpin from profile</>
+                    ) : (
+                      <><Pin className="h-4 w-4 mr-2" />Pin to profile</>
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {toggleHideCounts && (
+                  <DropdownMenuItem
+                    onClick={() => toggleHideCounts(!hideCounts)}
+                    className="cursor-pointer"
+                  >
+                    {hideCounts ? (
+                      <><Eye className="h-4 w-4 mr-2" />Show interaction count</>
+                    ) : (
+                      <><EyeOff className="h-4 w-4 mr-2" />Hide interaction count</>
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {toggleCommentsDisabled && (
+                  <DropdownMenuItem
+                    onClick={() => toggleCommentsDisabled(!commentsDisabled)}
+                    className="cursor-pointer"
+                  >
+                    {commentsDisabled ? (
+                      <><MessageCircleOn className="h-4 w-4 mr-2" />Turn on commenting</>
+                    ) : (
+                      <><MessageCircleOff className="h-4 w-4 mr-2" />Turn off commenting</>
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {editCaption && (
+                  <DropdownMenuItem
+                    onClick={() => setEditOpen(true)}
+                    className="cursor-pointer"
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit caption
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => deletePost()}
                   disabled={isDeleting}
@@ -728,21 +793,27 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
               transition: 'fill 200ms ease, color 200ms ease',
             }}
           />
-          {!(post as any).hide_likes && displayLikeCount > 0 && (
+          {!(post as any).hide_likes && !hideCounts && displayLikeCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground">{displayLikeCount}</span>
           )}
         </motion.button>
         <motion.button 
           onClick={() => {
+            if (commentsDisabled) return;
             setCommentsOpen(true);
             commentControls.start({ scale: [1, 1.2, 1], transition: { duration: 0.2, ease: 'easeOut' } });
           }}
+          disabled={commentsDisabled}
           animate={commentControls}
           whileTap={{ scale: 0.9 }}
-          className="action-btn p-1.5 flex items-center gap-1"
+          className={`action-btn p-1.5 flex items-center gap-1 ${commentsDisabled ? 'opacity-40' : ''}`}
         >
-          <MessageCircle className="h-6 w-6 stroke-[1.5] fill-none" />
-          {displayCommentCount > 0 && (
+          {commentsDisabled ? (
+            <MessageCircleOff className="h-6 w-6 stroke-[1.5] fill-none" />
+          ) : (
+            <MessageCircle className="h-6 w-6 stroke-[1.5] fill-none" />
+          )}
+          {!hideCounts && !commentsDisabled && displayCommentCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground">{displayCommentCount}</span>
           )}
         </motion.button>
@@ -759,7 +830,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
               transition: 'color 200ms ease',
             }}
           />
-          {displayRepostCount > 0 && (
+          {!hideCounts && displayRepostCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground">{displayRepostCount}</span>
           )}
         </motion.button>
@@ -818,6 +889,34 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           postId={post.id}
           userId={userId}
         />
+      )}
+
+      {editCaption && (
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit caption</DialogTitle>
+            </DialogHeader>
+            <Textarea
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              rows={6}
+              maxLength={2200}
+              placeholder="Write a caption..."
+            />
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  editCaption(editDraft.trim());
+                  setEditOpen(false);
+                }}
+              >
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </Card>
       </div>

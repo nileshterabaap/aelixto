@@ -67,6 +67,9 @@ function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { 
     comments_count: 0,
     isRepost: !!post.is_repost,
     isRealPost: true,
+    pinned_at: (post as any).pinned_at ?? null,
+    hide_counts: !!(post as any).hide_counts,
+    comments_disabled: !!(post as any).comments_disabled,
   } as any;
 }
 
