@@ -267,9 +267,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       const iframes = mediaNodes.filter((node): node is HTMLIFrameElement => node instanceof HTMLIFrameElement);
       if (iframes.length > 0) {
-        if (attachIframeHandlers()) {
-          markReady();
-        }
+        // Reveal as soon as an iframe is mounted — waiting for its `load`
+        // event keeps our skeleton on top of SDK-driven embeds (Twitter,
+        // Reddit, Pinterest, YouTube, Facebook) for 5–8s. The iframe's
+        // own loading UI is a better UX than our skeleton at that point.
+        attachIframeHandlers();
+        markReady();
         return true;
       }
 
@@ -315,10 +318,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     const handleEmbedReady = () => { markReady(); };
     el.addEventListener('embedReady', handleEmbedReady);
 
-    // Soft fallback: only reveal early if no renderer is still actively loading.
-    // Facebook SDK divs take longer (5-8s), so extend the soft fallback for them.
+    // Soft fallback: reveal early if no renderer is still actively loading.
     const isFacebookPost = detectedPlatform === 'facebook';
-    const softTimeout = isFacebookPost ? 8000 : 4000;
+    const softTimeout = isFacebookPost ? 2500 : 1500;
     const fallback = setTimeout(() => {
       if (settled) return;
       if (checkContent()) return;
