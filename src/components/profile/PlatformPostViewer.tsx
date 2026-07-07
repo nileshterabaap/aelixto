@@ -239,19 +239,40 @@ export const PlatformPostViewer = ({
     };
     container.addEventListener("scroll", onScroll, { passive: true });
 
-    // Safety: stop anchoring after 12s — long enough for slow embeds to
-    // finish hydrating, short enough to never feel sticky.
+    // Safety: stop anchoring after 12s — long enough for slow embeds
+    // (YouTube iframe, Facebook SDK, Twitter/X widget, Reddit, Pinterest,
+    // Quora article scrape) to finish hydrating, short enough to never
+    // feel sticky. Working platforms (IG/LinkedIn/Threads/Spotify) render
+    // via raw embed_html and stabilise almost instantly; the slow ones
+    // above kept pushing the tapped post out of view when anchoring
+    // stopped at 4s.
     const safetyTimeout = window.setTimeout(() => {
       cancelled = true;
       ro.disconnect();
       mo.disconnect();
-    }, 4000);
+      if (rafId) cancelAnimationFrame(rafId);
+    }, 12000);
+
+    // Belt-and-braces: run a per-frame re-anchor for the first 3s so
+    // slow-hydrating embeds that resize between ResizeObserver ticks
+    // can't drift the tapped post off screen.
+    let rafId: number | null = null;
+    const rafDeadline = performance.now() + 3000;
+    const rafLoop = () => {
+      if (cancelled || userScrolledRef.current) return;
+      anchor();
+      if (performance.now() < rafDeadline) {
+        rafId = requestAnimationFrame(rafLoop);
+      }
+    };
+    rafId = requestAnimationFrame(rafLoop);
 
     return () => {
       cancelled = true;
       ro.disconnect();
       mo.disconnect();
       window.clearTimeout(safetyTimeout);
+      if (rafId) cancelAnimationFrame(rafId);
       container.removeEventListener("wheel", markScrolled);
       container.removeEventListener("touchmove", markScrolled);
       container.removeEventListener("pointerdown", markScrolled);
