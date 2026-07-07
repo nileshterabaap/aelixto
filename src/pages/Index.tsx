@@ -70,8 +70,10 @@ const Index = () => {
   });
   
   
-  // Demo feed for signed-out users
-  const { data: demoPostsData, isLoading: demoLoading } = usePosts();
+  // Demo feed for signed-out users — only fetched when actually shown
+  const isDemoModeEnv = import.meta.env.VITE_DEMO_MODE === "true";
+  const enableDemoFetch = !user && isDemoModeEnv;
+  const { data: demoPostsData, isLoading: demoLoading } = usePosts({ enabled: enableDemoFetch });
 
   // Following feed for signed-in users
   const {
@@ -82,7 +84,7 @@ const Index = () => {
     hasMore,
   } = useFollowingFeed();
 
-  const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
+  const isDemoMode = isDemoModeEnv;
   const isSignedOut = !user;
   const showDemoFeed = isSignedOut && isDemoMode;
 
