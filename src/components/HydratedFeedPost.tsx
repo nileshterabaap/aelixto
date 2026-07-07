@@ -628,7 +628,53 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-background z-[100]">
+              <DropdownMenuContent align="end" className="bg-background z-[100] w-56">
+                {!post.isRepost && togglePin && (
+                  <DropdownMenuItem
+                    onClick={() => togglePin({ pinned: !isPinned, platform: (post as any).platform })}
+                    className="cursor-pointer"
+                  >
+                    {isPinned ? (
+                      <><PinOff className="h-4 w-4 mr-2" />Unpin from profile</>
+                    ) : (
+                      <><Pin className="h-4 w-4 mr-2" />Pin to profile</>
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {toggleHideCounts && (
+                  <DropdownMenuItem
+                    onClick={() => toggleHideCounts(!hideCounts)}
+                    className="cursor-pointer"
+                  >
+                    {hideCounts ? (
+                      <><Eye className="h-4 w-4 mr-2" />Show interaction count</>
+                    ) : (
+                      <><EyeOff className="h-4 w-4 mr-2" />Hide interaction count</>
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {toggleCommentsDisabled && (
+                  <DropdownMenuItem
+                    onClick={() => toggleCommentsDisabled(!commentsDisabled)}
+                    className="cursor-pointer"
+                  >
+                    {commentsDisabled ? (
+                      <><MessageCircleOn className="h-4 w-4 mr-2" />Turn on commenting</>
+                    ) : (
+                      <><MessageCircleOff className="h-4 w-4 mr-2" />Turn off commenting</>
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {editCaption && (
+                  <DropdownMenuItem
+                    onClick={() => setEditOpen(true)}
+                    className="cursor-pointer"
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit caption
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => deletePost()}
                   disabled={isDeleting}
