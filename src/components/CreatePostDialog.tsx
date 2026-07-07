@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Link2, Loader2, Sparkles, X, Check } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
+import { useImageUpload } from "@/hooks/useImageUpload";
+import { ImageUploadButton } from "@/components/ImageUploadButton";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
 import {
@@ -43,6 +45,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const createPost = useCreatePost();
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
+  const { uploadImage, uploading: uploadingThumbnail } = useImageUpload();
   const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
   // Height measured offscreen at create-time so the very first viewer
   // (including the creator) opens the card at its real size — no blank space.
@@ -788,38 +791,31 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           </div>
 
                           <div className="space-y-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => setShowThumbnailInput(!showThumbnailInput)}
-                              className="h-11 w-full rounded-[20px] border-input bg-background"
+                            <ImageUploadButton
+                              uploading={uploadingThumbnail}
+                              onFileSelect={async (file) => {
+                                const { data: { user } } = await supabase.auth.getUser();
+                                if (!user) {
+                                  toast.error("Please sign in to upload a thumbnail");
+                                  return;
+                                }
+                                const url = await uploadImage(file, "posts", user.id);
+                                if (url) setThumbnailUrl(url);
+                              }}
+                              className="h-11 rounded-[20px] border-input bg-background"
                             >
-                              {showThumbnailInput ? "Hide" : "Change"} Thumbnail
-                            </Button>
-
-                            <AnimatePresence initial={false}>
-                              {showThumbnailInput && (
-                                <motion.div
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: "auto", opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{ duration: 0.25 }}
-                                  className="overflow-hidden"
-                                >
-                                  <Label htmlFor="thumbnail" className="text-sm font-medium">
-                                    Thumbnail URL
-                                  </Label>
-                                  <input
-                                    id="thumbnail"
-                                    type="url"
-                                    placeholder="https://..."
-                                    value={thumbnailUrl}
-                                    onChange={(e) => setThumbnailUrl(e.target.value)}
-                                    className="mt-2 h-12 w-full rounded-[22px] border border-input bg-background px-4 text-base outline-none shadow-[0_0_0_4px_hsl(var(--muted)/0.75)] transition-[border-color,box-shadow] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.06)]"
-                                  />
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
+                              {thumbnailUrl ? "Change Thumbnail" : "Choose Thumbnail from Gallery"}
+                            </ImageUploadButton>
+                            {thumbnailUrl && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setThumbnailUrl("")}
+                                className="h-9 w-full rounded-[18px] text-xs text-muted-foreground"
+                              >
+                                Remove thumbnail
+                              </Button>
+                            )}
                           </div>
 
                           <motion.div whileTap={{ scale: 0.98 }}>
