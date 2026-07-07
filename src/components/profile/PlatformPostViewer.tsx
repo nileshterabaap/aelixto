@@ -222,8 +222,6 @@ export const PlatformPostViewer = ({
     };
     container.addEventListener("wheel", markScrolled, { passive: true });
     container.addEventListener("touchmove", markScrolled, { passive: true });
-    container.addEventListener("pointerdown", markScrolled, { passive: true });
-    container.addEventListener("touchstart", markScrolled, { passive: true });
     container.addEventListener("keydown", markScrolled, { passive: true });
     // Last-resort: any genuine scroll delta the observers didn't catch
     // (momentum, scrollbar drag, programmatic-but-user-initiated) trips
@@ -245,7 +243,7 @@ export const PlatformPostViewer = ({
       cancelled = true;
       ro.disconnect();
       mo.disconnect();
-    }, 4000);
+    }, 12000);
 
     return () => {
       cancelled = true;
@@ -254,8 +252,6 @@ export const PlatformPostViewer = ({
       window.clearTimeout(safetyTimeout);
       container.removeEventListener("wheel", markScrolled);
       container.removeEventListener("touchmove", markScrolled);
-      container.removeEventListener("pointerdown", markScrolled);
-      container.removeEventListener("touchstart", markScrolled);
       container.removeEventListener("keydown", markScrolled);
       container.removeEventListener("scroll", onScroll);
       container.removeEventListener("load", onAnyLoad, true);
