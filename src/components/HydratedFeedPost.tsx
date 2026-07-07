@@ -890,6 +890,34 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           userId={userId}
         />
       )}
+
+      {editCaption && (
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit caption</DialogTitle>
+            </DialogHeader>
+            <Textarea
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              rows={6}
+              maxLength={2200}
+              placeholder="Write a caption..."
+            />
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  editCaption(editDraft.trim());
+                  setEditOpen(false);
+                }}
+              >
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
       </div>
     </div>
