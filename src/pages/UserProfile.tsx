@@ -23,6 +23,7 @@ import { AuthCTABar } from "@/components/AuthCTABar";
 import { Lock } from "lucide-react";
 import { useIsBlocked } from "@/hooks/useIsBlocked";
 import { useAmIBlockedBy } from "@/hooks/useAmIBlockedBy";
+import { AelixtoLoader } from "@/components/AelixtoLoader";
 import { Ban } from "lucide-react";
 
 interface UserProfileProps {
