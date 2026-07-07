@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, RefreshCw } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, RefreshCw, Pin, PinOff, EyeOff, Eye, MessageCircleOff, MessageCircle as MessageCircleOn, Pencil } from "lucide-react";
 import { motion, useAnimation } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -7,8 +7,17 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
 import { EmbedSkeleton } from "@/components/EmbedSkeleton";
@@ -443,6 +452,16 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     : { isReposted: false, toggleRepost: () => {}, isReposting: false };
 
   const { isLiked, isSaved, toggleLike, toggleSave, deletePost, isDeleting } = postActions;
+  const togglePin = (postActions as any).togglePin as ((v: { pinned: boolean; platform?: string | null }) => void) | undefined;
+  const toggleHideCounts = (postActions as any).toggleHideCounts as ((v: boolean) => void) | undefined;
+  const toggleCommentsDisabled = (postActions as any).toggleCommentsDisabled as ((v: boolean) => void) | undefined;
+  const editCaption = (postActions as any).editCaption as ((v: string) => void) | undefined;
+  const isPinned = !!(post as any).pinned_at;
+  const hideCounts = !!(post as any).hide_counts;
+  const commentsDisabled = !!(post as any).comments_disabled;
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDraft, setEditDraft] = useState<string>(post.content || "");
+  useEffect(() => { setEditDraft(post.content || ""); }, [post.id, post.content]);
   const { isReposted, toggleRepost } = repostActions;
 
   useEffect(() => {
