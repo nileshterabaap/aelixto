@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import { Pin } from "lucide-react";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 import { getThumbnailText } from "@/lib/getThumbnailText";
@@ -29,6 +30,14 @@ function PostCard({ post, onClick }: {
 }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const isPinned = !!post.pinned_at;
+
+  const PinBadge = () =>
+    isPinned ? (
+      <div className="absolute top-2 left-2 z-10 grid place-items-center h-7 w-7 rounded-full bg-black/40 backdrop-blur-sm">
+        <Pin className="h-3.5 w-3.5 text-neutral-300 fill-neutral-300" style={{ transform: 'rotate(45deg)' }} />
+      </div>
+    ) : null;
   
   // YouTube uses 16:9, all others use 3:4 portrait
   const getAspectRatio = () => post.platform === "youtube" ? "aspect-video" : "aspect-[3/4]";
@@ -114,6 +123,7 @@ function PostCard({ post, onClick }: {
         onClick={onClick}
         className={`press-in relative overflow-hidden rounded-2xl ${aspect} block w-full bg-muted/70`}
       >
+        <PinBadge />
         <TextCardThumbnail
           platform={post.platform}
           text={textSource}
