@@ -142,6 +142,7 @@ function PostCard({ post, onClick }: {
       onClick={onClick}
       className={`press-in relative overflow-hidden rounded-2xl ${getAspectRatio()} block w-full bg-muted/70 group`}
     >
+      <PinBadge />
       {!imageLoaded && (
         <div
           className="absolute inset-0 bg-muted/70 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/40 before:to-transparent before:animate-shimmer"
