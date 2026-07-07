@@ -272,6 +272,7 @@ export const PlatformPostViewer = ({
       ro.disconnect();
       mo.disconnect();
       window.clearTimeout(safetyTimeout);
+      if (rafId) cancelAnimationFrame(rafId);
       container.removeEventListener("wheel", markScrolled);
       container.removeEventListener("touchmove", markScrolled);
       container.removeEventListener("pointerdown", markScrolled);
