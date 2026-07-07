@@ -5,7 +5,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
 import { PostSkeleton } from "@/components/PostSkeleton";
-import { AelixtoLoader } from "@/components/AelixtoLoader";
 import { motion } from "framer-motion";
 import { useSession } from "@/hooks/useSession";
 import { markPostsSeenImmediate } from "@/hooks/useMarkPostSeen";
@@ -105,20 +104,22 @@ export const PlatformPostViewer = ({
     },
   });
   const [portalReady, setPortalReady] = useState(false);
-  // Show the brand loader over the viewer until the tapped post has had a
-  // moment to hydrate its embed. Fades out smoothly.
-  const [loaderDone, setLoaderDone] = useState(false);
-  const [loaderGone, setLoaderGone] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   // Fires exactly once when the tapped target post is first attached to
   // the DOM — used to synchronously scroll the container to that post
   // BEFORE the browser paints, so post #0 never flashes.
   const initialAnchorDoneRef = useRef(false);
-  // Show the tapped post immediately. We used to hide it until the embed
-  // height stabilised, but any missing signal (no iframe/img, blocked load,
-  // etc.) would leave it invisible forever — worse than a brief IG resize
-  // flash. Anchor scrolling below keeps the correct post in view.
+  // Hide the tapped target post until its first iframe/image has fully
+  // rendered AND its height has stabilised so users don't see the
+  // Instagram "tall footer → trimmed" flash. Falls back after 1400ms so
+  // slow embeds never leave the post invisible.
+  const [targetReady, setTargetReady] = useState(false);
+  useEffect(() => {
+    setTargetReady(false);
+    const t = window.setTimeout(() => setTargetReady(true), 1400);
+    return () => window.clearTimeout(t);
+  }, [initialPostId]);
   // Persist scroll-locked state across effect re-runs. Without this, if
   // `posts`/`profileData`/etc change after the user has already started
   // scrolling, the anchoring effect re-runs with userScrolled=false and
@@ -154,18 +155,6 @@ export const PlatformPostViewer = ({
       document.body.style.overflow = previousOverflow;
     };
   }, []);
-
-  // Reset + auto-dismiss the loader whenever a new post is opened.
-  useEffect(() => {
-    setLoaderDone(false);
-    setLoaderGone(false);
-    const fadeAt = window.setTimeout(() => setLoaderDone(true), 1100);
-    const removeAt = window.setTimeout(() => setLoaderGone(true), 1700);
-    return () => {
-      window.clearTimeout(fadeAt);
-      window.clearTimeout(removeAt);
-    };
-  }, [initialPostId, activeTab]);
 
   // Anchor scroll to the tapped post and keep it anchored while posts above
   // hydrate. Stops anchoring once the user scrolls.
@@ -416,11 +405,61 @@ export const PlatformPostViewer = ({
                         container.scrollTop + (targetRect.top - containerRect.top);
                       initialAnchorDoneRef.current = true;
                     }
+                    // Reveal only after the embed's height has been
+                    // stable for ~250ms following its first load. This
+                    // avoids the Instagram "tall-then-trim" flash where
+                    // the iframe first paints with IG's own footer, then
+                    // shrinks after the MEASURE postMessage arrives.
+                    let stableTimer: number | null = null;
+                    let lastHeight = -1;
+                    let revealed = false;
+                    const reveal = () => {
+                      if (revealed) return;
+                      revealed = true;
+                      setTargetReady(true);
+                    };
+                    const scheduleStable = () => {
+                      if (stableTimer) window.clearTimeout(stableTimer);
+                      stableTimer = window.setTimeout(reveal, 250);
+                    };
+                    const ro = new ResizeObserver((entries) => {
+                      const h = Math.round(entries[0]?.contentRect.height || 0);
+                      if (h <= 0) return;
+                      if (h !== lastHeight) {
+                        lastHeight = h;
+                        scheduleStable();
+                      }
+                    });
+                    ro.observe(el);
+                    const armOnLoad = () => {
+                      const media = el.querySelector("iframe, img") as HTMLIFrameElement | HTMLImageElement | null;
+                      if (!media) return false;
+                      if ((media as HTMLImageElement).complete) {
+                        scheduleStable();
+                      } else {
+                        media.addEventListener("load", scheduleStable, { once: true });
+                      }
+                      return true;
+                    };
+                    if (!armOnLoad()) {
+                      const mo = new MutationObserver(() => {
+                        if (armOnLoad()) mo.disconnect();
+                      });
+                      mo.observe(el, { childList: true, subtree: true });
+                      window.setTimeout(() => mo.disconnect(), 1500);
+                    }
+                    // Safety cap — always reveal by 1.4s even if the
+                    // embed never stabilises (slow network, no MEASURE).
+                    window.setTimeout(reveal, 1400);
                   }
                 }}
                 initial={post.id === targetPostId ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                style={undefined}
+                style={
+                  post.id === targetPostId && !targetReady
+                    ? { opacity: 0 }
+                    : undefined
+                }
                 transition={{
                   duration: 0.28,
                   delay: Math.min(Math.abs(idx - initialIdx), 4) * 0.04,
@@ -454,16 +493,6 @@ export const PlatformPostViewer = ({
           />
         ))}
       </div>
-
-      {/* Brand loader overlay — fades away once the post has had time to render */}
-      {!loaderGone && (
-        <div
-          className="fixed inset-0 z-[80] flex items-center justify-center pointer-events-none bg-background/60 backdrop-blur-sm transition-opacity duration-500"
-          style={{ opacity: loaderDone ? 0 : 1 }}
-        >
-          <AelixtoLoader size={96} />
-        </div>
-      )}
     </motion.div>
   );
 
