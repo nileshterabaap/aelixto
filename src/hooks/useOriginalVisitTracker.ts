@@ -113,15 +113,20 @@ export function useOriginalVisitTracker(
 
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'hidden') return;
-      // Only infer a visit for non-playable embeds (article/link cards where
-      // tapping opens the source). Playable posts must not auto-fire Visit on
-      // app backgrounding — user may just be watching inline.
-      if (trackPlayableInteraction) return;
       const now = Date.now();
-      if (
+      const recentTap =
         now - recentPointerRef.current < 3000 ||
-        now - lastIframeInteractionRef.current < 10000
-      ) {
+        now - lastIframeInteractionRef.current < 10000;
+      if (trackPlayableInteraction) {
+        // Playable posts on some platforms (Threads, X) hand the tap off to
+        // the native app / a new tab instead of playing inline. When the app
+        // is backgrounded shortly after a tap inside this post, credit it as
+        // a Play so the score reflects the interaction. `playFiredRef` still
+        // prevents duplicates when the pointerdown handler also fired.
+        if (recentTap) firePlay();
+        return;
+      }
+      if (recentTap) {
         fireOriginal();
       }
     };
