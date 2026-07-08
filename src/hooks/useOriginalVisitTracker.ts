@@ -61,17 +61,11 @@ export function useOriginalVisitTracker(
     };
 
     const scheduleOriginalFromPlayableDwell = () => {
-      if (!trackPlayableInteraction || firedRef.current || originalDwellTimerRef.current) return;
-      originalDwellTimerRef.current = setTimeout(() => {
-        originalDwellTimerRef.current = null;
-        // Cross-origin Instagram/TikTok/etc. controls do not reliably bubble
-        // their "open original" tap to the parent page. If a playable embed has
-        // focus long enough to be watched, record the original-platform
-        // engagement so reels don't get stuck at impression/play only.
-        if (playFiredRef.current && document.visibilityState === 'visible') {
-          fireOriginal();
-        }
-      }, 3500);
+      // Intentionally a no-op: "Visited the original source" must only fire
+      // when the user actually leaves the app for the source platform (anchor
+      // click, tab hidden, blur to iframe on non-playable). Watching a video
+      // inline should count as Play (+1) only, not Play + Visit.
+      return;
     };
 
     const isInsideIframe = (node: EventTarget | null): boolean => {
@@ -85,11 +79,10 @@ export function useOriginalVisitTracker(
       recentPointerRef.current = now;
       if (isInsideIframe(e.target)) {
         if (trackPlayableInteraction) {
+          // Playable posts: tapping into the iframe = Play (+1) only.
+          // "Visited the original source" is intentionally NOT inferred here;
+          // it must come from an explicit anchor click or the platform-icon button.
           firePlay();
-          scheduleOriginalFromPlayableDwell();
-          if (playFiredRef.current && lastIframeInteractionRef.current > 0 && now - lastIframeInteractionRef.current > 1200) {
-            fireOriginal();
-          }
           lastIframeInteractionRef.current = now;
         } else {
           fireOriginal();
@@ -109,12 +102,7 @@ export function useOriginalVisitTracker(
           el.contains(active)
         ) {
           if (trackPlayableInteraction) {
-            if (playFiredRef.current && lastIframeInteractionRef.current > 0 && now - lastIframeInteractionRef.current > 1200) {
-              fireOriginal();
-            } else {
-              firePlay();
-              scheduleOriginalFromPlayableDwell();
-            }
+            firePlay();
             lastIframeInteractionRef.current = now;
           } else {
             fireOriginal();
@@ -125,13 +113,14 @@ export function useOriginalVisitTracker(
 
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'hidden') return;
-      // If the page hid within ~3s of a pointerdown on this embed, the user
-      // likely tapped through to a native app / new tab.
+      // Only infer a visit for non-playable embeds (article/link cards where
+      // tapping opens the source). Playable posts must not auto-fire Visit on
+      // app backgrounding — user may just be watching inline.
+      if (trackPlayableInteraction) return;
       const now = Date.now();
       if (
         now - recentPointerRef.current < 3000 ||
-        now - lastIframeInteractionRef.current < 10000 ||
-        (trackPlayableInteraction && playFiredRef.current)
+        now - lastIframeInteractionRef.current < 10000
       ) {
         fireOriginal();
       }
@@ -151,12 +140,7 @@ export function useOriginalVisitTracker(
     const handleIframeFocus = () => {
       const now = Date.now();
       if (trackPlayableInteraction) {
-        if (playFiredRef.current && lastIframeInteractionRef.current > 0 && now - lastIframeInteractionRef.current > 1200) {
-          fireOriginal();
-        } else {
-          firePlay();
-          scheduleOriginalFromPlayableDwell();
-        }
+        firePlay();
         lastIframeInteractionRef.current = now;
       } else {
         fireOriginal();

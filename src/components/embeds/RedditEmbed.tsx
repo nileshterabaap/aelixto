@@ -179,18 +179,13 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const embedSrc = useMemo(() => (resolvedUrl ? toRedditEmbedSrc(resolvedUrl) : null), [resolvedUrl]);
   const persistHeight = usePersistEmbedHeight(postId);
 
-  // Detect broken/blocked Reddit thumbnails (e.g. URLs that 403 or 404) so the
-  // fallback card swaps to the author's profile picture instead of rendering a
-  // broken <img>, matching the X/Threads behavior.
-  useEffect(() => {
-    setThumbBroken(false);
-    if (!effectiveThumb || sameUrl(effectiveThumb, authorAvatar)) return;
-    let cancelled = false;
-    const probe = new Image();
-    probe.onerror = () => { if (!cancelled) setThumbBroken(true); };
-    probe.src = effectiveThumb;
-    return () => { cancelled = true; };
-  }, [effectiveThumb, authorAvatar]);
+  // Previously we ran an `Image()` probe here to mark broken thumbnails, but
+  // Reddit's `external-preview.redd.it` CDN sometimes rejects cross-origin
+  // probe requests inside the Capacitor WebView even though the actual
+  // `<img>` tag renders fine. That caused valid Reddit thumbnails to be
+  // dropped and the fallback card to collapse into the plain "Reddit Post"
+  // text placeholder. Trust the `<img>` tag itself and only mark the thumb
+  // broken if the real image tag we render below fires `onError`.
 
   // Lazily fetch + persist a real Reddit thumbnail when one isn't already
   // stored. This guarantees image posts have something to render if the

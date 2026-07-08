@@ -1,7 +1,6 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import React, { useState } from "react";
 import { useComments, type Comment } from "@/hooks/useComments";
 import { UsernameLink, parseTextWithMentions } from "@/components/UsernameLink";
@@ -178,14 +177,17 @@ export const CommentsDialog = ({ open, onOpenChange, postId, postAuthorId }: Com
   const commentDisabled = canComment && !canComment.allowed;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Comments ({totalCount})</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <ScrollArea className="h-[350px] pr-4">
-            {isLoading ? (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="bottom"
+        className="z-[100] p-0 rounded-t-2xl h-[85dvh] flex flex-col gap-0 border-t"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <SheetHeader className="px-4 py-3 border-b flex-shrink-0">
+          <SheetTitle className="text-center">Comments ({totalCount})</SheetTitle>
+        </SheetHeader>
+        <div className="flex-1 overflow-y-auto px-4 py-3">
+          {isLoading ? (
               <p className="text-sm text-muted-foreground text-center py-4">Loading comments...</p>
             ) : comments.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No comments yet. Be the first!</p>
@@ -209,8 +211,12 @@ export const CommentsDialog = ({ open, onOpenChange, postId, postAuthorId }: Com
                 ))}
               </div>
             )}
-          </ScrollArea>
-          
+        </div>
+
+        <div
+          className="border-t bg-background flex-shrink-0 px-4 py-3"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
           {commentDisabled ? (
             <p className="text-sm text-muted-foreground text-center py-2">
               {canComment?.reason || 'Comments are disabled'}
@@ -230,7 +236,8 @@ export const CommentsDialog = ({ open, onOpenChange, postId, postAuthorId }: Com
                 placeholder={replyTo ? `Reply to @${replyTo.username}...` : "Write a comment..."}
                 value={comment}
                 onChange={(e) => setComment(e.target.value)}
-                rows={3}
+                rows={2}
+                className="resize-none"
               />
               <Button 
                 onClick={handleSubmit} 
@@ -242,7 +249,7 @@ export const CommentsDialog = ({ open, onOpenChange, postId, postAuthorId }: Com
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 };

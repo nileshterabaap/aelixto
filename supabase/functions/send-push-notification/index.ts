@@ -274,6 +274,17 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Auth: only the service role (used by DB triggers) may invoke this function.
+    const authHeader = req.headers.get("Authorization") || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "");
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    if (!token || !serviceKey || token !== serviceKey) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     const { userId, title, body, url, icon } = await req.json();
 
     if (!userId || !title) {

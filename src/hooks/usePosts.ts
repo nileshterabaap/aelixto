@@ -15,6 +15,9 @@ export interface Post {
   preview_image_url?: string | null;
   preview_title?: string | null;
   preview_text?: string | null;
+  media_kind?: string | null;
+  aspect_ratio?: number | null;
+  suggested_height?: number | null;
   saves_count: number;
   likes_count: number;
   comments_count: number;
@@ -28,7 +31,7 @@ export interface Post {
   } | null;
 }
 
-export const usePosts = () => {
+export const usePosts = (options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: ["posts"],
     queryFn: async () => {
@@ -42,11 +45,14 @@ export const usePosts = () => {
             settings
           )
         `)
-        .order("created_at", { ascending: false });
+        .eq("is_public", true)
+        .order("created_at", { ascending: false })
+        .limit(30);
 
       if (error) throw error;
       return data as unknown as Post[];
     },
+    enabled: options?.enabled ?? true,
     staleTime: 5 * 60 * 1000, // 5 minutes - data stays fresh
     gcTime: 30 * 60 * 1000, // 30 minutes - keep in cache
     refetchOnWindowFocus: false,
@@ -68,6 +74,8 @@ export const useCreatePost = () => {
       embed_html?: string;
       thumbnail_url?: string;
       suggested_height?: number | null;
+      media_kind?: string | null;
+      aspect_ratio?: number | null;
       preview_text?: string;
     }) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -84,6 +92,8 @@ export const useCreatePost = () => {
           platform: newPost.platform || null,
           embed_html: newPost.embed_html || null,
           thumbnail_url: newPost.thumbnail_url || null,
+          media_kind: newPost.media_kind || null,
+          aspect_ratio: newPost.aspect_ratio ?? null,
           suggested_height: newPost.suggested_height ?? null,
           preview_text: newPost.preview_text || null,
         })
