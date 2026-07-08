@@ -109,8 +109,6 @@ export const HydratedEmbed = memo(({
     platformHint === 'linkedin' ||
     platformHint === 'threads' ||
     platformHint === 'pinterest' ||
-    platformHint === 'twitter' ||
-    platformHint === 'x' ||
     lowerUrl.includes('youtube.com/') ||
     lowerUrl.includes('youtu.be/') ||
     lowerUrl.includes('open.spotify.com/') ||
@@ -123,8 +121,6 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('threads.com/') ||
     lowerUrl.includes('pinterest.com/') ||
     lowerUrl.includes('pin.it/') ||
-    lowerUrl.includes('twitter.com/') ||
-    lowerUrl.includes('x.com/') ||
     lowerUrl.includes('/reel/') ||
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
