@@ -48,7 +48,7 @@ export default function SavedPosts() {
             id, user_id, content, created_at, likes_count, saves_count,
             comments_count, reposts_count, media_type, media_url,
             platform, embed_html, thumbnail_url, title, preview_text,
-            preview_title, preview_image_url, media_kind, aspect_ratio, suggested_height, is_public,
+            preview_title, preview_image_url, is_public,
             profiles:user_id (username, display_name, avatar_url)
           )
         `)
@@ -75,9 +75,6 @@ export default function SavedPosts() {
             preview_text: post.preview_text,
             preview_title: post.preview_title,
             preview_image_url: post.preview_image_url,
-            media_kind: post.media_kind,
-            aspect_ratio: post.aspect_ratio,
-            suggested_height: post.suggested_height,
             timestamp: new Date(post.created_at),
             likes: post.likes_count || 0,
             comments: post.comments_count || 0,

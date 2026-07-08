@@ -205,7 +205,6 @@ export type Database = {
           conversation_id: string
           id: string
           joined_at: string
-          last_delivered_at: string | null
           last_read_at: string | null
           user_id: string
         }
@@ -213,7 +212,6 @@ export type Database = {
           conversation_id: string
           id?: string
           joined_at?: string
-          last_delivered_at?: string | null
           last_read_at?: string | null
           user_id: string
         }
@@ -221,7 +219,6 @@ export type Database = {
           conversation_id?: string
           id?: string
           joined_at?: string
-          last_delivered_at?: string | null
           last_read_at?: string | null
           user_id?: string
         }
@@ -774,11 +771,9 @@ export type Database = {
           broken_check_count: number
           broken_first_seen_at: string | null
           comments_count: number | null
-          comments_disabled: boolean
           content: string
           created_at: string
           embed_html: string | null
-          hide_counts: boolean
           id: string
           is_public: boolean
           last_validated_at: string | null
@@ -786,7 +781,6 @@ export type Database = {
           media_kind: string | null
           media_type: string | null
           media_url: string | null
-          pinned_at: string | null
           platform: string | null
           preview_image_url: string | null
           preview_text: string | null
@@ -804,11 +798,9 @@ export type Database = {
           broken_check_count?: number
           broken_first_seen_at?: string | null
           comments_count?: number | null
-          comments_disabled?: boolean
           content: string
           created_at?: string
           embed_html?: string | null
-          hide_counts?: boolean
           id?: string
           is_public?: boolean
           last_validated_at?: string | null
@@ -816,7 +808,6 @@ export type Database = {
           media_kind?: string | null
           media_type?: string | null
           media_url?: string | null
-          pinned_at?: string | null
           platform?: string | null
           preview_image_url?: string | null
           preview_text?: string | null
@@ -834,11 +825,9 @@ export type Database = {
           broken_check_count?: number
           broken_first_seen_at?: string | null
           comments_count?: number | null
-          comments_disabled?: boolean
           content?: string
           created_at?: string
           embed_html?: string | null
-          hide_counts?: boolean
           id?: string
           is_public?: boolean
           last_validated_at?: string | null
@@ -846,7 +835,6 @@ export type Database = {
           media_kind?: string | null
           media_type?: string | null
           media_url?: string | null
-          pinned_at?: string | null
           platform?: string | null
           preview_image_url?: string | null
           preview_text?: string | null
@@ -1153,13 +1141,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      am_i_blocked_by: { Args: { _target: string }; Returns: boolean }
-      are_blocked: { Args: { _a: string; _b: string }; Returns: boolean }
-      can_view_follow_list: {
-        Args: { _kind: string; _target: string; _viewer: string }
-        Returns: boolean
-      }
-      can_view_profile_posts: { Args: { _target: string }; Returns: boolean }
       cancel_follow_or_request: {
         Args: { _target: string }
         Returns: undefined
@@ -1348,11 +1329,9 @@ export type Database = {
           target_user: string
         }
         Returns: {
-          comments_disabled: boolean
           content: string
           created_at: string
           embed_html: string
-          hide_counts: boolean
           id: string
           is_public: boolean
           is_repost: boolean
@@ -1360,7 +1339,6 @@ export type Database = {
           media_type: string
           media_url: string
           original_user_id: string
-          pinned_at: string
           platform: string
           saves_count: number
           thumbnail_url: string

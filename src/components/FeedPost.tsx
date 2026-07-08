@@ -320,10 +320,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             </div>
           </div>
 
-          {/* Caption with see more/less — user's own caption written on Aelixto.
-              Instagram native caption is stripped in RawEmbedRenderer, so the
-              user caption is safe to show for IG too. */}
-          {post.content && (
+          {/* Caption with see more/less */}
+          {detectedPlatform !== 'instagram' && post.content && (
             <CollapsibleCaption content={post.content} />
           )}
 
@@ -481,8 +479,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         </div>
 
-        {/* Caption with see more/less — user's own caption written on Aelixto. */}
-        {post.content && (
+        {/* Caption with see more/less */}
+        {detectedPlatform !== 'instagram' && post.content && (
           <CollapsibleCaption content={post.content} />
         )}
 

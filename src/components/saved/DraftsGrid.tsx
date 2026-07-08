@@ -48,7 +48,6 @@ function DraftCard({
   onDelete: () => void;
 }) {
   const [imgError, setImgError] = useState(false);
-  const [imgLoaded, setImgLoaded] = useState(false);
   const platform = (draft.platform || "").toLowerCase();
   const icon = PLATFORM_ICONS[platform];
   const src = !imgError && draft.thumbnail_url ? maybeProxy(draft.thumbnail_url, 480) : null;
@@ -60,19 +59,13 @@ function DraftCard({
         className="relative overflow-hidden rounded-2xl aspect-square bg-muted/50 w-full"
       >
         {src ? (
-          <>
-            {!imgLoaded && (
-              <div className="absolute inset-0 bg-muted/70 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/40 before:to-transparent before:animate-shimmer" />
-            )}
-            <img
-              src={src}
-              alt=""
-              onError={() => setImgError(true)}
-              onLoad={() => setImgLoaded(true)}
-              loading="lazy"
-              className={`w-full h-full object-cover transition-opacity duration-300 ${imgLoaded ? "opacity-100" : "opacity-0"}`}
-            />
-          </>
+          <img
+            src={src}
+            alt=""
+            onError={() => setImgError(true)}
+            className="w-full h-full object-cover"
+            loading="lazy"
+          />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-muted">
             <FileText className="w-8 h-8 text-muted-foreground/60 mb-1" />

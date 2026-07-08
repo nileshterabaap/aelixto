@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
 import { onMessageThreadRead } from '@/lib/messageReadEvents';
-import { preloadImageWithPromise } from '@/lib/preloadImages';
 
 export interface ConversationWithDetails {
   id: string;
@@ -84,17 +83,7 @@ export const useConversations = () => {
           schema: 'public',
           table: 'messages'
         },
-        (payload) => {
-          // Mark incoming messages as delivered for the current user
-          const msg = (payload.new as { conversation_id?: string; sender_id?: string } | null) ?? null;
-          if (msg && msg.sender_id && msg.sender_id !== user.id && msg.conversation_id) {
-            supabase
-              .from('conversation_participants')
-              .update({ last_delivered_at: new Date().toISOString() })
-              .eq('conversation_id', msg.conversation_id)
-              .eq('user_id', user.id)
-              .then(() => { /* fire-and-forget */ });
-          }
+        () => {
           fetchConversations();
         }
       )
@@ -137,15 +126,6 @@ export const useConversations = () => {
       }
 
       const conversationIds = participantData.map(p => p.conversation_id);
-
-      // Bump delivered-at for all my participant rows so senders see 2 ticks
-      // once I've been online.
-      supabase
-        .from('conversation_participants')
-        .update({ last_delivered_at: new Date().toISOString() })
-        .eq('user_id', user.id)
-        .in('conversation_id', conversationIds)
-        .then(() => { /* fire-and-forget */ });
 
       // Get conversation details
       const { data: conversationData, error: conversationError } = await supabase
@@ -214,25 +194,6 @@ export const useConversations = () => {
           unread_count: unreadCount,
         };
       }) || [];
-
-      // Sort by last message time (most recent first). Fall back to
-      // conversation.updated_at if there are no messages yet.
-      conversationsWithDetails.sort((a, b) => {
-        const aTime = new Date(a.last_message?.created_at || a.updated_at).getTime();
-        const bTime = new Date(b.last_message?.created_at || b.updated_at).getTime();
-        return bTime - aTime;
-      });
-
-      // Preload avatars so they appear together with the list (avoid pop-in)
-      const avatarUrls = conversationsWithDetails
-        .map(c => c.other_user.avatar_url)
-        .filter((u): u is string => !!u);
-      if (avatarUrls.length > 0) {
-        await Promise.race([
-          Promise.all(avatarUrls.map(u => preloadImageWithPromise(u))),
-          new Promise<void>(resolve => setTimeout(resolve, 1200)),
-        ]);
-      }
 
       setConversations(conversationsWithDetails);
       if (cacheKey) {
