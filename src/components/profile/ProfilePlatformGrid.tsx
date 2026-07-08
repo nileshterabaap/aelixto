@@ -264,6 +264,7 @@ function PostCard({ post, onClick }: {
           preferProfile={useProfileFallback}
           aspect={aspect}
         />
+        <PostCardOwnerMenu post={post} />
       </button>
     );
   }
@@ -298,6 +299,7 @@ function PostCard({ post, onClick }: {
           </div>
         </div>
       )}
+      <PostCardOwnerMenu post={post} />
     </button>
   );
 }
