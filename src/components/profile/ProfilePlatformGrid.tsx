@@ -115,8 +115,9 @@ function PostCard({ post, onClick }: {
   // Show platform-branded fallback when no thumbnail or image error
   if (!src || src === "/placeholder.svg") {
     const textSource = getThumbnailText(post);
-    const useProfileFallback =
-      !textSource && platform === "threads";
+    // Threads (like X and Reddit) should always render a branded text card
+    // instead of falling back to the author's profile picture.
+    const useProfileFallback = false;
     const aspect = getAspectRatio();
     return (
       <button
