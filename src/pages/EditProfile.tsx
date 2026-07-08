@@ -86,7 +86,9 @@ const EditProfile = () => {
       });
       // Load Aelix Score preference from settings
       const settings = profile.settings as any;
-      setAelixScoreEnabled(settings?.aelix_score_enabled !== false);
+      // Default OFF for new users; only enable when the profile has
+      // explicitly opted in.
+      setAelixScoreEnabled(settings?.aelix_score_enabled === true);
     }
   }, [profile]);
 
