@@ -53,7 +53,13 @@ const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
 const isGenericPlaceholderThumbnail = (url?: string | null) => {
   if (!url) return false;
   const lower = url.toLowerCase();
-  return lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com");
+  return (
+    lower.includes("images.unsplash.com") ||
+    lower.includes("source.unsplash.com") ||
+    // Reddit's branded fallback/logo thumbnails — never a real post preview.
+    lower.includes("redditstatic.com") ||
+    lower.includes("share.redd.it/preview/post")
+  );
 };
 
 const hasUsableTextThumbnail = (post: PlatformPost) => {

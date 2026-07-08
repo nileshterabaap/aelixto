@@ -21,6 +21,9 @@ import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 import { measureEmbedHeight } from "@/lib/measureEmbedHeight";
 import { estimateEmbedHeight } from "@/lib/estimateEmbedHeight";
 import { extractOriginalCaptionFromSourceTitle } from "@/lib/originalCaption";
+import { getPostThumb } from "@/lib/getPostThumb";
+import { getThumbnailText } from "@/lib/getThumbnailText";
+import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 
 const isYouTubeShortUrl = (url: string) => decodeURIComponent(url).toLowerCase().includes('/shorts/');
 
@@ -761,21 +764,47 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                           className="space-y-4"
                         >
-                          {thumbnailUrl && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.96 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ duration: 0.3 }}
-                              className="overflow-hidden rounded-2xl border border-border/60"
-                            >
-                              <img
-                                src={thumbnailUrl}
-                                alt="Preview"
-                                className="h-48 w-full object-cover"
-                                onError={() => setThumbnailUrl("")}
-                              />
-                            </motion.div>
-                          )}
+                          {(() => {
+                            const previewPlatform = classifyUrl(linkUrl, ogType);
+                            const syntheticPost = {
+                              platform: previewPlatform,
+                              title,
+                              content: caption,
+                              thumbnail_url: thumbnailUrl,
+                              preview_text: fetchedPreviewTextRef.current,
+                              embed_html: embedHtml,
+                            };
+                            const resolvedThumb = getPostThumb(syntheticPost);
+                            const textSource = getThumbnailText(syntheticPost);
+                            const hasAnyPreview = !!resolvedThumb || !!textSource ||
+                              ["x", "twitter", "threads", "reddit"].includes(previewPlatform);
+                            if (!hasAnyPreview) return null;
+                            return (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.96 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.3 }}
+                                className="overflow-hidden rounded-2xl border border-border/60"
+                              >
+                                {resolvedThumb ? (
+                                  <img
+                                    src={resolvedThumb}
+                                    alt="Preview"
+                                    className="h-48 w-full object-cover"
+                                    onError={() => setThumbnailUrl("")}
+                                  />
+                                ) : (
+                                  <div className="h-48 w-full">
+                                    <TextCardThumbnail
+                                      platform={previewPlatform}
+                                      text={textSource}
+                                      aspect="h-full"
+                                    />
+                                  </div>
+                                )}
+                              </motion.div>
+                            );
+                          })()}
 
                           <div>
                             <Label htmlFor="caption" className="text-sm font-medium text-foreground/80">

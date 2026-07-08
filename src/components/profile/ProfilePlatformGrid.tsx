@@ -116,7 +116,7 @@ function PostCard({ post, onClick }: {
   if (!src || src === "/placeholder.svg") {
     const textSource = getThumbnailText(post);
     const useProfileFallback =
-      !textSource && ["threads", "x", "twitter"].includes(platform);
+      !textSource && platform === "threads";
     const aspect = getAspectRatio();
     return (
       <button
