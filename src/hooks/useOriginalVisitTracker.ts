@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
+import { trackOriginalVisit, trackView, trackVideoPlayBeacon } from '@/hooks/useViewTracking';
 
 /**
  * Detects when the user taps/clicks into an embedded iframe or an outbound
@@ -46,6 +46,16 @@ export function useOriginalVisitTracker(
       if (trackPlayableInteraction && !playFiredRef.current) {
         playFiredRef.current = true;
         trackView({ postId, eventType: 'video_play' }).catch(() => {
+          playFiredRef.current = false;
+        });
+      }
+    };
+
+    const firePlayBeacon = () => {
+      if (trackPlayableInteraction && !playFiredRef.current) {
+        playFiredRef.current = true;
+        // Fire-and-forget beacon; survives backgrounding/native app hand-off.
+        trackVideoPlayBeacon(postId).catch(() => {
           playFiredRef.current = false;
         });
       }
@@ -120,12 +130,10 @@ export function useOriginalVisitTracker(
         now - recentPointerRef.current < 3000 ||
         now - lastIframeInteractionRef.current < 10000;
       if (trackPlayableInteraction) {
-        // Playable posts on some platforms (Threads, X) hand the tap off to
-        // the native app / a new tab instead of playing inline. When the app
-        // is backgrounded shortly after a tap inside this post, credit it as
-        // a Play so the score reflects the interaction. `playFiredRef` still
-        // prevents duplicates when the pointerdown handler also fired.
-        if (recentTap) firePlay();
+        // Playable posts on some platforms (Threads) hand the tap off to the
+        // native app instead of playing inline — the pending `trackView` fetch
+        // gets aborted when the tab hides. Use a beacon so the insert lands.
+        if (recentTap) firePlayBeacon();
         return;
       }
       if (recentTap) {
@@ -156,6 +164,17 @@ export function useOriginalVisitTracker(
 
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
       iframe.addEventListener('focus', handleIframeFocus);
+      // Some platforms (Threads) swallow pointer events on the iframe so they
+      // never bubble to the container. Listen on the iframe itself too.
+      const onIframePointer = () => {
+        const now = Date.now();
+        recentPointerRef.current = now;
+        lastIframeInteractionRef.current = now;
+        if (trackPlayableInteraction) firePlay();
+        else fireOriginal();
+      };
+      iframe.addEventListener('pointerdown', onIframePointer, true);
+      iframe.addEventListener('touchstart', onIframePointer, { capture: true, passive: true });
       iframe.addEventListener('load', () => {
         try {
           iframe.contentWindow?.addEventListener?.('focus', handleIframeFocus);
