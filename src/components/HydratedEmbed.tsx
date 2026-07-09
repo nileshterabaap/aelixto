@@ -378,7 +378,13 @@ export const HydratedEmbed = memo(({
         {/* Raw embed HTML (Instagram, Facebook, Spotify) */}
         {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && r.html && !rawEmbedFailed && (
           <ImageViewTracker postId={post.id}>
-            <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} onOriginalVisit={handleOriginalVisit} />
+            <RawEmbedRenderer
+              embedHtml={r.html}
+              onError={handleRawEmbedError}
+              onOriginalVisit={handleOriginalVisit}
+              postId={post.id}
+              authorUserId={authorUserId}
+            />
           </ImageViewTracker>
         )}
 

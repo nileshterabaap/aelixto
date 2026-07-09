@@ -550,7 +550,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <RawEmbedRenderer embedHtml={r.html} />
+                  <RawEmbedRenderer
+                    embedHtml={r.html}
+                    postId={post.id}
+                    authorUserId={(post as any).user_id || null}
+                  />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -561,7 +565,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <RawEmbedRenderer embedHtml={r.html} />
+                <RawEmbedRenderer
+                  embedHtml={r.html}
+                  postId={post.id}
+                  authorUserId={(post as any).user_id || null}
+                />
               </LazyEmbed>
             )}
             {r.kind === 'reddit' && post.isRealPost && (
