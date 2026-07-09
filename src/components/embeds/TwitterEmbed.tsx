@@ -7,6 +7,7 @@ import { loadTwitterEmbed } from "@/lib/ScriptLoader";
 interface TwitterEmbedProps {
   url: string;
   onOriginalTap?: () => void;
+  onOriginalVisit?: () => void;
 }
 
 declare global {
@@ -19,6 +20,10 @@ declare global {
           container: HTMLElement,
           options?: any
         ) => Promise<HTMLElement | undefined>;
+      };
+      events?: {
+        bind: (eventName: string, handler: (event: any) => void) => void;
+        unbind?: (eventName: string, handler: (event: any) => void) => void;
       };
     };
   }
@@ -37,12 +42,14 @@ const extractTweetId = (url: string): string | null => {
   return null;
 };
 
-export const TwitterEmbed = ({ url, onOriginalTap }: TwitterEmbedProps) => {
+export const TwitterEmbed = ({ url, onOriginalTap, onOriginalVisit }: TwitterEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    let twitterClickHandler: ((event: any) => void) | null = null;
+
     const loadEmbed = async () => {
       try {
         const tweetId = extractTweetId(url);
@@ -72,6 +79,16 @@ export const TwitterEmbed = ({ url, onOriginalTap }: TwitterEmbedProps) => {
           if (!tweet) {
             setError(true);
           } else {
+            if (onOriginalVisit && window.twttr?.events?.bind) {
+              twitterClickHandler = (event: any) => {
+                const target = event?.target;
+                if (target instanceof Node && containerRef.current?.contains(target)) {
+                  onOriginalVisit();
+                }
+              };
+              window.twttr.events.bind('click', twitterClickHandler);
+            }
+
             // Dispatch a custom event so HydratedFeedPost can detect readiness
             // immediately without waiting for MutationObserver cycles
             containerRef.current?.dispatchEvent(
@@ -88,7 +105,13 @@ export const TwitterEmbed = ({ url, onOriginalTap }: TwitterEmbedProps) => {
     };
 
     loadEmbed();
-  }, [url]);
+
+    return () => {
+      if (twitterClickHandler && window.twttr?.events?.unbind) {
+        window.twttr.events.unbind('click', twitterClickHandler);
+      }
+    };
+  }, [url, onOriginalVisit]);
 
   if (error) {
     return (

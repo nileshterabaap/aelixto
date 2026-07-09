@@ -28,6 +28,9 @@ Deno.serve(async (req) => {
     const allowedOrigins = [
       'https://aelixto.com',
       'https://www.aelixto.com',
+      'capacitor://localhost',
+      'ionic://localhost',
+      'http://localhost',
       'http://localhost:5173',
       'http://localhost:3000',
       'http://127.0.0.1:5173',

@@ -144,6 +144,37 @@ const ThreadsIframeEmbed = ({
   }, []);
 
   useEffect(() => {
+    const root = iframeRef.current?.parentElement;
+    if (!root || !postId) return;
+
+    let dwellTimer: number | null = null;
+    const clearDwell = () => {
+      if (dwellTimer) {
+        window.clearTimeout(dwellTimer);
+        dwellTimer = null;
+      }
+    };
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && entry.intersectionRatio >= 0.65) {
+          clearDwell();
+          dwellTimer = window.setTimeout(trackThreadsPlay, 1800);
+        } else {
+          clearDwell();
+        }
+      },
+      { threshold: [0, 0.65] }
+    );
+
+    observer.observe(root);
+    return () => {
+      clearDwell();
+      observer.disconnect();
+    };
+  }, [postId, trackThreadsPlay]);
+
+  useEffect(() => {
     const timeout = setTimeout(() => {
       if (!hasLoaded) {
         setFailed(true);
