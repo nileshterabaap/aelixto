@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 import { loadTwitterEmbed } from "@/lib/ScriptLoader";
+import { trackVideoPlayBeacon } from "@/hooks/useViewTracking";
 
 interface TwitterEmbedProps {
   url: string;
+  postId?: string | null;
+  authorUserId?: string | null;
   onOriginalTap?: () => void;
   onOriginalVisit?: () => void;
 }
@@ -42,10 +45,24 @@ const extractTweetId = (url: string): string | null => {
   return null;
 };
 
-export const TwitterEmbed = ({ url, onOriginalTap, onOriginalVisit }: TwitterEmbedProps) => {
+export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOriginalVisit }: TwitterEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const playTrackedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+
+  const trackXPlay = useCallback(() => {
+    if (!postId || playTrackedRef.current) return;
+    playTrackedRef.current = true;
+    trackVideoPlayBeacon(postId, authorUserId).catch(() => {
+      playTrackedRef.current = false;
+    });
+  }, [postId, authorUserId]);
+
+  useEffect(() => {
+    playTrackedRef.current = false;
+  }, [url, postId]);
 
   useEffect(() => {
     let twitterClickHandler: ((event: any) => void) | null = null;
@@ -83,6 +100,7 @@ export const TwitterEmbed = ({ url, onOriginalTap, onOriginalVisit }: TwitterEmb
               twitterClickHandler = (event: any) => {
                 const target = event?.target;
                 if (target instanceof Node && containerRef.current?.contains(target)) {
+                  trackXPlay();
                   onOriginalVisit();
                 }
               };
@@ -111,7 +129,21 @@ export const TwitterEmbed = ({ url, onOriginalTap, onOriginalVisit }: TwitterEmb
         window.twttr.events.unbind('click', twitterClickHandler);
       }
     };
-  }, [url, onOriginalVisit]);
+  }, [url, onOriginalVisit, trackXPlay]);
+
+  useEffect(() => {
+    const onWindowBlur = () => {
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (active?.tagName === 'IFRAME' && rootRef.current?.contains(active)) {
+          trackXPlay();
+        }
+      }, 0);
+    };
+
+    window.addEventListener('blur', onWindowBlur);
+    return () => window.removeEventListener('blur', onWindowBlur);
+  }, [trackXPlay]);
 
   if (error) {
     return (
@@ -150,7 +182,14 @@ export const TwitterEmbed = ({ url, onOriginalTap, onOriginalVisit }: TwitterEmb
   }
 
   return (
-    <div className="relative" data-embed-status={loading ? 'loading' : 'ready'}>
+    <div
+      ref={rootRef}
+      className="relative"
+      data-embed-status={loading ? 'loading' : 'ready'}
+      onPointerDownCapture={trackXPlay}
+      onTouchStartCapture={trackXPlay}
+      onFocusCapture={trackXPlay}
+    >
       {loading && (
         <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       )}

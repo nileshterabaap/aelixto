@@ -105,8 +105,8 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('x.com/');
 
   const isPlayableMediaPost =
-    !isXPost &&
-    (mediaTypeHint === 'video' ||
+    isXPost ||
+    mediaTypeHint === 'video' ||
       mediaTypeHint === 'audio' ||
       r.kind === 'video' ||
       platformHint === 'youtube' ||
@@ -130,7 +130,7 @@ export const HydratedEmbed = memo(({
       lowerUrl.includes('pin.it/') ||
       lowerUrl.includes('/reel/') ||
       lowerUrl.includes('/shorts/') ||
-      lowerUrl.includes('/video/'));
+      lowerUrl.includes('/video/');
 
   const mediaLifecycleEnabled =
     shouldHydrate &&
@@ -353,7 +353,13 @@ export const HydratedEmbed = memo(({
         {/* Fallback routing for legacy raw payloads */}
         {forceTwitterRenderer && mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <TwitterEmbed url={mediaUrl} onOriginalTap={handleXOriginalTap} onOriginalVisit={handleOriginalVisit} />
+            <TwitterEmbed
+              url={mediaUrl}
+              postId={post.id}
+              authorUserId={authorUserId}
+              onOriginalTap={handleXOriginalTap}
+              onOriginalVisit={handleOriginalVisit}
+            />
           </ImageViewTracker>
         )}
 
@@ -386,7 +392,13 @@ export const HydratedEmbed = memo(({
         {/* Twitter/X embed */}
         {r.kind === 'twitter' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} onOriginalVisit={handleOriginalVisit} />
+            <TwitterEmbed
+              url={r.url}
+              postId={post.id}
+              authorUserId={authorUserId}
+              onOriginalTap={handleXOriginalTap}
+              onOriginalVisit={handleOriginalVisit}
+            />
           </ImageViewTracker>
         )}
         

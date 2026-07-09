@@ -596,7 +596,13 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} onOriginalVisit={handleXOriginalVisit} />
+                  <TwitterEmbed
+                    url={r.url}
+                    postId={post.id}
+                    authorUserId={(post as any).user_id || null}
+                    onOriginalTap={handleXOriginalTap}
+                    onOriginalVisit={handleXOriginalVisit}
+                  />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -607,7 +613,13 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} onOriginalVisit={handleXOriginalVisit} />
+                <TwitterEmbed
+                  url={r.url}
+                  postId={post.id}
+                  authorUserId={(post as any).user_id || null}
+                  onOriginalTap={handleXOriginalTap}
+                  onOriginalVisit={handleXOriginalVisit}
+                />
               </LazyEmbed>
             )}
             {r.kind === 'pinterest' && post.isRealPost && (
