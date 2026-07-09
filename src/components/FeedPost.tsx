@@ -224,7 +224,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
 
   const handleXOriginalTap = useCallback(() => {
     if (post.isRealPost) {
-      markOriginalVisit(post.id);
+      markOriginalVisit(post.id, (post as any).user_id || null);
     }
     if (mediaUrl) {
       void openExternalUrl(mediaUrl);
@@ -233,7 +233,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
 
   const handleXOriginalVisit = useCallback(() => {
     if (post.isRealPost) {
-      markOriginalVisit(post.id);
+      markOriginalVisit(post.id, (post as any).user_id || null);
     }
   }, [post.id, post.isRealPost]);
   
@@ -668,7 +668,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+                  <UniversalMetaEmbed url={r.url} postId={post.id} authorUserId={(post as any).user_id || null} suggestedHeight={(post as any).suggested_height ?? null} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -679,7 +679,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+                <UniversalMetaEmbed url={r.url} postId={post.id} authorUserId={(post as any).user_id || null} suggestedHeight={(post as any).suggested_height ?? null} />
               </LazyEmbed>
             )}
             {r.kind === 'universal' && isFacebookUnavailable && (

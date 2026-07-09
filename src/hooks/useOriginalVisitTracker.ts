@@ -19,6 +19,7 @@ export function useOriginalVisitTracker(
   postId: string,
   enabled: boolean = true,
   trackPlayableInteraction: boolean = false,
+  authorUserId?: string | null,
 ) {
   const firedRef = useRef(false);
   const playFiredRef = useRef(false);
@@ -50,7 +51,7 @@ export function useOriginalVisitTracker(
     const firePlay = () => {
       if (trackPlayableInteraction && !playFiredRef.current && !playRequestInFlightRef.current) {
         playRequestInFlightRef.current = true;
-        trackView({ postId, eventType: 'video_play' })
+        trackView({ postId, eventType: 'video_play', authorUserId })
           .then((success) => {
             if (success) playFiredRef.current = true;
           })
@@ -65,7 +66,7 @@ export function useOriginalVisitTracker(
         playBeaconSentRef.current = true;
         playFiredRef.current = true;
         // Fire-and-forget beacon; survives backgrounding/native app hand-off.
-        trackVideoPlayBeacon(postId).catch(() => {
+        trackVideoPlayBeacon(postId, authorUserId).catch(() => {
           playFiredRef.current = false;
           playBeaconSentRef.current = false;
         });
@@ -75,7 +76,7 @@ export function useOriginalVisitTracker(
     const fireOriginal = () => {
       if (firedRef.current) return;
       firedRef.current = true;
-      trackOriginalVisit(postId).catch(() => {
+      trackOriginalVisit(postId, authorUserId).catch(() => {
         // Allow a retry on next interaction
         firedRef.current = false;
       });
@@ -226,10 +227,10 @@ export function useOriginalVisitTracker(
         originalDwellTimerRef.current = null;
       }
     };
-  }, [containerRef, postId, enabled, trackPlayableInteraction]);
+  }, [containerRef, postId, enabled, trackPlayableInteraction, authorUserId]);
 }
 
-export function markOriginalVisit(postId: string) {
+export function markOriginalVisit(postId: string, authorUserId?: string | null) {
   if (!postId) return;
-  trackOriginalVisit(postId).catch(() => {});
+  trackOriginalVisit(postId, authorUserId).catch(() => {});
 }

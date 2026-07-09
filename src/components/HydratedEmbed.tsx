@@ -94,6 +94,7 @@ export const HydratedEmbed = memo(({
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
   const shouldHydrate = isHydrated || hydratedPostIds.has(post.id);
   const mediaUrl = post.mediaUrl || (post as any).media_url || r.url;
+  const authorUserId = (post as any).user_id || (post as any).userId || null;
   const platformHint = (post.platform || '').toLowerCase();
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
@@ -147,7 +148,7 @@ export const HydratedEmbed = memo(({
 
   // Track click-throughs to the original platform (iframe focus or anchor clicks).
   // Awards +1 engagement score to the author on top of the impression score.
-  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost);
+  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost, authorUserId);
 
   const forceTwitterRenderer =
     r.kind === 'raw' &&
@@ -203,8 +204,8 @@ export const HydratedEmbed = memo(({
   }, [post.id]);
 
   const handleOriginalVisit = useCallback(() => {
-    markOriginalVisit(post.id);
-  }, [post.id]);
+    markOriginalVisit(post.id, authorUserId);
+  }, [post.id, authorUserId]);
 
   const handleExternalOriginalClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
     handleOriginalVisit();
@@ -364,7 +365,7 @@ export const HydratedEmbed = memo(({
 
         {forceUniversalRenderer && mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={mediaUrl} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+            <UniversalMetaEmbed url={mediaUrl} postId={post.id} authorUserId={authorUserId} suggestedHeight={(post as any).suggested_height ?? null} />
           </ImageViewTracker>
         )}
         
@@ -378,7 +379,7 @@ export const HydratedEmbed = memo(({
         {/* Fallback when raw embed fails — show UniversalMetaEmbed to rebuild */}
         {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && rawEmbedFailed && post.mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={post.mediaUrl} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+            <UniversalMetaEmbed url={post.mediaUrl} postId={post.id} authorUserId={authorUserId} suggestedHeight={(post as any).suggested_height ?? null} />
           </ImageViewTracker>
         )}
         
@@ -427,7 +428,7 @@ export const HydratedEmbed = memo(({
         {/* Universal Meta embed (Instagram, Facebook, etc) */}
         {r.kind === 'universal' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+            <UniversalMetaEmbed url={r.url} postId={post.id} authorUserId={authorUserId} suggestedHeight={(post as any).suggested_height ?? null} />
           </ImageViewTracker>
         )}
       </div>

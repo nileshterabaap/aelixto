@@ -94,12 +94,14 @@ const ThreadsIframeEmbed = ({
   expandedUrl,
   fallbackData,
   postId,
+  authorUserId,
   suggestedHeight,
 }: {
   src: string;
   expandedUrl: string;
   fallbackData: { title?: string; image?: string; description?: string } | null;
   postId?: string | null;
+  authorUserId?: string | null;
   suggestedHeight?: number | null;
 }) => {
   const [failed, setFailed] = useState(false);
@@ -116,11 +118,11 @@ const ThreadsIframeEmbed = ({
   const trackThreadsPlay = useCallback(() => {
     if (postId && !playTrackedRef.current) {
       playTrackedRef.current = true;
-      trackVideoPlayBeacon(postId).catch(() => {
+      trackVideoPlayBeacon(postId, authorUserId).catch(() => {
         playTrackedRef.current = false;
       });
     }
-  }, [postId]);
+  }, [postId, authorUserId]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -614,6 +616,7 @@ const TikTokIframeEmbed = ({
 interface UniversalMetaEmbedProps {
   url: string;
   postId?: string | null;
+  authorUserId?: string | null;
   suggestedHeight?: number | null;
 }
 
@@ -861,7 +864,7 @@ const buildTikTokEmbed = (url: string): string | null => {
 };
 
 
-export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMetaEmbedProps) => {
+export const UniversalMetaEmbed = ({ url, postId, authorUserId, suggestedHeight }: UniversalMetaEmbedProps) => {
   const cached = embedCache.get(url);
 
   const [embedHtml, setEmbedHtml] = useState<string | null>(cached?.embedHtml ?? null);
@@ -1096,6 +1099,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
           <TikTokIframeEmbed
             src={iframeSrc}
             postId={postId}
+            authorUserId={authorUserId}
             suggestedHeight={suggestedHeight}
           />
         );
