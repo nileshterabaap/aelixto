@@ -195,37 +195,6 @@ const ThreadsIframeEmbed = ({
   }, [handleThreadsInteraction, trackThreadsPlay, trackThreadsVisit]);
 
   useEffect(() => {
-    const root = iframeRef.current?.parentElement;
-    if (!root || !postId) return;
-
-    let dwellTimer: number | null = null;
-    const clearDwell = () => {
-      if (dwellTimer) {
-        window.clearTimeout(dwellTimer);
-        dwellTimer = null;
-      }
-    };
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.65) {
-          clearDwell();
-          dwellTimer = window.setTimeout(trackThreadsPlay, 1800);
-        } else {
-          clearDwell();
-        }
-      },
-      { threshold: [0, 0.65] }
-    );
-
-    observer.observe(root);
-    return () => {
-      clearDwell();
-      observer.disconnect();
-    };
-  }, [postId, trackThreadsPlay]);
-
-  useEffect(() => {
     const timeout = setTimeout(() => {
       if (!hasLoaded) {
         setFailed(true);
@@ -251,6 +220,8 @@ const ThreadsIframeEmbed = ({
     <div
       className="relative w-full overflow-hidden"
       style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
+      onPointerDownCapture={handleThreadsInteraction}
+      onTouchStartCapture={handleThreadsInteraction}
     >
       <iframe
         ref={iframeRef}
@@ -259,8 +230,6 @@ const ThreadsIframeEmbed = ({
         allowFullScreen
         allow="encrypted-media"
         loading="lazy"
-        onPointerDown={handleThreadsInteraction}
-        onTouchStart={handleThreadsInteraction}
         onFocus={handleThreadsInteraction}
         onLoad={() => setHasLoaded(true)}
         onError={() => setFailed(true)}
