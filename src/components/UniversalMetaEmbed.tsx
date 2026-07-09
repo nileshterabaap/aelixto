@@ -113,15 +113,14 @@ const ThreadsIframeEmbed = ({
   const playTrackedRef = useRef(false);
   const persistHeight = usePersistEmbedHeight(postId);
 
-  const trackAndOpenThreads = useCallback(() => {
+  const trackThreadsPlay = useCallback(() => {
     if (postId && !playTrackedRef.current) {
       playTrackedRef.current = true;
       trackVideoPlayBeacon(postId).catch(() => {
         playTrackedRef.current = false;
       });
     }
-    void openExternalUrl(expandedUrl);
-  }, [expandedUrl, postId]);
+  }, [postId]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -178,6 +177,9 @@ const ThreadsIframeEmbed = ({
         allowFullScreen
         allow="encrypted-media"
         loading="lazy"
+        onPointerDown={trackThreadsPlay}
+        onTouchStart={trackThreadsPlay}
+        onFocus={trackThreadsPlay}
         onLoad={() => setHasLoaded(true)}
         onError={() => setFailed(true)}
         style={{
@@ -190,26 +192,6 @@ const ThreadsIframeEmbed = ({
           background: 'transparent',
         }}
       />
-      {postId && (
-        <button
-          type="button"
-          aria-label="Open Threads video"
-          className="absolute inset-0 z-[2] cursor-pointer border-0 p-0"
-          style={{ background: 'transparent', touchAction: 'pan-y' }}
-          onPointerDown={() => {
-            if (!playTrackedRef.current) {
-              playTrackedRef.current = true;
-              trackVideoPlayBeacon(postId).catch(() => {
-                playTrackedRef.current = false;
-              });
-            }
-          }}
-          onClick={(event) => {
-            event.stopPropagation();
-            trackAndOpenThreads();
-          }}
-        />
-      )}
     </div>
   );
 };
