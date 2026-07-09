@@ -71,20 +71,12 @@ const Auth = () => {
     }
     setUsernameStatus("checking");
     const timer = setTimeout(async () => {
-      try {
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("username", usernameValue.toLowerCase())
-          .maybeSingle();
-        if (error) {
-          setUsernameStatus("idle");
-          return;
-        }
-        setUsernameStatus(data ? "taken" : "available");
-      } catch {
-        setUsernameStatus("idle");
-      }
+      const { data } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("username", usernameValue.toLowerCase())
+        .maybeSingle();
+      setUsernameStatus(data ? "taken" : "available");
     }, 500);
     return () => clearTimeout(timer);
   }, [usernameValue]);
@@ -335,26 +327,12 @@ const Auth = () => {
       return;
     }
 
-    // Web flow.
-    try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/auth`,
-      });
-      if (result.error) {
-        console.error("Google sign-in error", result.error);
-        toast({
-          title: "Google sign-in failed",
-          description: result.error.message || "Please try again.",
-          variant: "destructive",
-        });
-      }
-    } catch (e) {
-      console.error("Google sign-in threw", e);
-      toast({
-        title: "Google sign-in failed",
-        description: (e as Error)?.message || "Please try again.",
-        variant: "destructive",
-      });
+    // Web flow — unchanged.
+    const { error } = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: `${window.location.origin}/`,
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     }
   };
 
@@ -440,7 +418,7 @@ const Auth = () => {
                   id="username"
                   name="username"
                   type="text"
-                  placeholder="Username"
+                  placeholder="coolcreator"
                   value={usernameValue}
                   onChange={(e) => setUsernameValue(e.target.value.replace(/\s/g, ""))}
                 />
@@ -456,11 +434,11 @@ const Auth = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-email">Email</Label>
-                <Input id="signup-email" name="signup-email" type="email" placeholder="Email" required />
+                <Input id="signup-email" name="signup-email" type="email" placeholder="you@example.com" required />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signup-password">Password</Label>
-                <Input id="signup-password" name="signup-password" type="password" placeholder="Password" required minLength={6} />
+                <Input id="signup-password" name="signup-password" type="password" placeholder="••••••••" required minLength={6} />
               </div>
               <Button
                 type="submit"
@@ -503,7 +481,7 @@ const Auth = () => {
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  placeholder="Email or username"
+                  placeholder="you@example.com or @username"
                   value={signinIdentifier}
                   onChange={(e) => setSigninIdentifier(e.target.value)}
                   required
@@ -511,7 +489,7 @@ const Auth = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="signin-password">Password</Label>
-                <Input id="signin-password" name="signin-password" type="password" placeholder="Password" required />
+                <Input id="signin-password" name="signin-password" type="password" placeholder="••••••••" required />
               </div>
               <Button
                 type="submit"
