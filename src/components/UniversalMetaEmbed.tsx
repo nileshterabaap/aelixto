@@ -136,6 +136,11 @@ const ThreadsIframeEmbed = ({
     }
   }, [postId, authorUserId]);
 
+  const handleThreadsInteraction = useCallback(() => {
+    recentIntentRef.current = Date.now();
+    trackThreadsPlay();
+  }, [trackThreadsPlay]);
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const iframeWindow = iframeRef.current?.contentWindow;
@@ -176,7 +181,7 @@ const ThreadsIframeEmbed = ({
       setTimeout(() => {
         const active = document.activeElement;
         if (active?.tagName === 'IFRAME' && iframeRef.current === active) {
-          trackThreadsPlay();
+          handleThreadsInteraction();
         }
       }, 0);
     };
@@ -187,7 +192,7 @@ const ThreadsIframeEmbed = ({
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
     };
-  }, [trackThreadsPlay, trackThreadsVisit]);
+  }, [handleThreadsInteraction, trackThreadsPlay, trackThreadsVisit]);
 
   useEffect(() => {
     const root = iframeRef.current?.parentElement;
@@ -254,9 +259,9 @@ const ThreadsIframeEmbed = ({
         allowFullScreen
         allow="encrypted-media"
         loading="lazy"
-        onPointerDown={trackThreadsPlay}
-        onTouchStart={trackThreadsPlay}
-        onFocus={trackThreadsPlay}
+        onPointerDown={handleThreadsInteraction}
+        onTouchStart={handleThreadsInteraction}
+        onFocus={handleThreadsInteraction}
         onLoad={() => setHasLoaded(true)}
         onError={() => setFailed(true)}
         style={{
