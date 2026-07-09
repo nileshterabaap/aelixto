@@ -281,22 +281,9 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit, postId, 
       }
     };
 
-    const handleWindowBlur = () => {
-      setTimeout(() => {
-        const active = document.activeElement;
-        if (active?.tagName === 'IFRAME' && containerRef.current?.contains(active)) {
-          handleThreadsInteraction();
-        }
-      }, 0);
-    };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleWindowBlur);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleWindowBlur);
-    };
-  }, [platform, handleThreadsInteraction, trackThreadsPlay, trackThreadsVisit]);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [platform, trackThreadsPlay, trackThreadsVisit]);
 
 
   // Extract URL from embed HTML for double-tap redirection

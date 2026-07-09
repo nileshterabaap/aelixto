@@ -177,22 +177,9 @@ const ThreadsIframeEmbed = ({
       }
     };
 
-    const handleWindowBlur = () => {
-      setTimeout(() => {
-        const active = document.activeElement;
-        if (active?.tagName === 'IFRAME' && iframeRef.current === active) {
-          handleThreadsInteraction();
-        }
-      }, 0);
-    };
-
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('blur', handleWindowBlur);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('blur', handleWindowBlur);
-    };
-  }, [handleThreadsInteraction, trackThreadsPlay, trackThreadsVisit]);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [trackThreadsPlay, trackThreadsVisit]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {

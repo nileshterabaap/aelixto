@@ -47,15 +47,12 @@ const extractTweetId = (url: string): string | null => {
 
 export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOriginalVisit }: TwitterEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
   const playTrackedRef = useRef(false);
   const visitTrackedRef = useRef(false);
-  const recentIntentRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const trackXPlay = useCallback(() => {
-    recentIntentRef.current = Date.now();
     if (!postId || playTrackedRef.current) return;
     playTrackedRef.current = true;
     trackVideoPlayBeacon(postId, authorUserId).catch(() => {
@@ -78,7 +75,6 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOrigi
   useEffect(() => {
     playTrackedRef.current = false;
     visitTrackedRef.current = false;
-    recentIntentRef.current = 0;
   }, [url, postId]);
 
   useEffect(() => {
@@ -148,33 +144,6 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOrigi
     };
   }, [url, trackXPlay, trackXVisit]);
 
-  useEffect(() => {
-    const onWindowBlur = () => {
-      setTimeout(() => {
-        const active = document.activeElement;
-        if (active?.tagName === 'IFRAME' && rootRef.current?.contains(active)) {
-          trackXPlay();
-        }
-      }, 0);
-    };
-
-    window.addEventListener('blur', onWindowBlur);
-    return () => window.removeEventListener('blur', onWindowBlur);
-  }, [trackXPlay]);
-
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      if (document.visibilityState !== 'hidden') return;
-      if (Date.now() - recentIntentRef.current < 3000) {
-        trackXPlay();
-        trackXVisit();
-      }
-    };
-
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
-  }, [trackXPlay, trackXVisit]);
-
   if (error) {
     return (
       <div data-embed-status="ready">
@@ -213,7 +182,6 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOrigi
 
   return (
     <div
-      ref={rootRef}
       className="relative"
       data-embed-status={loading ? 'loading' : 'ready'}
       onPointerDownCapture={trackXPlay}
