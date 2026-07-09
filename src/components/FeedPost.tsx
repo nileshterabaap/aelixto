@@ -230,6 +230,12 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
       void openExternalUrl(mediaUrl);
     }
   }, [post.id, post.isRealPost, mediaUrl]);
+
+  const handleXOriginalVisit = useCallback(() => {
+    if (post.isRealPost) {
+      markOriginalVisit(post.id);
+    }
+  }, [post.id, post.isRealPost]);
   
   // Always call hooks unconditionally (React rules of hooks)
   const postActionsResult = usePostActions(post.id, userId || '');
@@ -590,7 +596,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} />
+                  <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} onOriginalVisit={handleXOriginalVisit} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -601,7 +607,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} />
+                <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} onOriginalVisit={handleXOriginalVisit} />
               </LazyEmbed>
             )}
             {r.kind === 'pinterest' && post.isRealPost && (

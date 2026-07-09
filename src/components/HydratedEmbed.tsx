@@ -352,7 +352,7 @@ export const HydratedEmbed = memo(({
         {/* Fallback routing for legacy raw payloads */}
         {forceTwitterRenderer && mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <TwitterEmbed url={mediaUrl} onOriginalTap={handleXOriginalTap} />
+            <TwitterEmbed url={mediaUrl} onOriginalTap={handleXOriginalTap} onOriginalVisit={handleOriginalVisit} />
           </ImageViewTracker>
         )}
 
@@ -385,7 +385,7 @@ export const HydratedEmbed = memo(({
         {/* Twitter/X embed */}
         {r.kind === 'twitter' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} />
+            <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} onOriginalVisit={handleOriginalVisit} />
           </ImageViewTracker>
         )}
         
