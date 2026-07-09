@@ -3,7 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 import { loadTwitterEmbed } from "@/lib/ScriptLoader";
-import { trackVideoPlayBeacon } from "@/hooks/useViewTracking";
+import { trackOriginalVisit, trackVideoPlayBeacon } from "@/hooks/useViewTracking";
 
 interface TwitterEmbedProps {
   url: string;
@@ -49,10 +49,13 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOrigi
   const containerRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const playTrackedRef = useRef(false);
+  const visitTrackedRef = useRef(false);
+  const recentIntentRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   const trackXPlay = useCallback(() => {
+    recentIntentRef.current = Date.now();
     if (!postId || playTrackedRef.current) return;
     playTrackedRef.current = true;
     trackVideoPlayBeacon(postId, authorUserId).catch(() => {
@@ -60,8 +63,22 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOrigi
     });
   }, [postId, authorUserId]);
 
+  const trackXVisit = useCallback(() => {
+    if (!postId || visitTrackedRef.current) return;
+    visitTrackedRef.current = true;
+    if (onOriginalVisit) {
+      onOriginalVisit();
+      return;
+    }
+    trackOriginalVisit(postId, authorUserId).catch(() => {
+      visitTrackedRef.current = false;
+    });
+  }, [postId, authorUserId, onOriginalVisit]);
+
   useEffect(() => {
     playTrackedRef.current = false;
+    visitTrackedRef.current = false;
+    recentIntentRef.current = 0;
   }, [url, postId]);
 
   useEffect(() => {
@@ -101,7 +118,7 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOrigi
                 const target = event?.target;
                 if (target instanceof Node && containerRef.current?.contains(target)) {
                   trackXPlay();
-                  onOriginalVisit();
+                  trackXVisit();
                 }
               };
               window.twttr.events.bind('click', twitterClickHandler);
@@ -129,7 +146,7 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOrigi
         window.twttr.events.unbind('click', twitterClickHandler);
       }
     };
-  }, [url, onOriginalVisit, trackXPlay]);
+  }, [url, trackXPlay, trackXVisit]);
 
   useEffect(() => {
     const onWindowBlur = () => {
@@ -144,6 +161,19 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOrigi
     window.addEventListener('blur', onWindowBlur);
     return () => window.removeEventListener('blur', onWindowBlur);
   }, [trackXPlay]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'hidden') return;
+      if (Date.now() - recentIntentRef.current < 3000) {
+        trackXPlay();
+        trackXVisit();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [trackXPlay, trackXVisit]);
 
   if (error) {
     return (
