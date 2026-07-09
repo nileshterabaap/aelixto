@@ -254,11 +254,10 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit, postId, 
   const trackThreadsVisit = useCallback(() => {
     if (!postId || visitTrackedRef.current) return;
     visitTrackedRef.current = true;
-    onOriginalVisit?.();
     trackOriginalVisit(postId, authorUserId).catch(() => {
       visitTrackedRef.current = false;
     });
-  }, [postId, authorUserId, onOriginalVisit]);
+  }, [postId, authorUserId]);
 
   const handleThreadsInteraction = useCallback(() => {
     recentIntentRef.current = Date.now();
