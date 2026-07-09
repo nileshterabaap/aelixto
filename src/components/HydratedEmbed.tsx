@@ -107,7 +107,6 @@ export const HydratedEmbed = memo(({
     platformHint === 'instagram' ||
     platformHint === 'facebook' ||
     platformHint === 'linkedin' ||
-    platformHint === 'threads' ||
     platformHint === 'pinterest' ||
     lowerUrl.includes('youtube.com/') ||
     lowerUrl.includes('youtu.be/') ||
@@ -117,13 +116,38 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('facebook.com/') ||
     lowerUrl.includes('fb.watch/') ||
     lowerUrl.includes('linkedin.com/') ||
-    lowerUrl.includes('threads.net/') ||
-    lowerUrl.includes('threads.com/') ||
     lowerUrl.includes('pinterest.com/') ||
     lowerUrl.includes('pin.it/') ||
     lowerUrl.includes('/reel/') ||
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
+
+  // ── X & Threads: scoring rebuilt from scratch ────────────────────────────
+  // View  = handled by the impression tracker elsewhere.
+  // Play  = any tap inside the embed when the post is a video/reel/clip.
+  // Visit = any tap inside the embed (tap hands the user off to x.com /
+  //         threads.net or the native app), fired via beacon so it survives
+  //         backgrounding. Backend dedups per post+viewer per cooldown, so
+  //         firing Play + Visit on the same tap is safe.
+  const isXPlatform =
+    platformHint === 'x' ||
+    platformHint === 'twitter' ||
+    lowerUrl.includes('twitter.com/') ||
+    lowerUrl.includes('x.com/');
+  const isThreadsPlatform =
+    platformHint === 'threads' ||
+    lowerUrl.includes('threads.net/') ||
+    lowerUrl.includes('threads.com/');
+  const isXOrThreadsVideo =
+    (isXPlatform || isThreadsPlatform) &&
+    (mediaTypeHint === 'video' ||
+      mediaTypeHint === 'audio' ||
+      lowerUrl.includes('/video/') ||
+      lowerUrl.includes('/reel/') ||
+      lowerUrl.includes('/status/') && (mediaTypeHint === 'video'));
+
+  const playFires = isPlayableMediaPost || isXOrThreadsVideo;
+  const exitFiresOnAnyTap = isXPlatform || isThreadsPlatform;
 
   const mediaLifecycleEnabled =
     shouldHydrate &&
@@ -141,7 +165,7 @@ export const HydratedEmbed = memo(({
 
   // Track click-throughs to the original platform (iframe focus or anchor clicks).
   // Awards +1 engagement score to the author on top of the impression score.
-  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost);
+  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, playFires, exitFiresOnAnyTap);
 
   const forceTwitterRenderer =
     r.kind === 'raw' &&
