@@ -3,7 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 
-export const usePostActions = (postId: string, userId: string | undefined) => {
+interface UsePostActionsOptions {
+  isRepost?: boolean;
+  onDeleted?: () => void;
+}
+
+export const usePostActions = (
+  postId: string,
+  userId: string | undefined,
+  options: UsePostActionsOptions = {}
+) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { decrement: decrementDailyCount } = useDailyPostLimit();
@@ -144,6 +153,20 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
     mutationFn: async () => {
       if (!userId) throw new Error("Not authenticated");
 
+      if (options.isRepost) {
+        const { data, error } = await supabase
+          .from("reposts")
+          .delete()
+          .eq("post_id", postId)
+          .eq("user_id", userId)
+          .select("id");
+
+        if (error) throw error;
+        if (!data || data.length === 0) throw new Error("Repost not found or not owned");
+
+        return { createdAt: undefined as string | undefined, deletedRepost: true };
+      }
+
       // Fetch created_at first so we can decide whether to refund the daily credit
       const { data: existing } = await supabase
         .from("posts")
@@ -152,15 +175,17 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
         .eq("user_id", userId)
         .maybeSingle();
 
-      const { error } = await supabase
+      const { data: deletedRows, error } = await supabase
         .from("posts")
         .delete()
         .eq("id", postId)
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .select("id");
 
       if (error) throw error;
+      if (!deletedRows || deletedRows.length === 0) throw new Error("Post not found or not owned");
 
-      return { createdAt: existing?.created_at as string | undefined };
+      return { createdAt: existing?.created_at as string | undefined, deletedRepost: false };
     },
     onSuccess: (result) => {
       // Refund the daily post credit only if the post was created today (same local day)
@@ -184,9 +209,13 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
       queryClient.invalidateQueries({ queryKey: ["user-posts"] });
       queryClient.invalidateQueries({ queryKey: ["profile-posts"] });
 
+      options.onDeleted?.();
+
       toast({
-        title: "Post deleted",
-        description: refunded
+        title: result?.deletedRepost ? "Repost removed" : "Post deleted",
+        description: result?.deletedRepost
+          ? "Removed from your profile."
+          : refunded
           ? "Your post has been removed. Daily credit refunded."
           : "Your post has been removed.",
       });
@@ -200,6 +229,94 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
     },
   });
 
+  // Toggle pin (max 5 per platform, enforced in DB trigger)
+  const pinMutation = useMutation({
+    mutationFn: async ({ pinned, platform }: { pinned: boolean; platform?: string | null }) => {
+      if (!userId) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("posts")
+        .update({ pinned_at: pinned ? new Date().toISOString() : null })
+        .eq("id", postId)
+        .eq("user_id", userId);
+      if (error) throw error;
+      return { pinned, platform };
+    },
+    onSuccess: ({ pinned }) => {
+      queryClient.invalidateQueries({ queryKey: ["platform-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      toast({ title: pinned ? "Pinned to profile" : "Unpinned" });
+    },
+    onError: (e: any) => {
+      const msg = String(e?.message || "");
+      if (msg.includes("PIN_LIMIT_REACHED")) {
+        toast({
+          title: "Pin limit reached",
+          description: "You can pin up to 5 posts per platform. Unpin one first.",
+          variant: "destructive",
+        });
+      } else {
+        toast({ title: "Failed to update pin", variant: "destructive" });
+      }
+    },
+  });
+
+  const hideCountsMutation = useMutation({
+    mutationFn: async (hide: boolean) => {
+      if (!userId) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("posts")
+        .update({ hide_counts: hide })
+        .eq("id", postId)
+        .eq("user_id", userId);
+      if (error) throw error;
+      return hide;
+    },
+    onSuccess: (hide) => {
+      queryClient.invalidateQueries({ queryKey: ["platform-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      toast({ title: hide ? "Interaction counts hidden" : "Interaction counts visible" });
+    },
+    onError: () => toast({ title: "Failed to update", variant: "destructive" }),
+  });
+
+  const commentsDisabledMutation = useMutation({
+    mutationFn: async (disabled: boolean) => {
+      if (!userId) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("posts")
+        .update({ comments_disabled: disabled })
+        .eq("id", postId)
+        .eq("user_id", userId);
+      if (error) throw error;
+      return disabled;
+    },
+    onSuccess: (disabled) => {
+      queryClient.invalidateQueries({ queryKey: ["platform-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      toast({ title: disabled ? "Commenting turned off" : "Commenting turned on" });
+    },
+    onError: () => toast({ title: "Failed to update", variant: "destructive" }),
+  });
+
+  const editCaptionMutation = useMutation({
+    mutationFn: async (content: string) => {
+      if (!userId) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("posts")
+        .update({ content })
+        .eq("id", postId)
+        .eq("user_id", userId);
+      if (error) throw error;
+      return content;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["platform-posts"] });
+      queryClient.invalidateQueries({ queryKey: ["posts"] });
+      toast({ title: "Caption updated" });
+    },
+    onError: () => toast({ title: "Failed to update caption", variant: "destructive" }),
+  });
+
   return {
     isLiked: isLiked || false,
     isSaved: isSaved || false,
@@ -208,5 +325,11 @@ export const usePostActions = (postId: string, userId: string | undefined) => {
     handleShare,
     deletePost: deleteMutation.mutate,
     isDeleting: deleteMutation.isPending,
+    togglePin: pinMutation.mutate,
+    isPinning: pinMutation.isPending,
+    toggleHideCounts: hideCountsMutation.mutate,
+    toggleCommentsDisabled: commentsDisabledMutation.mutate,
+    editCaption: editCaptionMutation.mutate,
+    isEditingCaption: editCaptionMutation.isPending,
   };
 };

@@ -30,6 +30,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
     followers: 0, 
     following: 0 
   });
+  const [countsReady, setCountsReady] = useState<boolean>(false);
 
   const refresh = useCallback(async () => {
     if (!targetUserId) return;
@@ -84,6 +85,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
       setIsFollowing(!!myFollow);
       setIsRequested(!!myRequest && !myFollow);
       setFollowsMe(!!theirFollow);
+      setCountsReady(true);
     } catch (error) {
       console.error("Error refreshing follow data:", error);
     }
@@ -132,71 +134,70 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
 
   const follow = useCallback(async () => {
     if (!targetUserId || isFollowing || isRequested) return;
-    setLoading(true);
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase.rpc("request_or_follow", { _target: targetUserId });
-      if (error) throw error;
-      const result = (data as string) || "";
-      if (result === "requested") {
-        setIsRequested(true);
+    // Optimistic: flip button instantly, reconcile in background.
+    setIsFollowing(true);
+    setCounts(prev => ({ ...prev, followers: prev.followers + 1 }));
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setIsFollowing(false);
+          setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
+          return;
+        }
+        const { data, error } = await supabase.rpc("request_or_follow", { _target: targetUserId });
+        if (error) throw error;
+        const result = (data as string) || "";
+        if (result === "requested") {
+          setIsRequested(true);
+          setIsFollowing(false);
+          setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
+        }
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["notification-count"] });
+        queryClient.invalidateQueries({ queryKey: ["profile"] });
+        queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+        queryClient.invalidateQueries({ queryKey: ["user-search"] });
+        queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+        refresh();
+      } catch (error) {
+        console.error("Error following:", error);
         setIsFollowing(false);
-      } else if (result === "following") {
-        setIsFollowing(true);
-        setIsRequested(false);
-        setCounts(prev => ({ ...prev, followers: prev.followers + 1 }));
+        setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
       }
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["notification-count"] });
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
-      queryClient.invalidateQueries({ queryKey: ["user-search"] });
-      await refresh();
-    } catch (error) {
-      console.error("Error following:", error);
-    } finally {
-      setLoading(false);
-    }
+    })();
   }, [targetUserId, isFollowing, isRequested, refresh, queryClient]);
 
   const unfollow = useCallback(async () => {
     if (!targetUserId || (!isFollowing && !isRequested)) return;
-    setLoading(true);
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      const wasFollowing = isFollowing;
-      setIsFollowing(false);
-      setIsRequested(false);
-      if (wasFollowing) {
-        setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
-      }
-
-      const { error } = await supabase.rpc("cancel_follow_or_request", { _target: targetUserId });
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["notification-count"] });
-      queryClient.invalidateQueries({ queryKey: ["profile"] });
-      queryClient.invalidateQueries({ queryKey: ["user-profile"] });
-      queryClient.invalidateQueries({ queryKey: ["user-search"] });
-      await refresh();
-    } catch (error) {
-      console.error("Error unfollowing:", error);
-    } finally {
-      setLoading(false);
+    const wasFollowing = isFollowing;
+    const wasRequested = isRequested;
+    setIsFollowing(false);
+    setIsRequested(false);
+    if (wasFollowing) {
+      setCounts(prev => ({ ...prev, followers: Math.max(0, prev.followers - 1) }));
     }
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { error } = await supabase.rpc("cancel_follow_or_request", { _target: targetUserId });
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ["notifications"] });
+        queryClient.invalidateQueries({ queryKey: ["notification-count"] });
+        queryClient.invalidateQueries({ queryKey: ["profile"] });
+        queryClient.invalidateQueries({ queryKey: ["user-profile"] });
+        queryClient.invalidateQueries({ queryKey: ["user-search"] });
+        queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+        refresh();
+      } catch (error) {
+        console.error("Error unfollowing:", error);
+        setIsFollowing(wasFollowing);
+        setIsRequested(wasRequested);
+        if (wasFollowing) setCounts(prev => ({ ...prev, followers: prev.followers + 1 }));
+      }
+    })();
   }, [targetUserId, isFollowing, isRequested, refresh, queryClient]);
 
-  return { isFollowing, isRequested, followsMe, follow, unfollow, loading, counts, refresh };
+  return { isFollowing, isRequested, followsMe, follow, unfollow, loading, counts, countsReady, refresh };
 }

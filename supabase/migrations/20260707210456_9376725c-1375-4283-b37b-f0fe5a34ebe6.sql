@@ -1,0 +1,1 @@
+CREATE POLICY "Public can view post images" ON storage.objects FOR SELECT USING (bucket_id = 'posts');
