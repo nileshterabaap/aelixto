@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed, clearScriptCache } from '@/lib/ScriptLoader';
-import { trackVideoPlayBeacon } from '@/hooks/useViewTracking';
 import DOMPurify from 'dompurify';
 
 /** Decode HTML entities (&#064; → @, &#039; → ', etc.) using DOMParser */
@@ -126,8 +125,6 @@ interface RawEmbedRendererProps {
   embedHtml: string;
   onError?: () => void;
   onOriginalVisit?: () => void;
-  postId?: string | null;
-  authorUserId?: string | null;
 }
 
 // Sanitize embed HTML using DOMPurify to prevent XSS attacks
@@ -225,12 +222,10 @@ const detectPlatform = (html: string): 'instagram' | 'facebook' | 'threads' | 't
   return 'unknown';
 };
 
-export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit, postId, authorUserId }: RawEmbedRendererProps) => {
+export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit }: RawEmbedRendererProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<number>(0);
   const hasProcessedRef = useRef(false);
-  const playTrackedRef = useRef(false);
-  const recentIntentRef = useRef(0);
   const [embedFailed, setEmbedFailed] = useState(false);
   const platform = detectPlatform(embedHtml);
   const isInstagram = isInstagramEmbed(embedHtml);
@@ -240,39 +235,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit, postId, 
   if (platform === 'facebook') {
     sanitizedHtml = transformFacebookEmbed(sanitizedHtml);
   }
-
-  const trackThreadsPlay = useCallback(() => {
-    recentIntentRef.current = Date.now();
-    if (!postId || playTrackedRef.current) return;
-    playTrackedRef.current = true;
-    trackVideoPlayBeacon(postId, authorUserId).catch(() => {
-      playTrackedRef.current = false;
-    });
-  }, [postId, authorUserId]);
-
-  const handleThreadsInteraction = useCallback(() => {
-    recentIntentRef.current = Date.now();
-    trackThreadsPlay();
-  }, [trackThreadsPlay]);
-
-  useEffect(() => {
-    playTrackedRef.current = false;
-    recentIntentRef.current = 0;
-  }, [embedHtml, postId]);
-
-  useEffect(() => {
-    if (platform !== 'threads') return;
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'hidden') return;
-      if (Date.now() - recentIntentRef.current < 3000) {
-        trackThreadsPlay();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [platform, trackThreadsPlay]);
 
 
   // Extract URL from embed HTML for double-tap redirection
@@ -503,9 +465,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit, postId, 
       >
         <div
           ref={containerRef}
-          onPointerDownCapture={handleThreadsInteraction}
-          onTouchStartCapture={handleThreadsInteraction}
-          onFocusCapture={handleThreadsInteraction}
           className="embed-container w-full max-w-full [&>*]:!m-0 [&>blockquote]:!mb-0 [&>blockquote]:!pb-0 [&>iframe]:!block [&>div]:!mb-0 [&>iframe~*]:!hidden"
           style={{ overflow: 'hidden' }}
           dangerouslySetInnerHTML={{ __html: decodedThreadsHtml }}

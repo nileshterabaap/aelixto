@@ -5,7 +5,29 @@ import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { openExternalUrl } from '@/lib/openExternalUrl';
-import { trackVideoPlayBeacon } from '@/hooks/useViewTracking';
+
+/**
+ * Small pill-shaped overlay button rendered on top of an embed iframe so
+ * the user can always open the original post on its source platform, even
+ * when the iframe swallows every tap. Positioned so it never covers the
+ * platform's native Play button (top-right corner).
+ */
+const OpenOriginalPill = ({ url, label }: { url: string; label: string }) => {
+  if (!url) return null;
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        void openExternalUrl(url);
+      }}
+      className="absolute top-2 right-2 z-10 rounded-full bg-black/55 backdrop-blur-sm text-white text-[11px] font-medium px-2.5 py-1 shadow-sm active:scale-95 transition-transform pointer-events-auto"
+      aria-label={label}
+    >
+      {label}
+    </button>
+  );
+};
 
 const THREADS_MIN_HEIGHT = 220;
 const THREADS_MAX_HEIGHT = 1400;
@@ -71,14 +93,12 @@ const ThreadsIframeEmbed = ({
   expandedUrl,
   fallbackData,
   postId,
-  authorUserId,
   suggestedHeight,
 }: {
   src: string;
   expandedUrl: string;
   fallbackData: { title?: string; image?: string; description?: string } | null;
   postId?: string | null;
-  authorUserId?: string | null;
   suggestedHeight?: number | null;
 }) => {
   const [failed, setFailed] = useState(false);
@@ -89,24 +109,7 @@ const ThreadsIframeEmbed = ({
   );
   const [hasLoaded, setHasLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const playTrackedRef = useRef(false);
-  const recentIntentRef = useRef(0);
   const persistHeight = usePersistEmbedHeight(postId);
-
-  const trackThreadsPlay = useCallback(() => {
-    recentIntentRef.current = Date.now();
-    if (postId && !playTrackedRef.current) {
-      playTrackedRef.current = true;
-      trackVideoPlayBeacon(postId, authorUserId).catch(() => {
-        playTrackedRef.current = false;
-      });
-    }
-  }, [postId, authorUserId]);
-
-  const handleThreadsInteraction = useCallback(() => {
-    recentIntentRef.current = Date.now();
-    trackThreadsPlay();
-  }, [trackThreadsPlay]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -128,23 +131,6 @@ const ThreadsIframeEmbed = ({
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
-
-  useEffect(() => {
-    playTrackedRef.current = false;
-    recentIntentRef.current = 0;
-  }, [postId, src]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'hidden') return;
-      if (Date.now() - recentIntentRef.current < 3000) {
-        trackThreadsPlay();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [trackThreadsPlay]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -172,8 +158,6 @@ const ThreadsIframeEmbed = ({
     <div
       className="relative w-full overflow-hidden"
       style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
-      onPointerDownCapture={handleThreadsInteraction}
-      onTouchStartCapture={handleThreadsInteraction}
     >
       <iframe
         ref={iframeRef}
@@ -182,7 +166,6 @@ const ThreadsIframeEmbed = ({
         allowFullScreen
         allow="encrypted-media"
         loading="lazy"
-        onFocus={handleThreadsInteraction}
         onLoad={() => setHasLoaded(true)}
         onError={() => setFailed(true)}
         style={{
@@ -586,7 +569,6 @@ const TikTokIframeEmbed = ({
 interface UniversalMetaEmbedProps {
   url: string;
   postId?: string | null;
-  authorUserId?: string | null;
   suggestedHeight?: number | null;
 }
 
@@ -834,7 +816,7 @@ const buildTikTokEmbed = (url: string): string | null => {
 };
 
 
-export const UniversalMetaEmbed = ({ url, postId, authorUserId, suggestedHeight }: UniversalMetaEmbedProps) => {
+export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMetaEmbedProps) => {
   const cached = embedCache.get(url);
 
   const [embedHtml, setEmbedHtml] = useState<string | null>(cached?.embedHtml ?? null);
@@ -1098,7 +1080,6 @@ export const UniversalMetaEmbed = ({ url, postId, authorUserId, suggestedHeight 
             expandedUrl={expandedUrl}
             fallbackData={fallbackData}
             postId={postId}
-            authorUserId={authorUserId}
             suggestedHeight={suggestedHeight}
           />
         );
@@ -1116,8 +1097,6 @@ export const UniversalMetaEmbed = ({ url, postId, authorUserId, suggestedHeight 
       <div onClick={handleDoubleTap}>
         <RawEmbedRenderer
           embedHtml={embedHtml}
-          postId={postId}
-          authorUserId={authorUserId}
           onError={() => {
             
             setShowFallback(true);

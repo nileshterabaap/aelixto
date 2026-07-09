@@ -62,28 +62,6 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
   const { isFollowing, isRequested, followsMe, follow, unfollow, loading: followLoading, counts, countsReady, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
-
-  // Realtime: reflect aelix_score changes on the viewed profile instantly.
-  useEffect(() => {
-    if (!profile?.user_id || !username) return;
-    const channel = supabase
-      .channel(`profile-view-${profile.user_id}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `user_id=eq.${profile.user_id}` },
-        (payload) => {
-          const next = payload.new as unknown as Profile;
-          queryClient.setQueryData(['user-profile', username], (prev: Profile | null | undefined) =>
-            prev ? { ...prev, ...next } : next
-          );
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [profile?.user_id, username, queryClient]);
-
   const { isBlocked, refetch: refetchBlocked } = useIsBlocked(profile?.user_id);
   const { amIBlockedBy, isLoading: amIBlockedByLoading } = useAmIBlockedBy(profile?.user_id);
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
@@ -144,21 +122,13 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const showSkeleton = !contentReady;
 
   const handleRefresh = useCallback(async () => {
-    const profileId = profile?.user_id;
     await Promise.all([
       refetchProfile(),
       refreshFollow(),
-      profileId
-        ? queryClient.invalidateQueries({ queryKey: ["user-platform-tabs", profileId], refetchType: "all" })
-        : Promise.resolve(),
-      profileId
-        ? queryClient.invalidateQueries({ queryKey: ["platform-posts", profileId], refetchType: "all" })
-        : Promise.resolve(),
-      profileId && activeTab
-        ? queryClient.invalidateQueries({ queryKey: ["platform-posts", profileId, activeTab], refetchType: "all" })
-        : Promise.resolve(),
+      queryClient.invalidateQueries({ queryKey: ["user-platform-tabs", profile?.user_id] }),
+      queryClient.invalidateQueries({ queryKey: ["platform-posts", profile?.user_id] }),
     ]);
-  }, [refetchProfile, refreshFollow, queryClient, profile?.user_id, activeTab]);
+  }, [refetchProfile, refreshFollow, queryClient, profile?.user_id]);
 
   if (!isLoading && !profile) {
     return (

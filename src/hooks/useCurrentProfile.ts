@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
 import { toast } from '@/hooks/use-toast';
@@ -114,28 +113,6 @@ export const useCurrentProfile = () => {
   const upsertProfile = (updates: Partial<Profile>) => {
     updateMutation.mutate(updates);
   };
-
-  // Realtime: keep aelix_score and other profile fields in sync instantly.
-  useEffect(() => {
-    if (!user?.id) return;
-    const channel = supabase
-      .channel(`profile-self-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `user_id=eq.${user.id}` },
-        (payload) => {
-          const next = payload.new as unknown as Profile;
-          queryClient.setQueryData(['profile', user.id], (prev: Profile | undefined) =>
-            prev ? { ...prev, ...next } : next
-          );
-          queryClient.invalidateQueries({ queryKey: ['user-profile'] });
-        }
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id, queryClient]);
 
   // Loading is true if session is loading OR if profile query is loading (and user exists)
   const loading = sessionLoading || (!!user && isLoading);

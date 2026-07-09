@@ -602,7 +602,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
                 aria-label={`Open on ${platform.name}`}
                 onClick={(e) => {
                   e.stopPropagation();
-                  markOriginalVisit(post.id, (post as any).user_id || null);
+                  markOriginalVisit(post.id);
                   void openExternalUrl(mediaUrl);
                 }}
                 className="p-0 bg-transparent border-0 cursor-pointer"

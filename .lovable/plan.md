@@ -1,34 +1,46 @@
-## What I found
+## Problems
 
-- **X:** the score only credits from the platform icon because that button directly calls `markOriginalVisit(post.id)`. The X embed itself is rendered inside Twitter's SDK iframe, and taps inside that cross-origin iframe do not reliably bubble to Aelixto's container listener. So normal post taps never reach the tracking hook.
-- **Threads:** Threads is using a direct iframe. Like X, iframe taps can be swallowed before Aelixto sees them. Also, when Threads opens/hands off quickly, the regular async tracking request can be aborted before it reaches the backend.
-- **Profile refresh:** the profile pull-to-refresh code already invalidates profile grid queries, but I’ll verify it’s invalidating the exact keys used by platform tabs/posts and tighten if needed.
+1. **X posts don't credit `original_visit`.** In `HydratedEmbed.tsx`, `platformHint === 'x' || 'twitter'` marks X as `isPlayableMediaPost=true`. That flag makes `useOriginalVisitTracker` only fire `firePlay` on tap and skip `fireOriginal`. Result: tapping into an X embed (which opens x.com or the X app) never records a visit.
 
-## Plan
+2. **Threads video plays don't credit `video_play`.** Threads is `isPlayableMediaPost=true`, so `pointerdown` on the container is supposed to call `firePlay`. In practice Threads' iframe hands the tap off to the native app / new tab and the app is backgrounded before the play insert completes. Because `trackView` isn't a beacon and isn't retried, the request is aborted mid-flight when the tab hides. Additionally, some Threads plays go straight through the iframe with no synthetic pointerdown reaching the container.
 
-1. **Make X post taps count as original visits**
-   - Keep the icon behavior unchanged.
-   - Add a tiny transparent click-capture layer only for X embeds, positioned over the embed tap area.
-   - On tap, call `markOriginalVisit(post.id)` first, then open the X URL through the existing external-url helper.
-   - This matches what the icon already does, but works when tapping the post itself.
+3. **Profile feed doesn't show new posts on refresh.** `UserProfile.tsx`'s `handleRefresh` only calls `refetchProfile()` + `refreshFollow()`. It never invalidates `platform-posts` or `user-platform-tabs`, so pull-to-refresh on someone's profile leaves the grid stale.
 
-2. **Make Threads video taps count as plays**
-   - Add a Threads-specific tap capture layer in the Threads iframe wrapper.
-   - On tap, immediately send `video_play` using the navigation-safe beacon path, then let the user open/interact with the Threads post.
-   - Keep it once-per-post on the frontend; backend dedupe remains the final guard.
+## Fix
 
-3. **Fix the tracking hook bug that blocks beacon fallback**
-   - Current code sets `playFiredRef = true` before the normal `video_play` request finishes, so the hidden/visibility beacon fallback often refuses to send.
-   - Add a separate “pending play” flag so Threads can still send beacon if the page backgrounds before confirmation.
+### 1. `src/components/HydratedEmbed.tsx`
+Remove `twitter` / `x` from the `isPlayableMediaPost` list and drop `twitter.com/` / `x.com/` from the URL checks. X is a text/link platform for engagement scoring — tapping it should credit as `original_visit`, matching Reddit's behavior. (Twitter embeds that happen to contain video will still count as a visit, which is the correct signal for X per the user's request.)
 
-4. **Re-check profile refresh query keys**
-   - Confirm `useUserPlatformPosts` / `useUserPlatformTabs` keys match `UserProfile` invalidation.
-   - If there’s a mismatch, update only that invalidation path so new posts appear after refresh.
+### 2. `src/hooks/useOriginalVisitTracker.ts`
+Make Play tracking survive the tap-out to a native app, and use a beacon:
 
-## Scope control
+- Add a new `firePlayBeacon()` variant that calls `trackViewBeforeNavigation({ postId, eventType: 'video_play' })` (a `navigator.sendBeacon` / `keepalive: true` request). Export a small `trackVideoPlayBeacon` from `useViewTracking.ts` that reuses the existing navigation-safe path.
+- In `onPointerDown` for playable posts: fire the regular `firePlay()` immediately (best case, still on-page) AND arm a "pending play" flag.
+- In `onVisibilityChange` (hidden) for playable posts: if a recent tap happened AND `playFiredRef` never confirmed success (or the pending flag is set), call `firePlayBeacon()` so the insert survives backgrounding. Still guarded once-per-post.
+- Also attach `pointerdown`/`touchstart` capture listeners on the iframe element itself when it mounts (via the existing `attachIframeListeners` MutationObserver path), so Threads taps that don't bubble to the container still fire play.
 
-- No scoring-rule changes.
-- No backend schema changes unless the frontend fix reveals the edge function rejects valid `video_play` / `original_visit` requests.
-- No unrelated UI changes.
+This keeps behavior scoped to playable posts — no change for text platforms.
 
-**Probability of success: 88%.**
+### 3. `src/pages/UserProfile.tsx`
+Extend `handleRefresh` to also invalidate the grid queries for the profile being viewed:
+
+```ts
+const handleRefresh = useCallback(async () => {
+  await Promise.all([
+    refetchProfile(),
+    refreshFollow(),
+    queryClient.invalidateQueries({ queryKey: ["user-platform-tabs", profile?.user_id] }),
+    queryClient.invalidateQueries({ queryKey: ["platform-posts", profile?.user_id] }),
+  ]);
+}, [refetchProfile, refreshFollow, queryClient, profile?.user_id]);
+```
+
+`queryClient` is already imported and used elsewhere in the file.
+
+## Out of scope
+
+- No changes to `record-view` edge function, scoring rules, or self-view logic.
+- No changes to any other platform's tracking behavior.
+- No UI/visual changes.
+
+**Success probability: ~85%.**

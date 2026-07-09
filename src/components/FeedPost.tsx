@@ -45,8 +45,6 @@ import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
 import { getOriginalPostCaption } from "@/lib/originalCaption";
-import { markOriginalVisit } from "@/hooks/useOriginalVisitTracker";
-import { openExternalUrl } from "@/lib/openExternalUrl";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -221,16 +219,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
       await trackVideoPlay(post.id);
     }
   };
-
-  const handleXOriginalTap = useCallback(() => {
-    if (post.isRealPost) {
-      markOriginalVisit(post.id, (post as any).user_id || null);
-    }
-    if (mediaUrl) {
-      void openExternalUrl(mediaUrl);
-    }
-  }, [post.id, post.isRealPost, mediaUrl]);
-
+  
   // Always call hooks unconditionally (React rules of hooks)
   const postActionsResult = usePostActions(post.id, userId || '');
   const repostActionsResult = useRepost(post.id, userId || '');
@@ -544,11 +533,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <RawEmbedRenderer
-                    embedHtml={r.html}
-                    postId={post.id}
-                    authorUserId={(post as any).user_id || null}
-                  />
+                  <RawEmbedRenderer embedHtml={r.html} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -559,11 +544,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <RawEmbedRenderer
-                  embedHtml={r.html}
-                  postId={post.id}
-                  authorUserId={(post as any).user_id || null}
-                />
+                <RawEmbedRenderer embedHtml={r.html} />
               </LazyEmbed>
             )}
             {r.kind === 'reddit' && post.isRealPost && (
@@ -598,12 +579,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <TwitterEmbed
-                    url={r.url}
-                    postId={post.id}
-                    authorUserId={(post as any).user_id || null}
-                    onOriginalTap={handleXOriginalTap}
-                  />
+                  <TwitterEmbed url={r.url} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -614,12 +590,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <TwitterEmbed
-                  url={r.url}
-                  postId={post.id}
-                  authorUserId={(post as any).user_id || null}
-                  onOriginalTap={handleXOriginalTap}
-                />
+                <TwitterEmbed url={r.url} />
               </LazyEmbed>
             )}
             {r.kind === 'pinterest' && post.isRealPost && (
@@ -680,7 +651,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <UniversalMetaEmbed url={r.url} postId={post.id} authorUserId={(post as any).user_id || null} suggestedHeight={(post as any).suggested_height ?? null} />
+                  <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -691,7 +662,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <UniversalMetaEmbed url={r.url} postId={post.id} authorUserId={(post as any).user_id || null} suggestedHeight={(post as any).suggested_height ?? null} />
+                <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
               </LazyEmbed>
             )}
             {r.kind === 'universal' && isFacebookUnavailable && (

@@ -1,15 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 import { loadTwitterEmbed } from "@/lib/ScriptLoader";
-import { trackVideoPlayBeacon } from "@/hooks/useViewTracking";
 
 interface TwitterEmbedProps {
   url: string;
-  postId?: string | null;
-  authorUserId?: string | null;
-  onOriginalTap?: () => void;
 }
 
 declare global {
@@ -22,10 +18,6 @@ declare global {
           container: HTMLElement,
           options?: any
         ) => Promise<HTMLElement | undefined>;
-      };
-      events?: {
-        bind: (eventName: string, handler: (event: any) => void) => void;
-        unbind?: (eventName: string, handler: (event: any) => void) => void;
       };
     };
   }
@@ -44,27 +36,12 @@ const extractTweetId = (url: string): string | null => {
   return null;
 };
 
-export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap }: TwitterEmbedProps) => {
+export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const playTrackedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  const trackXPlay = useCallback(() => {
-    if (!postId || playTrackedRef.current) return;
-    playTrackedRef.current = true;
-    trackVideoPlayBeacon(postId, authorUserId).catch(() => {
-      playTrackedRef.current = false;
-    });
-  }, [postId, authorUserId]);
-
   useEffect(() => {
-    playTrackedRef.current = false;
-  }, [url, postId]);
-
-  useEffect(() => {
-    let twitterClickHandler: ((event: any) => void) | null = null;
-
     const loadEmbed = async () => {
       try {
         const tweetId = extractTweetId(url);
@@ -94,16 +71,6 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap }: Twitt
           if (!tweet) {
             setError(true);
           } else {
-            if (window.twttr?.events?.bind) {
-              twitterClickHandler = (event: any) => {
-                const target = event?.target;
-                if (target instanceof Node && containerRef.current?.contains(target)) {
-                  trackXPlay();
-                }
-              };
-              window.twttr.events.bind('click', twitterClickHandler);
-            }
-
             // Dispatch a custom event so HydratedFeedPost can detect readiness
             // immediately without waiting for MutationObserver cycles
             containerRef.current?.dispatchEvent(
@@ -120,13 +87,7 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap }: Twitt
     };
 
     loadEmbed();
-
-    return () => {
-      if (twitterClickHandler && window.twttr?.events?.unbind) {
-        window.twttr.events.unbind('click', twitterClickHandler);
-      }
-    };
-  }, [url, trackXPlay]);
+  }, [url]);
 
   if (error) {
     return (
@@ -145,16 +106,7 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap }: Twitt
             Unable to load this post
           </p>
           <Button variant="outline" size="sm" asChild>
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(event) => {
-                if (!onOriginalTap) return;
-                event.preventDefault();
-                onOriginalTap();
-              }}
-            >
+            <a href={url} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="w-4 h-4 mr-2" />
               View on X
             </a>
@@ -165,13 +117,7 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap }: Twitt
   }
 
   return (
-    <div
-      className="relative"
-      data-embed-status={loading ? 'loading' : 'ready'}
-      onPointerDownCapture={trackXPlay}
-      onTouchStartCapture={trackXPlay}
-      onFocusCapture={trackXPlay}
-    >
+    <div className="relative" data-embed-status={loading ? 'loading' : 'ready'}>
       {loading && (
         <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       )}

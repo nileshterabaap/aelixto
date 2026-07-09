@@ -14,7 +14,6 @@ import { PageTransition } from "@/components/PageTransition";
 import { KeepAliveRoutes } from "@/components/KeepAliveRoutes";
 import { PersistentBottomNav } from "@/components/PersistentBottomNav";
 import { persistOptions } from "@/lib/queryPersister";
-import { registerAelixScoreQueryClient } from "@/lib/aelixScoreOptimism";
 import Index from "./pages/Index";
 import Discover from "./pages/Discover";
 import Notifications from "./pages/Notifications";
@@ -50,8 +49,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-registerAelixScoreQueryClient(queryClient);
 
 // Preload embed SDKs and core data immediately
 preloadEmbedSDKs();
