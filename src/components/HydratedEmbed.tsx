@@ -152,7 +152,7 @@ export const HydratedEmbed = memo(({
 
   // Track click-throughs to the original platform (iframe focus or anchor clicks).
   // Awards +1 engagement score to the author on top of the impression score.
-  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate && !isThreadsPost, isPlayableMediaPost, authorUserId);
+  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate && !isThreadsPost && !isXPost, isPlayableMediaPost, authorUserId);
 
   const forceTwitterRenderer =
     r.kind === 'raw' &&
