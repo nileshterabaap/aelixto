@@ -231,12 +231,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
     }
   }, [post.id, post.isRealPost, mediaUrl]);
 
-  const handleXOriginalVisit = useCallback(() => {
-    if (post.isRealPost) {
-      markOriginalVisit(post.id, (post as any).user_id || null);
-    }
-  }, [post.id, post.isRealPost]);
-  
   // Always call hooks unconditionally (React rules of hooks)
   const postActionsResult = usePostActions(post.id, userId || '');
   const repostActionsResult = useRepost(post.id, userId || '');
