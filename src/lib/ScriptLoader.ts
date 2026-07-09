@@ -120,28 +120,7 @@ export const clearScriptCache = (src: string) => {
 };
 
 // Twitter/X embed script loader
-export const loadTwitterEmbed = (): Promise<void> => {
-  const scriptUrl = 'https://platform.twitter.com/widgets.js';
-  if (window.twttr?.widgets) return Promise.resolve();
-
-  return new Promise((resolve, reject) => {
-    loadScript(scriptUrl).catch(reject);
-
-    const startedAt = Date.now();
-    const check = window.setInterval(() => {
-      if (window.twttr?.widgets) {
-        window.clearInterval(check);
-        resolve();
-        return;
-      }
-
-      if (Date.now() - startedAt > 4000) {
-        window.clearInterval(check);
-        reject(new Error('Twitter SDK timeout'));
-      }
-    }, 50);
-  });
-};
+export const loadTwitterEmbed = () => loadScript('https://platform.twitter.com/widgets.js');
 
 // Reddit embed script loader (official blockquote widget)
 export const loadRedditEmbed = (): Promise<void> => {
@@ -194,16 +173,6 @@ export const preloadEmbedSDKs = () => {
 // Type declarations for global window objects
 declare global {
   interface Window {
-    twttr?: {
-      widgets?: {
-        load?: (element?: HTMLElement) => void;
-        createTweet?: (
-          tweetId: string,
-          container: HTMLElement,
-          options?: any
-        ) => Promise<HTMLElement | undefined>;
-      };
-    };
     FB?: {
       XFBML?: {
         parse: (element?: HTMLElement) => void;

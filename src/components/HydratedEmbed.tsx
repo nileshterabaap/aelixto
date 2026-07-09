@@ -12,7 +12,6 @@ import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
 import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
 import { openExternalUrl } from '@/lib/openExternalUrl';
-import { getThumbnailText } from '@/lib/getThumbnailText';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -366,12 +365,7 @@ export const HydratedEmbed = memo(({
         {/* Fallback routing for legacy raw payloads */}
         {forceTwitterRenderer && mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <TwitterEmbed
-              url={mediaUrl}
-              fallbackText={getThumbnailText(post as any)}
-              authorName={post.author?.name}
-              username={post.author?.username}
-            />
+            <TwitterEmbed url={mediaUrl} />
           </ImageViewTracker>
         )}
 
@@ -404,12 +398,7 @@ export const HydratedEmbed = memo(({
         {/* Twitter/X embed */}
         {r.kind === 'twitter' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <TwitterEmbed
-              url={r.url}
-              fallbackText={getThumbnailText(post as any)}
-              authorName={post.author?.name}
-              username={post.author?.username}
-            />
+            <TwitterEmbed url={r.url} />
           </ImageViewTracker>
         )}
         
