@@ -609,7 +609,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                     postId={post.id}
                     authorUserId={(post as any).user_id || null}
                     onOriginalTap={handleXOriginalTap}
-                    onOriginalVisit={handleXOriginalVisit}
                   />
                 </ImageViewTracker>
               </LazyEmbed>
@@ -626,7 +625,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                   postId={post.id}
                   authorUserId={(post as any).user_id || null}
                   onOriginalTap={handleXOriginalTap}
-                  onOriginalVisit={handleXOriginalVisit}
                 />
               </LazyEmbed>
             )}

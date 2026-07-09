@@ -10,7 +10,6 @@ interface TwitterEmbedProps {
   postId?: string | null;
   authorUserId?: string | null;
   onOriginalTap?: () => void;
-  onOriginalVisit?: () => void;
 }
 
 declare global {
@@ -45,7 +44,7 @@ const extractTweetId = (url: string): string | null => {
   return null;
 };
 
-export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOriginalVisit }: TwitterEmbedProps) => {
+export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap }: TwitterEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const playTrackedRef = useRef(false);
   const [loading, setLoading] = useState(true);
