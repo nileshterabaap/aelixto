@@ -3,24 +3,6 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pin, PinOff, MoreVertical, EyeOff, Eye, MessageCircleOff, MessageCircle as MessageCircleOn, Pencil, Trash2 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { usePostActions } from "@/hooks/usePostActions";
-import { useSession } from "@/hooks/useSession";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 import { getThumbnailText } from "@/lib/getThumbnailText";
@@ -40,119 +22,6 @@ import ExternalIcon from "@/assets/platforms/external.svg";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 import { PlatformPostViewer } from "./PlatformPostViewer";
 
-function PostCardOwnerMenu({ post }: { post: PlatformPost }) {
-  const { user } = useSession();
-  const ownerId = post.is_repost ? (post.profile_owner_id || post.user_id) : post.user_id;
-  const isOwner = !!user?.id && ownerId === user.id;
-  const actions = usePostActions(post.id, user?.id, { isRepost: !!post.is_repost });
-  const [editOpen, setEditOpen] = useState(false);
-  const [editDraft, setEditDraft] = useState(post.content || "");
-  useEffect(() => { setEditDraft(post.content || ""); }, [post.id, post.content]);
-  if (!isOwner) return null;
-
-  const isPinned = !!post.pinned_at;
-  const hideCounts = !!post.hide_counts;
-  const commentsDisabled = !!post.comments_disabled;
-  const togglePin = (actions as any).togglePin as ((v: { pinned: boolean; platform?: string | null }) => void) | undefined;
-  const toggleHideCounts = (actions as any).toggleHideCounts as ((v: boolean) => void) | undefined;
-  const toggleCommentsDisabled = (actions as any).toggleCommentsDisabled as ((v: boolean) => void) | undefined;
-  const editCaption = (actions as any).editCaption as ((v: string) => void) | undefined;
-
-  return (
-    <div
-      className="absolute top-2 right-2 z-20"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            aria-label="Post options"
-            className="grid place-items-center h-8 w-8 rounded-full bg-black/45 backdrop-blur-sm text-white hover:bg-black/60"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="bg-background z-[100] w-56">
-          {!post.is_repost && togglePin && (
-            <DropdownMenuItem
-              onClick={() => togglePin({ pinned: !isPinned, platform: post.platform })}
-              className="cursor-pointer"
-            >
-              {isPinned ? (
-                <><PinOff className="h-4 w-4 mr-2" />Unpin from profile</>
-              ) : (
-                <><Pin className="h-4 w-4 mr-2" />Pin to profile</>
-              )}
-            </DropdownMenuItem>
-          )}
-          {toggleHideCounts && (
-            <DropdownMenuItem onClick={() => toggleHideCounts(!hideCounts)} className="cursor-pointer">
-              {hideCounts ? (
-                <><Eye className="h-4 w-4 mr-2" />Show interaction count</>
-              ) : (
-                <><EyeOff className="h-4 w-4 mr-2" />Hide interaction count</>
-              )}
-            </DropdownMenuItem>
-          )}
-          {toggleCommentsDisabled && (
-            <DropdownMenuItem onClick={() => toggleCommentsDisabled(!commentsDisabled)} className="cursor-pointer">
-              {commentsDisabled ? (
-                <><MessageCircleOn className="h-4 w-4 mr-2" />Turn on commenting</>
-              ) : (
-                <><MessageCircleOff className="h-4 w-4 mr-2" />Turn off commenting</>
-              )}
-            </DropdownMenuItem>
-          )}
-          {editCaption && (
-            <DropdownMenuItem onClick={() => setEditOpen(true)} className="cursor-pointer">
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit caption
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => actions.deletePost()}
-            disabled={actions.isDeleting}
-            className="text-destructive focus:text-destructive cursor-pointer"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {editCaption && (
-        <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent className="max-w-lg" onClick={(e) => e.stopPropagation()}>
-            <DialogHeader>
-              <DialogTitle>Edit caption</DialogTitle>
-            </DialogHeader>
-            <Textarea
-              value={editDraft}
-              onChange={(e) => setEditDraft(e.target.value)}
-              rows={6}
-              maxLength={2200}
-              placeholder="Write a caption..."
-            />
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
-              <Button
-                onClick={() => {
-                  editCaption(editDraft.trim());
-                  setEditOpen(false);
-                }}
-              >
-                Save
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-    </div>
-  );
-}
-
 function PostCard({ post, onClick }: { 
   post: PlatformPost; 
   onClick: () => void;
@@ -160,14 +29,6 @@ function PostCard({ post, onClick }: {
 }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const isPinned = !!post.pinned_at;
-
-  const PinBadge = () =>
-    isPinned ? (
-      <div className="absolute top-2 left-2 z-10 grid place-items-center h-7 w-7 rounded-full bg-black/40 backdrop-blur-sm">
-        <Pin className="h-3.5 w-3.5 text-neutral-300 fill-neutral-300" style={{ transform: 'rotate(45deg)' }} />
-      </div>
-    ) : null;
   
   // YouTube uses 16:9, all others use 3:4 portrait
   const getAspectRatio = () => post.platform === "youtube" ? "aspect-video" : "aspect-[3/4]";
@@ -245,16 +106,14 @@ function PostCard({ post, onClick }: {
   // Show platform-branded fallback when no thumbnail or image error
   if (!src || src === "/placeholder.svg") {
     const textSource = getThumbnailText(post);
-    // Threads (like X and Reddit) should always render a branded text card
-    // instead of falling back to the author's profile picture.
-    const useProfileFallback = false;
+    const useProfileFallback =
+      !textSource && ["threads", "x", "twitter"].includes(platform);
     const aspect = getAspectRatio();
     return (
       <button
         onClick={onClick}
-        className={`press-in relative overflow-hidden rounded-2xl ${aspect} block w-full bg-muted/70`}
+        className={`relative overflow-hidden rounded-2xl ${aspect} block w-full bg-muted/70`}
       >
-        <PinBadge />
         <TextCardThumbnail
           platform={post.platform}
           text={textSource}
@@ -264,7 +123,6 @@ function PostCard({ post, onClick }: {
           preferProfile={useProfileFallback}
           aspect={aspect}
         />
-        <PostCardOwnerMenu post={post} />
       </button>
     );
   }
@@ -272,9 +130,8 @@ function PostCard({ post, onClick }: {
   return (
     <button
       onClick={onClick}
-      className={`press-in relative overflow-hidden rounded-2xl ${getAspectRatio()} block w-full bg-muted/70 group`}
+      className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} block w-full bg-muted/70 group`}
     >
-      <PinBadge />
       {!imageLoaded && (
         <div
           className="absolute inset-0 bg-muted/70 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/40 before:to-transparent before:animate-shimmer"
@@ -299,7 +156,6 @@ function PostCard({ post, onClick }: {
           </div>
         </div>
       )}
-      <PostCardOwnerMenu post={post} />
     </button>
   );
 }

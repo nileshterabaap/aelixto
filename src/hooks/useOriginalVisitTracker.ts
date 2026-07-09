@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { trackOriginalVisit, trackView, trackVideoPlayBeacon } from '@/hooks/useViewTracking';
+import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
 
 /**
  * Detects when the user taps/clicks into an embedded iframe or an outbound
@@ -51,16 +51,6 @@ export function useOriginalVisitTracker(
       }
     };
 
-    const firePlayBeacon = () => {
-      if (trackPlayableInteraction && !playFiredRef.current) {
-        playFiredRef.current = true;
-        // Fire-and-forget beacon; survives backgrounding/native app hand-off.
-        trackVideoPlayBeacon(postId).catch(() => {
-          playFiredRef.current = false;
-        });
-      }
-    };
-
     const fireOriginal = () => {
       if (firedRef.current) return;
       firedRef.current = true;
@@ -71,11 +61,17 @@ export function useOriginalVisitTracker(
     };
 
     const scheduleOriginalFromPlayableDwell = () => {
-      // Intentionally a no-op: "Visited the original source" must only fire
-      // when the user actually leaves the app for the source platform (anchor
-      // click, tab hidden, blur to iframe on non-playable). Watching a video
-      // inline should count as Play (+1) only, not Play + Visit.
-      return;
+      if (!trackPlayableInteraction || firedRef.current || originalDwellTimerRef.current) return;
+      originalDwellTimerRef.current = setTimeout(() => {
+        originalDwellTimerRef.current = null;
+        // Cross-origin Instagram/TikTok/etc. controls do not reliably bubble
+        // their "open original" tap to the parent page. If a playable embed has
+        // focus long enough to be watched, record the original-platform
+        // engagement so reels don't get stuck at impression/play only.
+        if (playFiredRef.current && document.visibilityState === 'visible') {
+          fireOriginal();
+        }
+      }, 3500);
     };
 
     const isInsideIframe = (node: EventTarget | null): boolean => {
@@ -87,18 +83,17 @@ export function useOriginalVisitTracker(
     const onPointerDown = (e: Event) => {
       const now = Date.now();
       recentPointerRef.current = now;
-      const insideIframe = isInsideIframe(e.target);
-      if (trackPlayableInteraction) {
-        // Playable posts: a tap anywhere inside the hydrated embed counts as
-        // Play (+1). Some platforms (Threads, TikTok, X) overlay tap targets
-        // on top of the iframe, so the pointerdown target isn't the iframe
-        // itself even when the user is clearly hitting the video. Guarded
-        // once-per-post by `playFiredRef` so accidental container taps still
-        // only credit a single play.
-        firePlay();
-        if (insideIframe) lastIframeInteractionRef.current = now;
-      } else if (insideIframe) {
-        fireOriginal();
+      if (isInsideIframe(e.target)) {
+        if (trackPlayableInteraction) {
+          firePlay();
+          scheduleOriginalFromPlayableDwell();
+          if (playFiredRef.current && lastIframeInteractionRef.current > 0 && now - lastIframeInteractionRef.current > 1200) {
+            fireOriginal();
+          }
+          lastIframeInteractionRef.current = now;
+        } else {
+          fireOriginal();
+        }
       }
     };
 
@@ -114,7 +109,12 @@ export function useOriginalVisitTracker(
           el.contains(active)
         ) {
           if (trackPlayableInteraction) {
-            firePlay();
+            if (playFiredRef.current && lastIframeInteractionRef.current > 0 && now - lastIframeInteractionRef.current > 1200) {
+              fireOriginal();
+            } else {
+              firePlay();
+              scheduleOriginalFromPlayableDwell();
+            }
             lastIframeInteractionRef.current = now;
           } else {
             fireOriginal();
@@ -125,18 +125,14 @@ export function useOriginalVisitTracker(
 
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'hidden') return;
+      // If the page hid within ~3s of a pointerdown on this embed, the user
+      // likely tapped through to a native app / new tab.
       const now = Date.now();
-      const recentTap =
+      if (
         now - recentPointerRef.current < 3000 ||
-        now - lastIframeInteractionRef.current < 10000;
-      if (trackPlayableInteraction) {
-        // Playable posts on some platforms (Threads) hand the tap off to the
-        // native app instead of playing inline — the pending `trackView` fetch
-        // gets aborted when the tab hides. Use a beacon so the insert lands.
-        if (recentTap) firePlayBeacon();
-        return;
-      }
-      if (recentTap) {
+        now - lastIframeInteractionRef.current < 10000 ||
+        (trackPlayableInteraction && playFiredRef.current)
+      ) {
         fireOriginal();
       }
     };
@@ -155,7 +151,12 @@ export function useOriginalVisitTracker(
     const handleIframeFocus = () => {
       const now = Date.now();
       if (trackPlayableInteraction) {
-        firePlay();
+        if (playFiredRef.current && lastIframeInteractionRef.current > 0 && now - lastIframeInteractionRef.current > 1200) {
+          fireOriginal();
+        } else {
+          firePlay();
+          scheduleOriginalFromPlayableDwell();
+        }
         lastIframeInteractionRef.current = now;
       } else {
         fireOriginal();
@@ -164,17 +165,6 @@ export function useOriginalVisitTracker(
 
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
       iframe.addEventListener('focus', handleIframeFocus);
-      // Some platforms (Threads) swallow pointer events on the iframe so they
-      // never bubble to the container. Listen on the iframe itself too.
-      const onIframePointer = () => {
-        const now = Date.now();
-        recentPointerRef.current = now;
-        lastIframeInteractionRef.current = now;
-        if (trackPlayableInteraction) firePlay();
-        else fireOriginal();
-      };
-      iframe.addEventListener('pointerdown', onIframePointer, true);
-      iframe.addEventListener('touchstart', onIframePointer, { capture: true, passive: true });
       iframe.addEventListener('load', () => {
         try {
           iframe.contentWindow?.addEventListener?.('focus', handleIframeFocus);

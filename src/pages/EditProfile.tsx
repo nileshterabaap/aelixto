@@ -50,23 +50,6 @@ const EditProfile = () => {
     };
   }, []);
 
-  // Close info tooltip when tapping/clicking anywhere
-  useEffect(() => {
-    if (!showInfoTooltip) return;
-    const close = () => {
-      if (infoTimeoutRef.current) clearTimeout(infoTimeoutRef.current);
-      setShowInfoTooltip(false);
-    };
-    // Delay attach so the opening tap doesn't immediately close it
-    const t = setTimeout(() => {
-      document.addEventListener('pointerdown', close, true);
-    }, 0);
-    return () => {
-      clearTimeout(t);
-      document.removeEventListener('pointerdown', close, true);
-    };
-  }, [showInfoTooltip]);
-
   // Check ownership and redirect if not owner
   useEffect(() => {
     if (!loading && profile && user && user.id !== profile.user_id) {
@@ -86,9 +69,7 @@ const EditProfile = () => {
       });
       // Load Aelix Score preference from settings
       const settings = profile.settings as any;
-      // Score visibility is opt-in — default OFF unless the user has
-      // explicitly enabled it. Matches the display gate in UserProfile.
-      setAelixScoreEnabled(settings?.aelix_score_enabled === true);
+      setAelixScoreEnabled(settings?.aelix_score_enabled !== false);
     }
   }, [profile]);
 
@@ -349,9 +330,9 @@ const EditProfile = () => {
                   <div className="absolute left-0 top-full mt-2 z-50 max-w-xs rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95">
                     <p>Aelix Score represents the total engagement earned by your shared posts.</p>
                     <ul className="list-disc pl-4 space-y-0.5 mt-1">
-                      <li>Viewed a shared post (+1)</li>
-                      <li>Played shared content (+1)</li>
-                      <li>Visited the original source (+1)</li>
+                      <li>View a shared post (+1)</li>
+                      <li>Play shared content (+1)</li>
+                      <li>Visit the original source (+1)</li>
                     </ul>
                   </div>
                 )}

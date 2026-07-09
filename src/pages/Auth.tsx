@@ -24,20 +24,9 @@ const GoogleIcon = () => (
   </svg>
 );
 
-const AppleIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
-    <path d="M16.365 1.43c0 1.14-.42 2.22-1.19 3.02-.82.87-2.17 1.55-3.27 1.46-.14-1.11.43-2.28 1.16-3.03.82-.85 2.24-1.48 3.3-1.45zM20.5 17.14c-.55 1.27-.81 1.83-1.52 2.95-.98 1.55-2.37 3.48-4.09 3.5-1.53.01-1.92-.99-4-.98-2.08.01-2.51 1-4.04.98-1.72-.02-3.03-1.77-4.02-3.32C.09 15.9-.2 10.87 1.62 8.19c1.29-1.9 3.33-3.02 5.24-3.02 1.95 0 3.17 1.07 4.78 1.07 1.56 0 2.51-1.07 4.77-1.07 1.71 0 3.51.93 4.79 2.55-4.21 2.31-3.52 8.33-.7 9.42z"/>
-  </svg>
-);
-
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  // Hide Apple sign-in on Android. Apple's guidelines require the native
-  // Apple sheet on iOS, and non-Apple platforms should not offer this option
-  // (matches how other apps behave).
-  const showApple =
-    !(Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
@@ -369,41 +358,6 @@ const Auth = () => {
     }
   };
 
-  const handleAppleSignIn = async () => {
-    try {
-      const result = await lovable.auth.signInWithOAuth("apple", {
-        redirect_uri: `${window.location.origin}/auth`,
-      });
-      if (result.error) {
-        toast({
-          title: "Apple sign-in failed",
-          description: result.error.message || "Please try again.",
-          variant: "destructive",
-        });
-      }
-    } catch (e) {
-      toast({
-        title: "Apple sign-in failed",
-        description: (e as Error)?.message || "Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  // While the initial Supabase session probe is running, render nothing so
-  // the splash screen (kept alive in main.tsx) covers the wait. Otherwise
-  // signed-in users would see the auth form flash for ~1s before the
-  // navigate("/") fires.
-  const [sessionChecked, setSessionChecked] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    supabase.auth.getSession().then(() => {
-      if (!cancelled) setSessionChecked(true);
-    });
-    return () => { cancelled = true; };
-  }, []);
-  if (!sessionChecked || user) return null;
-
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-background p-5 overflow-hidden">
       <div className="relative w-full max-w-md">
@@ -535,19 +489,6 @@ const Auth = () => {
                 <GoogleIcon />
                 Continue with Google
               </Button>
-
-              {showApple && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
-                  onClick={handleAppleSignIn}
-                  disabled={loading}
-                >
-                  <AppleIcon />
-                  Continue with Apple
-                </Button>
-              )}
             </form>
           </TabsContent>
 
@@ -615,19 +556,6 @@ const Auth = () => {
                 <GoogleIcon />
                 Continue with Google
               </Button>
-
-              {showApple && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
-                  onClick={handleAppleSignIn}
-                  disabled={loading}
-                >
-                  <AppleIcon />
-                  Continue with Apple
-                </Button>
-              )}
             </form>
           </TabsContent>
         </Tabs>
