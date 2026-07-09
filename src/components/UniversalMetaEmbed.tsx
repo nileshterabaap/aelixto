@@ -1099,7 +1099,6 @@ export const UniversalMetaEmbed = ({ url, postId, authorUserId, suggestedHeight 
           <TikTokIframeEmbed
             src={iframeSrc}
             postId={postId}
-            authorUserId={authorUserId}
             suggestedHeight={suggestedHeight}
           />
         );
@@ -1129,6 +1128,7 @@ export const UniversalMetaEmbed = ({ url, postId, authorUserId, suggestedHeight 
             expandedUrl={expandedUrl}
             fallbackData={fallbackData}
             postId={postId}
+            authorUserId={authorUserId}
             suggestedHeight={suggestedHeight}
           />
         );
