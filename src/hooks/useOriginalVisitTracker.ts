@@ -19,6 +19,7 @@ export function useOriginalVisitTracker(
   postId: string,
   enabled: boolean = true,
   trackPlayableInteraction: boolean = false,
+  treatAnyTapAsExit: boolean = false,
 ) {
   const firedRef = useRef(false);
   const playFiredRef = useRef(false);
@@ -70,6 +71,15 @@ export function useOriginalVisitTracker(
       });
     };
 
+    const fireOriginalBeacon = () => {
+      if (firedRef.current) return;
+      firedRef.current = true;
+      // Beacon variant survives backgrounding / native-app hand-off.
+      trackOriginalVisit(postId).catch(() => {
+        firedRef.current = false;
+      });
+    };
+
     const scheduleOriginalFromPlayableDwell = () => {
       // Intentionally a no-op: "Visited the original source" must only fire
       // when the user actually leaves the app for the source platform (anchor
@@ -97,7 +107,13 @@ export function useOriginalVisitTracker(
         // only credit a single play.
         firePlay();
         if (insideIframe) lastIframeInteractionRef.current = now;
-      } else if (insideIframe) {
+      }
+      if (treatAnyTapAsExit) {
+        // X / Threads: any tap hands the user off to the platform. Fire the
+        // beacon variant so the insert survives backgrounding.
+        fireOriginalBeacon();
+        if (insideIframe) lastIframeInteractionRef.current = now;
+      } else if (!trackPlayableInteraction && insideIframe) {
         fireOriginal();
       }
     };
@@ -129,16 +145,10 @@ export function useOriginalVisitTracker(
       const recentTap =
         now - recentPointerRef.current < 3000 ||
         now - lastIframeInteractionRef.current < 10000;
-      if (trackPlayableInteraction) {
-        // Playable posts on some platforms (Threads) hand the tap off to the
-        // native app instead of playing inline — the pending `trackView` fetch
-        // gets aborted when the tab hides. Use a beacon so the insert lands.
-        if (recentTap) firePlayBeacon();
-        return;
-      }
-      if (recentTap) {
-        fireOriginal();
-      }
+      if (!recentTap) return;
+      if (trackPlayableInteraction) firePlayBeacon();
+      if (treatAnyTapAsExit) fireOriginalBeacon();
+      else if (!trackPlayableInteraction) fireOriginal();
     };
 
     // Fallback: explicit anchor/button clicks inside the embed (article CTAs,
@@ -157,7 +167,11 @@ export function useOriginalVisitTracker(
       if (trackPlayableInteraction) {
         firePlay();
         lastIframeInteractionRef.current = now;
-      } else {
+      }
+      if (treatAnyTapAsExit) {
+        fireOriginalBeacon();
+        lastIframeInteractionRef.current = now;
+      } else if (!trackPlayableInteraction) {
         fireOriginal();
       }
     };
@@ -171,7 +185,8 @@ export function useOriginalVisitTracker(
         recentPointerRef.current = now;
         lastIframeInteractionRef.current = now;
         if (trackPlayableInteraction) firePlay();
-        else fireOriginal();
+        if (treatAnyTapAsExit) fireOriginalBeacon();
+        else if (!trackPlayableInteraction) fireOriginal();
       };
       iframe.addEventListener('pointerdown', onIframePointer, true);
       iframe.addEventListener('touchstart', onIframePointer, { capture: true, passive: true });
