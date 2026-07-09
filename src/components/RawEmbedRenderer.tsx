@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed, clearScriptCache } from '@/lib/ScriptLoader';
-import { trackOriginalVisit, trackVideoPlayBeacon } from '@/hooks/useViewTracking';
+import { trackVideoPlayBeacon } from '@/hooks/useViewTracking';
 import DOMPurify from 'dompurify';
 
 /** Decode HTML entities (&#064; → @, &#039; → ', etc.) using DOMParser */
@@ -230,7 +230,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit, postId, 
   const lastTapRef = useRef<number>(0);
   const hasProcessedRef = useRef(false);
   const playTrackedRef = useRef(false);
-  const visitTrackedRef = useRef(false);
   const recentIntentRef = useRef(0);
   const [embedFailed, setEmbedFailed] = useState(false);
   const platform = detectPlatform(embedHtml);
@@ -251,14 +250,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit, postId, 
     });
   }, [postId, authorUserId]);
 
-  const trackThreadsVisit = useCallback(() => {
-    if (!postId || visitTrackedRef.current) return;
-    visitTrackedRef.current = true;
-    trackOriginalVisit(postId, authorUserId).catch(() => {
-      visitTrackedRef.current = false;
-    });
-  }, [postId, authorUserId]);
-
   const handleThreadsInteraction = useCallback(() => {
     recentIntentRef.current = Date.now();
     trackThreadsPlay();
@@ -266,7 +257,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit, postId, 
 
   useEffect(() => {
     playTrackedRef.current = false;
-    visitTrackedRef.current = false;
     recentIntentRef.current = 0;
   }, [embedHtml, postId]);
 
@@ -277,13 +267,12 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit, postId, 
       if (document.visibilityState !== 'hidden') return;
       if (Date.now() - recentIntentRef.current < 3000) {
         trackThreadsPlay();
-        trackThreadsVisit();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [platform, trackThreadsPlay, trackThreadsVisit]);
+  }, [platform, trackThreadsPlay]);
 
 
   // Extract URL from embed HTML for double-tap redirection
