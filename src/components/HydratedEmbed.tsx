@@ -362,7 +362,6 @@ export const HydratedEmbed = memo(({
               postId={post.id}
               authorUserId={authorUserId}
               onOriginalTap={handleXOriginalTap}
-              onOriginalVisit={handleOriginalVisit}
             />
           </ImageViewTracker>
         )}
@@ -407,7 +406,6 @@ export const HydratedEmbed = memo(({
               postId={post.id}
               authorUserId={authorUserId}
               onOriginalTap={handleXOriginalTap}
-              onOriginalVisit={handleOriginalVisit}
             />
           </ImageViewTracker>
         )}

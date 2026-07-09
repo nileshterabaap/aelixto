@@ -3,14 +3,13 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 import { loadTwitterEmbed } from "@/lib/ScriptLoader";
-import { trackOriginalVisit, trackVideoPlayBeacon } from "@/hooks/useViewTracking";
+import { trackVideoPlayBeacon } from "@/hooks/useViewTracking";
 
 interface TwitterEmbedProps {
   url: string;
   postId?: string | null;
   authorUserId?: string | null;
   onOriginalTap?: () => void;
-  onOriginalVisit?: () => void;
 }
 
 declare global {
@@ -45,10 +44,9 @@ const extractTweetId = (url: string): string | null => {
   return null;
 };
 
-export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOriginalVisit }: TwitterEmbedProps) => {
+export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap }: TwitterEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const playTrackedRef = useRef(false);
-  const visitTrackedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -60,21 +58,8 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOrigi
     });
   }, [postId, authorUserId]);
 
-  const trackXVisit = useCallback(() => {
-    if (!postId || visitTrackedRef.current) return;
-    visitTrackedRef.current = true;
-    if (onOriginalVisit) {
-      onOriginalVisit();
-      return;
-    }
-    trackOriginalVisit(postId, authorUserId).catch(() => {
-      visitTrackedRef.current = false;
-    });
-  }, [postId, authorUserId, onOriginalVisit]);
-
   useEffect(() => {
     playTrackedRef.current = false;
-    visitTrackedRef.current = false;
   }, [url, postId]);
 
   useEffect(() => {
@@ -109,12 +94,11 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOrigi
           if (!tweet) {
             setError(true);
           } else {
-            if (onOriginalVisit && window.twttr?.events?.bind) {
+            if (window.twttr?.events?.bind) {
               twitterClickHandler = (event: any) => {
                 const target = event?.target;
                 if (target instanceof Node && containerRef.current?.contains(target)) {
                   trackXPlay();
-                  trackXVisit();
                 }
               };
               window.twttr.events.bind('click', twitterClickHandler);
@@ -142,7 +126,7 @@ export const TwitterEmbed = ({ url, postId, authorUserId, onOriginalTap, onOrigi
         window.twttr.events.unbind('click', twitterClickHandler);
       }
     };
-  }, [url, trackXPlay, trackXVisit]);
+  }, [url, trackXPlay]);
 
   if (error) {
     return (

@@ -5,30 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { openExternalUrl } from '@/lib/openExternalUrl';
-import { trackOriginalVisit, trackVideoPlayBeacon } from '@/hooks/useViewTracking';
-
-/**
- * Small pill-shaped overlay button rendered on top of an embed iframe so
- * the user can always open the original post on its source platform, even
- * when the iframe swallows every tap. Positioned so it never covers the
- * platform's native Play button (top-right corner).
- */
-const OpenOriginalPill = ({ url, label }: { url: string; label: string }) => {
-  if (!url) return null;
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        void openExternalUrl(url);
-      }}
-      className="absolute top-2 right-2 z-10 rounded-full bg-black/55 backdrop-blur-sm text-white text-[11px] font-medium px-2.5 py-1 shadow-sm active:scale-95 transition-transform pointer-events-auto"
-      aria-label={label}
-    >
-      {label}
-    </button>
-  );
-};
+import { trackVideoPlayBeacon } from '@/hooks/useViewTracking';
 
 const THREADS_MIN_HEIGHT = 220;
 const THREADS_MAX_HEIGHT = 1400;
@@ -113,7 +90,6 @@ const ThreadsIframeEmbed = ({
   const [hasLoaded, setHasLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const playTrackedRef = useRef(false);
-  const visitTrackedRef = useRef(false);
   const recentIntentRef = useRef(0);
   const persistHeight = usePersistEmbedHeight(postId);
 
@@ -123,15 +99,6 @@ const ThreadsIframeEmbed = ({
       playTrackedRef.current = true;
       trackVideoPlayBeacon(postId, authorUserId).catch(() => {
         playTrackedRef.current = false;
-      });
-    }
-  }, [postId, authorUserId]);
-
-  const trackThreadsVisit = useCallback(() => {
-    if (postId && !visitTrackedRef.current) {
-      visitTrackedRef.current = true;
-      trackOriginalVisit(postId, authorUserId).catch(() => {
-        visitTrackedRef.current = false;
       });
     }
   }, [postId, authorUserId]);
@@ -164,7 +131,6 @@ const ThreadsIframeEmbed = ({
 
   useEffect(() => {
     playTrackedRef.current = false;
-    visitTrackedRef.current = false;
     recentIntentRef.current = 0;
   }, [postId, src]);
 
@@ -173,13 +139,12 @@ const ThreadsIframeEmbed = ({
       if (document.visibilityState !== 'hidden') return;
       if (Date.now() - recentIntentRef.current < 3000) {
         trackThreadsPlay();
-        trackThreadsVisit();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [trackThreadsPlay, trackThreadsVisit]);
+  }, [trackThreadsPlay]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
