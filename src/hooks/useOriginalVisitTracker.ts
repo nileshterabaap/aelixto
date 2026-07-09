@@ -146,6 +146,10 @@ export function useOriginalVisitTracker(
         // native app instead of playing inline — the pending `trackView` fetch
         // gets aborted when the tab hides. Use a beacon so the insert lands.
         if (recentTap && (!playFiredRef.current || playRequestInFlightRef.current)) firePlayBeacon();
+        // If the page actually backgrounds after an embed interaction, the
+        // user did not only play inline — they left Aelixto for the source
+        // platform. Count the source visit separately and immediately.
+        if (recentTap) fireOriginal();
         return;
       }
       if (recentTap) {

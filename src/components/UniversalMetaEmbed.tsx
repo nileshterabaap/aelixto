@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { openExternalUrl } from '@/lib/openExternalUrl';
-import { trackVideoPlayBeacon } from '@/hooks/useViewTracking';
+import { trackOriginalVisit, trackVideoPlayBeacon } from '@/hooks/useViewTracking';
 
 /**
  * Small pill-shaped overlay button rendered on top of an embed iframe so
@@ -113,9 +113,12 @@ const ThreadsIframeEmbed = ({
   const [hasLoaded, setHasLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const playTrackedRef = useRef(false);
+  const visitTrackedRef = useRef(false);
+  const recentIntentRef = useRef(0);
   const persistHeight = usePersistEmbedHeight(postId);
 
   const trackThreadsPlay = useCallback(() => {
+    recentIntentRef.current = Date.now();
     if (postId && !playTrackedRef.current) {
       playTrackedRef.current = true;
       trackVideoPlayBeacon(postId, authorUserId).catch(() => {
@@ -123,6 +126,20 @@ const ThreadsIframeEmbed = ({
       });
     }
   }, [postId, authorUserId]);
+
+  const trackThreadsVisit = useCallback(() => {
+    if (postId && !visitTrackedRef.current) {
+      visitTrackedRef.current = true;
+      trackOriginalVisit(postId, authorUserId).catch(() => {
+        visitTrackedRef.current = false;
+      });
+    }
+  }, [postId, authorUserId]);
+
+  const handleThreadsInteraction = useCallback(() => {
+    recentIntentRef.current = Date.now();
+    trackThreadsPlay();
+  }, [trackThreadsPlay]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -146,35 +163,36 @@ const ThreadsIframeEmbed = ({
   }, []);
 
   useEffect(() => {
-    const root = iframeRef.current?.parentElement;
-    if (!root || !postId) return;
+    playTrackedRef.current = false;
+    visitTrackedRef.current = false;
+    recentIntentRef.current = 0;
+  }, [postId, src]);
 
-    let dwellTimer: number | null = null;
-    const clearDwell = () => {
-      if (dwellTimer) {
-        window.clearTimeout(dwellTimer);
-        dwellTimer = null;
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'hidden') return;
+      if (Date.now() - recentIntentRef.current < 3000) {
+        trackThreadsPlay();
+        trackThreadsVisit();
       }
     };
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && entry.intersectionRatio >= 0.65) {
-          clearDwell();
-          dwellTimer = window.setTimeout(trackThreadsPlay, 1800);
-        } else {
-          clearDwell();
+    const handleWindowBlur = () => {
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (active?.tagName === 'IFRAME' && iframeRef.current === active) {
+          handleThreadsInteraction();
         }
-      },
-      { threshold: [0, 0.65] }
-    );
-
-    observer.observe(root);
-    return () => {
-      clearDwell();
-      observer.disconnect();
+      }, 0);
     };
-  }, [postId, trackThreadsPlay]);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [handleThreadsInteraction, trackThreadsPlay, trackThreadsVisit]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -202,6 +220,8 @@ const ThreadsIframeEmbed = ({
     <div
       className="relative w-full overflow-hidden"
       style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
+      onPointerDownCapture={handleThreadsInteraction}
+      onTouchStartCapture={handleThreadsInteraction}
     >
       <iframe
         ref={iframeRef}
@@ -210,9 +230,7 @@ const ThreadsIframeEmbed = ({
         allowFullScreen
         allow="encrypted-media"
         loading="lazy"
-        onPointerDown={trackThreadsPlay}
-        onTouchStart={trackThreadsPlay}
-        onFocus={trackThreadsPlay}
+        onFocus={handleThreadsInteraction}
         onLoad={() => setHasLoaded(true)}
         onError={() => setFailed(true)}
         style={{
@@ -1146,6 +1164,8 @@ export const UniversalMetaEmbed = ({ url, postId, authorUserId, suggestedHeight 
       <div onClick={handleDoubleTap}>
         <RawEmbedRenderer
           embedHtml={embedHtml}
+          postId={postId}
+          authorUserId={authorUserId}
           onError={() => {
             
             setShowFallback(true);

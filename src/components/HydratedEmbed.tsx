@@ -103,10 +103,14 @@ export const HydratedEmbed = memo(({
     platformHint === 'twitter' ||
     lowerUrl.includes('twitter.com/') ||
     lowerUrl.includes('x.com/');
+  const isThreadsPost =
+    platformHint === 'threads' ||
+    lowerUrl.includes('threads.net/') ||
+    lowerUrl.includes('threads.com/');
 
   const isPlayableMediaPost =
-    !isXPost &&
-    (mediaTypeHint === 'video' ||
+    isXPost ||
+    mediaTypeHint === 'video' ||
       mediaTypeHint === 'audio' ||
       r.kind === 'video' ||
       platformHint === 'youtube' ||
@@ -130,7 +134,7 @@ export const HydratedEmbed = memo(({
       lowerUrl.includes('pin.it/') ||
       lowerUrl.includes('/reel/') ||
       lowerUrl.includes('/shorts/') ||
-      lowerUrl.includes('/video/'));
+      lowerUrl.includes('/video/');
 
   const mediaLifecycleEnabled =
     shouldHydrate &&
@@ -148,7 +152,7 @@ export const HydratedEmbed = memo(({
 
   // Track click-throughs to the original platform (iframe focus or anchor clicks).
   // Awards +1 engagement score to the author on top of the impression score.
-  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost, authorUserId);
+  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate && !isThreadsPost, isPlayableMediaPost, authorUserId);
 
   const forceTwitterRenderer =
     r.kind === 'raw' &&
@@ -353,7 +357,13 @@ export const HydratedEmbed = memo(({
         {/* Fallback routing for legacy raw payloads */}
         {forceTwitterRenderer && mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <TwitterEmbed url={mediaUrl} onOriginalTap={handleXOriginalTap} onOriginalVisit={handleOriginalVisit} />
+            <TwitterEmbed
+              url={mediaUrl}
+              postId={post.id}
+              authorUserId={authorUserId}
+              onOriginalTap={handleXOriginalTap}
+              onOriginalVisit={handleOriginalVisit}
+            />
           </ImageViewTracker>
         )}
 
@@ -372,7 +382,13 @@ export const HydratedEmbed = memo(({
         {/* Raw embed HTML (Instagram, Facebook, Spotify) */}
         {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && r.html && !rawEmbedFailed && (
           <ImageViewTracker postId={post.id}>
-            <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} onOriginalVisit={handleOriginalVisit} />
+            <RawEmbedRenderer
+              embedHtml={r.html}
+              onError={handleRawEmbedError}
+              onOriginalVisit={handleOriginalVisit}
+              postId={post.id}
+              authorUserId={authorUserId}
+            />
           </ImageViewTracker>
         )}
 
@@ -386,7 +402,13 @@ export const HydratedEmbed = memo(({
         {/* Twitter/X embed */}
         {r.kind === 'twitter' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} onOriginalVisit={handleOriginalVisit} />
+            <TwitterEmbed
+              url={r.url}
+              postId={post.id}
+              authorUserId={authorUserId}
+              onOriginalTap={handleXOriginalTap}
+              onOriginalVisit={handleOriginalVisit}
+            />
           </ImageViewTracker>
         )}
         
