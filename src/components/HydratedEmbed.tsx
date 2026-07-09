@@ -97,33 +97,39 @@ export const HydratedEmbed = memo(({
   const platformHint = (post.platform || '').toLowerCase();
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
+  const isXPost =
+    platformHint === 'x' ||
+    platformHint === 'twitter' ||
+    lowerUrl.includes('twitter.com/') ||
+    lowerUrl.includes('x.com/');
 
   const isPlayableMediaPost =
-    mediaTypeHint === 'video' ||
-    mediaTypeHint === 'audio' ||
-    r.kind === 'video' ||
-    platformHint === 'youtube' ||
-    platformHint === 'spotify' ||
-    platformHint === 'instagram' ||
-    platformHint === 'facebook' ||
-    platformHint === 'linkedin' ||
-    platformHint === 'threads' ||
-    platformHint === 'pinterest' ||
-    lowerUrl.includes('youtube.com/') ||
-    lowerUrl.includes('youtu.be/') ||
-    lowerUrl.includes('open.spotify.com/') ||
-    lowerUrl.includes('tiktok.com/') ||
-    lowerUrl.includes('instagram.com/') ||
-    lowerUrl.includes('facebook.com/') ||
-    lowerUrl.includes('fb.watch/') ||
-    lowerUrl.includes('linkedin.com/') ||
-    lowerUrl.includes('threads.net/') ||
-    lowerUrl.includes('threads.com/') ||
-    lowerUrl.includes('pinterest.com/') ||
-    lowerUrl.includes('pin.it/') ||
-    lowerUrl.includes('/reel/') ||
-    lowerUrl.includes('/shorts/') ||
-    lowerUrl.includes('/video/');
+    !isXPost &&
+    (mediaTypeHint === 'video' ||
+      mediaTypeHint === 'audio' ||
+      r.kind === 'video' ||
+      platformHint === 'youtube' ||
+      platformHint === 'spotify' ||
+      platformHint === 'instagram' ||
+      platformHint === 'facebook' ||
+      platformHint === 'linkedin' ||
+      platformHint === 'threads' ||
+      platformHint === 'pinterest' ||
+      lowerUrl.includes('youtube.com/') ||
+      lowerUrl.includes('youtu.be/') ||
+      lowerUrl.includes('open.spotify.com/') ||
+      lowerUrl.includes('tiktok.com/') ||
+      lowerUrl.includes('instagram.com/') ||
+      lowerUrl.includes('facebook.com/') ||
+      lowerUrl.includes('fb.watch/') ||
+      lowerUrl.includes('linkedin.com/') ||
+      lowerUrl.includes('threads.net/') ||
+      lowerUrl.includes('threads.com/') ||
+      lowerUrl.includes('pinterest.com/') ||
+      lowerUrl.includes('pin.it/') ||
+      lowerUrl.includes('/reel/') ||
+      lowerUrl.includes('/shorts/') ||
+      lowerUrl.includes('/video/'));
 
   const mediaLifecycleEnabled =
     shouldHydrate &&
@@ -205,6 +211,11 @@ export const HydratedEmbed = memo(({
     if (!mediaUrl) return;
     event.preventDefault();
     void openExternalUrl(mediaUrl);
+  }, [handleOriginalVisit, mediaUrl]);
+
+  const handleXOriginalTap = useCallback(() => {
+    handleOriginalVisit();
+    if (mediaUrl) void openExternalUrl(mediaUrl);
   }, [handleOriginalVisit, mediaUrl]);
   
   const isYouTubePost = platformHint === 'youtube' || (!!r.url && /youtube\.com|youtu\.be/i.test(r.url));
@@ -341,7 +352,7 @@ export const HydratedEmbed = memo(({
         {/* Fallback routing for legacy raw payloads */}
         {forceTwitterRenderer && mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <TwitterEmbed url={mediaUrl} />
+            <TwitterEmbed url={mediaUrl} onOriginalTap={handleXOriginalTap} />
           </ImageViewTracker>
         )}
 
@@ -374,7 +385,7 @@ export const HydratedEmbed = memo(({
         {/* Twitter/X embed */}
         {r.kind === 'twitter' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <TwitterEmbed url={r.url} />
+            <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} />
           </ImageViewTracker>
         )}
         

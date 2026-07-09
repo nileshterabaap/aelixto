@@ -6,6 +6,7 @@ import { loadTwitterEmbed } from "@/lib/ScriptLoader";
 
 interface TwitterEmbedProps {
   url: string;
+  onOriginalTap?: () => void;
 }
 
 declare global {
@@ -36,7 +37,7 @@ const extractTweetId = (url: string): string | null => {
   return null;
 };
 
-export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
+export const TwitterEmbed = ({ url, onOriginalTap }: TwitterEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -106,7 +107,16 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
             Unable to load this post
           </p>
           <Button variant="outline" size="sm" asChild>
-            <a href={url} target="_blank" rel="noopener noreferrer">
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(event) => {
+                if (!onOriginalTap) return;
+                event.preventDefault();
+                onOriginalTap();
+              }}
+            >
               <ExternalLink className="w-4 h-4 mr-2" />
               View on X
             </a>
@@ -122,6 +132,18 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
         <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       )}
       <div ref={containerRef} className="twitter-embed-container" />
+      {!loading && !error && onOriginalTap && (
+        <button
+          type="button"
+          aria-label="Open on X"
+          className="absolute inset-0 z-10 cursor-pointer border-0 p-0"
+          style={{ background: 'transparent', touchAction: 'pan-y' }}
+          onClick={(event) => {
+            event.stopPropagation();
+            onOriginalTap();
+          }}
+        />
+      )}
       <style>{`
         .twitter-embed-container iframe {
           margin-bottom: -85px !important;

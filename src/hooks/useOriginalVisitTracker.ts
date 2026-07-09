@@ -22,13 +22,18 @@ export function useOriginalVisitTracker(
 ) {
   const firedRef = useRef(false);
   const playFiredRef = useRef(false);
+  const playRequestInFlightRef = useRef(false);
+  const playBeaconSentRef = useRef(false);
   const recentPointerRef = useRef(0);
   const lastIframeInteractionRef = useRef(0);
+  const attachedIframesRef = useRef(new WeakSet<HTMLIFrameElement>());
   const originalDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     firedRef.current = false;
     playFiredRef.current = false;
+    playRequestInFlightRef.current = false;
+    playBeaconSentRef.current = false;
     recentPointerRef.current = 0;
     lastIframeInteractionRef.current = 0;
     if (originalDwellTimerRef.current) {
@@ -43,20 +48,26 @@ export function useOriginalVisitTracker(
     if (!el) return;
 
     const firePlay = () => {
-      if (trackPlayableInteraction && !playFiredRef.current) {
-        playFiredRef.current = true;
-        trackView({ postId, eventType: 'video_play' }).catch(() => {
-          playFiredRef.current = false;
-        });
+      if (trackPlayableInteraction && !playFiredRef.current && !playRequestInFlightRef.current) {
+        playRequestInFlightRef.current = true;
+        trackView({ postId, eventType: 'video_play' })
+          .then((success) => {
+            if (success) playFiredRef.current = true;
+          })
+          .finally(() => {
+            playRequestInFlightRef.current = false;
+          });
       }
     };
 
     const firePlayBeacon = () => {
-      if (trackPlayableInteraction && !playFiredRef.current) {
+      if (trackPlayableInteraction && !playFiredRef.current && !playBeaconSentRef.current) {
+        playBeaconSentRef.current = true;
         playFiredRef.current = true;
         // Fire-and-forget beacon; survives backgrounding/native app hand-off.
         trackVideoPlayBeacon(postId).catch(() => {
           playFiredRef.current = false;
+          playBeaconSentRef.current = false;
         });
       }
     };
@@ -133,7 +144,7 @@ export function useOriginalVisitTracker(
         // Playable posts on some platforms (Threads) hand the tap off to the
         // native app instead of playing inline — the pending `trackView` fetch
         // gets aborted when the tab hides. Use a beacon so the insert lands.
-        if (recentTap) firePlayBeacon();
+        if (recentTap && (!playFiredRef.current || playRequestInFlightRef.current)) firePlayBeacon();
         return;
       }
       if (recentTap) {
@@ -163,6 +174,8 @@ export function useOriginalVisitTracker(
     };
 
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
+      if (attachedIframesRef.current.has(iframe)) return;
+      attachedIframesRef.current.add(iframe);
       iframe.addEventListener('focus', handleIframeFocus);
       // Some platforms (Threads) swallow pointer events on the iframe so they
       // never bubble to the container. Listen on the iframe itself too.

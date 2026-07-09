@@ -31,7 +31,7 @@ export function resolveRenderer(post: any): Renderer {
 
   // 1) Platform-specific renderers that need their own SDKs — BEFORE raw HTML
   if (isRedditUrl(url)) return { kind: 'reddit', url: url! };
-  if (url && platform === 'twitter') return { kind: 'twitter', url };
+  if (url && (platform === 'twitter' || platform === 'x')) return { kind: 'twitter', url };
   if (url && platform === 'pinterest') return { kind: 'pinterest', url };
   if (url && (platform === 'threads' || platform === 'linkedin'))
     return { kind: 'universal', url };
