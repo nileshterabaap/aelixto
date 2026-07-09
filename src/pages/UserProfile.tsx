@@ -62,6 +62,28 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
   const { isFollowing, isRequested, followsMe, follow, unfollow, loading: followLoading, counts, countsReady, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
+
+  // Realtime: reflect aelix_score changes on the viewed profile instantly.
+  useEffect(() => {
+    if (!profile?.user_id || !username) return;
+    const channel = supabase
+      .channel(`profile-view-${profile.user_id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `user_id=eq.${profile.user_id}` },
+        (payload) => {
+          const next = payload.new as unknown as Profile;
+          queryClient.setQueryData(['user-profile', username], (prev: Profile | null | undefined) =>
+            prev ? { ...prev, ...next } : next
+          );
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profile?.user_id, username, queryClient]);
+
   const { isBlocked, refetch: refetchBlocked } = useIsBlocked(profile?.user_id);
   const { amIBlockedBy, isLoading: amIBlockedByLoading } = useAmIBlockedBy(profile?.user_id);
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
