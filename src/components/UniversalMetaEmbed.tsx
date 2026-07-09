@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { openExternalUrl } from '@/lib/openExternalUrl';
-import { trackVideoPlayBeacon } from '@/hooks/useViewTracking';
+import { trackOriginalVisit, trackVideoPlayBeacon } from '@/hooks/useViewTracking';
 
 /**
  * Small pill-shaped overlay button rendered on top of an embed iframe so
@@ -113,13 +113,25 @@ const ThreadsIframeEmbed = ({
   const [hasLoaded, setHasLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const playTrackedRef = useRef(false);
+  const visitTrackedRef = useRef(false);
+  const recentIntentRef = useRef(0);
   const persistHeight = usePersistEmbedHeight(postId);
 
   const trackThreadsPlay = useCallback(() => {
+    recentIntentRef.current = Date.now();
     if (postId && !playTrackedRef.current) {
       playTrackedRef.current = true;
       trackVideoPlayBeacon(postId, authorUserId).catch(() => {
         playTrackedRef.current = false;
+      });
+    }
+  }, [postId, authorUserId]);
+
+  const trackThreadsVisit = useCallback(() => {
+    if (postId && !visitTrackedRef.current) {
+      visitTrackedRef.current = true;
+      trackOriginalVisit(postId, authorUserId).catch(() => {
+        visitTrackedRef.current = false;
       });
     }
   }, [postId, authorUserId]);
@@ -144,6 +156,38 @@ const ThreadsIframeEmbed = ({
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
+
+  useEffect(() => {
+    playTrackedRef.current = false;
+    visitTrackedRef.current = false;
+    recentIntentRef.current = 0;
+  }, [postId, src]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'hidden') return;
+      if (Date.now() - recentIntentRef.current < 3000) {
+        trackThreadsPlay();
+        trackThreadsVisit();
+      }
+    };
+
+    const handleWindowBlur = () => {
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (active?.tagName === 'IFRAME' && iframeRef.current === active) {
+          trackThreadsPlay();
+        }
+      }, 0);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, [trackThreadsPlay, trackThreadsVisit]);
 
   useEffect(() => {
     const root = iframeRef.current?.parentElement;
