@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getDeviceId, sha256 } from '@/lib/deviceId';
+import { optimisticallyBumpAelixScore } from '@/lib/aelixScoreOptimism';
 import { useCallback } from 'react';
 
 type EventType = 'video_play' | 'image_view' | 'article_open' | 'external_visit' | 'original_visit';
@@ -8,13 +9,16 @@ interface TrackViewParams {
   postId: string;
   eventType: EventType;
   durationMs?: number;
+  authorUserId?: string | null;
 }
 
 /**
  * Track engagement events (video plays, image views)
  * Sends to edge function which handles deduplication and scoring
  */
-export async function trackView({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
+export async function trackView({ postId, eventType, durationMs = 0, authorUserId }: TrackViewParams): Promise<boolean> {
+  optimisticallyBumpAelixScore(authorUserId, `${eventType}:${postId}`);
+
   try {
     // Get current user (may be null for anonymous)
     const { data: { user } } = await supabase.auth.getUser();
@@ -47,7 +51,9 @@ export async function trackView({ postId, eventType, durationMs = 0 }: TrackView
   }
 }
 
-async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
+async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0, authorUserId }: TrackViewParams): Promise<boolean> {
+  optimisticallyBumpAelixScore(authorUserId, `${eventType}:${postId}`);
+
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const deviceHash = await sha256(getDeviceId());
@@ -126,14 +132,14 @@ export async function trackExternalVisit(postId: string): Promise<boolean> {
  * Track a click-through to the original platform (any embed) for +1 engagement score.
  * Fires once per post per cooldown window — backend dedups.
  */
-export async function trackOriginalVisit(postId: string): Promise<boolean> {
-  return await trackViewBeforeNavigation({ postId, eventType: 'original_visit' });
+export async function trackOriginalVisit(postId: string, authorUserId?: string | null): Promise<boolean> {
+  return await trackViewBeforeNavigation({ postId, eventType: 'original_visit', authorUserId });
 }
 
 /**
  * Navigation-safe video play tracker. Uses sendBeacon / keepalive so the
  * insert survives when the tap hands the user off to a native app.
  */
-export async function trackVideoPlayBeacon(postId: string): Promise<boolean> {
-  return await trackViewBeforeNavigation({ postId, eventType: 'video_play' });
+export async function trackVideoPlayBeacon(postId: string, authorUserId?: string | null): Promise<boolean> {
+  return await trackViewBeforeNavigation({ postId, eventType: 'video_play', authorUserId });
 }
