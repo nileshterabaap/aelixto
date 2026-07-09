@@ -152,20 +152,15 @@ export const TwitterEmbed = ({ url, fallbackText, authorName, username }: Twitte
           href={url}
           target="_blank"
           rel="noopener noreferrer"
-          className="block rounded-2xl border bg-card p-5 no-underline text-card-foreground"
+          className="block rounded-2xl border bg-card p-4 no-underline text-card-foreground"
         >
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              <p className="font-semibold leading-tight truncate">{authorName || handle || 'Post on X'}</p>
-              {handle && <p className="text-sm text-muted-foreground truncate">@{handle}</p>}
-            </div>
-            <svg className="h-8 w-8 shrink-0 text-foreground" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" />
-            </svg>
-          </div>
-          {text && <p className="mt-4 text-base leading-relaxed whitespace-pre-wrap">{text}</p>}
-          <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <ExternalLink className="h-4 w-4" />
+          {text ? (
+            <p className="text-base leading-relaxed whitespace-pre-wrap">{text}</p>
+          ) : (
+            <p className="text-base text-muted-foreground">Open this post on X</p>
+          )}
+          <div className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <ExternalLink className="h-3.5 w-3.5" />
             <span>View on X</span>
           </div>
         </a>
