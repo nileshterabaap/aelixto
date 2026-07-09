@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { openExternalUrl } from '@/lib/openExternalUrl';
+import { trackVideoPlayBeacon } from '@/hooks/useViewTracking';
 
 /**
  * Small pill-shaped overlay button rendered on top of an embed iframe so
@@ -109,7 +110,18 @@ const ThreadsIframeEmbed = ({
   );
   const [hasLoaded, setHasLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const playTrackedRef = useRef(false);
   const persistHeight = usePersistEmbedHeight(postId);
+
+  const trackAndOpenThreads = useCallback(() => {
+    if (postId && !playTrackedRef.current) {
+      playTrackedRef.current = true;
+      trackVideoPlayBeacon(postId).catch(() => {
+        playTrackedRef.current = false;
+      });
+    }
+    void openExternalUrl(expandedUrl);
+  }, [expandedUrl, postId]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -178,6 +190,26 @@ const ThreadsIframeEmbed = ({
           background: 'transparent',
         }}
       />
+      {postId && (
+        <button
+          type="button"
+          aria-label="Open Threads video"
+          className="absolute inset-0 z-[2] cursor-pointer border-0 p-0"
+          style={{ background: 'transparent', touchAction: 'pan-y' }}
+          onPointerDown={() => {
+            if (!playTrackedRef.current) {
+              playTrackedRef.current = true;
+              trackVideoPlayBeacon(postId).catch(() => {
+                playTrackedRef.current = false;
+              });
+            }
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+            trackAndOpenThreads();
+          }}
+        />
+      )}
     </div>
   );
 };

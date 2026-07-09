@@ -45,6 +45,8 @@ import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
 import { getOriginalPostCaption } from "@/lib/originalCaption";
+import { markOriginalVisit } from "@/hooks/useOriginalVisitTracker";
+import { openExternalUrl } from "@/lib/openExternalUrl";
 
 interface FeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -219,6 +221,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
       await trackVideoPlay(post.id);
     }
   };
+
+  const handleXOriginalTap = useCallback(() => {
+    if (post.isRealPost) {
+      markOriginalVisit(post.id);
+    }
+    if (mediaUrl) {
+      void openExternalUrl(mediaUrl);
+    }
+  }, [post.id, post.isRealPost, mediaUrl]);
   
   // Always call hooks unconditionally (React rules of hooks)
   const postActionsResult = usePostActions(post.id, userId || '');
@@ -579,7 +590,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <TwitterEmbed url={r.url} />
+                  <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -590,7 +601,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <TwitterEmbed url={r.url} />
+                <TwitterEmbed url={r.url} onOriginalTap={handleXOriginalTap} />
               </LazyEmbed>
             )}
             {r.kind === 'pinterest' && post.isRealPost && (
