@@ -132,18 +132,6 @@ export const TwitterEmbed = ({ url, onOriginalTap }: TwitterEmbedProps) => {
         <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       )}
       <div ref={containerRef} className="twitter-embed-container" />
-      {!loading && !error && onOriginalTap && (
-        <button
-          type="button"
-          aria-label="Open on X"
-          className="absolute inset-0 z-10 cursor-pointer border-0 p-0"
-          style={{ background: 'transparent', touchAction: 'pan-y' }}
-          onClick={(event) => {
-            event.stopPropagation();
-            onOriginalTap();
-          }}
-        />
-      )}
       <style>{`
         .twitter-embed-container iframe {
           margin-bottom: -85px !important;
