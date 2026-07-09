@@ -11,21 +11,6 @@ interface TwitterEmbedProps {
   username?: string | null;
 }
 
-declare global {
-  interface Window {
-    twttr?: {
-      widgets: {
-        load: (element?: HTMLElement) => void;
-        createTweet?: (
-          tweetId: string,
-          container: HTMLElement,
-          options?: any
-        ) => Promise<HTMLElement | undefined>;
-      };
-    };
-  }
-}
-
 const extractTweetId = (url: string): string | null => {
   const patterns = [
     /twitter\.com\/\w+\/status\/(\d+)/,
