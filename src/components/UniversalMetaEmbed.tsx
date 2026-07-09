@@ -1164,6 +1164,8 @@ export const UniversalMetaEmbed = ({ url, postId, authorUserId, suggestedHeight 
       <div onClick={handleDoubleTap}>
         <RawEmbedRenderer
           embedHtml={embedHtml}
+          postId={postId}
+          authorUserId={authorUserId}
           onError={() => {
             
             setShowFallback(true);
