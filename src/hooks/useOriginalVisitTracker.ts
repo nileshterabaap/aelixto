@@ -71,6 +71,15 @@ export function useOriginalVisitTracker(
       });
     };
 
+    const fireOriginalBeacon = () => {
+      if (firedRef.current) return;
+      firedRef.current = true;
+      // Beacon variant survives backgrounding / native-app hand-off.
+      trackOriginalVisit(postId).catch(() => {
+        firedRef.current = false;
+      });
+    };
+
     const scheduleOriginalFromPlayableDwell = () => {
       // Intentionally a no-op: "Visited the original source" must only fire
       // when the user actually leaves the app for the source platform (anchor
