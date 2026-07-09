@@ -6,21 +6,9 @@ import { loadTwitterEmbed } from "@/lib/ScriptLoader";
 
 interface TwitterEmbedProps {
   url: string;
-}
-
-declare global {
-  interface Window {
-    twttr?: {
-      widgets: {
-        load: (element?: HTMLElement) => void;
-        createTweet: (
-          tweetId: string,
-          container: HTMLElement,
-          options?: any
-        ) => Promise<HTMLElement | undefined>;
-      };
-    };
-  }
+  fallbackText?: string | null;
+  authorName?: string | null;
+  username?: string | null;
 }
 
 const extractTweetId = (url: string): string | null => {
@@ -36,25 +24,53 @@ const extractTweetId = (url: string): string | null => {
   return null;
 };
 
-export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
+const trimFallbackText = (text?: string | null) => {
+  if (!text) return "";
+  const clean = text.replace(/\s+/g, " ").trim();
+  return clean.length > 220 ? `${clean.slice(0, 219).trimEnd()}…` : clean;
+};
+
+export const TwitterEmbed = ({ url, fallbackText, authorName, username }: TwitterEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [fallbackReady, setFallbackReady] = useState(false);
+  const [renderedEmbed, setRenderedEmbed] = useState(false);
+
+  const dispatchReady = () => {
+    containerRef.current?.dispatchEvent(
+      new CustomEvent('embedReady', { bubbles: true })
+    );
+  };
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(false);
+    setFallbackReady(false);
+    setRenderedEmbed(false);
+
+    const fallbackTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      setFallbackReady(true);
+      dispatchReady();
+    }, 1800);
+
     const loadEmbed = async () => {
       try {
         const tweetId = extractTweetId(url);
         
         if (!tweetId) {
+          window.clearTimeout(fallbackTimer);
           setError(true);
           setLoading(false);
+          dispatchReady();
           return;
         }
 
         await loadTwitterEmbed();
 
-        if (containerRef.current && window.twttr) {
+        if (!cancelled && containerRef.current && window.twttr?.widgets?.createTweet) {
           containerRef.current.innerHTML = "";
           
           const tweet = await window.twttr.widgets.createTweet(
@@ -68,26 +84,36 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
             }
           );
 
+          if (cancelled) return;
           if (!tweet) {
             setError(true);
           } else {
-            // Dispatch a custom event so HydratedFeedPost can detect readiness
-            // immediately without waiting for MutationObserver cycles
-            containerRef.current?.dispatchEvent(
-              new CustomEvent('embedReady', { bubbles: true })
-            );
+            setRenderedEmbed(true);
+            window.clearTimeout(fallbackTimer);
+            dispatchReady();
           }
         }
       } catch (err) {
         console.error("[TwitterEmbed] Failed to load Twitter embed:", err);
-        setError(true);
+        if (!cancelled) {
+          setFallbackReady(true);
+          dispatchReady();
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     loadEmbed();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(fallbackTimer);
+    };
   }, [url]);
+
+  const text = trimFallbackText(fallbackText);
+  const handle = username?.replace(/^@/, "");
+  const status = error || fallbackReady || renderedEmbed || !loading ? 'ready' : 'loading';
 
   if (error) {
     return (
@@ -117,11 +143,34 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
   }
 
   return (
-    <div className="relative" data-embed-status={loading ? 'loading' : 'ready'}>
-      {loading && (
+    <div className="relative" data-embed-status={status}>
+      {loading && !fallbackReady && !renderedEmbed && (
         <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       )}
-      <div ref={containerRef} className="twitter-embed-container" />
+      {fallbackReady && !renderedEmbed && !error && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block rounded-2xl border bg-card p-5 no-underline text-card-foreground"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="font-semibold leading-tight truncate">{authorName || handle || 'Post on X'}</p>
+              {handle && <p className="text-sm text-muted-foreground truncate">@{handle}</p>}
+            </div>
+            <svg className="h-8 w-8 shrink-0 text-foreground" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" />
+            </svg>
+          </div>
+          {text && <p className="mt-4 text-base leading-relaxed whitespace-pre-wrap">{text}</p>}
+          <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <ExternalLink className="h-4 w-4" />
+            <span>View on X</span>
+          </div>
+        </a>
+      )}
+      <div ref={containerRef} className={renderedEmbed ? "twitter-embed-container" : "twitter-embed-container hidden"} />
       <style>{`
         .twitter-embed-container iframe {
           margin-bottom: -85px !important;
