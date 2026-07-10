@@ -43,18 +43,28 @@ export function useOriginalVisitTracker(
     if (!el) return;
 
     const firePlay = () => {
+      console.log('[TRACE] firePlay() called', { postId, alreadyFired: playFiredRef.current, trackPlayableInteraction });
       if (trackPlayableInteraction && !playFiredRef.current) {
         playFiredRef.current = true;
-        trackView({ postId, eventType: 'video_play' }).catch(() => {
+        console.log('[TRACE] firePlay -> trackView(video_play) dispatching', { postId });
+        trackView({ postId, eventType: 'video_play' }).then((ok) => {
+          console.log('[TRACE] firePlay -> trackView result', { postId, ok });
+        }).catch((err) => {
+          console.log('[TRACE] firePlay -> trackView error', { postId, err });
           playFiredRef.current = false;
         });
       }
     };
 
     const fireOriginal = () => {
+      console.log('[TRACE] fireOriginal() called', { postId, alreadyFired: firedRef.current });
       if (firedRef.current) return;
       firedRef.current = true;
-      trackOriginalVisit(postId).catch(() => {
+      console.log('[TRACE] fireOriginal -> trackOriginalVisit dispatching', { postId });
+      trackOriginalVisit(postId).then((ok) => {
+        console.log('[TRACE] fireOriginal -> trackOriginalVisit result', { postId, ok });
+      }).catch((err) => {
+        console.log('[TRACE] fireOriginal -> trackOriginalVisit error', { postId, err });
         // Allow a retry on next interaction
         firedRef.current = false;
       });
@@ -91,6 +101,24 @@ export function useOriginalVisitTracker(
     const onPointerDown = (e: Event) => {
       const now = Date.now();
       recentPointerRef.current = now;
+      const t = e.target as Element | null;
+      const path: string[] = [];
+      let cur: Element | null = t;
+      for (let i = 0; cur && i < 6; i++) {
+        path.push(`${cur.tagName}${cur.className ? '.' + String(cur.className).toString().split(' ').slice(0,2).join('.') : ''}`);
+        cur = cur.parentElement;
+      }
+      console.log('[TRACE] onPointerDown', {
+        postId,
+        type: e.type,
+        trackPlayableInteraction,
+        targetTag: t?.tagName,
+        targetClass: t?.className,
+        insideIframe: isInsideIframe(e.target),
+        insideThreadsEmbed: isInsideThreadsEmbed(e.target),
+        isXPost: isXPost(),
+        path,
+      });
       if (isInsideIframe(e.target)) {
         if (trackPlayableInteraction) {
           // Playable posts: tapping into the iframe = Play (+1) only.
@@ -111,11 +139,18 @@ export function useOriginalVisitTracker(
     };
 
     const onWindowBlur = () => {
+      console.log('[TRACE] onWindowBlur', { postId });
       // The iframe steals focus when tapped — check that the now-active element
       // belongs to this post's embed container.
       setTimeout(() => {
         const now = Date.now();
         const active = document.activeElement;
+        console.log('[TRACE] onWindowBlur:setTimeout', {
+          postId,
+          activeTag: active?.tagName,
+          activeInsideEl: active ? el.contains(active) : false,
+          trackPlayableInteraction,
+        });
         if (
           active &&
           active.tagName === 'IFRAME' &&
@@ -132,6 +167,14 @@ export function useOriginalVisitTracker(
     };
 
     const onVisibilityChange = () => {
+      console.log('[TRACE] onVisibilityChange', {
+        postId,
+        visibilityState: document.visibilityState,
+        trackPlayableInteraction,
+        isXPost: isXPost(),
+        msSincePointer: Date.now() - recentPointerRef.current,
+        msSinceIframe: Date.now() - lastIframeInteractionRef.current,
+      });
       if (document.visibilityState !== 'hidden') return;
       // Only infer a visit for non-playable embeds (article/link cards where
       // tapping opens the source). Playable posts must not auto-fire Visit on
@@ -156,6 +199,12 @@ export function useOriginalVisitTracker(
     // fallback link cards) — anything that opens the original.
     const onClick = (e: Event) => {
       const target = e.target as HTMLElement | null;
+      const anchorProbe = target?.closest?.('a[href]') as HTMLAnchorElement | null;
+      console.log('[TRACE] onClick', {
+        postId,
+        targetTag: target?.tagName,
+        anchorHref: anchorProbe?.href || null,
+      });
       if (!target) return;
       const anchor = target.closest('a[href]') as HTMLAnchorElement | null;
       if (anchor && anchor.href && !anchor.href.startsWith('javascript:')) {
