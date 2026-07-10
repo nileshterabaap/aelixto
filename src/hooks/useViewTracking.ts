@@ -129,11 +129,3 @@ export async function trackExternalVisit(postId: string): Promise<boolean> {
 export async function trackOriginalVisit(postId: string): Promise<boolean> {
   return await trackViewBeforeNavigation({ postId, eventType: 'original_visit' });
 }
-
-/**
- * Navigation-safe video play tracker. Uses sendBeacon / keepalive so the
- * insert survives when the tap hands the user off to a native app.
- */
-export async function trackVideoPlayBeacon(postId: string): Promise<boolean> {
-  return await trackViewBeforeNavigation({ postId, eventType: 'video_play' });
-}

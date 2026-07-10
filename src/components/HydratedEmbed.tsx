@@ -109,8 +109,8 @@ export const HydratedEmbed = memo(({
     platformHint === 'linkedin' ||
     platformHint === 'threads' ||
     platformHint === 'pinterest' ||
-    platformHint === 'x' ||
     platformHint === 'twitter' ||
+    platformHint === 'x' ||
     lowerUrl.includes('youtube.com/') ||
     lowerUrl.includes('youtu.be/') ||
     lowerUrl.includes('open.spotify.com/') ||
@@ -129,17 +129,6 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
 
-  // Platforms that hand the tap off to the native app / new tab. For these,
-  // a tap should credit both Play (+1) and Visit (+1) — one each per post.
-  const firesOriginalOnHandoff =
-    platformHint === 'x' ||
-    platformHint === 'twitter' ||
-    platformHint === 'threads' ||
-    lowerUrl.includes('twitter.com/') ||
-    lowerUrl.includes('x.com/') ||
-    lowerUrl.includes('threads.net/') ||
-    lowerUrl.includes('threads.com/');
-
   const mediaLifecycleEnabled =
     shouldHydrate &&
     (isPlayableMediaPost ||
@@ -156,13 +145,7 @@ export const HydratedEmbed = memo(({
 
   // Track click-throughs to the original platform (iframe focus or anchor clicks).
   // Awards +1 engagement score to the author on top of the impression score.
-  useOriginalVisitTracker(
-    embedContainerRef,
-    post.id,
-    shouldHydrate,
-    isPlayableMediaPost,
-    firesOriginalOnHandoff,
-  );
+  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost);
 
   const forceTwitterRenderer =
     r.kind === 'raw' &&

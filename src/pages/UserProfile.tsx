@@ -122,13 +122,8 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const showSkeleton = !contentReady;
 
   const handleRefresh = useCallback(async () => {
-    await Promise.all([
-      refetchProfile(),
-      refreshFollow(),
-      queryClient.invalidateQueries({ queryKey: ["user-platform-tabs", profile?.user_id] }),
-      queryClient.invalidateQueries({ queryKey: ["platform-posts", profile?.user_id] }),
-    ]);
-  }, [refetchProfile, refreshFollow, queryClient, profile?.user_id]);
+    await Promise.all([refetchProfile(), refreshFollow()]);
+  }, [refetchProfile, refreshFollow]);
 
   if (!isLoading && !profile) {
     return (
