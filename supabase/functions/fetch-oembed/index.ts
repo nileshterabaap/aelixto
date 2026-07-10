@@ -23,6 +23,8 @@ const PLATFORM_DOMAINS: Record<string, string[]> = {
 const ARTICLE_DOMAINS = [
   'medium.com', 'substack.com', 'ghost.io', 'wordpress.com',
   'hashnode.com', 'dev.to', 'mirror.xyz', 'blogger.com',
+  'wikipedia.org', 'wikimedia.org', 'fandom.com',
+  'notion.site', 'bearblog.dev', 'tumblr.com',
 ];
 
 function classifyPlatform(url: string): string {
@@ -32,6 +34,28 @@ function classifyPlatform(url: string): string {
   }
   if (ARTICLE_DOMAINS.some(d => lower.includes(d))) return 'article';
   return 'external';
+}
+
+function extractFacebookNextUrl(raw: string): string | null {
+  try {
+    const parsed = new URL(raw);
+    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return null;
+    const next = parsed.searchParams.get('next');
+    if (!next) return null;
+    const decoded = decodeURIComponent(next);
+    const nextUrl = new URL(decoded);
+    if (!/(^|\.)facebook\.com$/i.test(nextUrl.hostname)) return null;
+    const looksLikePost =
+      /\/story\.php/i.test(nextUrl.pathname) ||
+      /\/permalink\.php/i.test(nextUrl.pathname) ||
+      /\/(?:photo|photos|posts|videos?|watch|reel)\b/i.test(nextUrl.pathname) ||
+      nextUrl.searchParams.has('story_fbid') ||
+      nextUrl.searchParams.has('fbid') ||
+      nextUrl.searchParams.has('v');
+    return looksLikePost ? nextUrl.toString() : null;
+  } catch {
+    return null;
+  }
 }
 
 serve(async (req) => {
@@ -165,7 +189,7 @@ serve(async (req) => {
             headers: { 'User-Agent': 'Mozilla/5.0 (AelixtoBot/1.0)' },
           });
           if (expanded.url) {
-            resolvedFacebookUrl = expanded.url;
+            resolvedFacebookUrl = extractFacebookNextUrl(expanded.url) || expanded.url;
             console.log('[fetch-oembed] Facebook URL expanded to:', resolvedFacebookUrl);
           }
         } catch (e) {

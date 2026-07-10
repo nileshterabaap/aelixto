@@ -25,6 +25,7 @@ All colors MUST be HSL.
 
     --muted: 0 0% 96%;
     --muted-foreground: 0 0% 45%;
+    --profile-cover: 0 0% 24%;
 
     --accent: 0 0% 96%;
     --accent-foreground: 0 0% 0%;
@@ -162,6 +163,19 @@ span[data-pin-href] button {
     0 10px 28px -10px hsl(220 40% 12% / 0.10);
 }
 
+.profile-cover-fallback {
+  background-color: hsl(var(--profile-cover));
+}
+
+/* Premium glass translucent feed-post card */
+.glass-post-card {
+  background: hsl(0 0% 100%);
+  border: 1px solid hsl(220 13% 91%);
+  box-shadow:
+    0 1px 2px hsl(220 40% 12% / 0.04),
+    0 4px 16px -8px hsl(220 40% 12% / 0.06);
+}
+
 /* Instagram embed styles */
 .embed-container .instagram-media,
 .embed-container iframe[src*="instagram.com"] {
@@ -244,8 +258,38 @@ a:active:not(:disabled) {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Press-in tap: element stays visibly pressed while held, then releases.
+   Use on grid thumbnails and message rows instead of the bouncy tap. */
+.press-in {
+  transition: transform 180ms cubic-bezier(0.2, 0, 0, 1),
+              opacity 180ms cubic-bezier(0.2, 0, 0, 1);
+  -webkit-tap-highlight-color: transparent;
+  transform-origin: center;
+}
+.press-in:active:not(:disabled) {
+  transform: scale(0.96);
+  opacity: 0.9;
+  animation: none !important;
+  transition: transform 80ms ease-out, opacity 80ms ease-out;
+}
+
 /* Global iframe freeze during scroll — prevents iframes from intercepting
    touch events which causes 1-2s scroll input delay on mobile */
 .scroll-freezing-iframes iframe {
   pointer-events: none !important;
+}
+
+/* When the page is at scroll-top, disable pointer-events on iframes so
+   Pull-to-Refresh can capture touchstart from anywhere on the feed
+   (including over YouTube/Instagram/Twitter embeds). Once the user
+   scrolls down at all, this class is removed and iframes become
+   interactive again. */
+body.at-scroll-top iframe {
+  pointer-events: none !important;
+}
+
+/* Disable the browser's native pull-to-refresh so our in-app PullToRefresh
+   component owns the gesture on every page (especially short empty states). */
+html, body {
+  overscroll-behavior-y: none;
 }

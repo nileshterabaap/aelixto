@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface PlatformPost {
   id: string;
   user_id: string;
+  profile_owner_id?: string | null;
   content: string;
   created_at: string;
   likes_count: number;
@@ -18,15 +19,21 @@ export interface PlatformPost {
   preview_text?: string | null;
   preview_title?: string | null;
   preview_image_url?: string | null;
+  media_kind?: string | null;
+  aspect_ratio?: number | null;
+  suggested_height?: number | null;
   is_public: boolean;
   is_repost: boolean;
   original_user_id: string | null;
   profile_username?: string | null;
   profile_display_name?: string | null;
   profile_avatar_url?: string | null;
+  pinned_at?: string | null;
+  hide_counts?: boolean;
+  comments_disabled?: boolean;
 }
 
-const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook", "reddit", "threads", "tiktok", "article", "medium"]);
+const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook", "reddit", "threads", "linkedin", "tiktok", "article", "medium"]);
 const inflightBackfills = new Set<string>();
 
 const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
@@ -46,7 +53,13 @@ const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
 const isGenericPlaceholderThumbnail = (url?: string | null) => {
   if (!url) return false;
   const lower = url.toLowerCase();
-  return lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com");
+  return (
+    lower.includes("images.unsplash.com") ||
+    lower.includes("source.unsplash.com") ||
+    // Reddit's branded fallback/logo thumbnails — never a real post preview.
+    lower.includes("redditstatic.com") ||
+    lower.includes("share.redd.it/preview/post")
+  );
 };
 
 const hasUsableTextThumbnail = (post: PlatformPost) => {
@@ -59,18 +72,18 @@ const hasUsableTextThumbnail = (post: PlatformPost) => {
   return !!content || hasTitle || hasPreviewTitle || (!!previewText && previewText !== "Threads");
 };
 
-async function backfillThumbnail(post: PlatformPost) {
+async function backfillThumbnail(post: PlatformPost, force = false) {
   if (!post.media_url || !post.platform) return;
   const platform = post.platform.toLowerCase();
   if (!THUMB_BACKFILL_PLATFORMS.has(platform)) return;
-  if (post.thumbnail_url && !isGenericPlaceholderThumbnail(post.thumbnail_url)) return;
+  if (!force && post.thumbnail_url && !isGenericPlaceholderThumbnail(post.thumbnail_url)) return;
   // For Reddit/Instagram/Facebook/TikTok, ALWAYS try to recover the real
   // media thumbnail even when we have usable text — an image post should
   // show the image, not its title. For pure text platforms (Threads, X,
   // article) we can skip backfill when text is already usable.
   const imageFirstPlatform =
     platform === "reddit" || platform === "instagram" ||
-    platform === "facebook" || platform === "tiktok" || platform === "pinterest";
+    platform === "facebook" || platform === "linkedin" || platform === "tiktok" || platform === "pinterest";
   if (!post.thumbnail_url && !imageFirstPlatform && hasUsableTextThumbnail(post)) return;
 
   const key = `${post.id}:${platform}`;
@@ -145,6 +158,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
         const pageItems = (data || []) as PlatformPost[];
         all.push(...pageItems.map((post) => ({
           ...post,
+          profile_owner_id: userId,
           preview_text: (post as any).preview_text ?? null,
           preview_title: (post as any).preview_title ?? null,
           preview_image_url: (post as any).preview_image_url ?? null,
@@ -158,7 +172,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       const { data: postDetails } = postIds.length
         ? await supabase
             .from("posts")
-            .select("id, title, content, thumbnail_url, preview_text, preview_title, preview_image_url")
+            .select("id, title, content, thumbnail_url, preview_text, preview_title, preview_image_url, media_kind, aspect_ratio, suggested_height, pinned_at, hide_counts, comments_disabled")
             .in("id", postIds)
         : { data: [] };
 
@@ -207,7 +221,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
 
     const imageFirstPlatform =
       platformLower === "reddit" || platformLower === "instagram" ||
-      platformLower === "facebook" || platformLower === "tiktok" || platformLower === "pinterest";
+      platformLower === "facebook" || platformLower === "linkedin" || platformLower === "tiktok" || platformLower === "pinterest";
     const missing = items.filter((p) => {
       if (!p.media_url) return false;
       const noThumb = !p.thumbnail_url || isGenericPlaceholderThumbnail(p.thumbnail_url);
@@ -215,16 +229,23 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       if (imageFirstPlatform) return true;
       return !hasUsableTextThumbnail(p);
     });
+    const missingPreviewText = items.filter((p) => {
+      if (!p.media_url) return false;
+      if ((p.preview_text || "").trim()) return false;
+      return ["facebook", "reddit", "threads", "twitter", "x", "tiktok"].includes(platformLower);
+    });
     const expiring = items.filter((p) => isLikelyExpiringMetaCdnUrl(p.thumbnail_url));
-    if (!missing.length && !expiring.length) return;
+    if (!missing.length && !missingPreviewText.length && !expiring.length) return;
 
     let cancelled = false;
 
     (async () => {
       // small, safe concurrency (1-by-1) to avoid rate limits
-      for (const p of missing.slice(0, 6)) {
+      const previewTextIds = new Set(missingPreviewText.map((p) => p.id));
+      const backfillTargets = [...new Map([...missing, ...missingPreviewText].map((p) => [p.id, p])).values()];
+      for (const p of backfillTargets.slice(0, 6)) {
         if (cancelled) return;
-        await backfillThumbnail(p);
+        await backfillThumbnail(p, previewTextIds.has(p.id));
       }
 
       // Also persist any currently-visible Meta CDN thumbnails so they don't break weeks later

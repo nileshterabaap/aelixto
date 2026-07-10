@@ -27,12 +27,34 @@ function isDirectImageUrl(url?: string | null): boolean {
   }
 }
 
+function isRedditMediaHost(url?: string | null): boolean {
+  if (!url) return false;
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host === "i.redd.it" ||
+      host === "preview.redd.it" ||
+      host === "external-preview.redd.it" ||
+      host.endsWith("redditmedia.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
 function isTextOnlySocialAvatar(platform: string, url: string): boolean {
   const lower = url.toLowerCase();
   if ((platform === "twitter" || platform === "x") && lower.includes("pbs.twimg.com/profile_images/")) {
     return true;
   }
   if ((platform === "twitter" || platform === "x") && lower.includes("abs.twimg.com/")) {
+    return true;
+  }
+  // Twitter's generic OG/summary card art (not the tweet's own media).
+  if ((platform === "twitter" || platform === "x") && lower.includes("pbs.twimg.com/card_img/")) {
+    return true;
+  }
+  if ((platform === "twitter" || platform === "x") && lower.includes("pbs.twimg.com/semantic_core_img/")) {
     return true;
   }
   if (platform === "threads" && isThreadsProfilePictureUrl(lower)) {
@@ -67,7 +89,6 @@ export function getPostThumb(p: {
   const piu = p.preview_image_url || p.previewImageUrl;
   const mu = p.media_url || p.mediaUrl;
   const authorAvatar = p.author_avatar_url || p.profile_avatar_url || null;
-  const previewIsThreadsAvatar = platform === "threads" && piu ? isThreadsProfilePictureUrl(decodeHtmlEntities(piu).toLowerCase()) : false;
 
   // 1) server-derived thumbnail wins (decode HTML entities first),
   //    BUT filter out misleading generic OG placeholders (e.g. Unsplash
@@ -83,7 +104,7 @@ export function getPostThumb(p: {
     // typographic TextCardThumbnail can render the actual text instead
     // of a misleading avatar tile.
     const matchesOwnAvatar = !!authorAvatar && sameUrl(decoded, authorAvatar);
-    if (matchesOwnAvatar || previewIsThreadsAvatar || isMisleadingThumbnail(platform, decoded) || isTextOnlySocialAvatar(platform, decoded)) {
+    if (matchesOwnAvatar || isMisleadingThumbnail(platform, decoded) || isTextOnlySocialAvatar(platform, decoded)) {
       // Fall through to platform/media derivations or placeholder.
     } else {
       return decoded;
@@ -94,8 +115,9 @@ export function getPostThumb(p: {
   // Use them consistently anywhere a grid/share card asks for a post thumb.
   if (piu) {
     const decoded = decodeHtmlEntities(piu);
+    const isThreadsAvatar = platform === "threads" && isThreadsProfilePictureUrl(decoded.toLowerCase());
     const matchesOwnAvatar = !!authorAvatar && sameUrl(decoded, authorAvatar);
-    if (!matchesOwnAvatar && !isMisleadingThumbnail(platform, decoded) && !isTextOnlySocialAvatar(platform, decoded)) {
+    if (!matchesOwnAvatar && !isThreadsAvatar && !isMisleadingThumbnail(platform, decoded) && !isTextOnlySocialAvatar(platform, decoded)) {
       return decoded;
     }
   }
@@ -111,6 +133,21 @@ export function getPostThumb(p: {
   //     Never return a reddit post page URL as an <img> src, and never fall
   //     back to the Aelixto user's avatar.
   if (platform === "reddit") {
+    // Prefer real Reddit media hosts stored on either thumbnail_url or
+    // preview_image_url — these are the actual post images/gifs and should
+    // beat the platform-branded text card.
+    if (tu) {
+      const decoded = decodeHtmlEntities(tu);
+      if (isRedditMediaHost(decoded) || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(decoded)) {
+        return decoded;
+      }
+    }
+    if (piu) {
+      const decoded = decodeHtmlEntities(piu);
+      if (isRedditMediaHost(decoded) || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(decoded)) {
+        return decoded;
+      }
+    }
     if (isDirectImageUrl(mu)) return mu!;
     return null;
   }
@@ -134,12 +171,18 @@ function isMisleadingThumbnail(platform: string, url: string): boolean {
   if (lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com")) {
     return true;
   }
-  // For Reddit, thumbnails should come from reddit/redd.it/redditmedia/redditstatic
-  // or from our own storage bucket. Anything else is a foreign OG scrape.
+  // For Reddit, reject the platform's branded chrome/logo images that get
+  // returned as OG fallbacks for deleted, restricted, or media-less posts.
+  // These render as the giant orange "reddit" wordmark in grid tiles.
   if (platform === "reddit") {
-    // Reddit posts can legitimately point to external image/video hosts
-    // (Imgur, Gfycat/CDN mirrors, news images, etc.). Only reject the known
-    // generic placeholders above; otherwise let real scraped media render.
+    if (lower.includes("redditstatic.com")) return true;
+    // share.redd.it /preview/post/<id> serves the generic orange Reddit
+    // logo when no real preview exists — never use it as a thumbnail.
+    if (lower.includes("share.redd.it/preview/post")) return true;
+    // Snoo / brand icon assets served from reddit's CDNs
+    if (/\b(reddit[-_ ]?logo|snoo|brand|icon|favicon|default[-_ ]?avatar)\b/.test(lower)) return true;
+    // Reddit's generic share fallback image
+    if (lower.includes("www.redditstatic.com/")) return true;
     return false;
   }
   return false;
