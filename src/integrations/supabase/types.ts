@@ -1127,6 +1127,39 @@ export type Database = {
         }
         Relationships: []
       }
+      trace_logs: {
+        Row: {
+          detail: Json | null
+          error: string | null
+          event: string
+          id: number
+          platform: string | null
+          post_id: string | null
+          step: string | null
+          ts: string
+        }
+        Insert: {
+          detail?: Json | null
+          error?: string | null
+          event: string
+          id?: number
+          platform?: string | null
+          post_id?: string | null
+          step?: string | null
+          ts?: string
+        }
+        Update: {
+          detail?: Json | null
+          error?: string | null
+          event?: string
+          id?: number
+          platform?: string | null
+          post_id?: string | null
+          step?: string | null
+          ts?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

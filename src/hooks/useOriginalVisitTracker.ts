@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
+import { traceLog } from '@/lib/traceLog';
 
 /**
  * Detects when the user taps/clicks into an embedded iframe or an outbound
@@ -43,28 +44,28 @@ export function useOriginalVisitTracker(
     if (!el) return;
 
     const firePlay = () => {
-      console.log('[TRACE] firePlay() called', { postId, alreadyFired: playFiredRef.current, trackPlayableInteraction });
+      traceLog('firePlay', 'called', { postId, detail: { alreadyFired: playFiredRef.current, trackPlayableInteraction } });
       if (trackPlayableInteraction && !playFiredRef.current) {
         playFiredRef.current = true;
-        console.log('[TRACE] firePlay -> trackView(video_play) dispatching', { postId });
+        traceLog('firePlay', 'dispatch:trackView(video_play)', { postId });
         trackView({ postId, eventType: 'video_play' }).then((ok) => {
-          console.log('[TRACE] firePlay -> trackView result', { postId, ok });
+          traceLog('firePlay', 'trackView:result', { postId, detail: { ok } });
         }).catch((err) => {
-          console.log('[TRACE] firePlay -> trackView error', { postId, err });
+          traceLog('firePlay', 'trackView:error', { postId, error: err });
           playFiredRef.current = false;
         });
       }
     };
 
     const fireOriginal = () => {
-      console.log('[TRACE] fireOriginal() called', { postId, alreadyFired: firedRef.current });
+      traceLog('fireOriginal', 'called', { postId, detail: { alreadyFired: firedRef.current } });
       if (firedRef.current) return;
       firedRef.current = true;
-      console.log('[TRACE] fireOriginal -> trackOriginalVisit dispatching', { postId });
+      traceLog('fireOriginal', 'dispatch:trackOriginalVisit', { postId });
       trackOriginalVisit(postId).then((ok) => {
-        console.log('[TRACE] fireOriginal -> trackOriginalVisit result', { postId, ok });
+        traceLog('fireOriginal', 'trackOriginalVisit:result', { postId, detail: { ok } });
       }).catch((err) => {
-        console.log('[TRACE] fireOriginal -> trackOriginalVisit error', { postId, err });
+        traceLog('fireOriginal', 'trackOriginalVisit:error', { postId, error: err });
         // Allow a retry on next interaction
         firedRef.current = false;
       });
@@ -108,16 +109,17 @@ export function useOriginalVisitTracker(
         path.push(`${cur.tagName}${cur.className ? '.' + String(cur.className).toString().split(' ').slice(0,2).join('.') : ''}`);
         cur = cur.parentElement;
       }
-      console.log('[TRACE] onPointerDown', {
+      traceLog('onPointerDown', e.type, {
         postId,
-        type: e.type,
-        trackPlayableInteraction,
-        targetTag: t?.tagName,
-        targetClass: t?.className,
-        insideIframe: isInsideIframe(e.target),
-        insideThreadsEmbed: isInsideThreadsEmbed(e.target),
-        isXPost: isXPost(),
-        path,
+        detail: {
+          trackPlayableInteraction,
+          targetTag: t?.tagName,
+          targetClass: String(t?.className || ''),
+          insideIframe: isInsideIframe(e.target),
+          insideThreadsEmbed: isInsideThreadsEmbed(e.target),
+          isXPost: isXPost(),
+          path,
+        },
       });
       if (isInsideIframe(e.target)) {
         if (trackPlayableInteraction) {
@@ -139,17 +141,19 @@ export function useOriginalVisitTracker(
     };
 
     const onWindowBlur = () => {
-      console.log('[TRACE] onWindowBlur', { postId });
+      traceLog('onWindowBlur', 'fired', { postId });
       // The iframe steals focus when tapped — check that the now-active element
       // belongs to this post's embed container.
       setTimeout(() => {
         const now = Date.now();
         const active = document.activeElement;
-        console.log('[TRACE] onWindowBlur:setTimeout', {
+        traceLog('onWindowBlur', 'setTimeout', {
           postId,
-          activeTag: active?.tagName,
-          activeInsideEl: active ? el.contains(active) : false,
-          trackPlayableInteraction,
+          detail: {
+            activeTag: active?.tagName,
+            activeInsideEl: active ? el.contains(active) : false,
+            trackPlayableInteraction,
+          },
         });
         if (
           active &&
@@ -167,13 +171,14 @@ export function useOriginalVisitTracker(
     };
 
     const onVisibilityChange = () => {
-      console.log('[TRACE] onVisibilityChange', {
+      traceLog('onVisibilityChange', document.visibilityState, {
         postId,
-        visibilityState: document.visibilityState,
-        trackPlayableInteraction,
-        isXPost: isXPost(),
-        msSincePointer: Date.now() - recentPointerRef.current,
-        msSinceIframe: Date.now() - lastIframeInteractionRef.current,
+        detail: {
+          trackPlayableInteraction,
+          isXPost: isXPost(),
+          msSincePointer: Date.now() - recentPointerRef.current,
+          msSinceIframe: Date.now() - lastIframeInteractionRef.current,
+        },
       });
       if (document.visibilityState !== 'hidden') return;
       // Only infer a visit for non-playable embeds (article/link cards where
@@ -200,10 +205,12 @@ export function useOriginalVisitTracker(
     const onClick = (e: Event) => {
       const target = e.target as HTMLElement | null;
       const anchorProbe = target?.closest?.('a[href]') as HTMLAnchorElement | null;
-      console.log('[TRACE] onClick', {
+      traceLog('onClick', 'fired', {
         postId,
-        targetTag: target?.tagName,
-        anchorHref: anchorProbe?.href || null,
+        detail: {
+          targetTag: target?.tagName,
+          anchorHref: anchorProbe?.href || null,
+        },
       });
       if (!target) return;
       const anchor = target.closest('a[href]') as HTMLAnchorElement | null;
