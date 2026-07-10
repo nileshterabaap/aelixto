@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getDeviceId, sha256 } from '@/lib/deviceId';
 import { useCallback } from 'react';
+import { traceLog } from '@/lib/traceLog';
 
 type EventType = 'video_play' | 'image_view' | 'article_open' | 'external_visit' | 'original_visit';
 
@@ -16,7 +17,7 @@ interface TrackViewParams {
  */
 export async function trackView({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
   try {
-    console.log('[TRACE] trackView() entry', { postId, eventType, durationMs });
+    traceLog('trackView', 'entry', { postId, detail: { eventType, durationMs } });
     // Get current user (may be null for anonymous)
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -33,28 +34,26 @@ export async function trackView({ postId, eventType, durationMs = 0 }: TrackView
       viewer_id: user?.id || null,
     };
 
-    console.log('[TRACE] trackView -> invoking record-view', { postId, eventType, viewer_id: payload.viewer_id });
+    traceLog('trackView', 'invoke:record-view', { postId, detail: { eventType, viewer_id: payload.viewer_id } });
     const { data, error } = await supabase.functions.invoke('record-view', { body: payload });
 
     if (error) {
-      console.error('[useViewTracking] Error:', error);
-      console.log('[TRACE] trackView <- record-view ERROR', { postId, eventType, error });
+      traceLog('trackView', 'record-view:error', { postId, detail: { eventType }, error });
       return false;
     }
 
     const success = data?.ok === true;
-    console.log('[TRACE] trackView <- record-view result', { postId, eventType, data });
+    traceLog('trackView', 'record-view:result', { postId, detail: { eventType, data } });
     return success;
   } catch (error) {
-    console.error('[useViewTracking] Exception:', error);
-    console.log('[TRACE] trackView EXCEPTION', { postId, eventType, error });
+    traceLog('trackView', 'exception', { postId, detail: { eventType }, error });
     return false;
   }
 }
 
 async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
   try {
-    console.log('[TRACE] trackViewBeforeNavigation() entry', { postId, eventType });
+    traceLog('trackViewBeforeNavigation', 'entry', { postId, detail: { eventType } });
     const { data: { session } } = await supabase.auth.getSession();
     const deviceHash = await sha256(getDeviceId());
     const payload = JSON.stringify({
@@ -70,11 +69,11 @@ async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: 
     const url = supabaseUrl
       ? `${supabaseUrl.replace(/\/$/, '')}/functions/v1/record-view`
       : `https://${projectId}.functions.supabase.co/record-view`;
-    console.log('[TRACE] trackViewBeforeNavigation -> POST', { postId, eventType, url, hasBeacon: !!navigator.sendBeacon });
+    traceLog('trackViewBeforeNavigation', 'post', { postId, detail: { eventType, url, hasBeacon: !!navigator.sendBeacon } });
     // No custom headers/content-type here: outbound clicks can navigate away
     // immediately, so this must avoid CORS preflight and use keepalive/beacon.
     if (navigator.sendBeacon && navigator.sendBeacon(url, payload)) {
-      console.log('[TRACE] trackViewBeforeNavigation sendBeacon OK', { postId, eventType });
+      traceLog('trackViewBeforeNavigation', 'sendBeacon:ok', { postId, detail: { eventType } });
       return true;
     }
 
@@ -83,11 +82,10 @@ async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: 
       body: payload,
       keepalive: true,
     });
-    console.log('[TRACE] trackViewBeforeNavigation fetch complete', { postId, eventType, status: res.status });
+    traceLog('trackViewBeforeNavigation', 'fetch:complete', { postId, detail: { eventType, status: res.status } });
     return true;
   } catch (error) {
-    console.error('[useViewTracking] Navigation-safe exception:', error);
-    console.log('[TRACE] trackViewBeforeNavigation EXCEPTION', { postId, eventType, error });
+    traceLog('trackViewBeforeNavigation', 'exception', { postId, detail: { eventType }, error });
     return false;
   }
 }
