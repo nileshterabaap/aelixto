@@ -22,15 +22,55 @@ import QuoraIcon from "@/assets/platforms/quora.svg";
 import ExternalIcon from "@/assets/platforms/external.svg";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 import { PlatformPostViewer } from "./PlatformPostViewer";
+import { PostOwnerActionsSheet } from "./PostOwnerActionsSheet";
 
-function PostCard({ post, onClick }: { 
+function PostCard({ post, onClick, onLongPress }: { 
   post: PlatformPost; 
   onClick: () => void;
+  onLongPress?: () => void;
   eager?: boolean;
 }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const isPinned = !!post.pinned_at;
+
+  // Long-press detection (touch + mouse) — opens the owner actions sheet.
+  const longPressTimer = useRef<number | null>(null);
+  const suppressClickRef = useRef(false);
+  const startLongPress = () => {
+    if (!onLongPress) return;
+    suppressClickRef.current = false;
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+    longPressTimer.current = window.setTimeout(() => {
+      suppressClickRef.current = true;
+      onLongPress();
+    }, 450);
+  };
+  const cancelLongPress = () => {
+    if (longPressTimer.current) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+  const handleClick = () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    onClick();
+  };
+  const pressProps = onLongPress
+    ? {
+        onTouchStart: startLongPress,
+        onTouchEnd: cancelLongPress,
+        onTouchMove: cancelLongPress,
+        onTouchCancel: cancelLongPress,
+        onMouseDown: startLongPress,
+        onMouseUp: cancelLongPress,
+        onMouseLeave: cancelLongPress,
+        onContextMenu: (e: React.MouseEvent) => { e.preventDefault(); },
+      }
+    : {};
 
   const PinBadge = () =>
     isPinned ? (
@@ -121,7 +161,8 @@ function PostCard({ post, onClick }: {
     const aspect = getAspectRatio();
     return (
       <button
-        onClick={onClick}
+        onClick={handleClick}
+        {...pressProps}
         className={`press-in relative overflow-hidden rounded-2xl ${aspect} block w-full bg-muted/70`}
       >
         <PinBadge />
@@ -140,7 +181,8 @@ function PostCard({ post, onClick }: {
 
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
+      {...pressProps}
       className={`press-in relative overflow-hidden rounded-2xl ${getAspectRatio()} block w-full bg-muted/70 group`}
     >
       <PinBadge />
@@ -177,6 +219,8 @@ interface ProfilePlatformGridProps {
   activeTab: string;
   tabs: PlatformTab[];
   onTabChange: (tab: string) => void;
+  isOwner?: boolean;
+  currentUserId?: string;
 }
 
 export const ProfilePlatformGrid = ({
@@ -184,6 +228,8 @@ export const ProfilePlatformGrid = ({
   activeTab,
   tabs,
   onTabChange,
+  isOwner = false,
+  currentUserId,
 }: ProfilePlatformGridProps) => {
   const { items, loading, hasMore, loadMore } = useUserPlatformPosts(
     userId,
@@ -192,6 +238,7 @@ export const ProfilePlatformGrid = ({
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedPostIndex, setSelectedPostIndex] = useState<number>(-1);
+  const [actionsPost, setActionsPost] = useState<PlatformPost | null>(null);
   const location = useLocation();
 
   // Close the viewer when the route/location changes (e.g. user taps a nav button)
@@ -295,6 +342,11 @@ export const ProfilePlatformGrid = ({
                     <PostCard
                       post={post}
                       onClick={() => handlePostClick(post.id, idx)}
+                      onLongPress={
+                        isOwner && currentUserId && !post.is_repost
+                          ? () => setActionsPost(post)
+                          : undefined
+                      }
                     />
                   </div>
                 ))}
@@ -330,6 +382,21 @@ export const ProfilePlatformGrid = ({
           onTabChange={(tab) => {
             onTabChange(tab);
           }}
+        />
+      )}
+
+      {actionsPost && currentUserId && (
+        <PostOwnerActionsSheet
+          open={!!actionsPost}
+          onOpenChange={(v) => { if (!v) setActionsPost(null); }}
+          postId={actionsPost.id}
+          userId={currentUserId}
+          platform={actionsPost.platform}
+          isPinned={!!actionsPost.pinned_at}
+          hideCounts={!!actionsPost.hide_counts}
+          commentsDisabled={!!actionsPost.comments_disabled}
+          isRepost={!!actionsPost.is_repost}
+          currentCaption={actionsPost.content || ""}
         />
       )}
     </>
