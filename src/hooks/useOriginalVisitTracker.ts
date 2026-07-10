@@ -19,6 +19,7 @@ export function useOriginalVisitTracker(
   postId: string,
   enabled: boolean = true,
   trackPlayableInteraction: boolean = false,
+  firesOriginalOnHandoff: boolean = false,
 ) {
   const firedRef = useRef(false);
   const playFiredRef = useRef(false);
@@ -140,7 +141,13 @@ export function useOriginalVisitTracker(
         // Playable posts on some platforms (Threads) hand the tap off to the
         // native app instead of playing inline — the pending `trackView` fetch
         // gets aborted when the tab hides. Use a beacon so the insert lands.
-        if (recentTap) firePlayBeacon();
+        if (recentTap) {
+          firePlayBeacon();
+          // Platforms like X and Threads open the native app on tap. That
+          // hand-off is also a visit to the original source, so credit both
+          // Play and Visit (dedup by refs — one each per post).
+          if (firesOriginalOnHandoff) fireOriginal();
+        }
         return;
       }
       if (recentTap) {
@@ -220,7 +227,7 @@ export function useOriginalVisitTracker(
         originalDwellTimerRef.current = null;
       }
     };
-  }, [containerRef, postId, enabled, trackPlayableInteraction]);
+  }, [containerRef, postId, enabled, trackPlayableInteraction, firesOriginalOnHandoff]);
 }
 
 export function markOriginalVisit(postId: string) {
