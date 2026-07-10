@@ -74,6 +74,20 @@ export function useOriginalVisitTracker(
       return !!node.closest('iframe');
     };
 
+    const THREADS_EMBED_SELECTOR =
+      '.js-threads-embed, [data-threads-embed], blockquote.text-post-media';
+    const isInsideThreadsEmbed = (node: EventTarget | null): boolean => {
+      if (!(node instanceof Element)) return false;
+      return !!node.closest(THREADS_EMBED_SELECTOR);
+    };
+
+    const isXPost = (): boolean => {
+      const scope = el.querySelector(
+        'blockquote.twitter-tweet, [data-tweet-id], iframe[src*="twitter.com"], iframe[src*="x.com"], iframe[src*="platform.twitter.com"]',
+      );
+      return !!scope;
+    };
+
     const onPointerDown = (e: Event) => {
       const now = Date.now();
       recentPointerRef.current = now;
@@ -87,6 +101,12 @@ export function useOriginalVisitTracker(
         } else {
           fireOriginal();
         }
+      } else if (trackPlayableInteraction && isInsideThreadsEmbed(e.target)) {
+        // Threads SDK inflates a same-origin <blockquote> (no iframe), so the
+        // isInsideIframe check above never matches. Treat a pointerdown on the
+        // inflated Threads embed as a play interaction (+1 only).
+        firePlay();
+        lastIframeInteractionRef.current = now;
       }
     };
 
@@ -116,7 +136,13 @@ export function useOriginalVisitTracker(
       // Only infer a visit for non-playable embeds (article/link cards where
       // tapping opens the source). Playable posts must not auto-fire Visit on
       // app backgrounding — user may just be watching inline.
-      if (trackPlayableInteraction) return;
+      // Exception: X/Twitter embeds are a cross-origin iframe that swallows
+      // internal anchor clicks; when the user taps through to the original
+      // post, the only observable signal is the app becoming hidden shortly
+      // after a pointerdown on the embed. Scope the fallback to X only so
+      // other playable platforms (YouTube/TikTok/IG/FB/LinkedIn/Pinterest/
+      // Spotify/Threads) are unaffected.
+      if (trackPlayableInteraction && !isXPost()) return;
       const now = Date.now();
       if (
         now - recentPointerRef.current < 3000 ||
