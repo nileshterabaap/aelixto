@@ -77,18 +77,16 @@ export function useOriginalVisitTracker(
     const onPointerDown = (e: Event) => {
       const now = Date.now();
       recentPointerRef.current = now;
-      const insideIframe = isInsideIframe(e.target);
-      if (trackPlayableInteraction) {
-        // Playable posts: a tap anywhere inside the hydrated embed counts as
-        // Play (+1). Some platforms (Threads, TikTok, X) overlay tap targets
-        // on top of the iframe, so the pointerdown target isn't the iframe
-        // itself even when the user is clearly hitting the video. Guarded
-        // once-per-post by `playFiredRef` so accidental container taps still
-        // only credit a single play.
-        firePlay();
-        if (insideIframe) lastIframeInteractionRef.current = now;
-      } else if (insideIframe) {
-        fireOriginal();
+      if (isInsideIframe(e.target)) {
+        if (trackPlayableInteraction) {
+          // Playable posts: tapping into the iframe = Play (+1) only.
+          // "Visited the original source" is intentionally NOT inferred here;
+          // it must come from an explicit anchor click or the platform-icon button.
+          firePlay();
+          lastIframeInteractionRef.current = now;
+        } else {
+          fireOriginal();
+        }
       }
     };
 
@@ -115,20 +113,15 @@ export function useOriginalVisitTracker(
 
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'hidden') return;
+      // Only infer a visit for non-playable embeds (article/link cards where
+      // tapping opens the source). Playable posts must not auto-fire Visit on
+      // app backgrounding — user may just be watching inline.
+      if (trackPlayableInteraction) return;
       const now = Date.now();
-      const recentTap =
+      if (
         now - recentPointerRef.current < 3000 ||
-        now - lastIframeInteractionRef.current < 10000;
-      if (trackPlayableInteraction) {
-        // Playable posts on some platforms (Threads, X) hand the tap off to
-        // the native app / a new tab instead of playing inline. When the app
-        // is backgrounded shortly after a tap inside this post, credit it as
-        // a Play so the score reflects the interaction. `playFiredRef` still
-        // prevents duplicates when the pointerdown handler also fired.
-        if (recentTap) firePlay();
-        return;
-      }
-      if (recentTap) {
+        now - lastIframeInteractionRef.current < 10000
+      ) {
         fireOriginal();
       }
     };

@@ -807,7 +807,7 @@ const buildTikTokEmbed = (url: string): string | null => {
     const videoMatch = u.pathname.match(/\/@[^/]+\/video\/(\d+)/);
     if (videoMatch) {
       const videoId = videoMatch[1];
-      return `<iframe src="https://www.tiktok.com/embed/v2/${videoId}?autoplay=0&loop=0&music_info=1" style="border:none;width:100%;display:block;" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+      return `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" style="border:none;width:100%;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
