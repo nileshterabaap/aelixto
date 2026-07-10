@@ -107,6 +107,13 @@ export function useOriginalVisitTracker(
       // belongs to this post's embed container.
       setTimeout(() => {
         const now = Date.now();
+        // Some embeds (notably X/Twitter widgets) steal focus during
+        // hydration without any user interaction. Require a recent pointer
+        // tap so we don't credit `original_visit` on mount.
+        const recentTap =
+          now - recentPointerRef.current < 3000 ||
+          now - lastIframeInteractionRef.current < 10000;
+        if (!recentTap) return;
         const active = document.activeElement;
         if (
           active &&
