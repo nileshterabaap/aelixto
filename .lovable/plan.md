@@ -1,46 +1,64 @@
-## Problems
+## Goal
 
-1. **X posts don't credit `original_visit`.** In `HydratedEmbed.tsx`, `platformHint === 'x' || 'twitter'` marks X as `isPlayableMediaPost=true`. That flag makes `useOriginalVisitTracker` only fire `firePlay` on tap and skip `fireOriginal`. Result: tapping into an X embed (which opens x.com or the X app) never records a visit.
+When a post's source (Instagram, TikTok, YouTube, Facebook, Threads, X, Pinterest, Reddit, LinkedIn, etc.) is deleted or made private — so the embed renders a "link broken / post removed" fallback — automatically delete that post from Aelixto and send the original poster a notification with the thumbnail preview on the right side (matching existing notification styling).
 
-2. **Threads video plays don't credit `video_play`.** Threads is `isPlayableMediaPost=true`, so `pointerdown` on the container is supposed to call `firePlay`. In practice Threads' iframe hands the tap off to the native app / new tab and the app is backgrounded before the play insert completes. Because `trackView` isn't a beacon and isn't retried, the request is aborted mid-flight when the tab hides. Additionally, some Threads plays go straight through the iframe with no synthetic pointerdown reaching the container.
+## Why this can't be done in the browser
 
-3. **Profile feed doesn't show new posts on refresh.** `UserProfile.tsx`'s `handleRefresh` only calls `refetchProfile()` + `refreshFollow()`. It never invalidates `platform-posts` or `user-platform-tabs`, so pull-to-refresh on someone's profile leaves the grid stale.
+The embed iframes (instagram.com, youtube.com, …) are cross-origin, so we cannot read their DOM to detect "Sorry, this post isn't available" messages from the client. Any client-side guess would produce false positives (slow networks, ad-blockers, transient failures) and wrongly delete real posts.
 
-## Fix
+The reliable signal is **server-side**: re-resolve each post's source URL via the official oEmbed / metadata endpoints. A consistent 404 / "not found" response means the source post is gone.
 
-### 1. `src/components/HydratedEmbed.tsx`
-Remove `twitter` / `x` from the `isPlayableMediaPost` list and drop `twitter.com/` / `x.com/` from the URL checks. X is a text/link platform for engagement scoring — tapping it should credit as `original_visit`, matching Reddit's behavior. (Twitter embeds that happen to contain video will still count as a visit, which is the correct signal for X per the user's request.)
+## Approach
 
-### 2. `src/hooks/useOriginalVisitTracker.ts`
-Make Play tracking survive the tap-out to a native app, and use a beacon:
+### 1. New edge function: `validate-post-source`
+For a given `postId`, fetch the canonical validation endpoint for its platform:
 
-- Add a new `firePlayBeacon()` variant that calls `trackViewBeforeNavigation({ postId, eventType: 'video_play' })` (a `navigator.sendBeacon` / `keepalive: true` request). Export a small `trackVideoPlayBeacon` from `useViewTracking.ts` that reuses the existing navigation-safe path.
-- In `onPointerDown` for playable posts: fire the regular `firePlay()` immediately (best case, still on-page) AND arm a "pending play" flag.
-- In `onVisibilityChange` (hidden) for playable posts: if a recent tap happened AND `playFiredRef` never confirmed success (or the pending flag is set), call `firePlayBeacon()` so the insert survives backgrounding. Still guarded once-per-post.
-- Also attach `pointerdown`/`touchstart` capture listeners on the iframe element itself when it mounts (via the existing `attachIframeListeners` MutationObserver path), so Threads taps that don't bubble to the container still fire play.
+- instagram → `graph.facebook.com/v18.0/instagram_oembed` (existing META token) — 404 / `error.code 24` = removed
+- facebook → `graph.facebook.com/v18.0/oembed_post` — same
+- youtube → `youtube.com/oembed?url=…` — 404 / 401 = removed/private
+- tiktok → `tiktok.com/oembed?url=…` — 404
+- threads / x / linkedin / pinterest / reddit → HEAD request to the post URL; treat HTTP 404 / 410 as removed. Reddit also: `…/.json` returning `{}` or "removed" flag
+- spotify / articles → skip (Spotify items rarely 404; articles handled by existing unfurl)
 
-This keeps behavior scoped to playable posts — no change for text platforms.
+Return `{ status: "ok" | "removed" | "unknown" }`. Only `removed` triggers deletion. `unknown` (timeouts, rate-limits, 5xx) never deletes.
 
-### 3. `src/pages/UserProfile.tsx`
-Extend `handleRefresh` to also invalidate the grid queries for the profile being viewed:
+### 2. Confirmation gate (false-positive protection)
+A post is only deleted when it returns `removed` on **two consecutive checks at least 6 hours apart**. We add a `posts.broken_check_count` int + `posts.broken_first_seen_at` timestamp. First removal hit just records; second hit deletes.
 
-```ts
-const handleRefresh = useCallback(async () => {
-  await Promise.all([
-    refetchProfile(),
-    refreshFollow(),
-    queryClient.invalidateQueries({ queryKey: ["user-platform-tabs", profile?.user_id] }),
-    queryClient.invalidateQueries({ queryKey: ["platform-posts", profile?.user_id] }),
-  ]);
-}, [refetchProfile, refreshFollow, queryClient, profile?.user_id]);
-```
+### 3. New edge function: `sweep-broken-posts` (cron)
+Runs hourly via pg_cron. Selects ~100 posts ordered by `last_validated_at` ascending (oldest first), calls `validate-post-source` for each, updates counters, and when threshold is hit:
+- captures the post's `thumbnail_url`, `platform`, `caption`/`title`, `media_url`
+- inserts a row into `notifications` with `type = 'post_removed'`, `actor_user_id = null`, `target_user_id = post.user_id`, payload `{ thumbnail_url, platform, original_url, caption }`
+- deletes the post (cascade removes likes/reposts/comments/saves as already configured)
+- triggers existing push-notification pipeline
 
-`queryClient` is already imported and used elsewhere in the file.
+### 4. Notification UI
+Existing `NotificationItem` already renders a right-side thumbnail when payload has `thumbnail_url`. Add a new branch for `type === 'post_removed'`:
 
-## Out of scope
+> "Your <Instagram> post was removed because the original was deleted or made private." — with the platform logo + cached thumbnail on the right exactly like engagement notifications.
 
-- No changes to `record-view` edge function, scoring rules, or self-view logic.
-- No changes to any other platform's tracking behavior.
-- No UI/visual changes.
+Tappable: opens a small sheet explaining why, no destination link.
 
-**Success probability: ~85%.**
+### 5. Manual trigger on viewer
+When `HydratedEmbed` mounts an Instagram/Facebook/Threads embed and the **`RawEmbedRenderer` onError** fires (which we already track via `rawEmbedFailed`), fire a one-shot `validate-post-source` call for that postId. This shortcuts the cron for posts the author is actively looking at, but still goes through the same 2-strike gate — no immediate deletion.
+
+## Files
+
+New:
+- `supabase/functions/validate-post-source/index.ts`
+- `supabase/functions/sweep-broken-posts/index.ts`
+- migration: add `broken_check_count`, `broken_first_seen_at`, `last_validated_at` to `posts`; add `post_removed` to notification type enum; schedule hourly cron for `sweep-broken-posts`
+- `src/components/notifications/PostRemovedNotification.tsx`
+
+Edited:
+- `src/components/notifications/NotificationItem.tsx` — route `post_removed` to new component
+- `src/components/HydratedEmbed.tsx` — on `handleRawEmbedError`, call `validate-post-source` once per session per postId
+
+## Out of scope / safeguards
+
+- No client-side "guess" deletion — only server validation deletes.
+- Posts from platforms we cannot reliably probe (Spotify, generic articles) are never auto-deleted.
+- Transient failures (5xx, network, rate-limit) are recorded as `unknown` and do not advance the strike counter.
+- Author can still manually delete; nothing changes for healthy posts.
+
+Approve and I'll implement.

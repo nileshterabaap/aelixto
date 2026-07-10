@@ -1,6 +1,5 @@
-import { useState, memo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
+import { useState, memo, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
-import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
 import type { Post } from '@/data/demoData';
 import { supabase } from '@/integrations/supabase/client';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
@@ -10,8 +9,6 @@ import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
-import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
-import { openExternalUrl } from '@/lib/openExternalUrl';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -60,19 +57,10 @@ const getYouTubeVideoId = (url: string) => {
   return (match && match[2].length === 11) ? match[2] : null;
 };
 
-const isYouTubeShort = (
-  url: string,
-  title?: string | null,
-  content?: string | null,
-  aspectRatio?: number | null,
-  mediaKind?: string | null,
-) => {
-  const normalizedUrl = decodeURIComponent(url).toLowerCase();
-  if (normalizedUrl.includes('/shorts/')) return true;
+const isYouTubeShort = (url: string, title?: string | null, content?: string | null) => {
+  if (url.includes('/shorts/')) return true;
   if (title && /#shorts?\b/i.test(title)) return true;
   if (content && /#shorts?\b/i.test(content)) return true;
-  if (typeof aspectRatio === 'number' && aspectRatio > 0 && aspectRatio < 1) return true;
-  if (mediaKind && /short|reel|vertical|portrait/i.test(mediaKind)) return true;
   return false;
 };
 
@@ -107,7 +95,10 @@ export const HydratedEmbed = memo(({
     platformHint === 'instagram' ||
     platformHint === 'facebook' ||
     platformHint === 'linkedin' ||
+    platformHint === 'threads' ||
     platformHint === 'pinterest' ||
+    platformHint === 'twitter' ||
+    platformHint === 'x' ||
     lowerUrl.includes('youtube.com/') ||
     lowerUrl.includes('youtu.be/') ||
     lowerUrl.includes('open.spotify.com/') ||
@@ -116,38 +107,15 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('facebook.com/') ||
     lowerUrl.includes('fb.watch/') ||
     lowerUrl.includes('linkedin.com/') ||
+    lowerUrl.includes('threads.net/') ||
+    lowerUrl.includes('threads.com/') ||
     lowerUrl.includes('pinterest.com/') ||
     lowerUrl.includes('pin.it/') ||
+    lowerUrl.includes('twitter.com/') ||
+    lowerUrl.includes('x.com/') ||
     lowerUrl.includes('/reel/') ||
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
-
-  // ── X & Threads: scoring rebuilt from scratch ────────────────────────────
-  // View  = handled by the impression tracker elsewhere.
-  // Play  = any tap inside the embed when the post is a video/reel/clip.
-  // Visit = any tap inside the embed (tap hands the user off to x.com /
-  //         threads.net or the native app), fired via beacon so it survives
-  //         backgrounding. Backend dedups per post+viewer per cooldown, so
-  //         firing Play + Visit on the same tap is safe.
-  const isXPlatform =
-    platformHint === 'x' ||
-    platformHint === 'twitter' ||
-    lowerUrl.includes('twitter.com/') ||
-    lowerUrl.includes('x.com/');
-  const isThreadsPlatform =
-    platformHint === 'threads' ||
-    lowerUrl.includes('threads.net/') ||
-    lowerUrl.includes('threads.com/');
-  const isXOrThreadsVideo =
-    (isXPlatform || isThreadsPlatform) &&
-    (mediaTypeHint === 'video' ||
-      mediaTypeHint === 'audio' ||
-      lowerUrl.includes('/video/') ||
-      lowerUrl.includes('/reel/') ||
-      lowerUrl.includes('/status/') && (mediaTypeHint === 'video'));
-
-  const playFires = isPlayableMediaPost || isXOrThreadsVideo;
-  const exitFiresOnAnyTap = isXPlatform || isThreadsPlatform;
 
   const mediaLifecycleEnabled =
     shouldHydrate &&
@@ -163,10 +131,6 @@ export const HydratedEmbed = memo(({
     { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: true }
   );
 
-  // Track click-throughs to the original platform (iframe focus or anchor clicks).
-  // Awards +1 engagement score to the author on top of the impression score.
-  useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, playFires, exitFiresOnAnyTap);
-
   const forceTwitterRenderer =
     r.kind === 'raw' &&
     !!mediaUrl &&
@@ -178,37 +142,7 @@ export const HydratedEmbed = memo(({
   const forceUniversalRenderer =
     r.kind === 'raw' &&
     !!mediaUrl &&
-    (platformHint === 'facebook' ||
-      platformHint === 'threads' ||
-      platformHint === 'linkedin' ||
-      platformHint === 'instagram' ||
-      lowerUrl.includes('facebook.com/') ||
-      lowerUrl.includes('fb.watch/') ||
-      lowerUrl.includes('fb.me/') ||
-      lowerUrl.includes('threads.net/') ||
-      lowerUrl.includes('threads.com/') ||
-      lowerUrl.includes('linkedin.com/') ||
-      lowerUrl.includes('instagram.com/') ||
-      lowerUrl.includes('instagr.am/'));
-
-  const isFacebookPost =
-    platformHint === 'facebook' ||
-    lowerUrl.includes('facebook.com/') ||
-    lowerUrl.includes('fb.watch/') ||
-    lowerUrl.includes('fb.me/');
-
-  const isFacebookVideoLike =
-    isFacebookPost &&
-    (mediaTypeHint === 'video' ||
-      String((post as any).media_kind || '').toLowerCase() === 'video' ||
-      lowerUrl.includes('/reel/') ||
-      lowerUrl.includes('/videos/') ||
-      lowerUrl.includes('/watch/') ||
-      lowerUrl.includes('/watch?') ||
-      lowerUrl.includes('/watch.') ||
-      lowerUrl.includes('/share/v/') ||
-      lowerUrl.includes('/share/r/') ||
-      lowerUrl.includes('fb.watch/'));
+    (platformHint === 'threads' || platformHint === 'linkedin' || lowerUrl.includes('threads.net/') || lowerUrl.includes('threads.com/') || lowerUrl.includes('linkedin.com/'));
 
   useEffect(() => {
     if (!shouldHydrate) return;
@@ -219,32 +153,13 @@ export const HydratedEmbed = memo(({
     setRawEmbedFailed(true);
     requestSourceValidation(post.id);
   }, [post.id]);
-
-  const handleOriginalVisit = useCallback(() => {
-    markOriginalVisit(post.id);
-  }, [post.id]);
-
-  const handleExternalOriginalClick = useCallback((event: MouseEvent<HTMLAnchorElement>) => {
-    handleOriginalVisit();
-    if (!mediaUrl) return;
-    event.preventDefault();
-    void openExternalUrl(mediaUrl);
-  }, [handleOriginalVisit, mediaUrl]);
   
-  const isYouTubePost = platformHint === 'youtube' || (!!r.url && /youtube\.com|youtu\.be/i.test(r.url));
-
   // For YouTube, prefer their thumbnail
-  const effectiveThumbnail = isYouTubePost && r.url 
+  const effectiveThumbnail = post.platform === 'youtube' && r.url 
     ? getYouTubeThumbnail(r.url) || thumbnailUrl 
     : thumbnailUrl;
   
-  const aspectClass = isYouTubePost && r.url && isYouTubeShort(
-    r.url,
-    post.title,
-    (post as any).content,
-    (post as any).aspect_ratio ?? (post as any).aspectRatio ?? null,
-    (post as any).media_kind ?? (post as any).mediaKind ?? null,
-  )
+  const aspectClass = post.platform === 'youtube' && r.url && isYouTubeShort(r.url, post.title, (post as any).content)
     ? 'aspect-[9/16]'
     : 'aspect-video';
   
@@ -268,34 +183,7 @@ export const HydratedEmbed = memo(({
       </div>
     );
   }
-
-  // Facebook photo posts render more reliably as the fetched media itself.
-  // The plugin iframe reserves a reactions/footer area that creates the blank
-  // strip the user reported; videos still use the iframe/player path.
-  if (shouldHydrate && isFacebookPost && effectiveThumbnail && !isFacebookVideoLike) {
-    return (
-      <div ref={embedContainerRef} className="w-full" data-embed-status="ready">
-        <ImageViewTracker postId={post.id}>
-          <a
-            href={mediaUrl || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleExternalOriginalClick}
-            className="block w-full overflow-hidden bg-muted"
-          >
-            <img
-              src={effectiveThumbnail}
-              alt="Facebook post content"
-              className="w-full h-auto object-contain"
-              loading="eager"
-              decoding="async"
-            />
-          </a>
-        </ImageViewTracker>
-      </div>
-    );
-  }
-
+  
   // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
   if (!shouldHydrate) {
     return (
@@ -325,7 +213,7 @@ export const HydratedEmbed = memo(({
       <div className="w-full">
 
         {/* YouTube video */}
-        {r.kind === 'video' && isYouTubePost && r.url && (
+        {r.kind === 'video' && post.platform === 'youtube' && r.url && (
           <ImageViewTracker postId={post.id}>
             <div className={`w-full bg-black ${aspectClass}`}>
               <iframe
@@ -340,7 +228,7 @@ export const HydratedEmbed = memo(({
         )}
         
         {/* Non-YouTube video */}
-        {r.kind === 'video' && !isYouTubePost && r.url && (
+        {r.kind === 'video' && post.platform !== 'youtube' && r.url && (
           <ImageViewTracker postId={post.id}>
             <video 
               src={r.url} 
@@ -377,21 +265,21 @@ export const HydratedEmbed = memo(({
 
         {forceUniversalRenderer && mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={mediaUrl} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+            <UniversalMetaEmbed url={mediaUrl} />
           </ImageViewTracker>
         )}
         
         {/* Raw embed HTML (Instagram, Facebook, Spotify) */}
         {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && r.html && !rawEmbedFailed && (
           <ImageViewTracker postId={post.id}>
-            <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} onOriginalVisit={handleOriginalVisit} />
+            <RawEmbedRenderer embedHtml={r.html} onError={handleRawEmbedError} />
           </ImageViewTracker>
         )}
 
         {/* Fallback when raw embed fails — show UniversalMetaEmbed to rebuild */}
         {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && rawEmbedFailed && post.mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={post.mediaUrl} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+            <UniversalMetaEmbed url={post.mediaUrl} />
           </ImageViewTracker>
         )}
         
@@ -422,25 +310,21 @@ export const HydratedEmbed = memo(({
         {/* Pinterest embed */}
         {r.kind === 'pinterest' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <PinterestEmbed
-              url={r.url}
-              postId={post.id}
-              suggestedHeight={(post as any).suggested_height ?? null}
-            />
+            <PinterestEmbed url={r.url} />
           </ImageViewTracker>
         )}
         
         {/* Article embed */}
         {r.kind === 'article' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <ArticleEmbed url={r.url} postId={post.id} platform={post.platform} />
+            <ArticleEmbed url={r.url} />
           </ImageViewTracker>
         )}
         
         {/* Universal Meta embed (Instagram, Facebook, etc) */}
         {r.kind === 'universal' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+            <UniversalMetaEmbed url={r.url} />
           </ImageViewTracker>
         )}
       </div>

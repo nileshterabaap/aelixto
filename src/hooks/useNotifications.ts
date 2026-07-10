@@ -1,17 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/useSession";
+import { useEffect } from "react";
 
 export interface Notification {
   id: string;
   recipient_id: string;
   actor_id: string;
-  type: 'like' | 'comment' | 'repost' | 'follow' | 'follow_request' | 'report_outcome';
+  type: 'like' | 'comment' | 'repost' | 'follow' | 'report_outcome';
   post_id: string | null;
   comment_id: string | null;
   is_read: boolean;
   created_at: string;
-  metadata?: Record<string, unknown>;
+  metadata?: any;
   actor?: {
     username: string;
     display_name: string | null;
@@ -25,6 +26,7 @@ export interface Notification {
 
 export const useNotificationCount = () => {
   const { user } = useSession();
+  const queryClient = useQueryClient();
 
   const { data: count = 0, isLoading } = useQuery({
     queryKey: ["notification-count", user?.id],
@@ -45,9 +47,35 @@ export const useNotificationCount = () => {
       return count || 0;
     },
     enabled: !!user?.id,
-    staleTime: 0,
-    refetchOnMount: 'always',
+    staleTime: 30000, // 30 seconds
   });
+
+  // Subscribe to realtime notifications
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`notifications-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `recipient_id=eq.${user.id}`,
+        },
+        () => {
+          // Invalidate the count query when notifications change
+          queryClient.invalidateQueries({ queryKey: ["notification-count", user.id] });
+          queryClient.invalidateQueries({ queryKey: ["notifications", user.id] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   return { count, isLoading };
 };
@@ -135,8 +163,6 @@ export const useNotifications = () => {
       return result;
     },
     enabled: !!user?.id,
-    staleTime: 0,
-    refetchOnMount: 'always',
   });
 
   // Mark all as read mutation

@@ -8,8 +8,6 @@ import { LinkPreviewCard } from "./LinkPreviewCard";
 interface ArticleEmbedProps {
   url: string;
   onFaviconLoaded?: (favicon: string) => void;
-  postId?: string;
-  platform?: string | null;
 }
 
 interface UnfurlResult {
@@ -65,7 +63,7 @@ const resolveRenderer = (url: string): 'reddit' | 'quora' | 'article' => {
   return 'article';
 };
 
-export const ArticleEmbed = ({ url, onFaviconLoaded, postId, platform }: ArticleEmbedProps) => {
+export const ArticleEmbed = ({ url, onFaviconLoaded }: ArticleEmbedProps) => {
   const [data, setData] = useState<UnfurlResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -141,48 +139,8 @@ export const ArticleEmbed = ({ url, onFaviconLoaded, postId, platform }: Article
         }
 
         if (!unfurledData) {
-          // Quora aggressively blocks scrapers — synthesize a minimal card
-          // from the URL itself so it still renders via ArticleContentEmbed
-          // (matching the Medium/Articles look) instead of the bare LinkPreviewCard.
-          if (rendererType === 'quora') {
-            const slugTitle = (() => {
-              try {
-                const u = new URL(cleanedUrl);
-                const parts = u.pathname.split('/').filter(Boolean);
-                const last = parts[parts.length - 1] || 'Quora Post';
-                return last
-                  .split('-')
-                  .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-                  .join(' ');
-              } catch {
-                return 'Quora Post';
-              }
-            })();
-            unfurledData = {
-              kind: 'quora-post',
-              resolvedUrl: cleanedUrl,
-              site: {
-                name: 'Quora',
-                domain: 'quora.com',
-                favicon: 'https://www.google.com/s2/favicons?domain=quora.com&sz=64',
-              },
-              meta: { title: slugTitle, description: '', image: null, publishedTime: null },
-              content: { html: '' },
-            };
-          } else {
-            setError('Failed to load article');
-            return;
-          }
-        }
-
-        // Always brand Quora cards cleanly even if unfurl returned a poor site name
-        if (rendererType === 'quora') {
-          unfurledData.site = {
-            ...unfurledData.site,
-            name: 'Quora',
-            domain: 'quora.com',
-            favicon: unfurledData.site.favicon || 'https://www.google.com/s2/favicons?domain=quora.com&sz=64',
-          };
+          setError('Failed to load article');
+          return;
         }
 
         console.log('[ArticleEmbed] Result:', unfurledData);
@@ -254,14 +212,27 @@ export const ArticleEmbed = ({ url, onFaviconLoaded, postId, platform }: Article
     );
   }
 
-  // Quora + everything else - rich article card
+  // Quora posts - link card only (Quora blocks embeds)
+  if (rendererType === 'quora') {
+    return (
+      <div data-embed-status="ready">
+        <LinkPreviewCard
+          url={data.resolvedUrl}
+          title={data.meta.title || 'View on Quora'}
+          description={data.meta.description}
+          image={data.meta.image || undefined}
+          domain={data.site.domain}
+          favicon={data.site.favicon}
+          siteName={data.site.name}
+        />
+      </div>
+    );
+  }
+
+  // Everything else - rich article card
   return (
     <div data-embed-status="ready">
-      <ArticleContentEmbed
-        data={data}
-        postId={postId}
-        platform={rendererType === 'quora' ? 'quora' : platform}
-      />
+      <ArticleContentEmbed data={data} />
     </div>
   );
 };

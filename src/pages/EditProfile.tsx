@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Loader2, Check, X, Share2, Info } from "lucide-react";
+import { ArrowLeft, Loader2, Check, X, Share2 } from "lucide-react";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { ImageUploadButton } from "@/components/ImageUploadButton";
@@ -15,7 +15,6 @@ import { useImageUpload } from "@/hooks/useImageUpload";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -39,33 +38,7 @@ const EditProfile = () => {
     cover_url: '',
   });
   const [aelixScoreEnabled, setAelixScoreEnabled] = useState(true);
-  const [showInfoTooltip, setShowInfoTooltip] = useState(false);
-  const infoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'self'>('idle');
-
-  // Cleanup info tooltip timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (infoTimeoutRef.current) clearTimeout(infoTimeoutRef.current);
-    };
-  }, []);
-
-  // Close info tooltip when tapping/clicking anywhere
-  useEffect(() => {
-    if (!showInfoTooltip) return;
-    const close = () => {
-      if (infoTimeoutRef.current) clearTimeout(infoTimeoutRef.current);
-      setShowInfoTooltip(false);
-    };
-    // Delay attach so the opening tap doesn't immediately close it
-    const t = setTimeout(() => {
-      document.addEventListener('pointerdown', close, true);
-    }, 0);
-    return () => {
-      clearTimeout(t);
-      document.removeEventListener('pointerdown', close, true);
-    };
-  }, [showInfoTooltip]);
 
   // Check ownership and redirect if not owner
   useEffect(() => {
@@ -86,9 +59,7 @@ const EditProfile = () => {
       });
       // Load Aelix Score preference from settings
       const settings = profile.settings as any;
-      // Score visibility is opt-in — default OFF unless the user has
-      // explicitly enabled it. Matches the display gate in UserProfile.
-      setAelixScoreEnabled(settings?.aelix_score_enabled === true);
+      setAelixScoreEnabled(settings?.aelix_score_enabled !== false);
     }
   }, [profile]);
 
@@ -330,31 +301,8 @@ const EditProfile = () => {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="space-y-0.5 relative">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="aelix-score">Aelix Score</Label>
-                  <button
-                    type="button"
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                    onClick={() => {
-                      if (infoTimeoutRef.current) clearTimeout(infoTimeoutRef.current);
-                      setShowInfoTooltip(true);
-                      infoTimeoutRef.current = setTimeout(() => setShowInfoTooltip(false), 5000);
-                    }}
-                  >
-                    <Info className="h-4 w-4" />
-                  </button>
-                </div>
-                {showInfoTooltip && (
-                  <div className="absolute left-0 top-full mt-2 z-50 max-w-xs rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-md animate-in fade-in zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out data-[state=closed]:zoom-out-95">
-                    <p>Aelix Score represents the total engagement earned by your shared posts.</p>
-                    <ul className="list-disc pl-4 space-y-0.5 mt-1">
-                      <li>Viewed a shared post (+1)</li>
-                      <li>Played shared content (+1)</li>
-                      <li>Visited the original source (+1)</li>
-                    </ul>
-                  </div>
-                )}
+              <div className="space-y-0.5">
+                <Label htmlFor="aelix-score">Aelix Score</Label>
                 <p className="text-sm text-muted-foreground">
                   Display your Aelix Score on your profile
                 </p>

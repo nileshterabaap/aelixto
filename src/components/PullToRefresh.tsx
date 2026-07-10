@@ -7,9 +7,9 @@ interface PullToRefreshProps {
   children: ReactNode;
 }
 
-const THRESHOLD = 55;
-const MAX_PULL = 100;
-const LOADING_REST = 45;
+const THRESHOLD = 60;
+const MAX_PULL = 180;
+const LOADING_REST = 55;
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -22,6 +22,8 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const [refreshing, setRefreshing] = useState(false);
   const pullY = useMotionValue(0);
   const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
+  const directionLocked = useRef<"none" | "vertical" | "horizontal">("none");
   const pulling = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -42,34 +44,22 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   }, []);
 
   useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
     const handleTouchStart = (event: TouchEvent) => {
       if (refreshing) return;
       if (shouldIgnorePullTarget(event.target)) return;
+      if (!isAtTop()) return;
+
       const touch = event.touches[0];
       if (!touch) return;
 
       touchStartY.current = touch.clientY;
-      // Allow starting the gesture from any scroll position.
-      // We'll begin the actual pull only once the user reaches the top
-      // while still dragging downward (Instagram-style).
+      touchStartX.current = touch.clientX;
+      directionLocked.current = "none";
       pulling.current = true;
     };
-
-    // Toggle `body.at-scroll-top` so iframes become pointer-events:none
-    // when at the top of the page — this is what lets the finger start
-    // a pull gesture over a YouTube/Instagram/Twitter embed. As soon as
-    // the user scrolls down, iframes become interactive again.
-    const updateAtTop = () => {
-      const pageScrollTop =
-        window.scrollY ||
-        document.scrollingElement?.scrollTop ||
-        document.documentElement.scrollTop ||
-        0;
-      const atTop = pageScrollTop <= 2;
-      document.body.classList.toggle("at-scroll-top", atTop);
-    };
-    updateAtTop();
-    window.addEventListener("scroll", updateAtTop, { passive: true });
 
     const handleTouchMove = (event: TouchEvent) => {
       if (!pulling.current || refreshing) return;
@@ -77,22 +67,38 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       const touch = event.touches[0];
       if (!touch) return;
 
-      const diff = touch.clientY - touchStartY.current;
+      const diffY = touch.clientY - touchStartY.current;
+      const diffX = touch.clientX - touchStartX.current;
 
-      if (diff > 0 && isAtTop()) {
-        // Re-anchor the start position the moment we hit the top, so the
-        // pull distance is measured from "top reached", not from finger-down.
-        const anchored = touch.clientY - touchStartY.current;
-        const dampened = Math.min(MAX_PULL, anchored * 0.5 * (1 - anchored / (anchored + 300)));
-        pullY.set(dampened);
+      // Lock direction after small movement; bail on horizontal swipes (e.g. SwipeableView)
+      if (directionLocked.current === "none") {
+        if (Math.abs(diffX) > 8 || Math.abs(diffY) > 8) {
+          directionLocked.current =
+            Math.abs(diffX) > Math.abs(diffY) ? "horizontal" : "vertical";
+        }
+      }
+
+      if (directionLocked.current === "horizontal") {
+        pulling.current = false;
+        pullY.set(0);
         return;
       }
 
-      if (!isAtTop()) {
-        // User is still scrolling normally — re-anchor so when they hit the
-        // top mid-gesture the pull starts cleanly from 0.
-        touchStartY.current = touch.clientY;
+      const diff = diffY;
+
+      if (diff > 0 && isAtTop()) {
+        // 1:1 tracking up to threshold, then gentle resistance for elastic over-pull
+        let dampened: number;
+        if (diff <= THRESHOLD) {
+          dampened = diff;
+        } else {
+          const over = diff - THRESHOLD;
+          dampened = THRESHOLD + over * 0.55 * (1 - over / (over + 400));
+        }
+        pullY.set(Math.min(MAX_PULL, dampened));
+        return;
       }
+
       pullY.set(0);
     };
 
@@ -121,21 +127,16 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       animate(pullY, 0, { type: "spring", stiffness: 350, damping: 28 });
     };
 
-    // Listen on window (capture phase) so touches over iframes, overlays,
-    // and embeds still trigger PTR — matching Instagram's "pull from anywhere".
-    const opts: AddEventListenerOptions = { passive: true, capture: true };
-    window.addEventListener("touchstart", handleTouchStart, opts);
-    window.addEventListener("touchmove", handleTouchMove, opts);
-    window.addEventListener("touchend", handleTouchEnd, opts);
-    window.addEventListener("touchcancel", handleTouchEnd, opts);
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
+    el.addEventListener("touchmove", handleTouchMove, { passive: true });
+    el.addEventListener("touchend", handleTouchEnd, { passive: true });
+    el.addEventListener("touchcancel", handleTouchEnd, { passive: true });
 
     return () => {
-      window.removeEventListener("touchstart", handleTouchStart, opts);
-      window.removeEventListener("touchmove", handleTouchMove, opts);
-      window.removeEventListener("touchend", handleTouchEnd, opts);
-      window.removeEventListener("touchcancel", handleTouchEnd, opts);
-      window.removeEventListener("scroll", updateAtTop);
-      document.body.classList.remove("at-scroll-top");
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchmove", handleTouchMove);
+      el.removeEventListener("touchend", handleTouchEnd);
+      el.removeEventListener("touchcancel", handleTouchEnd);
     };
   }, [isAtTop, onRefresh, pullY, refreshing]);
 
