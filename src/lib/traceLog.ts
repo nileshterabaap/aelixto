@@ -9,14 +9,19 @@ export function traceLog(
 ) {
   try {
     // Fire-and-forget; never block UI.
-    void supabase.from('trace_logs' as any).insert({
-      event,
-      step,
-      post_id: opts.postId ?? null,
-      platform: opts.platform ?? null,
-      detail: opts.detail ? JSON.parse(JSON.stringify(opts.detail)) : null,
-      error: opts.error ? String(opts.error?.message ?? opts.error) : null,
-    });
+    // NOTE: supabase.from().insert() is lazy — it only executes when .then()
+    // or await is called on the builder. Chain .then() so the request fires.
+    supabase
+      .from('trace_logs' as any)
+      .insert({
+        event,
+        step,
+        post_id: opts.postId ?? null,
+        platform: opts.platform ?? null,
+        detail: opts.detail ? JSON.parse(JSON.stringify(opts.detail)) : null,
+        error: opts.error ? String(opts.error?.message ?? opts.error) : null,
+      })
+      .then(() => {}, () => {});
   } catch {
     // swallow
   }
