@@ -3,24 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pin, PinOff, MoreVertical, EyeOff, Eye, MessageCircleOff, MessageCircle as MessageCircleOn, Pencil, Trash2 } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { usePostActions } from "@/hooks/usePostActions";
-import { useSession } from "@/hooks/useSession";
+import { Pin } from "lucide-react";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 import { getThumbnailText } from "@/lib/getThumbnailText";
@@ -39,128 +22,55 @@ import QuoraIcon from "@/assets/platforms/quora.svg";
 import ExternalIcon from "@/assets/platforms/external.svg";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 import { PlatformPostViewer } from "./PlatformPostViewer";
+import { PostOwnerActionsSheet } from "./PostOwnerActionsSheet";
 
-function PostCardOwnerMenu({ post }: { post: PlatformPost }) {
-  const { user } = useSession();
-  const ownerId = post.is_repost ? (post.profile_owner_id || post.user_id) : post.user_id;
-  const isOwner = !!user?.id && ownerId === user.id;
-  const actions = usePostActions(post.id, user?.id, { isRepost: !!post.is_repost });
-  const [editOpen, setEditOpen] = useState(false);
-  const [editDraft, setEditDraft] = useState(post.content || "");
-  useEffect(() => { setEditDraft(post.content || ""); }, [post.id, post.content]);
-  if (!isOwner) return null;
-
-  const isPinned = !!post.pinned_at;
-  const hideCounts = !!post.hide_counts;
-  const commentsDisabled = !!post.comments_disabled;
-  const togglePin = (actions as any).togglePin as ((v: { pinned: boolean; platform?: string | null }) => void) | undefined;
-  const toggleHideCounts = (actions as any).toggleHideCounts as ((v: boolean) => void) | undefined;
-  const toggleCommentsDisabled = (actions as any).toggleCommentsDisabled as ((v: boolean) => void) | undefined;
-  const editCaption = (actions as any).editCaption as ((v: string) => void) | undefined;
-
-  return (
-    <div
-      className="absolute top-2 right-2 z-20"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            aria-label="Post options"
-            className="grid place-items-center h-8 w-8 rounded-full bg-black/45 backdrop-blur-sm text-white hover:bg-black/60"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="bg-background z-[100] w-56">
-          {!post.is_repost && togglePin && (
-            <DropdownMenuItem
-              onClick={() => togglePin({ pinned: !isPinned, platform: post.platform })}
-              className="cursor-pointer"
-            >
-              {isPinned ? (
-                <><PinOff className="h-4 w-4 mr-2" />Unpin from profile</>
-              ) : (
-                <><Pin className="h-4 w-4 mr-2" />Pin to profile</>
-              )}
-            </DropdownMenuItem>
-          )}
-          {toggleHideCounts && (
-            <DropdownMenuItem onClick={() => toggleHideCounts(!hideCounts)} className="cursor-pointer">
-              {hideCounts ? (
-                <><Eye className="h-4 w-4 mr-2" />Show interaction count</>
-              ) : (
-                <><EyeOff className="h-4 w-4 mr-2" />Hide interaction count</>
-              )}
-            </DropdownMenuItem>
-          )}
-          {toggleCommentsDisabled && (
-            <DropdownMenuItem onClick={() => toggleCommentsDisabled(!commentsDisabled)} className="cursor-pointer">
-              {commentsDisabled ? (
-                <><MessageCircleOn className="h-4 w-4 mr-2" />Turn on commenting</>
-              ) : (
-                <><MessageCircleOff className="h-4 w-4 mr-2" />Turn off commenting</>
-              )}
-            </DropdownMenuItem>
-          )}
-          {editCaption && (
-            <DropdownMenuItem onClick={() => setEditOpen(true)} className="cursor-pointer">
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit caption
-            </DropdownMenuItem>
-          )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={() => actions.deletePost()}
-            disabled={actions.isDeleting}
-            className="text-destructive focus:text-destructive cursor-pointer"
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {editCaption && (
-        <Dialog open={editOpen} onOpenChange={setEditOpen}>
-          <DialogContent className="max-w-lg" onClick={(e) => e.stopPropagation()}>
-            <DialogHeader>
-              <DialogTitle>Edit caption</DialogTitle>
-            </DialogHeader>
-            <Textarea
-              value={editDraft}
-              onChange={(e) => setEditDraft(e.target.value)}
-              rows={6}
-              maxLength={2200}
-              placeholder="Write a caption..."
-            />
-            <DialogFooter>
-              <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
-              <Button
-                onClick={() => {
-                  editCaption(editDraft.trim());
-                  setEditOpen(false);
-                }}
-              >
-                Save
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-    </div>
-  );
-}
-
-function PostCard({ post, onClick }: { 
+function PostCard({ post, onClick, onLongPress }: { 
   post: PlatformPost; 
   onClick: () => void;
+  onLongPress?: () => void;
   eager?: boolean;
 }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const isPinned = !!post.pinned_at;
+
+  // Long-press detection (touch + mouse) — opens the owner actions sheet.
+  const longPressTimer = useRef<number | null>(null);
+  const suppressClickRef = useRef(false);
+  const startLongPress = () => {
+    if (!onLongPress) return;
+    suppressClickRef.current = false;
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+    longPressTimer.current = window.setTimeout(() => {
+      suppressClickRef.current = true;
+      onLongPress();
+    }, 450);
+  };
+  const cancelLongPress = () => {
+    if (longPressTimer.current) {
+      window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
+  const handleClick = () => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
+    onClick();
+  };
+  const pressProps = onLongPress
+    ? {
+        onTouchStart: startLongPress,
+        onTouchEnd: cancelLongPress,
+        onTouchMove: cancelLongPress,
+        onTouchCancel: cancelLongPress,
+        onMouseDown: startLongPress,
+        onMouseUp: cancelLongPress,
+        onMouseLeave: cancelLongPress,
+        onContextMenu: (e: React.MouseEvent) => { e.preventDefault(); },
+      }
+    : {};
 
   const PinBadge = () =>
     isPinned ? (
@@ -251,7 +161,8 @@ function PostCard({ post, onClick }: {
     const aspect = getAspectRatio();
     return (
       <button
-        onClick={onClick}
+        onClick={handleClick}
+        {...pressProps}
         className={`press-in relative overflow-hidden rounded-2xl ${aspect} block w-full bg-muted/70`}
       >
         <PinBadge />
@@ -264,14 +175,14 @@ function PostCard({ post, onClick }: {
           preferProfile={useProfileFallback}
           aspect={aspect}
         />
-        <PostCardOwnerMenu post={post} />
       </button>
     );
   }
 
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
+      {...pressProps}
       className={`press-in relative overflow-hidden rounded-2xl ${getAspectRatio()} block w-full bg-muted/70 group`}
     >
       <PinBadge />
@@ -299,7 +210,6 @@ function PostCard({ post, onClick }: {
           </div>
         </div>
       )}
-      <PostCardOwnerMenu post={post} />
     </button>
   );
 }
@@ -309,6 +219,8 @@ interface ProfilePlatformGridProps {
   activeTab: string;
   tabs: PlatformTab[];
   onTabChange: (tab: string) => void;
+  isOwner?: boolean;
+  currentUserId?: string;
 }
 
 export const ProfilePlatformGrid = ({
@@ -316,6 +228,8 @@ export const ProfilePlatformGrid = ({
   activeTab,
   tabs,
   onTabChange,
+  isOwner = false,
+  currentUserId,
 }: ProfilePlatformGridProps) => {
   const { items, loading, hasMore, loadMore } = useUserPlatformPosts(
     userId,
@@ -324,6 +238,7 @@ export const ProfilePlatformGrid = ({
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedPostIndex, setSelectedPostIndex] = useState<number>(-1);
+  const [actionsPost, setActionsPost] = useState<PlatformPost | null>(null);
   const location = useLocation();
 
   // Close the viewer when the route/location changes (e.g. user taps a nav button)
@@ -427,6 +342,11 @@ export const ProfilePlatformGrid = ({
                     <PostCard
                       post={post}
                       onClick={() => handlePostClick(post.id, idx)}
+                      onLongPress={
+                        isOwner && currentUserId && !post.is_repost
+                          ? () => setActionsPost(post)
+                          : undefined
+                      }
                     />
                   </div>
                 ))}
@@ -462,6 +382,21 @@ export const ProfilePlatformGrid = ({
           onTabChange={(tab) => {
             onTabChange(tab);
           }}
+        />
+      )}
+
+      {actionsPost && currentUserId && (
+        <PostOwnerActionsSheet
+          open={!!actionsPost}
+          onOpenChange={(v) => { if (!v) setActionsPost(null); }}
+          postId={actionsPost.id}
+          userId={currentUserId}
+          platform={actionsPost.platform}
+          isPinned={!!actionsPost.pinned_at}
+          hideCounts={!!actionsPost.hide_counts}
+          commentsDisabled={!!actionsPost.comments_disabled}
+          isRepost={!!actionsPost.is_repost}
+          currentCaption={actionsPost.content || ""}
         />
       )}
     </>
