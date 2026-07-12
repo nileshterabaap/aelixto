@@ -317,12 +317,13 @@ export function useOriginalVisitTracker(
       // after a pointerdown on the embed. Scope the fallback to X only so
       // other playable platforms (YouTube/TikTok/IG/FB/LinkedIn/Pinterest/
       // Spotify/Threads) are unaffected.
-      // Threads: cross-origin iframe hides which region was tapped. Play
-      // fires synchronously via the first-tap overlay, so a subsequent
-      // app-background after an iframe interaction is the reliable signal
-      // that the original Threads post was opened. `firedRef` +
-      // `trackOriginalVisit` dedup guarantee at most one visit per post.
-      if (trackPlayableInteraction && !isXPost() && !isThreadsPost()) return;
+      // Threads is intentionally excluded here: on Threads, any iframe
+      // interaction is credited as `video_play` (see onWindowBlur below).
+      // A subsequent app-background is almost always the user tapping the
+      // inline share link, which would double-credit as visit. Visit for
+      // Threads must come from the explicit header platform-icon button
+      // (markOriginalVisit) or an anchor click captured by onClick.
+      if (trackPlayableInteraction && !isXPost()) return;
       const now = Date.now();
       if (
         now - recentPointerRef.current < 3000 ||
