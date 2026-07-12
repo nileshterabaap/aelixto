@@ -1,7 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getDeviceId, sha256 } from '@/lib/deviceId';
 import { useCallback } from 'react';
-import { traceLog } from '@/lib/traceLog';
 
 type EventType = 'video_play' | 'image_view' | 'article_open' | 'external_visit' | 'original_visit';
 
@@ -17,7 +16,6 @@ interface TrackViewParams {
  */
 export async function trackView({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
   try {
-    traceLog('trackView', 'entry', { postId, detail: { eventType, durationMs } });
     // Get current user (may be null for anonymous)
     const { data: { user } } = await supabase.auth.getUser();
     
@@ -34,26 +32,21 @@ export async function trackView({ postId, eventType, durationMs = 0 }: TrackView
       viewer_id: user?.id || null,
     };
 
-    traceLog('trackView', 'invoke:record-view', { postId, detail: { eventType, viewer_id: payload.viewer_id } });
     const { data, error } = await supabase.functions.invoke('record-view', { body: payload });
 
     if (error) {
-      traceLog('trackView', 'record-view:error', { postId, detail: { eventType }, error });
       return false;
     }
 
     const success = data?.ok === true;
-    traceLog('trackView', 'record-view:result', { postId, detail: { eventType, data } });
     return success;
   } catch (error) {
-    traceLog('trackView', 'exception', { postId, detail: { eventType }, error });
     return false;
   }
 }
 
 async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
   try {
-    traceLog('trackViewBeforeNavigation', 'entry', { postId, detail: { eventType } });
     const { data: { session } } = await supabase.auth.getSession();
     const deviceHash = await sha256(getDeviceId());
     const payload = JSON.stringify({
@@ -69,11 +62,9 @@ async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: 
     const url = supabaseUrl
       ? `${supabaseUrl.replace(/\/$/, '')}/functions/v1/record-view`
       : `https://${projectId}.functions.supabase.co/record-view`;
-    traceLog('trackViewBeforeNavigation', 'post', { postId, detail: { eventType, url, hasBeacon: !!navigator.sendBeacon } });
     // No custom headers/content-type here: outbound clicks can navigate away
     // immediately, so this must avoid CORS preflight and use keepalive/beacon.
     if (navigator.sendBeacon && navigator.sendBeacon(url, payload)) {
-      traceLog('trackViewBeforeNavigation', 'sendBeacon:ok', { postId, detail: { eventType } });
       return true;
     }
 
@@ -82,10 +73,8 @@ async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: 
       body: payload,
       keepalive: true,
     });
-    traceLog('trackViewBeforeNavigation', 'fetch:complete', { postId, detail: { eventType, status: res.status } });
     return true;
   } catch (error) {
-    traceLog('trackViewBeforeNavigation', 'exception', { postId, detail: { eventType }, error });
     return false;
   }
 }
