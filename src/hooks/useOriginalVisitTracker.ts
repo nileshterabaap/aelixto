@@ -177,6 +177,34 @@ export function useOriginalVisitTracker(
       traceLog('onWindowBlur', 'fired', { postId });
       // The iframe steals focus when tapped — check that the now-active element
       // belongs to this post's embed container.
+      // Threads-only reliable path: cross-origin iframe taps on mobile Chrome
+      // frequently don't produce a parent-side pointerdown, and
+      // document.activeElement after the blur is often <body> rather than the
+      // iframe. Instead, detect that focus left the window *while the page is
+      // still visible* — that only happens when focus moved into a child
+      // iframe. If this post has a Threads iframe and it's on-screen, credit
+      // one video_play. This runs a short delay so we can confirm the page did
+      // not go hidden (that would be an app backgrounding, handled elsewhere).
+      if (trackPlayableInteraction && isThreadsPost() && !playFiredRef.current) {
+        const iframe = getThreadsIframe();
+        if (iframe) {
+          setTimeout(() => {
+            if (playFiredRef.current) return;
+            if (document.visibilityState === 'hidden') return;
+            const r = iframe.getBoundingClientRect();
+            const onScreen =
+              r.width > 0 &&
+              r.height > 0 &&
+              r.bottom > 0 &&
+              r.top < (window.innerHeight || document.documentElement.clientHeight);
+            if (!onScreen) return;
+            firePlay();
+            lastIframeInteractionRef.current = Date.now();
+          }, 120);
+          return;
+        }
+      }
+      // Non-Threads path: original activeElement === IFRAME check.
       setTimeout(() => {
         const now = Date.now();
         const active = document.activeElement;
