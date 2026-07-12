@@ -122,14 +122,8 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const showSkeleton = !contentReady;
 
   const handleRefresh = useCallback(async () => {
-    await Promise.all([
-      refetchProfile(),
-      refreshFollow(),
-      queryClient.invalidateQueries({ queryKey: ["user-platform-tabs", profile?.user_id] }),
-      queryClient.invalidateQueries({ queryKey: ["platform-posts", profile?.user_id] }),
-      queryClient.invalidateQueries({ queryKey: ["mutuals", profile?.user_id] }),
-    ]);
-  }, [refetchProfile, refreshFollow, queryClient, profile?.user_id]);
+    await Promise.all([refetchProfile(), refreshFollow()]);
+  }, [refetchProfile, refreshFollow]);
 
   if (!isLoading && !profile) {
     return (
@@ -451,14 +445,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
               <p className="text-sm text-muted-foreground">Follow @{profile.username} to see their posts.</p>
             </div>
           ) : !tabsLoading && tabs.length > 0 ? (
-            <ProfilePlatformGrid
-              userId={profile.user_id}
-              activeTab={activeTab}
-              tabs={tabs}
-              onTabChange={setActiveTab}
-              isOwner={isMe}
-              currentUserId={user?.id}
-            />
+            <ProfilePlatformGrid userId={profile.user_id} activeTab={activeTab} tabs={tabs} onTabChange={setActiveTab} />
           ) : !tabsLoading ? (
             <p className="text-center text-muted-foreground py-12 text-base">
               No posts yet

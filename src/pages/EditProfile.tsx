@@ -86,7 +86,8 @@ const EditProfile = () => {
       });
       // Load Aelix Score preference from settings
       const settings = profile.settings as any;
-      // Default to OFF — users must opt in to display their Aelix Score.
+      // Score visibility is opt-in — default OFF unless the user has
+      // explicitly enabled it. Matches the display gate in UserProfile.
       setAelixScoreEnabled(settings?.aelix_score_enabled === true);
     }
   }, [profile]);

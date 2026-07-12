@@ -50,7 +50,7 @@ const fetchOrCreateProfile = async (userId: string, email?: string, userMetadata
     bio: null,
     cover_url: null,
     aelix_score: 0,
-    settings: { aelix_score_enabled: false },
+    settings: {},
   };
 
   const { data: created, error: createError } = await supabase

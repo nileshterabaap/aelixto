@@ -1,9 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
 
-// no-op stub kept to minimize diff after removing temporary diagnostic logger
-const traceLog = (..._args: unknown[]) => {};
-
 /**
  * Detects when the user taps/clicks into an embedded iframe or an outbound
  * anchor inside the embed, and fires `original_visit` once per post.
@@ -46,28 +43,18 @@ export function useOriginalVisitTracker(
     if (!el) return;
 
     const firePlay = () => {
-      traceLog('firePlay', 'called', { postId, detail: { alreadyFired: playFiredRef.current, trackPlayableInteraction } });
       if (trackPlayableInteraction && !playFiredRef.current) {
         playFiredRef.current = true;
-        traceLog('firePlay', 'dispatch:trackView(video_play)', { postId });
-        trackView({ postId, eventType: 'video_play' }).then((ok) => {
-          traceLog('firePlay', 'trackView:result', { postId, detail: { ok } });
-        }).catch((err) => {
-          traceLog('firePlay', 'trackView:error', { postId, error: err });
+        trackView({ postId, eventType: 'video_play' }).catch(() => {
           playFiredRef.current = false;
         });
       }
     };
 
     const fireOriginal = () => {
-      traceLog('fireOriginal', 'called', { postId, detail: { alreadyFired: firedRef.current } });
       if (firedRef.current) return;
       firedRef.current = true;
-      traceLog('fireOriginal', 'dispatch:trackOriginalVisit', { postId });
-      trackOriginalVisit(postId).then((ok) => {
-        traceLog('fireOriginal', 'trackOriginalVisit:result', { postId, detail: { ok } });
-      }).catch((err) => {
-        traceLog('fireOriginal', 'trackOriginalVisit:error', { postId, error: err });
+      trackOriginalVisit(postId).catch(() => {
         // Allow a retry on next interaction
         firedRef.current = false;
       });
@@ -87,76 +74,30 @@ export function useOriginalVisitTracker(
       return !!node.closest('iframe');
     };
 
-    const THREADS_EMBED_SELECTOR =
-      '.js-threads-embed, [data-threads-embed], blockquote.text-post-media';
-    const isInsideThreadsEmbed = (node: EventTarget | null): boolean => {
-      if (!(node instanceof Element)) return false;
-      return !!node.closest(THREADS_EMBED_SELECTOR);
-    };
-
-    const isXPost = (): boolean => {
-      const scope = el.querySelector(
-        'blockquote.twitter-tweet, [data-tweet-id], iframe[src*="twitter.com"], iframe[src*="x.com"], iframe[src*="platform.twitter.com"]',
-      );
-      return !!scope;
-    };
-
     const onPointerDown = (e: Event) => {
       const now = Date.now();
       recentPointerRef.current = now;
-      const t = e.target as Element | null;
-      const path: string[] = [];
-      let cur: Element | null = t;
-      for (let i = 0; cur && i < 6; i++) {
-        path.push(`${cur.tagName}${cur.className ? '.' + String(cur.className).toString().split(' ').slice(0,2).join('.') : ''}`);
-        cur = cur.parentElement;
-      }
-      traceLog('onPointerDown', e.type, {
-        postId,
-        detail: {
-          trackPlayableInteraction,
-          targetTag: t?.tagName,
-          targetClass: String(t?.className || ''),
-          insideIframe: isInsideIframe(e.target),
-          insideThreadsEmbed: isInsideThreadsEmbed(e.target),
-          isXPost: isXPost(),
-          path,
-        },
-      });
-      if (isInsideIframe(e.target)) {
-        if (trackPlayableInteraction) {
-          // Playable posts: tapping into the iframe = Play (+1) only.
-          // "Visited the original source" is intentionally NOT inferred here;
-          // it must come from an explicit anchor click or the platform-icon button.
-          firePlay();
-          lastIframeInteractionRef.current = now;
-        } else {
-          fireOriginal();
-        }
-      } else if (trackPlayableInteraction && isInsideThreadsEmbed(e.target)) {
-        // Threads SDK inflates a same-origin <blockquote> (no iframe), so the
-        // isInsideIframe check above never matches. Treat a pointerdown on the
-        // inflated Threads embed as a play interaction (+1 only).
+      const insideIframe = isInsideIframe(e.target);
+      if (trackPlayableInteraction) {
+        // Playable posts: a tap anywhere inside the hydrated embed counts as
+        // Play (+1). Some platforms (Threads, TikTok, X) overlay tap targets
+        // on top of the iframe, so the pointerdown target isn't the iframe
+        // itself even when the user is clearly hitting the video. Guarded
+        // once-per-post by `playFiredRef` so accidental container taps still
+        // only credit a single play.
         firePlay();
-        lastIframeInteractionRef.current = now;
+        if (insideIframe) lastIframeInteractionRef.current = now;
+      } else if (insideIframe) {
+        fireOriginal();
       }
     };
 
     const onWindowBlur = () => {
-      traceLog('onWindowBlur', 'fired', { postId });
       // The iframe steals focus when tapped — check that the now-active element
       // belongs to this post's embed container.
       setTimeout(() => {
         const now = Date.now();
         const active = document.activeElement;
-        traceLog('onWindowBlur', 'setTimeout', {
-          postId,
-          detail: {
-            activeTag: active?.tagName,
-            activeInsideEl: active ? el.contains(active) : false,
-            trackPlayableInteraction,
-          },
-        });
         if (
           active &&
           active.tagName === 'IFRAME' &&
@@ -173,31 +114,21 @@ export function useOriginalVisitTracker(
     };
 
     const onVisibilityChange = () => {
-      traceLog('onVisibilityChange', document.visibilityState, {
-        postId,
-        detail: {
-          trackPlayableInteraction,
-          isXPost: isXPost(),
-          msSincePointer: Date.now() - recentPointerRef.current,
-          msSinceIframe: Date.now() - lastIframeInteractionRef.current,
-        },
-      });
       if (document.visibilityState !== 'hidden') return;
-      // Only infer a visit for non-playable embeds (article/link cards where
-      // tapping opens the source). Playable posts must not auto-fire Visit on
-      // app backgrounding — user may just be watching inline.
-      // Exception: X/Twitter embeds are a cross-origin iframe that swallows
-      // internal anchor clicks; when the user taps through to the original
-      // post, the only observable signal is the app becoming hidden shortly
-      // after a pointerdown on the embed. Scope the fallback to X only so
-      // other playable platforms (YouTube/TikTok/IG/FB/LinkedIn/Pinterest/
-      // Spotify/Threads) are unaffected.
-      if (trackPlayableInteraction && !isXPost()) return;
       const now = Date.now();
-      if (
+      const recentTap =
         now - recentPointerRef.current < 3000 ||
-        now - lastIframeInteractionRef.current < 10000
-      ) {
+        now - lastIframeInteractionRef.current < 10000;
+      if (trackPlayableInteraction) {
+        // Playable posts on some platforms (Threads, X) hand the tap off to
+        // the native app / a new tab instead of playing inline. When the app
+        // is backgrounded shortly after a tap inside this post, credit it as
+        // a Play so the score reflects the interaction. `playFiredRef` still
+        // prevents duplicates when the pointerdown handler also fired.
+        if (recentTap) firePlay();
+        return;
+      }
+      if (recentTap) {
         fireOriginal();
       }
     };
@@ -206,14 +137,6 @@ export function useOriginalVisitTracker(
     // fallback link cards) — anything that opens the original.
     const onClick = (e: Event) => {
       const target = e.target as HTMLElement | null;
-      const anchorProbe = target?.closest?.('a[href]') as HTMLAnchorElement | null;
-      traceLog('onClick', 'fired', {
-        postId,
-        detail: {
-          targetTag: target?.tagName,
-          anchorHref: anchorProbe?.href || null,
-        },
-      });
       if (!target) return;
       const anchor = target.closest('a[href]') as HTMLAnchorElement | null;
       if (anchor && anchor.href && !anchor.href.startsWith('javascript:')) {
