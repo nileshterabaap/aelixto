@@ -4,6 +4,8 @@ import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
 // no-op stub kept to minimize diff after removing temporary diagnostic logger
 const traceLog = (..._args: unknown[]) => {};
 
+const threadsPlaySessionFired = new Set<string>();
+
 /**
  * Detects when the user taps/clicks into an embedded iframe or an outbound
  * anchor inside the embed, and fires `original_visit` once per post.
@@ -28,12 +30,17 @@ export function useOriginalVisitTracker(
   const recentPointerRef = useRef(0);
   const lastIframeInteractionRef = useRef(0);
   const originalDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const threadsOverlayRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     firedRef.current = false;
-    playFiredRef.current = false;
+    playFiredRef.current = threadsPlaySessionFired.has(postId);
     recentPointerRef.current = 0;
     lastIframeInteractionRef.current = 0;
+    if (threadsOverlayRef.current) {
+      threadsOverlayRef.current.remove();
+      threadsOverlayRef.current = null;
+    }
     if (originalDwellTimerRef.current) {
       clearTimeout(originalDwellTimerRef.current);
       originalDwellTimerRef.current = null;
@@ -49,12 +56,18 @@ export function useOriginalVisitTracker(
       traceLog('firePlay', 'called', { postId, detail: { alreadyFired: playFiredRef.current, trackPlayableInteraction } });
       if (trackPlayableInteraction && !playFiredRef.current) {
         playFiredRef.current = true;
+        threadsPlaySessionFired.add(postId);
+        if (threadsOverlayRef.current) {
+          threadsOverlayRef.current.remove();
+          threadsOverlayRef.current = null;
+        }
         traceLog('firePlay', 'dispatch:trackView(video_play)', { postId });
         trackView({ postId, eventType: 'video_play' }).then((ok) => {
           traceLog('firePlay', 'trackView:result', { postId, detail: { ok } });
         }).catch((err) => {
           traceLog('firePlay', 'trackView:error', { postId, error: err });
           playFiredRef.current = false;
+          threadsPlaySessionFired.delete(postId);
         });
       }
     };
@@ -107,6 +120,59 @@ export function useOriginalVisitTracker(
       ) as HTMLIFrameElement | null;
     };
     const isThreadsPost = (): boolean => !!getThreadsIframe();
+
+    const installThreadsFirstTapOverlay = () => {
+      if (!trackPlayableInteraction || playFiredRef.current || threadsOverlayRef.current) return;
+      const iframe = getThreadsIframe();
+      if (!iframe) return;
+
+      const host = iframe.parentElement;
+      if (!host) return;
+
+      const hostStyle = window.getComputedStyle(host);
+      if (hostStyle.position === 'static') {
+        host.style.position = 'relative';
+      }
+
+      const overlay = document.createElement('div');
+      overlay.setAttribute('data-threads-play-capture', postId);
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.style.position = 'absolute';
+      overlay.style.inset = '0';
+      overlay.style.zIndex = '2';
+      overlay.style.background = 'transparent';
+      overlay.style.touchAction = 'manipulation';
+      overlay.style.cursor = 'pointer';
+
+      const onFirstInteraction = (event: Event) => {
+        event.stopPropagation();
+        traceLog('threadsVideoPlayOverlay', event.type, {
+          postId,
+          detail: {
+            iframePointerEvents: window.getComputedStyle(iframe).pointerEvents,
+            visibilityState: document.visibilityState,
+          },
+        });
+        if (document.visibilityState !== 'hidden') {
+          firePlay();
+          lastIframeInteractionRef.current = Date.now();
+        }
+      };
+
+      overlay.addEventListener('pointerdown', onFirstInteraction, { capture: true });
+      overlay.addEventListener('touchstart', onFirstInteraction, { capture: true, passive: true });
+      overlay.addEventListener('click', onFirstInteraction, { capture: true });
+
+      host.appendChild(overlay);
+      threadsOverlayRef.current = overlay;
+      traceLog('threadsVideoPlayOverlay', 'installed', {
+        postId,
+        detail: {
+          iframeSrc: iframe.src,
+          iframePointerEvents: window.getComputedStyle(iframe).pointerEvents,
+        },
+      });
+    };
 
     const onPointerDown = (e: Event) => {
       const now = Date.now();
@@ -308,11 +374,13 @@ export function useOriginalVisitTracker(
     };
 
     el.querySelectorAll('iframe').forEach(attachIframeListeners);
+    installThreadsFirstTapOverlay();
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
           if (node instanceof HTMLIFrameElement) attachIframeListeners(node);
           if (node instanceof HTMLElement) node.querySelectorAll('iframe').forEach(attachIframeListeners);
+          if (node instanceof HTMLIFrameElement || node instanceof HTMLElement) installThreadsFirstTapOverlay();
         });
       });
     });
@@ -331,6 +399,10 @@ export function useOriginalVisitTracker(
       document.removeEventListener('visibilitychange', onVisibilityChange);
       el.removeEventListener('click', onClick, true);
       observer.disconnect();
+      if (threadsOverlayRef.current) {
+        threadsOverlayRef.current.remove();
+        threadsOverlayRef.current = null;
+      }
       if (originalDwellTimerRef.current) {
         clearTimeout(originalDwellTimerRef.current);
         originalDwellTimerRef.current = null;
