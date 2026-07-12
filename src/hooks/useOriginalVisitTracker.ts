@@ -101,6 +101,13 @@ export function useOriginalVisitTracker(
       return !!scope;
     };
 
+    const getThreadsIframe = (): HTMLIFrameElement | null => {
+      return el.querySelector(
+        'iframe[src*="threads.net"], iframe[src*="threads.com"]',
+      ) as HTMLIFrameElement | null;
+    };
+    const isThreadsPost = (): boolean => !!getThreadsIframe();
+
     const onPointerDown = (e: Event) => {
       const now = Date.now();
       recentPointerRef.current = now;
@@ -139,6 +146,30 @@ export function useOriginalVisitTracker(
         // inflated Threads embed as a play interaction (+1 only).
         firePlay();
         lastIframeInteractionRef.current = now;
+      } else if (trackPlayableInteraction && isThreadsPost()) {
+        // Threads is rendered as a direct cross-origin iframe. On some mobile
+        // browsers a pointerdown on the iframe surface reports the event target
+        // as an ancestor element (not the IFRAME itself), so isInsideIframe
+        // above misses it. Fall back to a hit-test against the Threads iframe's
+        // bounding rect using the pointer coordinates.
+        const pe = e as PointerEvent | TouchEvent;
+        let x: number | null = null;
+        let y: number | null = null;
+        if ('clientX' in pe && typeof (pe as PointerEvent).clientX === 'number') {
+          x = (pe as PointerEvent).clientX;
+          y = (pe as PointerEvent).clientY;
+        } else if ('touches' in pe && (pe as TouchEvent).touches?.[0]) {
+          x = (pe as TouchEvent).touches[0].clientX;
+          y = (pe as TouchEvent).touches[0].clientY;
+        }
+        const iframe = getThreadsIframe();
+        if (iframe && x !== null && y !== null) {
+          const r = iframe.getBoundingClientRect();
+          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+            firePlay();
+            lastIframeInteractionRef.current = now;
+          }
+        }
       }
     };
 
@@ -192,7 +223,7 @@ export function useOriginalVisitTracker(
       // after a pointerdown on the embed. Scope the fallback to X only so
       // other playable platforms (YouTube/TikTok/IG/FB/LinkedIn/Pinterest/
       // Spotify/Threads) are unaffected.
-      if (trackPlayableInteraction && !isXPost()) return;
+      if (trackPlayableInteraction && !isXPost() && !isThreadsPost()) return;
       const now = Date.now();
       if (
         now - recentPointerRef.current < 3000 ||
