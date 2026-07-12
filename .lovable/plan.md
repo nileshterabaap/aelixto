@@ -1,39 +1,53 @@
-# Threads engagement tracking — Play + Visit
+# Diagnose Threads regression: missing `video_play` + double `original_visit`
 
-Bring Threads inline tracking to parity with X. All changes are scoped to Threads only; YouTube/TikTok/IG/FB/LinkedIn/Pinterest/Spotify behavior is unchanged.
+I need trace data before proposing a fix — the current code has three separate paths that can each emit `original_visit` and two that can emit `video_play`, and I can't tell from source alone which ones actually fired for your last interaction.
 
-## What will change
+## What I'll do once you approve
 
-1. **First interaction with the Threads iframe → `video_play` (+1)**
-   - Same signal path YouTube/TikTok/IG rely on: parent `window.blur` + `document.activeElement` is the Threads iframe.
-   - Plus a mobile-safe pointer-coordinate fallback for browsers where `activeElement` doesn't update in time.
-   - Fires once per post per cooldown (backend already dedups).
+**Step 1 — Query the trace, no code changes.**
+Pull the last ~10 minutes of `trace_logs` for the Threads post plus its `post_views` rows, and build a chronological timeline of every event the hook emitted:
 
-2. **App backgrounded shortly after a Threads iframe interaction → `original_visit` (+1)**
-   - Same one-line pattern used for X: allow the `visibilitychange → hidden` fallback for Threads posts specifically.
-   - Fires once per post per cooldown.
+- `onPointerDown` — target tag, `insideIframe`, `isThreadsPost`, hit-test result
+- `onWindowBlur` → setTimeout — `activeTag`, `activeInsideEl`
+- `onVisibilityChange` — `msSincePointer`, `msSinceIframe`
+- `firePlay` / `fireOriginal` — `alreadyFired` flag, `trackView:result`, `trackOriginalVisit:result`
 
-## Files to edit
+**Step 2 — Correlate against the two known suspects.**
 
-Only one file, no DB or edge-function changes:
+The code has these paths that can double-credit `original_visit` for Threads:
 
-- `src/hooks/useOriginalVisitTracker.ts`
-  - Add `isThreadsPost()` helper (mirrors existing `isXPost()`), matching `iframe[src*="threads.net"]` and `iframe[src*="threads.com"]`.
-  - In `onPointerDown`: when `trackPlayableInteraction && isThreadsPost()`, also treat a pointerdown whose coordinates fall inside the Threads iframe's bounding rect as a play (covers the case where the event target is the iframe but the mobile browser doesn't set `document.activeElement` yet).
-  - In `onWindowBlur`: keep existing logic; it already fires `firePlay` when the iframe becomes the active element.
-  - In `onVisibilityChange`: extend the existing X-only exception to also allow `isThreadsPost()`, so `original_visit` fires when the user leaves the app within 3s of a Threads interaction.
+1. `onVisibilityChange` — I recently removed the `isThreadsPost()` early-return, so any app-background within 3s of a pointerdown now fires `fireOriginal` for Threads. This is intentional but may be firing on the wrong window.
+2. `handleIframeFocus` on the `<iframe>` element itself — if `trackPlayableInteraction` is false at the moment the iframe first focuses (e.g. re-mount with stale prop), this fires `fireOriginal` instead of `firePlay`.
+3. Two mounted instances of `useOriginalVisitTracker` for the same post (feed card + `PlatformPostViewer` open simultaneously) — each has its own `firedRef`, so both can fire, and `post_views` will keep both rows if their `device_hash + event_type` dedupe window has already expired between them.
 
-No changes to `useViewTracking.ts`, `record-view`, `HydratedEmbed.tsx`, or `UniversalMetaEmbed.tsx`.
+For missing `video_play`:
 
-## Accepted tradeoff (same envelope as X)
+1. `onPointerDown` hit-test — if the pointer coordinates fall outside the iframe rect (e.g. tap on the Threads header/footer chrome that sits in the parent DOM), `firePlay` never runs.
+2. `onWindowBlur` setTimeout(0) — on mobile Chrome the `document.activeElement` after a cross-origin iframe tap can be `<body>`, not `IFRAME`, so the `firePlay` branch is skipped.
+3. `handleIframeFocus` — cross-origin iframes on mobile often don't fire a DOM `focus` event on the parent-side `<iframe>` element.
 
-- Any first tap on the Threads player counts as a play, even if the user actually tapped mute/scrub/fullscreen. Never double-counts (cooldown).
-- Any app-background within 3s of a Threads tap counts as a Visit, even if the user switched apps for an unrelated reason. Same behavior X already has.
+**Step 3 — Report which specific paths ran, then propose the smallest targeted fix.**
+No code changes until the trace conclusively identifies which of the above are the actual culprits.
 
-## Out of scope
+## Technical details
 
-- No changes to the header platform-icon Visit button (still works as-is).
-- No changes to non-Threads platforms.
-- Diagnostic `trace_logs` table / `traceLog` helper stay in place for now; can be removed in a follow-up cleanup once you've confirmed Threads counts are landing.
+Files I'll read (no edits):
+- `src/hooks/useOriginalVisitTracker.ts` — already in context
+- `src/components/HydratedEmbed.tsx` — confirm one vs. two mounts per post
+- `src/components/profile/PlatformPostViewer.tsx` — check if it mounts its own tracker while the feed card is still mounted
 
-Success probability: **90%**.
+Queries I'll run:
+```sql
+select ts, event, step, detail, error from public.trace_logs
+where post_id = '<threads post id>' and ts > now() - interval '15 min'
+order by ts;
+
+select created_at, event_type, viewer_id, device_hash
+from public.post_views
+where post_id = '<threads post id>' and created_at > now() - interval '15 min'
+order by created_at;
+```
+
+I need the Threads post_id from your last test (or I can pull the most recent Threads post from `posts`).
+
+Success probability: **95%** (trace is already instrumented and proven to write).
