@@ -77,18 +77,16 @@ export function useOriginalVisitTracker(
     const onPointerDown = (e: Event) => {
       const now = Date.now();
       recentPointerRef.current = now;
-      const insideIframe = isInsideIframe(e.target);
-      if (trackPlayableInteraction) {
-        // Playable posts: a tap anywhere inside the hydrated embed counts as
-        // Play (+1). Some platforms (Threads, TikTok, X) overlay tap targets
-        // on top of the iframe, so the pointerdown target isn't the iframe
-        // itself even when the user is clearly hitting the video. Guarded
-        // once-per-post by `playFiredRef` so accidental container taps still
-        // only credit a single play.
-        firePlay();
-        if (insideIframe) lastIframeInteractionRef.current = now;
-      } else if (insideIframe) {
-        fireOriginal();
+      if (isInsideIframe(e.target)) {
+        if (trackPlayableInteraction) {
+          // Playable posts: tapping into the iframe = Play (+1) only.
+          // "Visited the original source" is intentionally NOT inferred here;
+          // it must come from an explicit anchor click or the platform-icon button.
+          firePlay();
+          lastIframeInteractionRef.current = now;
+        } else {
+          fireOriginal();
+        }
       }
     };
 
