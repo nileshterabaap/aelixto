@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
-import { traceLog } from '@/lib/traceLog';
+
+// no-op stub kept to minimize diff after removing temporary diagnostic logger
+const traceLog = (..._args: unknown[]) => {};
 
 /**
  * Detects when the user taps/clicks into an embedded iframe or an outbound
