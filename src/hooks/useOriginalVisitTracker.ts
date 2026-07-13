@@ -327,92 +327,12 @@ export function useOriginalVisitTracker(
     const threadsCaptureAttached = new WeakSet<HTMLIFrameElement>();
 
     const attachThreadsPlayCapture = (iframe: HTMLIFrameElement) => {
-      if (!trackPlayableInteraction || threadsCaptureAttached.has(iframe)) return;
-      const src = iframe.src || '';
-      const id = iframe.id || '';
-      const title = iframe.title || '';
-      const cls = iframe.className || '';
-      const isThreadsIframe = /threads\.(net|com)/i.test(src);
-      // Twitter widget iframe often has src="" at creation and is identified
-      // by id="twitter-widget-N" / title="Twitter Tweet" instead.
-      const isXIframe =
-        /(twitter\.com|x\.com|platform\.twitter\.com)/i.test(src) ||
-        /^twitter-widget-/i.test(id) ||
-        /twitter[\s-]*tweet/i.test(title) ||
-        /twitter-tweet/i.test(cls);
-      if (!isThreadsIframe && !isXIframe) return;
-      const parent = iframe.parentElement;
-      if (!parent) return;
-
-      threadsCaptureAttached.add(iframe);
-
-      const previousInlinePosition = parent.style.position;
-      const parentWasStatic = window.getComputedStyle(parent).position === 'static';
-      if (parentWasStatic) parent.style.position = 'relative';
-
-      const overlay = document.createElement('div');
-      overlay.setAttribute('aria-hidden', 'true');
-      overlay.dataset.aelixtoThreadsPlayCapture = 'true';
-      Object.assign(overlay.style, {
-        position: 'absolute',
-        zIndex: '3',
-        background: 'transparent',
-        pointerEvents: 'auto',
-        touchAction: 'manipulation',
-      } satisfies Partial<CSSStyleDeclaration>);
-
-      const syncOverlay = () => {
-        const parentRect = parent.getBoundingClientRect();
-        const iframeRect = iframe.getBoundingClientRect();
-        overlay.style.left = `${iframeRect.left - parentRect.left + parent.scrollLeft}px`;
-        overlay.style.top = `${iframeRect.top - parentRect.top + parent.scrollTop}px`;
-        overlay.style.width = `${iframeRect.width}px`;
-        overlay.style.height = `${iframeRect.height}px`;
-      };
-
-      let removed = false;
-      let resizeObserver: ResizeObserver | null = null;
-      const removeOverlay = () => {
-        if (removed) return;
-        removed = true;
-        overlay.remove();
-        resizeObserver?.disconnect();
-        if (parentWasStatic) parent.style.position = previousInlinePosition;
-      };
-
-      // One-shot capture: the first body tap is intercepted so we can record
-      // Play (+1) without letting a stray anchor open the original. After
-      // that we remove the overlay so the native Play button and player
-      // controls inside the iframe start receiving taps normally.
-      const captureBodyTap = () => {
-        if (isXIframe) {
-          if (!playFiredRef.current) {
-            firePlay();
-            lastIframeInteractionRef.current = Date.now();
-          }
-        } else {
-          fireThreadsPlayOnce();
-        }
-        overlay.style.pointerEvents = 'none';
-        window.setTimeout(removeOverlay, 0);
-      };
-
-      overlay.addEventListener('pointerdown', captureBodyTap, { capture: true });
-      overlay.addEventListener('touchstart', captureBodyTap, { capture: true, passive: true });
-      overlay.addEventListener('mousedown', captureBodyTap, { capture: true });
-      overlay.addEventListener('click', captureBodyTap, { capture: true });
-
-      syncOverlay();
-      parent.appendChild(overlay);
-      resizeObserver = new ResizeObserver(syncOverlay);
-      resizeObserver.observe(parent);
-      resizeObserver.observe(iframe);
-      iframe.addEventListener('load', syncOverlay);
-
-      threadsCaptureCleanups.push(() => {
-        iframe.removeEventListener('load', syncOverlay);
-        removeOverlay();
-      });
+      // Overlay capture disabled: it swallowed the first tap on the native
+      // Play button, so the video never actually started. We now let taps
+      // pass straight through to the iframe and rely on pointerdown /
+      // window.blur / iframe focus signals below to credit Play.
+      void iframe;
+      void threadsCaptureAttached;
     };
 
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
