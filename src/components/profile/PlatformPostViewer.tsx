@@ -129,7 +129,9 @@ export const PlatformPostViewer = ({
     };
     if (check()) return;
     const unsub = subscribeEmbedReadiness(() => { check(); });
-    const cap = window.setTimeout(() => setTargetReady(true), 10000);
+    // Reveal the tapped post fast: the embed layers its own skeleton while
+    // hydrating, so we don't need to hold a full-post overlay for long.
+    const cap = window.setTimeout(() => setTargetReady(true), 1200);
     return () => { unsub(); window.clearTimeout(cap); };
   }, [initialPostId]);
   // Persist scroll-locked state across effect re-runs. Without this, if

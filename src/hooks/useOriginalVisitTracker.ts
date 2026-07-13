@@ -270,19 +270,11 @@ export function useOriginalVisitTracker(
       // Only infer a visit for non-playable embeds (article/link cards where
       // tapping opens the source). Playable posts must not auto-fire Visit on
       // app backgrounding — user may just be watching inline.
-      // Exception: X/Twitter embeds are a cross-origin iframe that swallows
-      // internal anchor clicks; when the user taps through to the original
-      // post, the only observable signal is the app becoming hidden shortly
-      // after a pointerdown on the embed. Scope the fallback to X only so
-      // other playable platforms (YouTube/TikTok/IG/FB/LinkedIn/Pinterest/
-      // Spotify/Threads) are unaffected.
-      // Threads is intentionally excluded here: on Threads, any iframe
-      // interaction is credited as `video_play` (see onWindowBlur below).
-      // A subsequent app-background is almost always the user tapping the
-      // inline share link, which would double-credit as visit. Visit for
-      // Threads must come from the explicit header platform-icon button
-      // (markOriginalVisit) or an anchor click captured by onClick.
-      if (trackPlayableInteraction && !isXPost()) return;
+      // Playable posts (X/YouTube/TikTok/IG/FB/LinkedIn/Pinterest/Spotify/
+      // Threads): iframe tap credits Play only. "Visit" must come from an
+      // explicit anchor click or the header platform-icon button, so we
+      // never infer visit from an app-background here on playable posts.
+      if (trackPlayableInteraction) return;
       const now = Date.now();
       if (
         now - recentPointerRef.current < 3000 ||
