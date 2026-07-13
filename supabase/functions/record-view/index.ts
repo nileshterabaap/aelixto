@@ -80,10 +80,10 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get post author_id
+    // Get post author_id and platform
     const { data: post, error: postError } = await supabase
       .from('posts')
-      .select('user_id')
+      .select('user_id, platform')
       .eq('id', post_id)
       .single();
 
@@ -102,6 +102,44 @@ Deno.serve(async (req) => {
         JSON.stringify({ ok: true, skipped: true, reason: 'Self-view not counted' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Threads embeds can emit multiple parent-page signals from a single tap
+    // when several Threads posts are mounted. Keep scoring one event per
+    // actual interaction by ignoring same-device same-event bursts that target
+    // a different Threads post within a tiny window.
+    const platform = String(post.platform || '').toLowerCase();
+    const isThreadsPost = platform === 'threads' || platform.includes('threads');
+    const isThreadScoreEvent = ['image_view', 'video_play', 'original_visit'].includes(event_type);
+
+    if (isThreadsPost && isThreadScoreEvent) {
+      const since = new Date(Date.now() - 2500).toISOString();
+      const { data: recentViews, error: burstError } = await supabase
+        .from('post_views')
+        .select('post_id')
+        .eq('event_type', event_type)
+        .neq('post_id', post_id)
+        .eq('device_hash', device_hash)
+        .gte('created_at', since)
+        .limit(8);
+
+      if (!burstError && recentViews && recentViews.length > 0) {
+        const recentPostIds = [...new Set(recentViews.map((row: { post_id: string }) => row.post_id))];
+        const { data: recentThreadPost } = await supabase
+          .from('posts')
+          .select('id')
+          .in('id', recentPostIds)
+          .ilike('platform', '%threads%')
+          .limit(1);
+
+        if (recentThreadPost && recentThreadPost.length > 0) {
+          console.log('[record-view] Skipping Threads burst duplicate', { post_id, event_type });
+          return new Response(
+            JSON.stringify({ ok: true, skipped: true, reason: 'Threads burst duplicate' }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
     }
 
     // Hash IP server-side
