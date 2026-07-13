@@ -389,7 +389,7 @@ export function useOriginalVisitTracker(
       };
 
       overlay.addEventListener('pointerdown', captureBodyTap, { capture: true });
-      overlay.addEventListener('touchstart', captureBodyTap, { capture: true });
+      overlay.addEventListener('touchstart', captureBodyTap, { capture: true, passive: true });
       overlay.addEventListener('mousedown', captureBodyTap, { capture: true });
       overlay.addEventListener('click', captureBodyTap, { capture: true });
 
