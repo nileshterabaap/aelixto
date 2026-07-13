@@ -299,6 +299,12 @@ export function useOriginalVisitTracker(
       if (!target) return;
       const anchor = target.closest('a[href]') as HTMLAnchorElement | null;
       if (anchor && anchor.href && !anchor.href.startsWith('javascript:')) {
+        // For X and Threads, anchor clicks inside the embed body must NOT
+        // record `original_visit` — body taps are view/play-only, and the
+        // sole sanctioned Visit trigger is the header platform icon.
+        if (trackPlayableInteraction && (isXPost() || isThreadsPost())) {
+          return;
+        }
         fireOriginal();
       }
     };
@@ -322,7 +328,10 @@ export function useOriginalVisitTracker(
 
     const attachThreadsPlayCapture = (iframe: HTMLIFrameElement) => {
       if (!trackPlayableInteraction || threadsCaptureAttached.has(iframe)) return;
-      if (!/threads\.(net|com)/i.test(iframe.src || '')) return;
+      const src = iframe.src || '';
+      const isThreadsIframe = /threads\.(net|com)/i.test(src);
+      const isXIframe = /(twitter\.com|x\.com|platform\.twitter\.com)/i.test(src);
+      if (!isThreadsIframe && !isXIframe) return;
       const parent = iframe.parentElement;
       if (!parent) return;
 
@@ -362,16 +371,27 @@ export function useOriginalVisitTracker(
         if (parentWasStatic) parent.style.position = previousInlinePosition;
       };
 
-      const captureThreadsPlay = () => {
-        fireThreadsPlayOnce();
-        overlay.style.pointerEvents = 'none';
-        window.setTimeout(removeOverlay, 0);
+      // Persistent capture: fire Play once, then keep swallowing subsequent
+      // body taps so the iframe never navigates the user to X / Threads.
+      // The header platform icon remains the sole Visit trigger.
+      const captureBodyTap = (e: Event) => {
+        // Prevent the iframe from receiving the navigation click.
+        e.preventDefault?.();
+        e.stopPropagation?.();
+        if (isXIframe) {
+          if (!playFiredRef.current) {
+            firePlay();
+            lastIframeInteractionRef.current = Date.now();
+          }
+        } else {
+          fireThreadsPlayOnce();
+        }
       };
 
-      overlay.addEventListener('pointerdown', captureThreadsPlay, { capture: true });
-      overlay.addEventListener('touchstart', captureThreadsPlay, { capture: true, passive: true });
-      overlay.addEventListener('mousedown', captureThreadsPlay, { capture: true });
-      overlay.addEventListener('click', captureThreadsPlay, { capture: true });
+      overlay.addEventListener('pointerdown', captureBodyTap, { capture: true });
+      overlay.addEventListener('touchstart', captureBodyTap, { capture: true });
+      overlay.addEventListener('mousedown', captureBodyTap, { capture: true });
+      overlay.addEventListener('click', captureBodyTap, { capture: true });
 
       syncOverlay();
       parent.appendChild(overlay);
