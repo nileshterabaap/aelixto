@@ -329,8 +329,17 @@ export function useOriginalVisitTracker(
     const attachThreadsPlayCapture = (iframe: HTMLIFrameElement) => {
       if (!trackPlayableInteraction || threadsCaptureAttached.has(iframe)) return;
       const src = iframe.src || '';
+      const id = iframe.id || '';
+      const title = iframe.title || '';
+      const cls = iframe.className || '';
       const isThreadsIframe = /threads\.(net|com)/i.test(src);
-      const isXIframe = /(twitter\.com|x\.com|platform\.twitter\.com)/i.test(src);
+      // Twitter widget iframe often has src="" at creation and is identified
+      // by id="twitter-widget-N" / title="Twitter Tweet" instead.
+      const isXIframe =
+        /(twitter\.com|x\.com|platform\.twitter\.com)/i.test(src) ||
+        /^twitter-widget-/i.test(id) ||
+        /twitter[\s-]*tweet/i.test(title) ||
+        /twitter-tweet/i.test(cls);
       if (!isThreadsIframe && !isXIframe) return;
       const parent = iframe.parentElement;
       if (!parent) return;
@@ -371,13 +380,11 @@ export function useOriginalVisitTracker(
         if (parentWasStatic) parent.style.position = previousInlinePosition;
       };
 
-      // Persistent capture: fire Play once, then keep swallowing subsequent
-      // body taps so the iframe never navigates the user to X / Threads.
-      // The header platform icon remains the sole Visit trigger.
-      const captureBodyTap = (e: Event) => {
-        // Prevent the iframe from receiving the navigation click.
-        e.preventDefault?.();
-        e.stopPropagation?.();
+      // One-shot capture: the first body tap is intercepted so we can record
+      // Play (+1) without letting a stray anchor open the original. After
+      // that we remove the overlay so the native Play button and player
+      // controls inside the iframe start receiving taps normally.
+      const captureBodyTap = () => {
         if (isXIframe) {
           if (!playFiredRef.current) {
             firePlay();
@@ -386,6 +393,8 @@ export function useOriginalVisitTracker(
         } else {
           fireThreadsPlayOnce();
         }
+        overlay.style.pointerEvents = 'none';
+        window.setTimeout(removeOverlay, 0);
       };
 
       overlay.addEventListener('pointerdown', captureBodyTap, { capture: true });
