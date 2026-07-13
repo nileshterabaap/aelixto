@@ -4,6 +4,8 @@ import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
 // no-op stub kept to minimize diff after removing temporary diagnostic logger
 const traceLog = (..._args: unknown[]) => {};
 
+const threadsVideoPlayFiredPosts = new Set<string>();
+
 /**
  * Detects when the user taps/clicks into an embedded iframe or an outbound
  * anchor inside the embed, and fires `original_visit` once per post.
@@ -107,6 +109,13 @@ export function useOriginalVisitTracker(
       ) as HTMLIFrameElement | null;
     };
     const isThreadsPost = (): boolean => !!getThreadsIframe();
+
+    const fireThreadsPlayOnce = () => {
+      if (threadsVideoPlayFiredPosts.has(postId)) return;
+      threadsVideoPlayFiredPosts.add(postId);
+      firePlay();
+      lastIframeInteractionRef.current = Date.now();
+    };
 
     const onPointerDown = (e: Event) => {
       const now = Date.now();
@@ -296,6 +305,75 @@ export function useOriginalVisitTracker(
       }
     };
 
+    const threadsCaptureCleanups: Array<() => void> = [];
+    const threadsCaptureAttached = new WeakSet<HTMLIFrameElement>();
+
+    const attachThreadsPlayCapture = (iframe: HTMLIFrameElement) => {
+      if (!trackPlayableInteraction || threadsCaptureAttached.has(iframe)) return;
+      if (!/threads\.(net|com)/i.test(iframe.src || '')) return;
+      const parent = iframe.parentElement;
+      if (!parent) return;
+
+      threadsCaptureAttached.add(iframe);
+
+      const previousInlinePosition = parent.style.position;
+      const parentWasStatic = window.getComputedStyle(parent).position === 'static';
+      if (parentWasStatic) parent.style.position = 'relative';
+
+      const overlay = document.createElement('div');
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.dataset.aelixtoThreadsPlayCapture = 'true';
+      Object.assign(overlay.style, {
+        position: 'absolute',
+        zIndex: '3',
+        background: 'transparent',
+        pointerEvents: 'auto',
+        touchAction: 'manipulation',
+      } satisfies Partial<CSSStyleDeclaration>);
+
+      const syncOverlay = () => {
+        const parentRect = parent.getBoundingClientRect();
+        const iframeRect = iframe.getBoundingClientRect();
+        overlay.style.left = `${iframeRect.left - parentRect.left + parent.scrollLeft}px`;
+        overlay.style.top = `${iframeRect.top - parentRect.top + parent.scrollTop}px`;
+        overlay.style.width = `${iframeRect.width}px`;
+        overlay.style.height = `${iframeRect.height}px`;
+      };
+
+      let removed = false;
+      let resizeObserver: ResizeObserver | null = null;
+      const removeOverlay = () => {
+        if (removed) return;
+        removed = true;
+        overlay.remove();
+        resizeObserver?.disconnect();
+        if (parentWasStatic) parent.style.position = previousInlinePosition;
+      };
+
+      const captureThreadsPlay = () => {
+        fireThreadsPlayOnce();
+        overlay.style.pointerEvents = 'none';
+        window.setTimeout(removeOverlay, 0);
+      };
+
+      overlay.addEventListener('pointerdown', captureThreadsPlay, { capture: true });
+      overlay.addEventListener('touchstart', captureThreadsPlay, { capture: true, passive: true });
+      overlay.addEventListener('mousedown', captureThreadsPlay, { capture: true });
+      overlay.addEventListener('click', captureThreadsPlay, { capture: true });
+
+      syncOverlay();
+      parent.appendChild(overlay);
+      resizeObserver = new ResizeObserver(syncOverlay);
+      resizeObserver.observe(parent);
+      resizeObserver.observe(iframe);
+      iframe.addEventListener('load', syncOverlay);
+
+      threadsCaptureCleanups.push(() => {
+        iframe.removeEventListener('load', syncOverlay);
+        removeOverlay();
+      });
+    };
+
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
       iframe.addEventListener('focus', handleIframeFocus);
       iframe.addEventListener('load', () => {
@@ -305,6 +383,7 @@ export function useOriginalVisitTracker(
           // Cross-origin iframes may reject direct listener attachment.
         }
       }, { once: true });
+      attachThreadsPlayCapture(iframe);
     };
 
     el.querySelectorAll('iframe').forEach(attachIframeListeners);
@@ -331,6 +410,7 @@ export function useOriginalVisitTracker(
       document.removeEventListener('visibilitychange', onVisibilityChange);
       el.removeEventListener('click', onClick, true);
       observer.disconnect();
+      threadsCaptureCleanups.forEach((cleanup) => cleanup());
       if (originalDwellTimerRef.current) {
         clearTimeout(originalDwellTimerRef.current);
         originalDwellTimerRef.current = null;
