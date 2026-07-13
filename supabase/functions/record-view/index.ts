@@ -114,22 +114,31 @@ Deno.serve(async (req) => {
 
     if (isThreadsPost && isThreadScoreEvent) {
       const since = new Date(Date.now() - 2500).toISOString();
-      const { data: recentBurst, error: burstError } = await supabase
+      const { data: recentViews, error: burstError } = await supabase
         .from('post_views')
-        .select('id, post_id, posts!inner(platform)')
+        .select('post_id')
         .eq('event_type', event_type)
         .neq('post_id', post_id)
         .eq('device_hash', device_hash)
         .gte('created_at', since)
-        .ilike('posts.platform', '%threads%')
-        .limit(1);
+        .limit(8);
 
-      if (!burstError && recentBurst && recentBurst.length > 0) {
-        console.log('[record-view] Skipping Threads burst duplicate', { post_id, event_type });
-        return new Response(
-          JSON.stringify({ ok: true, skipped: true, reason: 'Threads burst duplicate' }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      if (!burstError && recentViews && recentViews.length > 0) {
+        const recentPostIds = [...new Set(recentViews.map((row: { post_id: string }) => row.post_id))];
+        const { data: recentThreadPost } = await supabase
+          .from('posts')
+          .select('id')
+          .in('id', recentPostIds)
+          .ilike('platform', '%threads%')
+          .limit(1);
+
+        if (recentThreadPost && recentThreadPost.length > 0) {
+          console.log('[record-view] Skipping Threads burst duplicate', { post_id, event_type });
+          return new Response(
+            JSON.stringify({ ok: true, skipped: true, reason: 'Threads burst duplicate' }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
     }
 
