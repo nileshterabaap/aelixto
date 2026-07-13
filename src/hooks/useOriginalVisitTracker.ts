@@ -150,8 +150,12 @@ export function useOriginalVisitTracker(
           // Playable posts: tapping into the iframe = Play (+1) only.
           // "Visited the original source" is intentionally NOT inferred here;
           // it must come from an explicit anchor click or the platform-icon button.
-          firePlay();
-          lastIframeInteractionRef.current = now;
+          if (isThreadsPost()) {
+            fireThreadsPlayOnce();
+          } else {
+            firePlay();
+            lastIframeInteractionRef.current = now;
+          }
         } else {
           fireOriginal();
         }
@@ -159,8 +163,7 @@ export function useOriginalVisitTracker(
         // Threads SDK inflates a same-origin <blockquote> (no iframe), so the
         // isInsideIframe check above never matches. Treat a pointerdown on the
         // inflated Threads embed as a play interaction (+1 only).
-        firePlay();
-        lastIframeInteractionRef.current = now;
+        fireThreadsPlayOnce();
       } else if (trackPlayableInteraction && isThreadsPost()) {
         // Threads is rendered as a direct cross-origin iframe. On some mobile
         // browsers a pointerdown on the iframe surface reports the event target
@@ -181,8 +184,7 @@ export function useOriginalVisitTracker(
         if (iframe && x !== null && y !== null) {
           const r = iframe.getBoundingClientRect();
           if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-            firePlay();
-            lastIframeInteractionRef.current = now;
+            fireThreadsPlayOnce();
           }
         }
       }
@@ -312,8 +314,12 @@ export function useOriginalVisitTracker(
     const handleIframeFocus = () => {
       const now = Date.now();
       if (trackPlayableInteraction) {
-        firePlay();
-        lastIframeInteractionRef.current = now;
+        if (isThreadsPost()) {
+          fireThreadsPlayOnce();
+        } else {
+          firePlay();
+          lastIframeInteractionRef.current = now;
+        }
       } else {
         fireOriginal();
       }
