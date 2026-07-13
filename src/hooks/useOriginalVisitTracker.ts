@@ -5,6 +5,10 @@ import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
 const traceLog = (..._args: unknown[]) => {};
 
 const threadsVideoPlayFiredPosts = new Set<string>();
+const lastThreadsCaptureRef: { postId: string | null; time: number } = {
+  postId: null,
+  time: 0,
+};
 
 /**
  * Detects when the user taps/clicks into an embedded iframe or an outbound
@@ -112,6 +116,8 @@ export function useOriginalVisitTracker(
 
     const fireThreadsPlayOnce = () => {
       if (threadsVideoPlayFiredPosts.has(postId)) return;
+      lastThreadsCaptureRef.postId = postId;
+      lastThreadsCaptureRef.time = Date.now();
       threadsVideoPlayFiredPosts.add(postId);
       firePlay();
       lastIframeInteractionRef.current = Date.now();
@@ -199,6 +205,14 @@ export function useOriginalVisitTracker(
         if (iframe) {
           setTimeout(() => {
             if (playFiredRef.current) return;
+            // Each mounted Threads post owns a window.blur listener. A single
+            // iframe tap blurs the window globally, so only the post whose
+            // capture layer saw the tap may use this fallback; otherwise every
+            // visible Threads post would record video_play from one tap.
+            if (
+              lastThreadsCaptureRef.postId !== postId ||
+              Date.now() - lastThreadsCaptureRef.time > 1200
+            ) return;
             if (document.visibilityState === 'hidden') return;
             const r = iframe.getBoundingClientRect();
             const onScreen =
