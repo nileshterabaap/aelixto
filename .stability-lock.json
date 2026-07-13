@@ -2,7 +2,28 @@
   "version": 1,
   "protectedFiles": [
     "src/components/RawEmbedRenderer.tsx",
-    "src/lib/resolveRenderer.ts"
+    "src/lib/resolveRenderer.ts",
+    "src/components/HydratedFeedPost.tsx",
+    "src/components/HydratedEmbed.tsx",
+    "src/components/CommentsDialog.tsx",
+    "src/components/PullToRefresh.tsx",
+    "src/components/CreatePostDialog.tsx",
+    "src/components/AelixtoLoader.tsx",
+    "src/components/profile/ProfilePlatformGrid.tsx",
+    "src/components/profile/PostOwnerActionsSheet.tsx",
+    "src/components/profile/ProfileOptionsMenu.tsx",
+    "src/components/profile/PlatformPostViewer.tsx",
+    "src/hooks/useOriginalVisitTracker.ts",
+    "src/hooks/useViewTracking.ts",
+    "src/hooks/useFollow.ts",
+    "src/hooks/usePosts.ts",
+    "src/lib/getPostThumb.ts",
+    "src/lib/ScriptLoader.ts",
+    "src/pages/UserProfile.tsx",
+    "src/pages/Conversation.tsx",
+    "supabase/functions/record-view/index.ts",
+    "supabase/functions/extract-preview/index.ts",
+    "src/index.css"
   ],
   "baseline": {
     "src/components/RawEmbedRenderer.tsx": {
