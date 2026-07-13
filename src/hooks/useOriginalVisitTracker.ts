@@ -274,12 +274,7 @@ export function useOriginalVisitTracker(
       // Threads): iframe tap credits Play only. "Visit" must come from an
       // explicit anchor click or the header platform-icon button, so we
       // never infer visit from an app-background here on playable posts.
-      // X-only exception: tapping an X embed opens x.com/twitter.com (in-app
-      // browser or native app), which backgrounds the page. Credit Visit (+1)
-      // in addition to the Play already fired on the iframe tap. All other
-      // playable platforms (YouTube/TikTok/IG/FB/LinkedIn/Pinterest/Spotify/
-      // Threads) keep the strict rule: no Visit on app-background.
-      if (trackPlayableInteraction && !isXPost()) return;
+      if (trackPlayableInteraction) return;
       const now = Date.now();
       if (
         now - recentPointerRef.current < 3000 ||
