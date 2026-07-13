@@ -104,15 +104,20 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Threads embeds can emit multiple parent-page signals from a single tap
-    // when several Threads posts are mounted. Keep scoring one event per
-    // actual interaction by ignoring same-device same-event bursts that target
-    // a different Threads post within a tiny window.
+    // Threads AND X embeds can emit multiple parent-page signals from a single
+    // user action when several such posts are mounted (image_view fires for
+    // every embed intersecting the viewport, iframe blur fires on any tap).
+    // Collapse same-device same-event bursts targeting a different post of the
+    // same platform within a tiny window.
     const platform = String(post.platform || '').toLowerCase();
-    const isThreadsPost = platform === 'threads' || platform.includes('threads');
-    const isThreadScoreEvent = ['image_view', 'video_play', 'original_visit'].includes(event_type);
+    const isThreadsPost = platform.includes('threads');
+    const isXPost = platform === 'twitter' || platform === 'x';
+    const isBurstyPlatform = isThreadsPost || isXPost;
+    const platformPattern = isThreadsPost ? '%threads%' : '%';
+    const platformFilter = isXPost ? ['twitter', 'x'] : null;
+    const isBurstEvent = ['image_view', 'video_play', 'original_visit'].includes(event_type);
 
-    if (isThreadsPost && isThreadScoreEvent) {
+    if (isBurstyPlatform && isBurstEvent) {
       const since = new Date(Date.now() - 2500).toISOString();
       const { data: recentViews, error: burstError } = await supabase
         .from('post_views')
@@ -125,17 +130,22 @@ Deno.serve(async (req) => {
 
       if (!burstError && recentViews && recentViews.length > 0) {
         const recentPostIds = [...new Set(recentViews.map((row: { post_id: string }) => row.post_id))];
-        const { data: recentThreadPost } = await supabase
+        let recentQuery = supabase
           .from('posts')
           .select('id')
           .in('id', recentPostIds)
-          .ilike('platform', '%threads%')
           .limit(1);
+        if (platformFilter) {
+          recentQuery = recentQuery.in('platform', platformFilter);
+        } else {
+          recentQuery = recentQuery.ilike('platform', platformPattern);
+        }
+        const { data: recentSamePlatformPost } = await recentQuery;
 
-        if (recentThreadPost && recentThreadPost.length > 0) {
-          console.log('[record-view] Skipping Threads burst duplicate', { post_id, event_type });
+        if (recentSamePlatformPost && recentSamePlatformPost.length > 0) {
+          console.log('[record-view] Skipping burst duplicate', { post_id, event_type, platform });
           return new Response(
-            JSON.stringify({ ok: true, skipped: true, reason: 'Threads burst duplicate' }),
+            JSON.stringify({ ok: true, skipped: true, reason: 'Platform burst duplicate' }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
