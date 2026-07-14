@@ -345,6 +345,40 @@ export function useOriginalVisitTracker(
         }
       }, { once: true });
       attachThreadsPlayCapture(iframe);
+      applyNavLockSandbox(iframe);
+    };
+
+    // For X and Threads embeds we cannot inspect the cross-origin iframe to
+    // distinguish "video pixel" from "username link pixel". To honor the
+    // product rule ("embedded post must never navigate to the original"),
+    // we sandbox the iframe: allow scripts + same-origin (so the player,
+    // postMessage height sync, and video playback keep working), but omit
+    // allow-popups and allow-top-navigation*. Any link tap inside the embed
+    // is silently dropped by the browser instead of opening a new tab or
+    // navigating the app away. Play/pause on the native player is unaffected.
+    const applyNavLockSandbox = (iframe: HTMLIFrameElement) => {
+      if (!trackPlayableInteraction) return;
+      if (iframe.dataset.navLockApplied === '1') return;
+      const src = (iframe.getAttribute('src') || '').toLowerCase();
+      const title = (iframe.getAttribute('title') || '').toLowerCase();
+      const id = (iframe.id || '').toLowerCase();
+      const isX =
+        src.includes('twitter.com') ||
+        src.includes('x.com') ||
+        src.includes('platform.twitter.com') ||
+        id.includes('twitter-widget') ||
+        title.includes('twitter') ||
+        title.includes('tweet');
+      const isThreads =
+        src.includes('threads.net') || src.includes('threads.com');
+      if (!isX && !isThreads) return;
+      iframe.dataset.navLockApplied = '1';
+      // Setting sandbox on an already-loaded iframe reloads it once; that's
+      // acceptable and only happens the first time we see the frame.
+      iframe.setAttribute(
+        'sandbox',
+        'allow-scripts allow-same-origin allow-presentation',
+      );
     };
 
     el.querySelectorAll('iframe').forEach(attachIframeListeners);
