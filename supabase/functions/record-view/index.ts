@@ -104,16 +104,25 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Threads embeds can emit multiple parent-page signals from a single tap
-    // when several Threads posts are mounted. Keep scoring one event per
-    // actual interaction by ignoring same-device same-event bursts that target
-    // a different Threads post within a tiny window.
+    // Threads embeds can emit multiple parent-page signals from a single user
+    // action when several Threads posts are mounted (the SDK inflates an
+    // in-page blockquote, so one tap can trigger listeners on siblings). X
+    // does NOT have this problem — its iframe blur check is scoped per-post
+    // and its image_view timer is per-tracker — so X must NOT be collapsed
+    // here or legitimate sequential views get silently dropped.
     const platform = String(post.platform || '').toLowerCase();
-    const isThreadsPost = platform === 'threads' || platform.includes('threads');
-    const isThreadScoreEvent = ['image_view', 'video_play', 'original_visit'].includes(event_type);
+    const isThreadsPost = platform.includes('threads');
+    const isBurstyPlatform = isThreadsPost;
+    const platformPattern = '%threads%';
+    // Only collapse the events that actually leak across mounted Threads posts
+    // from a single interaction. image_view is per-post-timer and safe.
+    const isBurstEvent = ['video_play', 'original_visit'].includes(event_type);
 
-    if (isThreadsPost && isThreadScoreEvent) {
-      const since = new Date(Date.now() - 2500).toISOString();
+    if (isBurstyPlatform && isBurstEvent) {
+      // Tight window: a single blur/pointer event on one iframe reaches every
+      // mounted sibling listener within a few frames. 800ms is comfortably
+      // above that, well below any plausible sequential user interaction.
+      const since = new Date(Date.now() - 800).toISOString();
       const { data: recentViews, error: burstError } = await supabase
         .from('post_views')
         .select('post_id')
@@ -125,17 +134,17 @@ Deno.serve(async (req) => {
 
       if (!burstError && recentViews && recentViews.length > 0) {
         const recentPostIds = [...new Set(recentViews.map((row: { post_id: string }) => row.post_id))];
-        const { data: recentThreadPost } = await supabase
+        const { data: recentSamePlatformPost } = await supabase
           .from('posts')
           .select('id')
           .in('id', recentPostIds)
-          .ilike('platform', '%threads%')
+          .ilike('platform', platformPattern)
           .limit(1);
 
-        if (recentThreadPost && recentThreadPost.length > 0) {
-          console.log('[record-view] Skipping Threads burst duplicate', { post_id, event_type });
+        if (recentSamePlatformPost && recentSamePlatformPost.length > 0) {
+          console.log('[record-view] Skipping burst duplicate', { post_id, event_type, platform });
           return new Response(
-            JSON.stringify({ ok: true, skipped: true, reason: 'Threads burst duplicate' }),
+            JSON.stringify({ ok: true, skipped: true, reason: 'Platform burst duplicate' }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }

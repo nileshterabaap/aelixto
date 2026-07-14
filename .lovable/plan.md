@@ -1,53 +1,44 @@
-# Diagnose Threads regression: missing `video_play` + double `original_visit`
+## Goal
 
-I need trace data before proposing a fix — the current code has three separate paths that can each emit `original_visit` and two that can emit `video_play`, and I can't tell from source alone which ones actually fired for your last interaction.
+Match Instagram behavior for X and Threads: tapping anywhere on the embedded post body must only view/play the media. The header platform icon becomes the sole way to open the original post and the sole trigger for `original_visit`.
 
-## What I'll do once you approve
+## Current behavior (why body taps navigate today)
 
-**Step 1 — Query the trace, no code changes.**
-Pull the last ~10 minutes of `trace_logs` for the Threads post plus its `post_views` rows, and build a chronological timeline of every event the hook emitted:
+- X: the Twitter SDK inflates a `<blockquote>` whose author/timestamp/text nodes are real `<a target="_blank">` anchors, and when it upgrades to a same-domain iframe the whole iframe surface links to `x.com`. Anchor clicks currently also fire `original_visit` via the tracker's `onClick` handler.
+- Threads: rendered as a cross-origin iframe where the entire iframe body deep-links to `threads.net`. A one-shot capture overlay currently fires `video_play` on the first tap and then removes itself, so any following tap navigates to Threads.
 
-- `onPointerDown` — target tag, `insideIframe`, `isThreadsPost`, hit-test result
-- `onWindowBlur` → setTimeout — `activeTag`, `activeInsideEl`
-- `onVisibilityChange` — `msSincePointer`, `msSinceIframe`
-- `firePlay` / `fireOriginal` — `alreadyFired` flag, `trackView:result`, `trackOriginalVisit:result`
+## Changes (frontend only)
 
-**Step 2 — Correlate against the two known suspects.**
+### 1. `src/hooks/useOriginalVisitTracker.ts`
+- In `onClick`, when `trackPlayableInteraction === true` AND the post is X or Threads, do NOT call `fireOriginal()` for anchor clicks inside the embed. Anchor-based visit inference stays enabled only for non-playable article/link-card embeds.
+- Keep the existing "iframe tap = Play only" logic. No new `original_visit` inference from body taps for X or Threads under any code path.
+- Extend `attachThreadsPlayCapture` so its overlay is **persistent** for both Threads and X iframes:
+  - After the first body interaction fires `video_play`, keep the overlay mounted (do not remove, do not switch `pointerEvents` to none). Subsequent body taps are swallowed silently — no navigation, no duplicate Play.
+  - Reuse the existing `ResizeObserver` + `syncOverlay` so the overlay tracks iframe geometry.
+  - Add a sibling helper `attachXPlayCapture` (or generalize the current one) that matches `iframe[src*="twitter.com"], iframe[src*="x.com"], iframe[src*="platform.twitter.com"]` and behaves identically.
 
-The code has these paths that can double-credit `original_visit` for Threads:
+### 2. `src/components/embeds/TwitterEmbed.tsx`
+- After the Twitter widget hydrates the blockquote, add a transparent capture layer that sits above the rendered tweet card (same pattern as the Threads overlay) so anchor clicks inside the SDK-rendered blockquote cannot open `x.com`.
+- First tap on the layer calls `trackView({ postId, eventType: 'video_play' })` via a callback (mirrors the tracker's `firePlay`); subsequent taps are absorbed. Video posts still play because the native player exposes its own controls above the overlay only when the SDK renders an inline player; when it doesn't, the tweet is view-only, which matches the requested "view/play only" spec.
+- Container must remain `position: relative` and overlay `pointer-events: auto; background: transparent; z-index` above the widget iframe.
 
-1. `onVisibilityChange` — I recently removed the `isThreadsPost()` early-return, so any app-background within 3s of a pointerdown now fires `fireOriginal` for Threads. This is intentional but may be firing on the wrong window.
-2. `handleIframeFocus` on the `<iframe>` element itself — if `trackPlayableInteraction` is false at the moment the iframe first focuses (e.g. re-mount with stale prop), this fires `fireOriginal` instead of `firePlay`.
-3. Two mounted instances of `useOriginalVisitTracker` for the same post (feed card + `PlatformPostViewer` open simultaneously) — each has its own `firedRef`, so both can fire, and `post_views` will keep both rows if their `device_hash + event_type` dedupe window has already expired between them.
+### 3. Header platform icon (already correct — verify only)
+- `src/components/HydratedFeedPost.tsx` header icon `onClick` continues to call `markOriginalVisit(post.id)` then `openExternalUrl(mediaUrl)`. No change needed; this remains the single sanctioned Visit trigger for every platform, X and Threads included.
 
-For missing `video_play`:
+### 4. Stability guard
+- After the edits land, run `npm run stability:approve` so the new baselines for `useOriginalVisitTracker.ts` (protected in an earlier turn) and any newly locked file are stored.
 
-1. `onPointerDown` hit-test — if the pointer coordinates fall outside the iframe rect (e.g. tap on the Threads header/footer chrome that sits in the parent DOM), `firePlay` never runs.
-2. `onWindowBlur` setTimeout(0) — on mobile Chrome the `document.activeElement` after a cross-origin iframe tap can be `<body>`, not `IFRAME`, so the `firePlay` branch is skipped.
-3. `handleIframeFocus` — cross-origin iframes on mobile often don't fire a DOM `focus` event on the parent-side `<iframe>` element.
+## Explicit non-goals
 
-**Step 3 — Report which specific paths ran, then propose the smallest targeted fix.**
-No code changes until the trace conclusively identifies which of the above are the actual culprits.
+- No changes to Instagram, Facebook, YouTube, TikTok, LinkedIn, Pinterest, Spotify, Reddit, Quora, or article/link-card tracking.
+- No backend / edge-function / RLS changes. `record-view` burst-guard and score logic stay as they are.
+- The Play event model is unchanged (still 1 per post, deduped by `threadsVideoPlayFiredPosts` for Threads and by `playFiredRef` for X).
 
-## Technical details
+## Success criteria
 
-Files I'll read (no edits):
-- `src/hooks/useOriginalVisitTracker.ts` — already in context
-- `src/components/HydratedEmbed.tsx` — confirm one vs. two mounts per post
-- `src/components/profile/PlatformPostViewer.tsx` — check if it mounts its own tracker while the feed card is still mounted
+- Tapping anywhere on an X post body in the feed or profile grid: no navigation to `x.com`, `video_play` recorded exactly once, `original_visit` = 0.
+- Tapping anywhere on a Threads post body: no navigation to `threads.net`, `video_play` recorded exactly once, `original_visit` = 0.
+- Tapping the X or Threads platform icon in the post header: opens the original in a new tab and records `original_visit` exactly once.
+- Instagram behavior unchanged.
 
-Queries I'll run:
-```sql
-select ts, event, step, detail, error from public.trace_logs
-where post_id = '<threads post id>' and ts > now() - interval '15 min'
-order by ts;
-
-select created_at, event_type, viewer_id, device_hash
-from public.post_views
-where post_id = '<threads post id>' and created_at > now() - interval '15 min'
-order by created_at;
-```
-
-I need the Threads post_id from your last test (or I can pull the most recent Threads post from `posts`).
-
-Success probability: **95%** (trace is already instrumented and proven to write).
+Success probability: **90%** (the residual 10% is X's SDK occasionally repainting the blockquote after our overlay mounts; the `MutationObserver` in the tracker already reattaches iframe listeners, and the overlay's `ResizeObserver` handles geometry, so this is well covered).

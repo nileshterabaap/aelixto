@@ -270,19 +270,11 @@ export function useOriginalVisitTracker(
       // Only infer a visit for non-playable embeds (article/link cards where
       // tapping opens the source). Playable posts must not auto-fire Visit on
       // app backgrounding — user may just be watching inline.
-      // Exception: X/Twitter embeds are a cross-origin iframe that swallows
-      // internal anchor clicks; when the user taps through to the original
-      // post, the only observable signal is the app becoming hidden shortly
-      // after a pointerdown on the embed. Scope the fallback to X only so
-      // other playable platforms (YouTube/TikTok/IG/FB/LinkedIn/Pinterest/
-      // Spotify/Threads) are unaffected.
-      // Threads is intentionally excluded here: on Threads, any iframe
-      // interaction is credited as `video_play` (see onWindowBlur below).
-      // A subsequent app-background is almost always the user tapping the
-      // inline share link, which would double-credit as visit. Visit for
-      // Threads must come from the explicit header platform-icon button
-      // (markOriginalVisit) or an anchor click captured by onClick.
-      if (trackPlayableInteraction && !isXPost()) return;
+      // Playable posts (X/YouTube/TikTok/IG/FB/LinkedIn/Pinterest/Spotify/
+      // Threads): iframe tap credits Play only. "Visit" must come from an
+      // explicit anchor click or the header platform-icon button, so we
+      // never infer visit from an app-background here on playable posts.
+      if (trackPlayableInteraction) return;
       const now = Date.now();
       if (
         now - recentPointerRef.current < 3000 ||
@@ -307,6 +299,12 @@ export function useOriginalVisitTracker(
       if (!target) return;
       const anchor = target.closest('a[href]') as HTMLAnchorElement | null;
       if (anchor && anchor.href && !anchor.href.startsWith('javascript:')) {
+        // For X and Threads, anchor clicks inside the embed body must NOT
+        // record `original_visit` — body taps are view/play-only, and the
+        // sole sanctioned Visit trigger is the header platform icon.
+        if (trackPlayableInteraction && (isXPost() || isThreadsPost())) {
+          return;
+        }
         fireOriginal();
       }
     };
@@ -329,69 +327,12 @@ export function useOriginalVisitTracker(
     const threadsCaptureAttached = new WeakSet<HTMLIFrameElement>();
 
     const attachThreadsPlayCapture = (iframe: HTMLIFrameElement) => {
-      if (!trackPlayableInteraction || threadsCaptureAttached.has(iframe)) return;
-      if (!/threads\.(net|com)/i.test(iframe.src || '')) return;
-      const parent = iframe.parentElement;
-      if (!parent) return;
-
-      threadsCaptureAttached.add(iframe);
-
-      const previousInlinePosition = parent.style.position;
-      const parentWasStatic = window.getComputedStyle(parent).position === 'static';
-      if (parentWasStatic) parent.style.position = 'relative';
-
-      const overlay = document.createElement('div');
-      overlay.setAttribute('aria-hidden', 'true');
-      overlay.dataset.aelixtoThreadsPlayCapture = 'true';
-      Object.assign(overlay.style, {
-        position: 'absolute',
-        zIndex: '3',
-        background: 'transparent',
-        pointerEvents: 'auto',
-        touchAction: 'manipulation',
-      } satisfies Partial<CSSStyleDeclaration>);
-
-      const syncOverlay = () => {
-        const parentRect = parent.getBoundingClientRect();
-        const iframeRect = iframe.getBoundingClientRect();
-        overlay.style.left = `${iframeRect.left - parentRect.left + parent.scrollLeft}px`;
-        overlay.style.top = `${iframeRect.top - parentRect.top + parent.scrollTop}px`;
-        overlay.style.width = `${iframeRect.width}px`;
-        overlay.style.height = `${iframeRect.height}px`;
-      };
-
-      let removed = false;
-      let resizeObserver: ResizeObserver | null = null;
-      const removeOverlay = () => {
-        if (removed) return;
-        removed = true;
-        overlay.remove();
-        resizeObserver?.disconnect();
-        if (parentWasStatic) parent.style.position = previousInlinePosition;
-      };
-
-      const captureThreadsPlay = () => {
-        fireThreadsPlayOnce();
-        overlay.style.pointerEvents = 'none';
-        window.setTimeout(removeOverlay, 0);
-      };
-
-      overlay.addEventListener('pointerdown', captureThreadsPlay, { capture: true });
-      overlay.addEventListener('touchstart', captureThreadsPlay, { capture: true, passive: true });
-      overlay.addEventListener('mousedown', captureThreadsPlay, { capture: true });
-      overlay.addEventListener('click', captureThreadsPlay, { capture: true });
-
-      syncOverlay();
-      parent.appendChild(overlay);
-      resizeObserver = new ResizeObserver(syncOverlay);
-      resizeObserver.observe(parent);
-      resizeObserver.observe(iframe);
-      iframe.addEventListener('load', syncOverlay);
-
-      threadsCaptureCleanups.push(() => {
-        iframe.removeEventListener('load', syncOverlay);
-        removeOverlay();
-      });
+      // Overlay capture disabled: it swallowed the first tap on the native
+      // Play button, so the video never actually started. We now let taps
+      // pass straight through to the iframe and rely on pointerdown /
+      // window.blur / iframe focus signals below to credit Play.
+      void iframe;
+      void threadsCaptureAttached;
     };
 
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
@@ -404,6 +345,40 @@ export function useOriginalVisitTracker(
         }
       }, { once: true });
       attachThreadsPlayCapture(iframe);
+      applyNavLockSandbox(iframe);
+    };
+
+    // For X and Threads embeds we cannot inspect the cross-origin iframe to
+    // distinguish "video pixel" from "username link pixel". To honor the
+    // product rule ("embedded post must never navigate to the original"),
+    // we sandbox the iframe: allow scripts + same-origin (so the player,
+    // postMessage height sync, and video playback keep working), but omit
+    // allow-popups and allow-top-navigation*. Any link tap inside the embed
+    // is silently dropped by the browser instead of opening a new tab or
+    // navigating the app away. Play/pause on the native player is unaffected.
+    const applyNavLockSandbox = (iframe: HTMLIFrameElement) => {
+      if (!trackPlayableInteraction) return;
+      if (iframe.dataset.navLockApplied === '1') return;
+      const src = (iframe.getAttribute('src') || '').toLowerCase();
+      const title = (iframe.getAttribute('title') || '').toLowerCase();
+      const id = (iframe.id || '').toLowerCase();
+      const isX =
+        src.includes('twitter.com') ||
+        src.includes('x.com') ||
+        src.includes('platform.twitter.com') ||
+        id.includes('twitter-widget') ||
+        title.includes('twitter') ||
+        title.includes('tweet');
+      const isThreads =
+        src.includes('threads.net') || src.includes('threads.com');
+      if (!isX && !isThreads) return;
+      iframe.dataset.navLockApplied = '1';
+      // Setting sandbox on an already-loaded iframe reloads it once; that's
+      // acceptable and only happens the first time we see the frame.
+      iframe.setAttribute(
+        'sandbox',
+        'allow-scripts allow-same-origin allow-presentation',
+      );
     };
 
     el.querySelectorAll('iframe').forEach(attachIframeListeners);
