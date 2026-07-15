@@ -251,10 +251,8 @@ public class GamNativePlugin: CAPPlugin, GADNativeAdLoaderDelegate, GADAdLoaderD
         adView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         adView.layoutSubviews()
 
-        // Programmatic layout: header (52 tall), media (flex), text 88 tall
+        // Programmatic layout: header (52 tall), media (flex), text/cta at bottom
         let width = adView.bounds.width
-        // These will be re-evaluated in a layoutSubviews override via KVO on bounds.
-        NotificationCenter.default.addObserver(forName: UIView.layoutSubviewsNotification, object: nil, queue: .main) { _ in }
         let headerH: CGFloat = 52
         let ctaH: CGFloat = 32
         let textH: CGFloat = 90
