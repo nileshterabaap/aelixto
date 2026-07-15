@@ -1,41 +1,37 @@
-# Google Ad Manager (AdX) — Native In-Feed Ads
+# Google Ad Manager (AdX) — Native Ads
 
-This project ships the plumbing for Google Ad Manager native ads via
-`@capacitor-community/admob`. All frontend, RLS, install-age gating, and
-consent flow are wired. Only the four IDs below and the native-platform
-config still need to be filled in before real ads can serve.
+Ads are served by a **first-party Capacitor plugin** at
+`capacitor-plugins/gam-native` that wraps:
 
-## 1. Paste your IDs
+- **iOS:** `Google-Mobile-Ads-SDK` (`GADAdLoader` + `GAMRequest`)
+- **Android:** `play-services-ads` (`AdLoader.forNativeAd` + `AdManagerAdRequest`)
+- **Consent:** `GoogleUserMessagingPlatform` / `user-messaging-platform`
+  (Google-certified CMP via Funding Choices).
 
-### `capacitor.config.ts` → `plugins.AdMob`
-Replace the two test App IDs with the values Ad Manager gave you under
-**Admin → Apps**:
+Because the request path is `GAMRequest` / `AdManagerAdRequest` and the unit
+IDs are `/NETWORK_CODE/unit_name`, demand comes from **your Ad Manager
+account**, including AdX open auction and any yield partners you've enabled.
+There is no AdMob plugin in the tree.
 
+## Configure IDs (2 places)
+
+### 1. `src/config/ads.ts`
 ```ts
-appIdAndroid: 'ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY',
-appIdIos:     'ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY',
-```
-
-### `src/config/ads.ts`
-```ts
-export const AD_TEST_MODE = false;
+export const AD_TEST_MODE = false; // true keeps Google test creatives
 const LIVE_NATIVE_ANDROID = '/NETWORK_CODE/aelixto_feed_native';
 const LIVE_NATIVE_IOS     = '/NETWORK_CODE/aelixto_feed_native';
 ```
 
-## 2. Native platform config
+### 2. Native App IDs (after `npx cap sync`)
 
-After `npx cap sync`, edit:
-
-### `android/app/src/main/AndroidManifest.xml`
-Inside `<application>`:
+**`android/app/src/main/AndroidManifest.xml`** (inside `<application>`):
 ```xml
 <meta-data
   android:name="com.google.android.gms.ads.APPLICATION_ID"
   android:value="ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY"/>
 ```
 
-### `ios/App/App/Info.plist`
+**`ios/App/App/Info.plist`**:
 ```xml
 <key>GADApplicationIdentifier</key>
 <string>ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY</string>
@@ -43,49 +39,63 @@ Inside `<application>`:
 <string>Aelixto uses this identifier to show more relevant ads.</string>
 <key>SKAdNetworkItems</key>
 <array>
-  <!-- Paste Google's full SKAdNetworkItems list from
+  <!-- Paste Google's full list from
        https://developers.google.com/admob/ios/quick-start#update_your_infoplist -->
 </array>
 ```
 
-## 3. GAM dashboard checklist
+> The App ID is the AdMob-format app registration Google requires for the
+> Mobile Ads SDK to initialize; the actual ad demand still comes from your
+> Ad Manager unit IDs.
 
-- Admin → Apps → register Android + iOS apps.
-- Inventory → Ad units → create one **Native** unit per platform.
-- Yield groups → enable AdX open auction on those units.
-- Privacy & messaging → publish GDPR + IDFA + US-state messages (UMP form).
+## One-time build steps
 
-## 4. How the app decides whether to show an ad
+```bash
+git pull
+npm install
+npx cap sync
+cd ios/App && pod install && cd ../..   # iOS only
+npx cap open android    # or: npx cap open ios
+```
 
-All conditions must be true:
+The plugin is picked up automatically because it's declared in
+`package.json` as `aelixto-gam-native: file:capacitor-plugins/gam-native`,
+which is how Capacitor discovers local plugins.
 
-1. Running on Android or iOS via Capacitor (never web).
-2. UMP consent resolved and Google Mobile Ads SDK initialized
-   (`initAdsAndConsent` in `src/lib/adConsent.ts`).
-3. Install age ≥ 48 h — tracked in `public.install_metadata`
-   (per user + device) with a `localStorage` fallback for signed-out use.
-4. Placement: every 5th post in the main feed
-   (see `AD_INTERVAL` in `src/config/ads.ts`).
-5. Rate limit: no more than one ad request per 20 s
-   (`AD_MIN_REQUEST_INTERVAL_MS`).
+## Ad Manager dashboard checklist
 
-Users can revisit their consent via
-**Settings → Manage ad preferences** (native-only row).
+- Admin → Apps → register the Android + iOS apps.
+- Inventory → Ad units → create one **Native** unit per platform. Use those
+  `/NETWORK_CODE/…` paths in `src/config/ads.ts`.
+- Yield groups → enable AdX open auction on the units.
+- Privacy & messaging → publish GDPR + IDFA + US-state messages (the UMP
+  form the app fetches).
 
-## 5. Native ad rendering caveat
+## Gating rules (all must be true before an ad request fires)
 
-`@capacitor-community/admob` v8 supports Banner / Interstitial / Rewarded
-out of the box. Full native-ad rendering requires either:
+1. Running on Capacitor Android/iOS (never web).
+2. UMP consent resolved + `MobileAds` initialized (`adsReady()`).
+3. Install age ≥ 48 h — tracked in `public.install_metadata`, with a
+   `localStorage` fallback for signed-out sessions.
+4. Placement: one ad after every 5 posts (`AD_INTERVAL`).
+5. Rate limit: ≥ 20 s between ad requests (`AD_MIN_REQUEST_INTERVAL_MS`).
 
-- A newer plugin version that exposes `AdMob.loadNativeAd`, or
-- A small custom Capacitor plugin that wraps `GADNativeAd` (iOS) and
-  `NativeAd` (Android).
+Users can re-open their consent choices via **Settings → Manage ad
+preferences** (native-only row).
 
-`NativeFeedAd.tsx` already calls `AdMob.loadNativeAd({ adId })` and renders
-the returned creative. When the method isn't present, the component
-returns `null` and the feed renders exactly as it does today — no layout
-shift, no visible placeholder.
+## Impression / click reporting caveat
 
-Recommended next step once IDs are in: adopt
-[`admob-plus-capacitor`](https://github.com/admob-plus/admob-plus) or a
-bespoke plugin to fulfill the native ad request.
+Google's SDK auto-fires impressions and clicks when creatives are rendered
+inside a native `GADNativeAdView` / `NativeAdView`. Because our card is
+drawn inside the webview, the plugin:
+
+- Manually calls `nativeAd.recordImpression()` on iOS when the card crosses
+  ≥ 50 % visibility (Google's viewability bar).
+- On iOS, calls `performClickOnAsset(GADNativeCallToActionAsset)` for the
+  CTA tap — that's the SDK-sanctioned path, so the click is billable and
+  the landing page opens through Google's handler.
+- Android's public `NativeAd` API doesn't expose an equivalent manual
+  click hook. For full Android metrics + billable clicks, a follow-up is
+  to render the card in a native `NativeAdView` overlay above the webview
+  (small addition to the plugin's Java side). Impression tracking and
+  demand routing already work end-to-end via `AdManagerAdRequest`.

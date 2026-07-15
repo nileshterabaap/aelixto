@@ -15,7 +15,6 @@
     "stability:approve": "node scripts/stability-guard.mjs approve"
   },
   "dependencies": {
-    "@capacitor-community/admob": "^8.0.0",
     "@capacitor/android": "^8.0.2",
     "@capacitor/app": "^8.1.0",
     "@capacitor/app-launcher": "^8.0.1",
@@ -62,6 +61,7 @@
     "@tanstack/react-query-persist-client": "^5.90.21",
     "@tanstack/react-virtual": "^3.13.12",
     "@types/dompurify": "^3.0.5",
+    "aelixto-gam-native": "./capacitor-plugins/gam-native",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
