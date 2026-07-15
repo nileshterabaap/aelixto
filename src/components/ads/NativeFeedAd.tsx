@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Card } from '@/components/ui/card';
 import { AD_MIN_REQUEST_INTERVAL_MS, getNativeFeedAdUnitId } from '@/config/ads';
 import { adsReady } from '@/lib/adConsent';
 import { GamNative, type NativeAdCreative } from 'aelixto-gam-native';
@@ -40,8 +39,9 @@ export function NativeFeedAd() {
   const [ad, setAd] = useState<NativeAdCreative | null>(null);
   const [ready, setReady] = useState(false);
   const mountedRef = useRef(true);
-  const impressionFiredRef = useRef(false);
-  const cardRef = useRef<HTMLDivElement | null>(null);
+  const slotRef = useRef<HTMLDivElement | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const presentedRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -62,94 +62,59 @@ export function NativeFeedAd() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fire the Google impression the first time the card actually appears
-  // on-screen (>=50% visible), which is Google's required visibility bar.
+  // Mount + reposition the native NativeAdView overlay so Google's SDK
+  // auto-tracks impressions and billable clicks.
   useEffect(() => {
-    if (!ad?.adId || impressionFiredRef.current || !cardRef.current) return;
-    const node = cardRef.current;
-    const io = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((e) => {
-          if (e.isIntersecting && e.intersectionRatio >= 0.5 && !impressionFiredRef.current) {
-            impressionFiredRef.current = true;
-            void GamNative.recordImpression({ adId: ad.adId }).catch(() => {});
-            io.disconnect();
-          }
-        });
-      },
-      { threshold: [0.5] },
-    );
-    io.observe(node);
-    return () => io.disconnect();
+    if (!ad?.adId || !slotRef.current) return;
+    const adId = ad.adId;
+    const el = slotRef.current;
+
+    const pushFrame = () => {
+      const r = el.getBoundingClientRect();
+      const payload = {
+        adId,
+        x: Math.round(r.left),
+        y: Math.round(r.top),
+        width: Math.round(r.width),
+        height: Math.round(r.height),
+      };
+      if (!presentedRef.current) {
+        presentedRef.current = true;
+        void GamNative.presentNativeAd(payload).catch(() => {});
+      } else {
+        void GamNative.updateNativeAdFrame(payload).catch(() => {});
+      }
+    };
+    const schedule = () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(pushFrame);
+    };
+
+    pushFrame();
+    window.addEventListener('scroll', schedule, { passive: true, capture: true });
+    window.addEventListener('resize', schedule);
+    const ro = new ResizeObserver(schedule);
+    ro.observe(el);
+    return () => {
+      window.removeEventListener('scroll', schedule, true);
+      window.removeEventListener('resize', schedule);
+      ro.disconnect();
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
   }, [ad?.adId]);
 
   if (!ready || !ad) return null;
 
-  const open = () => {
-    // Route through Google's click handler so the click is billable and the
-    // landing page opens through the SDK.
-    void GamNative.recordClick({ adId: ad.adId }).catch(() => {});
-  };
-
+  // Reserved-height placeholder. The real ad UI lives in the native overlay
+  // (NativeAdView on Android, GADNativeAdView on iOS) positioned exactly on
+  // top of this box. Height matches the feed post rhythm.
   return (
-    <Card
-      ref={cardRef}
-      className="overflow-hidden rounded-2xl border-border/60 shadow-sm"
+    <div
+      ref={slotRef}
+      aria-hidden
       data-native-ad="1"
-    >
-      <div className="flex items-center gap-2 px-4 py-3">
-        {ad.iconUrl ? (
-          <img
-            src={ad.iconUrl}
-            alt=""
-            className="h-8 w-8 rounded-full object-cover"
-          />
-        ) : (
-          <div className="h-8 w-8 rounded-full bg-muted" />
-        )}
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold truncate">
-            {ad.advertiser || 'Sponsored'}
-          </div>
-          <div className="text-xs text-muted-foreground">Sponsored</div>
-        </div>
-        <span className="text-[10px] font-semibold uppercase tracking-wide rounded px-1.5 py-0.5 bg-foreground text-background">
-          Ad
-        </span>
-      </div>
-
-      {ad.imageUrl && (
-        <button type="button" onClick={open} className="block w-full">
-          <img
-            src={ad.imageUrl}
-            alt={ad.headline || ''}
-            className="w-full h-auto object-cover"
-          />
-        </button>
-      )}
-
-      <div className="px-4 py-3 space-y-2">
-        {ad.headline && (
-          <div className="text-base font-semibold leading-snug">
-            {ad.headline}
-          </div>
-        )}
-        {ad.body && (
-          <div className="text-sm text-muted-foreground leading-snug">
-            {ad.body}
-          </div>
-        )}
-        {ad.callToAction && (
-          <button
-            type="button"
-            onClick={open}
-            className="mt-1 inline-flex items-center rounded-full bg-foreground text-background px-4 py-1.5 text-sm font-medium"
-          >
-            {ad.callToAction}
-          </button>
-        )}
-      </div>
-    </Card>
+      style={{ height: 340, width: '100%' }}
+    />
   );
 }
 
