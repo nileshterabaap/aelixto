@@ -1,5 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
+import { initAdsAndConsent } from "@/lib/adConsent";
 
 export async function initCapacitorPlugins() {
   if (!Capacitor.isNativePlatform()) return;
@@ -229,4 +230,11 @@ export async function initCapacitorPlugins() {
     }, 2000);
   };
   initPushDetached();
+
+  // Fire-and-forget: consent + Google Mobile Ads SDK init. Runs after boot
+  // so it never blocks first paint. Ads only ever render inside the feed
+  // once this resolves AND install age is >= 48h AND the user is signed in.
+  setTimeout(() => {
+    void initAdsAndConsent();
+  }, 3000);
 }

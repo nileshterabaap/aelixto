@@ -15,6 +15,7 @@
     "stability:approve": "node scripts/stability-guard.mjs approve"
   },
   "dependencies": {
+    "@capacitor-community/admob": "^8.0.0",
     "@capacitor/android": "^8.0.2",
     "@capacitor/app": "^8.1.0",
     "@capacitor/app-launcher": "^8.0.1",
