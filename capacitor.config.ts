@@ -8,6 +8,15 @@ const config: CapacitorConfig = {
     cleartext: true,
   },
   plugins: {
+    AdMob: {
+      // Google Ad Manager App IDs. Real IDs go here once the user pastes
+      // them from Ad Manager -> Admin -> Apps. Placeholders keep the
+      // native SDK from erroring during dev.
+      appIdAndroid: 'ca-app-pub-3940256099942544~3347511713', // TEST
+      appIdIos:     'ca-app-pub-3940256099942544~1458002511', // TEST
+      requestTrackingAuthorization: true,
+      initializeForTesting: true,
+    },
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: true,
