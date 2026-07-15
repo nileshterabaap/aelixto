@@ -26,10 +26,21 @@ export interface GamNativePlugin {
    */
   loadNativeAd(options: { adUnitId: string }): Promise<NativeAdCreative | null>;
 
-  /** Fire when the user taps the ad in JS UI. Records click + opens landing page. */
-  recordClick(options: { adId: string }): Promise<void>;
-  /** Called once when the ad card becomes visible on screen. */
-  recordImpression(options: { adId: string }): Promise<void>;
+  /**
+   * Mount a real native `NativeAdView` (Android) / `GADNativeAdView` (iOS)
+   * as an overlay above the webview at the given CSS-pixel rect. This is
+   * the only rendering path that lets Google's SDK auto-track impressions
+   * and billable clicks on both platforms.
+   */
+  presentNativeAd(options: {
+    adId: string;
+    x: number; y: number; width: number; height: number;
+  }): Promise<void>;
+  /** Reposition the overlay after scroll/resize. */
+  updateNativeAdFrame(options: {
+    adId: string;
+    x: number; y: number; width: number; height: number;
+  }): Promise<void>;
   /** Free the underlying native ad object when the card unmounts. */
   destroyAd(options: { adId: string }): Promise<void>;
 }
