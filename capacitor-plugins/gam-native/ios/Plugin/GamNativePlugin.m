@@ -8,7 +8,7 @@ CAP_PLUGIN(GamNativePlugin, "GamNative",
   CAP_PLUGIN_METHOD(showPrivacyOptionsForm, CAPPluginReturnPromise);
   CAP_PLUGIN_METHOD(requestTrackingAuthorization, CAPPluginReturnPromise);
   CAP_PLUGIN_METHOD(loadNativeAd, CAPPluginReturnPromise);
-  CAP_PLUGIN_METHOD(recordImpression, CAPPluginReturnPromise);
-  CAP_PLUGIN_METHOD(recordClick, CAPPluginReturnPromise);
+  CAP_PLUGIN_METHOD(presentNativeAd, CAPPluginReturnPromise);
+  CAP_PLUGIN_METHOD(updateNativeAdFrame, CAPPluginReturnPromise);
   CAP_PLUGIN_METHOD(destroyAd, CAPPluginReturnPromise);
 )
