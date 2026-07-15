@@ -3,16 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { Card } from '@/components/ui/card';
 import { AD_MIN_REQUEST_INTERVAL_MS, getNativeFeedAdUnitId } from '@/config/ads';
 import { adsReady } from '@/lib/adConsent';
-
-interface NativeAdCreative {
-  headline?: string;
-  body?: string;
-  advertiser?: string;
-  callToAction?: string;
-  iconUrl?: string;
-  imageUrl?: string;
-  clickThroughUrl?: string;
-}
+import { GamNative, type NativeAdCreative } from 'aelixto-gam-native';
 
 let lastRequestAt = 0;
 
@@ -27,26 +18,8 @@ async function requestNativeAd(): Promise<NativeAdCreative | null> {
   if (!adUnitId) return null;
 
   try {
-    const mod: any = await import('@capacitor-community/admob');
-    const AdMob = mod.AdMob;
-    // The Capacitor community AdMob plugin does not yet expose a first-class
-    // NativeAd API. When it does (or when a custom Capacitor plugin is added),
-    // wire the call here. Until then, no-fill is returned and the slot
-    // unmounts silently so the feed layout is unaffected.
-    if (typeof AdMob?.loadNativeAd === 'function') {
-      const result = await AdMob.loadNativeAd({ adId: adUnitId });
-      if (!result) return null;
-      return {
-        headline: result.headline,
-        body: result.body,
-        advertiser: result.advertiser,
-        callToAction: result.callToAction,
-        iconUrl: result.icon,
-        imageUrl: result.image,
-        clickThroughUrl: result.clickThroughUrl,
-      };
-    }
-    return null;
+    const result = await GamNative.loadNativeAd({ adUnitId });
+    return result ?? null;
   } catch (e) {
     console.warn('[ads] loadNativeAd failed', e);
     return null;
@@ -67,6 +40,8 @@ export function NativeFeedAd() {
   const [ad, setAd] = useState<NativeAdCreative | null>(null);
   const [ready, setReady] = useState(false);
   const mountedRef = useRef(true);
+  const impressionFiredRef = useRef(false);
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -80,22 +55,45 @@ export function NativeFeedAd() {
     })();
     return () => {
       mountedRef.current = false;
+      if (ad?.adId) {
+        void GamNative.destroyAd({ adId: ad.adId }).catch(() => {});
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fire the Google impression the first time the card actually appears
+  // on-screen (>=50% visible), which is Google's required visibility bar.
+  useEffect(() => {
+    if (!ad?.adId || impressionFiredRef.current || !cardRef.current) return;
+    const node = cardRef.current;
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((e) => {
+          if (e.isIntersecting && e.intersectionRatio >= 0.5 && !impressionFiredRef.current) {
+            impressionFiredRef.current = true;
+            void GamNative.recordImpression({ adId: ad.adId }).catch(() => {});
+            io.disconnect();
+          }
+        });
+      },
+      { threshold: [0.5] },
+    );
+    io.observe(node);
+    return () => io.disconnect();
+  }, [ad?.adId]);
 
   if (!ready || !ad) return null;
 
   const open = () => {
-    if (!ad.clickThroughUrl) return;
-    try {
-      window.open(ad.clickThroughUrl, '_blank');
-    } catch {
-      /* ignore */
-    }
+    // Route through Google's click handler so the click is billable and the
+    // landing page opens through the SDK.
+    void GamNative.recordClick({ adId: ad.adId }).catch(() => {});
   };
 
   return (
     <Card
+      ref={cardRef}
       className="overflow-hidden rounded-2xl border-border/60 shadow-sm"
       data-native-ad="1"
     >

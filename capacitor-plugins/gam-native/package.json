@@ -2,9 +2,9 @@
   "name": "aelixto-gam-native",
   "version": "0.1.0",
   "description": "Custom Capacitor plugin — Google Ad Manager (AdX) native ads for Android + iOS.",
-  "main": "dist/plugin.cjs.js",
-  "module": "dist/esm/index.js",
-  "types": "dist/esm/index.d.ts",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
   "files": [
     "android/src/main/",
     "android/build.gradle",
