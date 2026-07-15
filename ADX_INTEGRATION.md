@@ -1,30 +1,50 @@
 # Google Ad Manager (AdX) — Native Ads
 
-Ads are served by a **first-party Capacitor plugin** at
-`capacitor-plugins/gam-native` that wraps:
+All ad demand is served by our first-party Capacitor plugin
+`aelixto-gam-native` (`capacitor-plugins/gam-native`). It uses **Google Ad
+Manager APIs only** — never AdMob:
 
-- **iOS:** `Google-Mobile-Ads-SDK` (`GADAdLoader` + `GAMRequest`)
-- **Android:** `play-services-ads` (`AdLoader.forNativeAd` + `AdManagerAdRequest`)
-- **Consent:** `GoogleUserMessagingPlatform` / `user-messaging-platform`
-  (Google-certified CMP via Funding Choices).
+| Platform | Request path | SDK |
+|---|---|---|
+| iOS     | `GADAdLoader` + `GAMRequest` + `GADNativeAdView` overlay | `Google-Mobile-Ads-SDK` |
+| Android | `AdLoader.forNativeAd` + `AdManagerAdRequest` + `NativeAdView` overlay | `play-services-ads` |
+| Consent | UMP (Google-certified CMP) | `GoogleUserMessagingPlatform` / `user-messaging-platform` |
 
-Because the request path is `GAMRequest` / `AdManagerAdRequest` and the unit
-IDs are `/NETWORK_CODE/unit_name`, demand comes from **your Ad Manager
-account**, including AdX open auction and any yield partners you've enabled.
-There is no AdMob plugin in the tree.
+Impressions and billable clicks are auto-fired by the SDK because the
+creative is rendered inside a real `NativeAdView` overlay positioned on top
+of the webview at the JS card's rect. There is **no manual `recordImpression`
+or `performClickOnAsset` workaround** on either platform.
 
-## Configure IDs (2 places)
+---
 
-### 1. `src/config/ads.ts`
+## Manual steps you still need to do
+
+### 1. Google Ad Manager dashboard
+
+1. **Admin → Apps** — register the Android app (`com.aelixto.app10`) and the
+   iOS app. Copy each **App ID** (`ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY`
+   format). Keep them for step 3.
+2. **Inventory → Ad units** — create one **Native** unit per platform, e.g.
+   `aelixto_feed_native_android` and `aelixto_feed_native_ios`. Copy the
+   fully-qualified paths (`/NETWORK_CODE/aelixto_feed_native_...`). Keep
+   them for step 2.
+3. **Yield → Yield groups** — enable **AdX open auction** on both units and
+   any yield partners you want to compete.
+4. **Privacy & messaging** — publish the **GDPR / EEA-UK**, **IDFA**, and
+   **US-state** messages. This is the UMP form the app auto-fetches.
+
+### 2. `src/config/ads.ts`
+
 ```ts
-export const AD_TEST_MODE = false; // true keeps Google test creatives
-const LIVE_NATIVE_ANDROID = '/NETWORK_CODE/aelixto_feed_native';
-const LIVE_NATIVE_IOS     = '/NETWORK_CODE/aelixto_feed_native';
+export const AD_TEST_MODE = false;                         // flip off
+const LIVE_NATIVE_ANDROID = '/NETWORK_CODE/aelixto_feed_native_android';
+const LIVE_NATIVE_IOS     = '/NETWORK_CODE/aelixto_feed_native_ios';
 ```
 
-### 2. Native App IDs (after `npx cap sync`)
+### 3. Native app IDs (after `npx cap sync`)
 
-**`android/app/src/main/AndroidManifest.xml`** (inside `<application>`):
+**`android/app/src/main/AndroidManifest.xml`** — inside `<application>`:
+
 ```xml
 <meta-data
   android:name="com.google.android.gms.ads.APPLICATION_ID"
@@ -32,23 +52,27 @@ const LIVE_NATIVE_IOS     = '/NETWORK_CODE/aelixto_feed_native';
 ```
 
 **`ios/App/App/Info.plist`**:
+
 ```xml
 <key>GADApplicationIdentifier</key>
 <string>ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY</string>
+
 <key>NSUserTrackingUsageDescription</key>
 <string>Aelixto uses this identifier to show more relevant ads.</string>
+
 <key>SKAdNetworkItems</key>
 <array>
-  <!-- Paste Google's full list from
-       https://developers.google.com/admob/ios/quick-start#update_your_infoplist -->
+  <!-- Paste Google's current SKAdNetwork list:
+       https://developers.google.com/admob/ios/quick-start#update_your_infoplist
+       (same list applies to the Mobile Ads SDK when used with Ad Manager) -->
 </array>
 ```
 
-> The App ID is the AdMob-format app registration Google requires for the
-> Mobile Ads SDK to initialize; the actual ad demand still comes from your
-> Ad Manager unit IDs.
+> The App ID is the app-registration identifier the Mobile Ads SDK needs to
+> initialize. Ad **demand** still comes from your Ad Manager `/NETWORK_CODE/…`
+> ad units — this is Ad Manager (AdX), not AdMob.
 
-## One-time build steps
+### 4. Build & sync
 
 ```bash
 git pull
@@ -58,44 +82,46 @@ cd ios/App && pod install && cd ../..   # iOS only
 npx cap open android    # or: npx cap open ios
 ```
 
-The plugin is picked up automatically because it's declared in
-`package.json` as `aelixto-gam-native: file:capacitor-plugins/gam-native`,
-which is how Capacitor discovers local plugins.
+The plugin is picked up automatically via `package.json`:
+`"aelixto-gam-native": "./capacitor-plugins/gam-native"`.
 
-## Ad Manager dashboard checklist
+### 5. Testing
 
-- Admin → Apps → register the Android + iOS apps.
-- Inventory → Ad units → create one **Native** unit per platform. Use those
-  `/NETWORK_CODE/…` paths in `src/config/ads.ts`.
-- Yield groups → enable AdX open auction on the units.
-- Privacy & messaging → publish GDPR + IDFA + US-state messages (the UMP
-  form the app fetches).
+- Keep `AD_TEST_MODE = true` for the first on-device run. The plugin ships
+  with Google's official test unit IDs; test creatives always fill.
+- Verify **UMP form** appears once on first launch (or force it via
+  Settings → Manage ad preferences).
+- Verify **ATT prompt** appears on iOS 14+ first launch.
+- Verify a native ad card appears after every 5 posts once the app has been
+  installed ≥ 48 h (or clear `localStorage`'s `aelixto_install_first_seen_at`
+  and the `install_metadata` row to reset the gate during QA).
+- Tap the CTA — the landing page opens through Google's click handler and
+  the click is billable on both platforms.
+- Ad Manager → Reports should show impressions and clicks within ~1 hour.
 
-## Gating rules (all must be true before an ad request fires)
+### 6. Production rollout
+
+1. Set `AD_TEST_MODE = false` and paste the live ad-unit IDs from step 2.
+2. Set the real App IDs from step 3 in `AndroidManifest.xml` + `Info.plist`.
+3. `npx cap sync`, rebuild release binaries, submit to Play Store / App
+   Store review.
+4. iOS review: mention IDFA usage (ATT prompt is already implemented).
+5. Monitor Ad Manager fill rate + eCPM for the first 24 h. Add yield
+   partners in Ad Manager as needed — no code changes required.
+
+---
+
+## Runtime gating (already implemented — for reference)
+
+All must be true before any ad is requested:
 
 1. Running on Capacitor Android/iOS (never web).
 2. UMP consent resolved + `MobileAds` initialized (`adsReady()`).
 3. Install age ≥ 48 h — tracked in `public.install_metadata`, with a
    `localStorage` fallback for signed-out sessions.
 4. Placement: one ad after every 5 posts (`AD_INTERVAL`).
-5. Rate limit: ≥ 20 s between ad requests (`AD_MIN_REQUEST_INTERVAL_MS`).
+5. Rate limit: ≥ 20 s between successive ad requests
+   (`AD_MIN_REQUEST_INTERVAL_MS`).
 
 Users can re-open their consent choices via **Settings → Manage ad
-preferences** (native-only row).
-
-## Impression / click reporting caveat
-
-Google's SDK auto-fires impressions and clicks when creatives are rendered
-inside a native `GADNativeAdView` / `NativeAdView`. Because our card is
-drawn inside the webview, the plugin:
-
-- Manually calls `nativeAd.recordImpression()` on iOS when the card crosses
-  ≥ 50 % visibility (Google's viewability bar).
-- On iOS, calls `performClickOnAsset(GADNativeCallToActionAsset)` for the
-  CTA tap — that's the SDK-sanctioned path, so the click is billable and
-  the landing page opens through Google's handler.
-- Android's public `NativeAd` API doesn't expose an equivalent manual
-  click hook. For full Android metrics + billable clicks, a follow-up is
-  to render the card in a native `NativeAdView` overlay above the webview
-  (small addition to the plugin's Java side). Impression tracking and
-  demand routing already work end-to-end via `AdManagerAdRequest`.
+preferences**.

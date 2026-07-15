@@ -42,4 +42,7 @@ dependencies {
     implementation 'com.google.android.gms:play-services-ads:23.5.0'
     // Google User Messaging Platform (UMP) — Google-certified CMP.
     implementation 'com.google.android.ump:user-messaging-platform:3.0.0'
+    // Image loading for the native ad icon (already used transitively by many
+    // Android apps; declared explicitly so the plugin is self-contained).
+    implementation 'com.squareup.picasso:picasso:2.8'
 }

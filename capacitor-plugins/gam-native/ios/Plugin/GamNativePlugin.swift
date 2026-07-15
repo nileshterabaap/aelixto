@@ -18,6 +18,7 @@ public class GamNativePlugin: CAPPlugin, GADNativeAdLoaderDelegate, GADAdLoaderD
     private var pendingLoads: [String: CAPPluginCall] = [:]
     private var loaders: [String: GADAdLoader] = [:]
     private var ads: [String: GADNativeAd] = [:]
+    private var adViews: [String: GADNativeAdView] = [:]
 
     // MARK: - Init
 
@@ -162,30 +163,116 @@ public class GamNativePlugin: CAPPlugin, GADNativeAdLoaderDelegate, GADAdLoaderD
         call.resolve(payload)
     }
 
-    // MARK: - Impression / click / cleanup
+    // MARK: - Native overlay (real GADNativeAdView, full SDK tracking)
 
-    @objc func recordImpression(_ call: CAPPluginCall) {
-        // Google's SDK auto-tracks impressions once the native ad view is
-        // registered. Because we render in the webview we cannot register a
-        // GADNativeAdView, so we manually fire the reporting.
+    @objc func presentNativeAd(_ call: CAPPluginCall) {
         guard let adId = call.getString("adId"), let ad = ads[adId] else {
-            call.resolve(); return
+            call.reject("ad not found"); return
         }
-        ad.recordImpression()
-        call.resolve()
+        let x = CGFloat(call.getDouble("x") ?? 0)
+        let y = CGFloat(call.getDouble("y") ?? 0)
+        let w = CGFloat(call.getDouble("width") ?? 0)
+        let h = CGFloat(call.getDouble("height") ?? 0)
+        DispatchQueue.main.async {
+            guard let host = self.bridge?.viewController?.view else { call.reject("no view"); return }
+            self.adViews[adId]?.removeFromSuperview()
+            let adView = self.buildNativeAdView(ad: ad)
+            adView.frame = CGRect(x: x, y: y, width: w, height: h)
+            host.addSubview(adView)
+            self.adViews[adId] = adView
+            call.resolve()
+        }
     }
 
-    @objc func recordClick(_ call: CAPPluginCall) {
-        guard let adId = call.getString("adId"), let ad = ads[adId] else {
-            call.resolve(); return
+    @objc func updateNativeAdFrame(_ call: CAPPluginCall) {
+        guard let adId = call.getString("adId") else { call.resolve(); return }
+        let x = CGFloat(call.getDouble("x") ?? 0)
+        let y = CGFloat(call.getDouble("y") ?? 0)
+        let w = CGFloat(call.getDouble("width") ?? 0)
+        let h = CGFloat(call.getDouble("height") ?? 0)
+        DispatchQueue.main.async {
+            self.adViews[adId]?.frame = CGRect(x: x, y: y, width: w, height: h)
+            call.resolve()
         }
-        // performClickOnAsset triggers Google's click handler + landing page.
-        ad.performClickOnAsset(withKey: GADNativeCallToActionAsset)
-        call.resolve()
+    }
+
+    private func buildNativeAdView(ad: GADNativeAd) -> GADNativeAdView {
+        let adView = GADNativeAdView()
+        adView.backgroundColor = .white
+
+        // Header
+        let icon = UIImageView(frame: CGRect(x: 12, y: 10, width: 32, height: 32))
+        icon.contentMode = .scaleAspectFill
+        icon.clipsToBounds = true
+        icon.layer.cornerRadius = 16
+        icon.image = ad.icon?.image
+        adView.addSubview(icon)
+        adView.iconView = icon
+
+        let advertiser = UILabel(frame: CGRect(x: 52, y: 12, width: 220, height: 28))
+        advertiser.font = UIFont.boldSystemFont(ofSize: 14)
+        advertiser.text = ad.advertiser ?? "Sponsored"
+        adView.addSubview(advertiser)
+        adView.advertiserView = advertiser
+
+        // Media (auto-sized in layoutSubviews)
+        let mediaView = GADMediaView()
+        adView.addSubview(mediaView)
+        adView.mediaView = mediaView
+
+        // Text block
+        let headline = UILabel()
+        headline.numberOfLines = 2
+        headline.font = UIFont.boldSystemFont(ofSize: 15)
+        headline.text = ad.headline
+        adView.addSubview(headline)
+        adView.headlineView = headline
+
+        let body = UILabel()
+        body.numberOfLines = 3
+        body.font = UIFont.systemFont(ofSize: 13)
+        body.textColor = .darkGray
+        body.text = ad.body
+        adView.addSubview(body)
+        adView.bodyView = body
+
+        let cta = UIButton(type: .system)
+        cta.setTitle(ad.callToAction, for: .normal)
+        cta.setTitleColor(.white, for: .normal)
+        cta.backgroundColor = .black
+        cta.contentEdgeInsets = UIEdgeInsets(top: 6, left: 12, bottom: 6, right: 12)
+        cta.layer.cornerRadius = 14
+        cta.isUserInteractionEnabled = false // SDK routes taps via nativeAdView
+        adView.addSubview(cta)
+        adView.callToActionView = cta
+
+        // Simple flow layout on layout pass
+        adView.translatesAutoresizingMaskIntoConstraints = true
+        adView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        adView.layoutSubviews()
+
+        // Programmatic layout: header (52 tall), media (flex), text/cta at bottom
+        let width = adView.bounds.width
+        let headerH: CGFloat = 52
+        let ctaH: CGFloat = 32
+        let textH: CGFloat = 90
+        let mediaTop = headerH
+        let mediaH = max(0, adView.bounds.height - headerH - textH)
+        mediaView.frame = CGRect(x: 0, y: mediaTop, width: width, height: mediaH)
+        headline.frame = CGRect(x: 12, y: mediaTop + mediaH + 4, width: width - 24, height: 22)
+        body.frame = CGRect(x: 12, y: mediaTop + mediaH + 28, width: width - 24, height: 34)
+        cta.frame = CGRect(x: 12, y: adView.bounds.height - ctaH - 8,
+                            width: cta.intrinsicContentSize.width + 24, height: ctaH)
+
+        adView.nativeAd = ad
+        return adView
     }
 
     @objc func destroyAd(_ call: CAPPluginCall) {
         if let adId = call.getString("adId") {
+            DispatchQueue.main.async {
+                self.adViews.removeValue(forKey: adId)?.removeFromSuperview()
+            }
             ads.removeValue(forKey: adId)
             loaders.removeValue(forKey: adId)
         }
