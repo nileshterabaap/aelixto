@@ -165,28 +165,14 @@ export function useOriginalVisitTracker(
         // inflated Threads embed as a play interaction (+1 only).
         fireThreadsPlayOnce();
       } else if (trackPlayableInteraction && isThreadsPost()) {
-        // Threads is rendered as a direct cross-origin iframe. On some mobile
-        // browsers a pointerdown on the iframe surface reports the event target
-        // as an ancestor element (not the IFRAME itself), so isInsideIframe
-        // above misses it. Fall back to a hit-test against the Threads iframe's
-        // bounding rect using the pointer coordinates.
-        const pe = e as PointerEvent | TouchEvent;
-        let x: number | null = null;
-        let y: number | null = null;
-        if ('clientX' in pe && typeof (pe as PointerEvent).clientX === 'number') {
-          x = (pe as PointerEvent).clientX;
-          y = (pe as PointerEvent).clientY;
-        } else if ('touches' in pe && (pe as TouchEvent).touches?.[0]) {
-          x = (pe as TouchEvent).touches[0].clientX;
-          y = (pe as TouchEvent).touches[0].clientY;
-        }
-        const iframe = getThreadsIframe();
-        if (iframe && x !== null && y !== null) {
-          const r = iframe.getBoundingClientRect();
-          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-            fireThreadsPlayOnce();
-          }
-        }
+        // Threads is rendered as a direct cross-origin iframe. On mobile the
+        // event target for a tap on the iframe surface is often reported as
+        // an ancestor element (not IFRAME), *and* body.at-scroll-top applies
+        // pointer-events:none to iframes so the tap can land on a plain div
+        // ancestor entirely. A hit-test against the iframe rect is fragile
+        // in both cases. Since this container only hosts one Threads post,
+        // any pointerdown that reaches this handler is an intent to play.
+        fireThreadsPlayOnce();
       }
     };
 
