@@ -1,86 +1,44 @@
-# Plan: Google Ad Manager Native Ads in Aelixto (Capacitor)
+## Goal
 
-Goal: Show one AdX-backed native ad after every 5 posts in the main feed, only for users whose install age is ≥ 2 days, on Android + iOS, with Google's User Messaging Platform (UMP) consent gathered first.
+Match Instagram behavior for X and Threads: tapping anywhere on the embedded post body must only view/play the media. The header platform icon becomes the sole way to open the original post and the sole trigger for `original_visit`.
 
-## 1. Prerequisites you complete in Google's dashboards (no code)
+## Current behavior (why body taps navigate today)
 
-1. In **Google Ad Manager** → Admin → Apps: register both apps
-   - Android: `app.lovable.9e8e690862444131a6858cbb5e68e94d`
-   - iOS: (bundle id you're using for TestFlight/App Store)
-   Ad Manager returns an **App ID** per platform in the form `ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY`.
-2. Create one **Native ad unit** per platform under your AdX-linked network. Ad Manager returns an **Ad Unit ID** in the form `/NETWORK_CODE/aelixto_feed_native` (or the shorter `ca-app-pub-...` form for AdMob-style units — either works with GMA SDK).
-3. In **GAM → Privacy & messaging → GDPR + IDFA + US state privacy**: publish messages (this is the UMP/CMP config the SDK will fetch). Google's own UMP counts as a certified CMP for AdX.
-4. Enable **AdX demand** on the native ad unit (Yield groups / open auction).
+- X: the Twitter SDK inflates a `<blockquote>` whose author/timestamp/text nodes are real `<a target="_blank">` anchors, and when it upgrades to a same-domain iframe the whole iframe surface links to `x.com`. Anchor clicks currently also fire `original_visit` via the tracker's `onClick` handler.
+- Threads: rendered as a cross-origin iframe where the entire iframe body deep-links to `threads.net`. A one-shot capture overlay currently fires `video_play` on the first tap and then removes itself, so any following tap navigates to Threads.
 
-You'll paste 4 values into the app: Android App ID, iOS App ID, Android native unit ID, iOS native unit ID.
+## Changes (frontend only)
 
-## 2. Install SDKs
+### 1. `src/hooks/useOriginalVisitTracker.ts`
+- In `onClick`, when `trackPlayableInteraction === true` AND the post is X or Threads, do NOT call `fireOriginal()` for anchor clicks inside the embed. Anchor-based visit inference stays enabled only for non-playable article/link-card embeds.
+- Keep the existing "iframe tap = Play only" logic. No new `original_visit` inference from body taps for X or Threads under any code path.
+- Extend `attachThreadsPlayCapture` so its overlay is **persistent** for both Threads and X iframes:
+  - After the first body interaction fires `video_play`, keep the overlay mounted (do not remove, do not switch `pointerEvents` to none). Subsequent body taps are swallowed silently — no navigation, no duplicate Play.
+  - Reuse the existing `ResizeObserver` + `syncOverlay` so the overlay tracks iframe geometry.
+  - Add a sibling helper `attachXPlayCapture` (or generalize the current one) that matches `iframe[src*="twitter.com"], iframe[src*="x.com"], iframe[src*="platform.twitter.com"]` and behaves identically.
 
-Add the community Capacitor plugin that wraps the Google Mobile Ads SDK (which is what serves GAM/AdX on mobile) plus the UMP consent plugin:
+### 2. `src/components/embeds/TwitterEmbed.tsx`
+- After the Twitter widget hydrates the blockquote, add a transparent capture layer that sits above the rendered tweet card (same pattern as the Threads overlay) so anchor clicks inside the SDK-rendered blockquote cannot open `x.com`.
+- First tap on the layer calls `trackView({ postId, eventType: 'video_play' })` via a callback (mirrors the tracker's `firePlay`); subsequent taps are absorbed. Video posts still play because the native player exposes its own controls above the overlay only when the SDK renders an inline player; when it doesn't, the tweet is view-only, which matches the requested "view/play only" spec.
+- Container must remain `position: relative` and overlay `pointer-events: auto; background: transparent; z-index` above the widget iframe.
 
-- `@capacitor-community/admob` — covers AdMob **and** Google Ad Manager ad units and includes UMP consent APIs.
-- No extra iOS pod / Android gradle work beyond `npx cap sync`; the plugin pulls the native GMA SDK transitively.
+### 3. Header platform icon (already correct — verify only)
+- `src/components/HydratedFeedPost.tsx` header icon `onClick` continues to call `markOriginalVisit(post.id)` then `openExternalUrl(mediaUrl)`. No change needed; this remains the single sanctioned Visit trigger for every platform, X and Threads included.
 
-## 3. Native config
+### 4. Stability guard
+- After the edits land, run `npm run stability:approve` so the new baselines for `useOriginalVisitTracker.ts` (protected in an earlier turn) and any newly locked file are stored.
 
-- `capacitor.config.ts`: add `plugins.AdMob` block with both App IDs so the SDK initializes on cold start.
-- iOS `Info.plist`: add `GADApplicationIdentifier` (iOS App ID) and the standard `SKAdNetworkItems` list Google publishes for AdMob/AdX.
-- Android `AndroidManifest.xml`: add `<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" .../>` with the Android App ID.
+## Explicit non-goals
 
-These are one-time edits the user runs `npx cap sync` after.
+- No changes to Instagram, Facebook, YouTube, TikTok, LinkedIn, Pinterest, Spotify, Reddit, Quora, or article/link-card tracking.
+- No backend / edge-function / RLS changes. `record-view` burst-guard and score logic stay as they are.
+- The Play event model is unchanged (still 1 per post, deduped by `threadsVideoPlayFiredPosts` for Threads and by `playFiredRef` for X).
 
-## 4. Install-age gate (2 days)
+## Success criteria
 
-New table `public.install_metadata` (per user + per device):
-- `user_id uuid`, `device_id text`, `first_seen_at timestamptz default now()`, primary key `(user_id, device_id)`.
-- RLS: user can insert/select their own row; standard GRANTs.
-- On app boot, upsert `(auth.uid(), deviceId)` with `ON CONFLICT DO NOTHING` so `first_seen_at` is preserved.
-- Helper `useAdsEligibility()` returns `true` only when `now() - first_seen_at >= interval '2 days'` **and** the user is signed in **and** UMP status is `OBTAINED` with personalized-or-non-personalized consent (i.e. not `REQUIRED` / `UNKNOWN`).
+- Tapping anywhere on an X post body in the feed or profile grid: no navigation to `x.com`, `video_play` recorded exactly once, `original_visit` = 0.
+- Tapping anywhere on a Threads post body: no navigation to `threads.net`, `video_play` recorded exactly once, `original_visit` = 0.
+- Tapping the X or Threads platform icon in the post header: opens the original in a new tab and records `original_visit` exactly once.
+- Instagram behavior unchanged.
 
-Fallback for logged-out users: use a `localStorage`/`Preferences`-persisted `installedAt` timestamp keyed to the device so the gate still works before sign-in.
-
-## 5. Consent (UMP / Google-certified CMP)
-
-- On first launch after install: call `AdMob.requestConsentInfoUpdate()` then `AdMob.showConsentForm()` if `isConsentFormAvailable`.
-- Persist result; re-check on cold start.
-- Do **not** initialize ads (`AdMob.initialize({ initializeForTesting: false })`) until UMP returns a non-required status.
-- Add a "Manage ad preferences" row in Settings that calls `AdMob.showPrivacyOptionsForm()` (required for EEA/UK).
-
-## 6. Feed integration (native in-feed ad every 5 posts)
-
-Touchpoints (frontend only, keeps existing tracking/blocking code untouched — Stability Guard stays green):
-- New component `src/components/ads/NativeFeedAd.tsx`
-  - Requests a native ad via the plugin's native-ad API, receives headline/body/cta/media/icon/advertiser.
-  - Renders inside a Card that visually matches `HydratedFeedPost` (same header/media/caption rhythm) but with a small "Ad" chip in the header slot where the platform icon lives, per Google's native ad policy (must show "Ad" / "Sponsored" and advertiser attribution).
-  - Registers the container + individual asset views with the SDK for viewability + click tracking (this is required by GMA — clicks only count when views are registered).
-  - Handles no-fill by unmounting silently (never leaves a blank slot).
-- New hook `src/hooks/useFeedWithAds.ts`
-  - Wraps the existing feed array from `usePosts` / `useFollowingFeed` and, when `useAdsEligibility()` is true, interleaves an `{ kind: 'ad', slotIndex }` entry after every 5th real post.
-  - Skipped entirely when ineligible → feed renders exactly as today.
-- `src/pages/Index.tsx` renders `NativeFeedAd` for `kind === 'ad'`, else the current `HydratedFeedPost`.
-- Frequency cap: max 1 ad request every ~20 s and cache the last loaded ad per slot for the session so scrolling up/down doesn't hammer AdX.
-- Preload the next ad ~2 slots ahead using an IntersectionObserver on the surrounding post so the ad is ready when it scrolls in.
-
-Not touched: `HydratedFeedPost.tsx`, `RawEmbedRenderer.tsx`, `resolveRenderer.ts`, `useOriginalVisitTracker.ts`, `useViewTracking.ts`, `record-view` — all Stability-Guarded files stay untouched.
-
-## 7. Config + secrets
-
-- `src/config/ads.ts` holds the 4 IDs plus a `TEST_MODE` flag; in dev we use Google's official Ad Manager native test unit IDs so no live impressions fire during preview.
-- No server-side secret needed — GAM/AdX IDs are public and belong in the app bundle.
-
-## 8. QA checklist before you ship
-
-1. Fresh install → no ads for 48 h (verify by temporarily lowering the gate to 2 min).
-2. UMP form appears on first launch in an EEA VPN; declining shows non-personalized ads only.
-3. Test ad unit fills in dev on both Android and iOS.
-4. Live unit fills once the app is on the store and Ad Manager reports at least one request per unit.
-5. Scroll-jank check: native ad card measured, no CLS in the feed.
-6. Report menu on ad card ("Hide this ad") — optional v2, Google recommends it.
-
-## Technical notes
-
-- Native GMA SDK is required because Capacitor is a WebView; GPT/AdSense web tags are **not** eligible to serve AdX inside a mobile app WebView.
-- `@capacitor-community/admob` exposes `AdManager` bidding via ad unit IDs of the form `/NETWORK_CODE/unit-name`, which is what AdX-linked GAM units use.
-- Install age must be based on the device's first-seen timestamp, not `auth.users.created_at`, so re-installs restart the 48 h window (this is what Google's own AdMob "new user" policies assume).
-
-Success probability: **90%**.
+Success probability: **90%** (the residual 10% is X's SDK occasionally repainting the blockquote after our overlay mounts; the `MutationObserver` in the tracker already reattaches iframe listeners, and the overlay's `ResizeObserver` handles geometry, so this is well covered).
