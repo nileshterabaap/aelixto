@@ -501,6 +501,27 @@ export type Database = {
         }
         Relationships: []
       }
+      install_metadata: {
+        Row: {
+          device_id: string
+          first_seen_at: string
+          platform: string | null
+          user_id: string
+        }
+        Insert: {
+          device_id: string
+          first_seen_at?: string
+          platform?: string | null
+          user_id: string
+        }
+        Update: {
+          device_id?: string
+          first_seen_at?: string
+          platform?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       likes: {
         Row: {
           created_at: string
