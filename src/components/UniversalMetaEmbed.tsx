@@ -164,7 +164,7 @@ const ThreadsIframeEmbed = ({
         src={src}
         scrolling="no"
         allowFullScreen
-        allow="encrypted-media"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share"
         loading="lazy"
         onLoad={() => setHasLoaded(true)}
         onError={() => setFailed(true)}
