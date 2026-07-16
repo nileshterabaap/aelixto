@@ -5,6 +5,7 @@
     "src/lib/resolveRenderer.ts",
     "src/components/HydratedFeedPost.tsx",
     "src/components/HydratedEmbed.tsx",
+    "src/components/UniversalMetaEmbed.tsx",
     "src/components/CommentsDialog.tsx",
     "src/components/PullToRefresh.tsx",
     "src/components/CreatePostDialog.tsx",
