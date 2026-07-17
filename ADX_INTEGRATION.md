@@ -33,13 +33,23 @@ or `performClickOnAsset` workaround** on either platform.
 4. **Privacy & messaging** — publish the **GDPR / EEA-UK**, **IDFA**, and
    **US-state** messages. This is the UMP form the app auto-fetches.
 
-### 2. `src/config/ads.ts`
+### 2. `src/config/ads.ts` — already wired
+
+Live IDs are baked in:
 
 ```ts
-export const AD_TEST_MODE = false;                         // flip off
-const LIVE_NATIVE_ANDROID = '/NETWORK_CODE/aelixto_feed_native_android';
-const LIVE_NATIVE_IOS     = '/NETWORK_CODE/aelixto_feed_native_ios';
+// Network code 23362049225
+LIVE_NATIVE_ANDROID = '/23362049225/aelixto_feed_native_android';
+LIVE_NATIVE_IOS     = '/23362049225/aelixto_feed_native_ios';
+GAM_APP_ID_ANDROID  = 'ca-app-pub-4944388830758437~6705238632';
+GAM_APP_ID_IOS      = 'ca-app-pub-4944388830758437~4837623196';
 ```
+
+`AD_TEST_MODE` and `AD_DEV_BYPASS_INSTALL_AGE` are both tied to
+`import.meta.env.DEV`, so:
+
+- `vite dev` / Capacitor hot-reload → test ads, no 48h gate (fast QA).
+- `npm run build` (every release APK/IPA) → live Ad Manager IDs, 48h gate on.
 
 ### 3. Native app IDs (after `npx cap sync`)
 
@@ -48,14 +58,14 @@ const LIVE_NATIVE_IOS     = '/NETWORK_CODE/aelixto_feed_native_ios';
 ```xml
 <meta-data
   android:name="com.google.android.gms.ads.APPLICATION_ID"
-  android:value="ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY"/>
+  android:value="ca-app-pub-4944388830758437~6705238632"/>
 ```
 
 **`ios/App/App/Info.plist`**:
 
 ```xml
 <key>GADApplicationIdentifier</key>
-<string>ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY</string>
+<string>ca-app-pub-4944388830758437~4837623196</string>
 
 <key>NSUserTrackingUsageDescription</key>
 <string>Aelixto uses this identifier to show more relevant ads.</string>

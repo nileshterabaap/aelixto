@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { getDeviceId } from '@/lib/deviceId';
 import { useSession } from '@/hooks/useSession';
-import { AD_MIN_INSTALL_AGE_MS } from '@/config/ads';
+import { AD_DEV_BYPASS_INSTALL_AGE, AD_MIN_INSTALL_AGE_MS } from '@/config/ads';
 import { adsReady } from '@/lib/adConsent';
 
 const LS_INSTALL_KEY = 'aelixto_install_first_seen_at';
@@ -37,6 +37,14 @@ export function useAdsEligibility(): boolean {
       if (!Capacitor.isNativePlatform()) return;
       const sdkOk = await adsReady();
       if (!sdkOk || cancelled) return;
+
+      // Developer-only: skip the 48h gate in DEV builds so on-device QA
+      // sees ads immediately. Release builds always fall through to the
+      // real age check below.
+      if (AD_DEV_BYPASS_INSTALL_AGE) {
+        if (!cancelled) setEligible(true);
+        return;
+      }
 
       const localAge = getLocalInstallAgeMs();
       let ageMs = localAge;
