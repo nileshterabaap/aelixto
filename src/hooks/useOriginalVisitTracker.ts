@@ -4,7 +4,6 @@ import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
 // no-op stub kept to minimize diff after removing temporary diagnostic logger
 const traceLog = (..._args: unknown[]) => {};
 
-const threadsVideoPlayFiredPosts = new Set<string>();
 const lastThreadsCaptureRef: { postId: string | null; time: number } = {
   postId: null,
   time: 0,
@@ -113,12 +112,15 @@ export function useOriginalVisitTracker(
       ) as HTMLIFrameElement | null;
     };
     const isThreadsPost = (): boolean => !!getThreadsIframe();
+    const isThreadsIframe = (iframe: HTMLIFrameElement): boolean => {
+      const src = (iframe.getAttribute('src') || '').toLowerCase();
+      return src.includes('threads.net') || src.includes('threads.com');
+    };
 
     const fireThreadsPlayOnce = () => {
-      if (threadsVideoPlayFiredPosts.has(postId)) return;
+      if (playFiredRef.current) return;
       lastThreadsCaptureRef.postId = postId;
       lastThreadsCaptureRef.time = Date.now();
-      threadsVideoPlayFiredPosts.add(postId);
       firePlay();
       lastIframeInteractionRef.current = Date.now();
     };
@@ -311,6 +313,7 @@ export function useOriginalVisitTracker(
 
     const threadsCaptureCleanups: Array<() => void> = [];
     const threadsCaptureAttached = new WeakSet<HTMLIFrameElement>();
+    const iframeGestureAttached = new WeakSet<HTMLIFrameElement>();
 
     const attachThreadsPlayCapture = (iframe: HTMLIFrameElement) => {
       // Overlay capture disabled: it swallowed the first tap on the native
@@ -330,6 +333,26 @@ export function useOriginalVisitTracker(
           // Cross-origin iframes may reject direct listener attachment.
         }
       }, { once: true });
+      if (!iframeGestureAttached.has(iframe)) {
+        iframeGestureAttached.add(iframe);
+        const onThreadsIframeGesture = () => {
+          // Mobile browsers often keep pointer/touch events inside the
+          // cross-origin Threads frame, so the parent capture listener never
+          // sees the tap. Listening directly on the iframe element catches the
+          // native Play-button gesture without restoring a blocking overlay.
+          if (trackPlayableInteraction && isThreadsIframe(iframe)) {
+            fireThreadsPlayOnce();
+          }
+        };
+        iframe.addEventListener('pointerdown', onThreadsIframeGesture, true);
+        iframe.addEventListener('touchstart', onThreadsIframeGesture, { capture: true, passive: true });
+        iframe.addEventListener('mousedown', onThreadsIframeGesture, true);
+        threadsCaptureCleanups.push(() => {
+          iframe.removeEventListener('pointerdown', onThreadsIframeGesture, true);
+          iframe.removeEventListener('touchstart', onThreadsIframeGesture, true);
+          iframe.removeEventListener('mousedown', onThreadsIframeGesture, true);
+        });
+      }
       attachThreadsPlayCapture(iframe);
       applyNavLockSandbox(iframe);
     };
