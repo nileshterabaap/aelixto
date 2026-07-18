@@ -116,6 +116,34 @@ export function useOriginalVisitTracker(
       const src = (iframe.getAttribute('src') || '').toLowerCase();
       return src.includes('threads.net') || src.includes('threads.com');
     };
+    const getThreadsIframeVisibilityScore = (iframe: HTMLIFrameElement): number => {
+      const rect = iframe.getBoundingClientRect();
+      const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const visibleWidth = Math.max(0, Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0));
+      const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
+      if (rect.width <= 0 || rect.height <= 0 || visibleWidth <= 0 || visibleHeight <= 0) return -Infinity;
+      const centerY = rect.top + rect.height / 2;
+      const distanceFromCenter = Math.abs(centerY - viewportHeight / 2);
+      return (visibleWidth * visibleHeight) - distanceFromCenter;
+    };
+    const isPrimaryVisibleThreadsIframe = (iframe: HTMLIFrameElement): boolean => {
+      const frames = Array.from(
+        document.querySelectorAll('iframe[src*="threads.net"], iframe[src*="threads.com"]'),
+      ) as HTMLIFrameElement[];
+      let bestFrame: HTMLIFrameElement | null = null;
+      let bestScore = -Infinity;
+
+      for (const frame of frames) {
+        const score = getThreadsIframeVisibilityScore(frame);
+        if (score > bestScore) {
+          bestFrame = frame;
+          bestScore = score;
+        }
+      }
+
+      return bestFrame === iframe && bestScore > 0;
+    };
 
     const fireThreadsPlayOnce = () => {
       if (playFiredRef.current) return;
@@ -195,14 +223,6 @@ export function useOriginalVisitTracker(
         if (iframe) {
           setTimeout(() => {
             if (playFiredRef.current) return;
-            // Each mounted Threads post owns a window.blur listener. A single
-            // iframe tap blurs the window globally, so only the post whose
-            // capture layer saw the tap may use this fallback; otherwise every
-            // visible Threads post would record video_play from one tap.
-            if (
-              lastThreadsCaptureRef.postId !== postId ||
-              Date.now() - lastThreadsCaptureRef.time > 1200
-            ) return;
             if (document.visibilityState === 'hidden') return;
             const r = iframe.getBoundingClientRect();
             const onScreen =
@@ -211,7 +231,15 @@ export function useOriginalVisitTracker(
               r.bottom > 0 &&
               r.top < (window.innerHeight || document.documentElement.clientHeight);
             if (!onScreen) return;
-            firePlay();
+            // Each mounted Threads post owns a window.blur listener. Prefer the
+            // post whose parent capture saw the tap; when the cross-origin
+            // iframe swallows the whole gesture, fall back to the primary
+            // visible Threads frame so only one post is credited.
+            const capturedThisPost =
+              lastThreadsCaptureRef.postId === postId &&
+              Date.now() - lastThreadsCaptureRef.time <= 1200;
+            if (!capturedThisPost && !isPrimaryVisibleThreadsIframe(iframe)) return;
+            fireThreadsPlayOnce();
             lastIframeInteractionRef.current = Date.now();
           }, 120);
           return;
