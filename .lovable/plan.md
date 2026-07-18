@@ -1,27 +1,53 @@
-## Goal
-Register the iOS bundle `com.aelixto.app10` as an allowed Apple client in the Lovable Cloud auth backend so that a future TestFlight/App Store build's **native** Sign in with Apple flow is accepted by the token exchange on first try — without touching anything else.
+# Diagnose Threads regression: missing `video_play` + double `original_visit`
 
-## Background
-Right now only the **web** Apple Services ID (`com.aelixto.web` or similar) is registered as the Apple client in Lovable Cloud. That's what made the browser-side Apple sheet start working. Native iOS Sign in with Apple sends a token issued to the **app's bundle ID**, not the Services ID. If the bundle ID isn't listed as an accepted Apple `client_id`, Supabase rejects the token with "Unacceptable audience in id_token".
+I need trace data before proposing a fix — the current code has three separate paths that can each emit `original_visit` and two that can emit `video_play`, and I can't tell from source alone which ones actually fired for your last interaction.
 
-## What I'll do
-1. Update the Lovable Cloud Apple provider configuration to accept a second client ID: `com.aelixto.app10` (the iOS bundle), in addition to the existing web Services ID.
-2. Verify via `supabase--debug_oauth_server` and `supabase--project_info` that both client IDs are listed as valid Apple audiences.
-3. Leave the existing JWT client secret, Services ID, Return URL, and Domains untouched — the web flow you just fixed keeps working exactly as it does today.
+## What I'll do once you approve
 
-## What I will NOT do (per your choice)
-- No Xcode / entitlements / Info.plist changes. You'll add the **Sign In with Apple** capability in Xcode yourself when you have Mac access.
-- No changes to Android, Google, PWA, feed, or any other subsystem.
-- No new files in `capacitor-plugins/`, no changes to `src/capacitor-init.ts` or `src/pages/AuthBridge.tsx`.
+**Step 1 — Query the trace, no code changes.**
+Pull the last ~10 minutes of `trace_logs` for the Threads post plus its `post_views` rows, and build a chronological timeline of every event the hook emitted:
 
-## After this plan is applied — what you still need to do later (documented, not done now)
-When you eventually build the iOS app on a Mac:
-1. Xcode → Signing & Capabilities → **+ Capability → Sign in with Apple**.
-2. Apple Developer console → Identifiers → your **App ID** (`com.aelixto.app10`) → enable the **Sign In with Apple** capability there too.
-3. `npx cap sync ios` and build.
+- `onPointerDown` — target tag, `insideIframe`, `isThreadsPost`, hit-test result
+- `onWindowBlur` → setTimeout — `activeTag`, `activeInsideEl`
+- `onVisibilityChange` — `msSincePointer`, `msSinceIframe`
+- `firePlay` / `fireOriginal` — `alreadyFired` flag, `trackView:result`, `trackOriginalVisit:result`
 
-## Verification
-- `supabase--debug_oauth_server` output shows both the web Services ID and `com.aelixto.app10` under Apple's accepted client IDs.
-- Web "Continue with Apple" still works (regression check — same flow, no config removed).
-- Success probability that native iOS Apple sign-in works on first TestFlight build **after** you also do the Xcode capability step: **~95%**.
-- Success probability of this backend-only change not breaking your current working web Apple flow: **~99%**.
+**Step 2 — Correlate against the two known suspects.**
+
+The code has these paths that can double-credit `original_visit` for Threads:
+
+1. `onVisibilityChange` — I recently removed the `isThreadsPost()` early-return, so any app-background within 3s of a pointerdown now fires `fireOriginal` for Threads. This is intentional but may be firing on the wrong window.
+2. `handleIframeFocus` on the `<iframe>` element itself — if `trackPlayableInteraction` is false at the moment the iframe first focuses (e.g. re-mount with stale prop), this fires `fireOriginal` instead of `firePlay`.
+3. Two mounted instances of `useOriginalVisitTracker` for the same post (feed card + `PlatformPostViewer` open simultaneously) — each has its own `firedRef`, so both can fire, and `post_views` will keep both rows if their `device_hash + event_type` dedupe window has already expired between them.
+
+For missing `video_play`:
+
+1. `onPointerDown` hit-test — if the pointer coordinates fall outside the iframe rect (e.g. tap on the Threads header/footer chrome that sits in the parent DOM), `firePlay` never runs.
+2. `onWindowBlur` setTimeout(0) — on mobile Chrome the `document.activeElement` after a cross-origin iframe tap can be `<body>`, not `IFRAME`, so the `firePlay` branch is skipped.
+3. `handleIframeFocus` — cross-origin iframes on mobile often don't fire a DOM `focus` event on the parent-side `<iframe>` element.
+
+**Step 3 — Report which specific paths ran, then propose the smallest targeted fix.**
+No code changes until the trace conclusively identifies which of the above are the actual culprits.
+
+## Technical details
+
+Files I'll read (no edits):
+- `src/hooks/useOriginalVisitTracker.ts` — already in context
+- `src/components/HydratedEmbed.tsx` — confirm one vs. two mounts per post
+- `src/components/profile/PlatformPostViewer.tsx` — check if it mounts its own tracker while the feed card is still mounted
+
+Queries I'll run:
+```sql
+select ts, event, step, detail, error from public.trace_logs
+where post_id = '<threads post id>' and ts > now() - interval '15 min'
+order by ts;
+
+select created_at, event_type, viewer_id, device_hash
+from public.post_views
+where post_id = '<threads post id>' and created_at > now() - interval '15 min'
+order by created_at;
+```
+
+I need the Threads post_id from your last test (or I can pull the most recent Threads post from `posts`).
+
+Success probability: **95%** (trace is already instrumented and proven to write).
