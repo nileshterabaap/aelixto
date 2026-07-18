@@ -5,6 +5,10 @@ import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
 const traceLog = (..._args: unknown[]) => {};
 
 const threadsVideoPlayFiredPosts = new Set<string>();
+const lastThreadsCaptureRef: { postId: string | null; time: number } = {
+  postId: null,
+  time: 0,
+};
 
 /**
  * Detects when the user taps/clicks into an embedded iframe or an outbound
@@ -112,6 +116,8 @@ export function useOriginalVisitTracker(
 
     const fireThreadsPlayOnce = () => {
       if (threadsVideoPlayFiredPosts.has(postId)) return;
+      lastThreadsCaptureRef.postId = postId;
+      lastThreadsCaptureRef.time = Date.now();
       threadsVideoPlayFiredPosts.add(postId);
       firePlay();
       lastIframeInteractionRef.current = Date.now();
@@ -144,8 +150,12 @@ export function useOriginalVisitTracker(
           // Playable posts: tapping into the iframe = Play (+1) only.
           // "Visited the original source" is intentionally NOT inferred here;
           // it must come from an explicit anchor click or the platform-icon button.
-          firePlay();
-          lastIframeInteractionRef.current = now;
+          if (isThreadsPost()) {
+            fireThreadsPlayOnce();
+          } else {
+            firePlay();
+            lastIframeInteractionRef.current = now;
+          }
         } else {
           fireOriginal();
         }
@@ -153,32 +163,16 @@ export function useOriginalVisitTracker(
         // Threads SDK inflates a same-origin <blockquote> (no iframe), so the
         // isInsideIframe check above never matches. Treat a pointerdown on the
         // inflated Threads embed as a play interaction (+1 only).
-        firePlay();
-        lastIframeInteractionRef.current = now;
+        fireThreadsPlayOnce();
       } else if (trackPlayableInteraction && isThreadsPost()) {
-        // Threads is rendered as a direct cross-origin iframe. On some mobile
-        // browsers a pointerdown on the iframe surface reports the event target
-        // as an ancestor element (not the IFRAME itself), so isInsideIframe
-        // above misses it. Fall back to a hit-test against the Threads iframe's
-        // bounding rect using the pointer coordinates.
-        const pe = e as PointerEvent | TouchEvent;
-        let x: number | null = null;
-        let y: number | null = null;
-        if ('clientX' in pe && typeof (pe as PointerEvent).clientX === 'number') {
-          x = (pe as PointerEvent).clientX;
-          y = (pe as PointerEvent).clientY;
-        } else if ('touches' in pe && (pe as TouchEvent).touches?.[0]) {
-          x = (pe as TouchEvent).touches[0].clientX;
-          y = (pe as TouchEvent).touches[0].clientY;
-        }
-        const iframe = getThreadsIframe();
-        if (iframe && x !== null && y !== null) {
-          const r = iframe.getBoundingClientRect();
-          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-            firePlay();
-            lastIframeInteractionRef.current = now;
-          }
-        }
+        // Threads is rendered as a direct cross-origin iframe. On mobile the
+        // event target for a tap on the iframe surface is often reported as
+        // an ancestor element (not IFRAME), *and* body.at-scroll-top applies
+        // pointer-events:none to iframes so the tap can land on a plain div
+        // ancestor entirely. A hit-test against the iframe rect is fragile
+        // in both cases. Since this container only hosts one Threads post,
+        // any pointerdown that reaches this handler is an intent to play.
+        fireThreadsPlayOnce();
       }
     };
 
@@ -199,6 +193,14 @@ export function useOriginalVisitTracker(
         if (iframe) {
           setTimeout(() => {
             if (playFiredRef.current) return;
+            // Each mounted Threads post owns a window.blur listener. A single
+            // iframe tap blurs the window globally, so only the post whose
+            // capture layer saw the tap may use this fallback; otherwise every
+            // visible Threads post would record video_play from one tap.
+            if (
+              lastThreadsCaptureRef.postId !== postId ||
+              Date.now() - lastThreadsCaptureRef.time > 1200
+            ) return;
             if (document.visibilityState === 'hidden') return;
             const r = iframe.getBoundingClientRect();
             const onScreen =
@@ -254,19 +256,11 @@ export function useOriginalVisitTracker(
       // Only infer a visit for non-playable embeds (article/link cards where
       // tapping opens the source). Playable posts must not auto-fire Visit on
       // app backgrounding — user may just be watching inline.
-      // Exception: X/Twitter embeds are a cross-origin iframe that swallows
-      // internal anchor clicks; when the user taps through to the original
-      // post, the only observable signal is the app becoming hidden shortly
-      // after a pointerdown on the embed. Scope the fallback to X only so
-      // other playable platforms (YouTube/TikTok/IG/FB/LinkedIn/Pinterest/
-      // Spotify/Threads) are unaffected.
-      // Threads is intentionally excluded here: on Threads, any iframe
-      // interaction is credited as `video_play` (see onWindowBlur below).
-      // A subsequent app-background is almost always the user tapping the
-      // inline share link, which would double-credit as visit. Visit for
-      // Threads must come from the explicit header platform-icon button
-      // (markOriginalVisit) or an anchor click captured by onClick.
-      if (trackPlayableInteraction && !isXPost()) return;
+      // Playable posts (X/YouTube/TikTok/IG/FB/LinkedIn/Pinterest/Spotify/
+      // Threads): iframe tap credits Play only. "Visit" must come from an
+      // explicit anchor click or the header platform-icon button, so we
+      // never infer visit from an app-background here on playable posts.
+      if (trackPlayableInteraction) return;
       const now = Date.now();
       if (
         now - recentPointerRef.current < 3000 ||
@@ -291,6 +285,12 @@ export function useOriginalVisitTracker(
       if (!target) return;
       const anchor = target.closest('a[href]') as HTMLAnchorElement | null;
       if (anchor && anchor.href && !anchor.href.startsWith('javascript:')) {
+        // For X and Threads, anchor clicks inside the embed body must NOT
+        // record `original_visit` — body taps are view/play-only, and the
+        // sole sanctioned Visit trigger is the header platform icon.
+        if (trackPlayableInteraction && (isXPost() || isThreadsPost())) {
+          return;
+        }
         fireOriginal();
       }
     };
@@ -298,8 +298,12 @@ export function useOriginalVisitTracker(
     const handleIframeFocus = () => {
       const now = Date.now();
       if (trackPlayableInteraction) {
-        firePlay();
-        lastIframeInteractionRef.current = now;
+        if (isThreadsPost()) {
+          fireThreadsPlayOnce();
+        } else {
+          firePlay();
+          lastIframeInteractionRef.current = now;
+        }
       } else {
         fireOriginal();
       }
@@ -309,69 +313,12 @@ export function useOriginalVisitTracker(
     const threadsCaptureAttached = new WeakSet<HTMLIFrameElement>();
 
     const attachThreadsPlayCapture = (iframe: HTMLIFrameElement) => {
-      if (!trackPlayableInteraction || threadsCaptureAttached.has(iframe)) return;
-      if (!/threads\.(net|com)/i.test(iframe.src || '')) return;
-      const parent = iframe.parentElement;
-      if (!parent) return;
-
-      threadsCaptureAttached.add(iframe);
-
-      const previousInlinePosition = parent.style.position;
-      const parentWasStatic = window.getComputedStyle(parent).position === 'static';
-      if (parentWasStatic) parent.style.position = 'relative';
-
-      const overlay = document.createElement('div');
-      overlay.setAttribute('aria-hidden', 'true');
-      overlay.dataset.aelixtoThreadsPlayCapture = 'true';
-      Object.assign(overlay.style, {
-        position: 'absolute',
-        zIndex: '3',
-        background: 'transparent',
-        pointerEvents: 'auto',
-        touchAction: 'manipulation',
-      } satisfies Partial<CSSStyleDeclaration>);
-
-      const syncOverlay = () => {
-        const parentRect = parent.getBoundingClientRect();
-        const iframeRect = iframe.getBoundingClientRect();
-        overlay.style.left = `${iframeRect.left - parentRect.left + parent.scrollLeft}px`;
-        overlay.style.top = `${iframeRect.top - parentRect.top + parent.scrollTop}px`;
-        overlay.style.width = `${iframeRect.width}px`;
-        overlay.style.height = `${iframeRect.height}px`;
-      };
-
-      let removed = false;
-      let resizeObserver: ResizeObserver | null = null;
-      const removeOverlay = () => {
-        if (removed) return;
-        removed = true;
-        overlay.remove();
-        resizeObserver?.disconnect();
-        if (parentWasStatic) parent.style.position = previousInlinePosition;
-      };
-
-      const captureThreadsPlay = () => {
-        fireThreadsPlayOnce();
-        overlay.style.pointerEvents = 'none';
-        window.setTimeout(removeOverlay, 0);
-      };
-
-      overlay.addEventListener('pointerdown', captureThreadsPlay, { capture: true });
-      overlay.addEventListener('touchstart', captureThreadsPlay, { capture: true, passive: true });
-      overlay.addEventListener('mousedown', captureThreadsPlay, { capture: true });
-      overlay.addEventListener('click', captureThreadsPlay, { capture: true });
-
-      syncOverlay();
-      parent.appendChild(overlay);
-      resizeObserver = new ResizeObserver(syncOverlay);
-      resizeObserver.observe(parent);
-      resizeObserver.observe(iframe);
-      iframe.addEventListener('load', syncOverlay);
-
-      threadsCaptureCleanups.push(() => {
-        iframe.removeEventListener('load', syncOverlay);
-        removeOverlay();
-      });
+      // Overlay capture disabled: it swallowed the first tap on the native
+      // Play button, so the video never actually started. We now let taps
+      // pass straight through to the iframe and rely on pointerdown /
+      // window.blur / iframe focus signals below to credit Play.
+      void iframe;
+      void threadsCaptureAttached;
     };
 
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
@@ -384,6 +331,40 @@ export function useOriginalVisitTracker(
         }
       }, { once: true });
       attachThreadsPlayCapture(iframe);
+      applyNavLockSandbox(iframe);
+    };
+
+    // For X and Threads embeds we cannot inspect the cross-origin iframe to
+    // distinguish "video pixel" from "username link pixel". To honor the
+    // product rule ("embedded post must never navigate to the original"),
+    // we sandbox the iframe: allow scripts + same-origin (so the player,
+    // postMessage height sync, and video playback keep working), but omit
+    // allow-popups and allow-top-navigation*. Any link tap inside the embed
+    // is silently dropped by the browser instead of opening a new tab or
+    // navigating the app away. Play/pause on the native player is unaffected.
+    const applyNavLockSandbox = (iframe: HTMLIFrameElement) => {
+      if (!trackPlayableInteraction) return;
+      if (iframe.dataset.navLockApplied === '1') return;
+      const src = (iframe.getAttribute('src') || '').toLowerCase();
+      const title = (iframe.getAttribute('title') || '').toLowerCase();
+      const id = (iframe.id || '').toLowerCase();
+      const isX =
+        src.includes('twitter.com') ||
+        src.includes('x.com') ||
+        src.includes('platform.twitter.com') ||
+        id.includes('twitter-widget') ||
+        title.includes('twitter') ||
+        title.includes('tweet');
+      const isThreads =
+        src.includes('threads.net') || src.includes('threads.com');
+      if (!isX && !isThreads) return;
+      iframe.dataset.navLockApplied = '1';
+      // Setting sandbox on an already-loaded iframe reloads it once; that's
+      // acceptable and only happens the first time we see the frame.
+      iframe.setAttribute(
+        'sandbox',
+        'allow-scripts allow-same-origin allow-presentation',
+      );
     };
 
     el.querySelectorAll('iframe').forEach(attachIframeListeners);
