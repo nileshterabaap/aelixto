@@ -116,7 +116,11 @@ Deno.serve(async (req) => {
     const platformPattern = '%threads%';
     // Only collapse the events that actually leak across mounted Threads posts
     // from a single interaction. image_view is per-post-timer and safe.
-    const isBurstEvent = ['video_play', 'original_visit'].includes(event_type);
+    // video_play is also safe: the client tracker scopes Threads play per
+    // post via `threadsVideoPlayFiredPosts` + `lastThreadsCaptureRef`, so a
+    // server-side burst guard here only suppresses legitimate sequential
+    // plays across different Threads posts.
+    const isBurstEvent = ['original_visit'].includes(event_type);
 
     if (isBurstyPlatform && isBurstEvent) {
       // Tight window: a single blur/pointer event on one iframe reaches every
