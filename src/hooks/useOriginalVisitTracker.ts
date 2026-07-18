@@ -5,10 +5,6 @@ import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
 const traceLog = (..._args: unknown[]) => {};
 
 const threadsVideoPlayFiredPosts = new Set<string>();
-const lastThreadsCaptureRef: { postId: string | null; time: number } = {
-  postId: null,
-  time: 0,
-};
 
 /**
  * Detects when the user taps/clicks into an embedded iframe or an outbound
@@ -116,8 +112,6 @@ export function useOriginalVisitTracker(
 
     const fireThreadsPlayOnce = () => {
       if (threadsVideoPlayFiredPosts.has(postId)) return;
-      lastThreadsCaptureRef.postId = postId;
-      lastThreadsCaptureRef.time = Date.now();
       threadsVideoPlayFiredPosts.add(postId);
       firePlay();
       lastIframeInteractionRef.current = Date.now();
@@ -150,12 +144,8 @@ export function useOriginalVisitTracker(
           // Playable posts: tapping into the iframe = Play (+1) only.
           // "Visited the original source" is intentionally NOT inferred here;
           // it must come from an explicit anchor click or the platform-icon button.
-          if (isThreadsPost()) {
-            fireThreadsPlayOnce();
-          } else {
-            firePlay();
-            lastIframeInteractionRef.current = now;
-          }
+          firePlay();
+          lastIframeInteractionRef.current = now;
         } else {
           fireOriginal();
         }
@@ -163,7 +153,8 @@ export function useOriginalVisitTracker(
         // Threads SDK inflates a same-origin <blockquote> (no iframe), so the
         // isInsideIframe check above never matches. Treat a pointerdown on the
         // inflated Threads embed as a play interaction (+1 only).
-        fireThreadsPlayOnce();
+        firePlay();
+        lastIframeInteractionRef.current = now;
       } else if (trackPlayableInteraction && isThreadsPost()) {
         // Threads is rendered as a direct cross-origin iframe. On some mobile
         // browsers a pointerdown on the iframe surface reports the event target
@@ -184,7 +175,8 @@ export function useOriginalVisitTracker(
         if (iframe && x !== null && y !== null) {
           const r = iframe.getBoundingClientRect();
           if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-            fireThreadsPlayOnce();
+            firePlay();
+            lastIframeInteractionRef.current = now;
           }
         }
       }
@@ -207,14 +199,6 @@ export function useOriginalVisitTracker(
         if (iframe) {
           setTimeout(() => {
             if (playFiredRef.current) return;
-            // Each mounted Threads post owns a window.blur listener. A single
-            // iframe tap blurs the window globally, so only the post whose
-            // capture layer saw the tap may use this fallback; otherwise every
-            // visible Threads post would record video_play from one tap.
-            if (
-              lastThreadsCaptureRef.postId !== postId ||
-              Date.now() - lastThreadsCaptureRef.time > 1200
-            ) return;
             if (document.visibilityState === 'hidden') return;
             const r = iframe.getBoundingClientRect();
             const onScreen =
@@ -314,12 +298,8 @@ export function useOriginalVisitTracker(
     const handleIframeFocus = () => {
       const now = Date.now();
       if (trackPlayableInteraction) {
-        if (isThreadsPost()) {
-          fireThreadsPlayOnce();
-        } else {
-          firePlay();
-          lastIframeInteractionRef.current = now;
-        }
+        firePlay();
+        lastIframeInteractionRef.current = now;
       } else {
         fireOriginal();
       }
