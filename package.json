@@ -61,6 +61,7 @@
     "@tanstack/react-query-persist-client": "^5.90.21",
     "@tanstack/react-virtual": "^3.13.12",
     "@types/dompurify": "^3.0.5",
+    "aelixto-gam-native": "./capacitor-plugins/gam-native",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
