@@ -65,7 +65,6 @@ interface HydratedFeedPostProps {
   userId?: string;
   isActive?: boolean; // Controlled by parent - whether this post is near viewport
   startHydrated?: boolean; // Skip IntersectionObserver, hydrate immediately
-  fastReveal?: boolean; // Show the post shell quickly while slow embeds finish inside it
   onDeleted?: () => void;
 }
 
@@ -114,7 +113,7 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
-export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false, fastReveal = false, onDeleted }: HydratedFeedPostProps) => {
+export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false, onDeleted }: HydratedFeedPostProps) => {
   // If this post was already revealed in a previous render, skip ALL skeleton/transition work
   const alreadyRevealed = revealedPostsCache.has(post.id);
 
@@ -330,13 +329,9 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
     // Soft fallback: reveal early if no renderer is still actively loading.
     const isFacebookPost = detectedPlatform === 'facebook';
-    const softTimeout = fastReveal ? 180 : isFacebookPost ? 2500 : 1500;
+    const softTimeout = isFacebookPost ? 2500 : 1500;
     const fallback = setTimeout(() => {
       if (settled) return;
-      if (fastReveal) {
-        markReady();
-        return;
-      }
       if (checkContent()) return;
       if (!getRendererStatuses().includes('loading')) {
         markReady();
@@ -353,7 +348,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       clearTimeout(fallback);
       clearTimeout(hardFallback);
     };
-  }, [isHydrated, embedState, alreadyRevealed, fastReveal]);
+  }, [isHydrated, embedState, alreadyRevealed]);
 
   // Unified reveal sequence: when embedState becomes 'ready', reveal card and sharpen
   useEffect(() => {
