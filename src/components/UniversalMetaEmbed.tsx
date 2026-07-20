@@ -440,7 +440,7 @@ const FacebookIframeEmbed = ({
         src={iframeSrc}
         scrolling="no"
         allowFullScreen
-        allow="encrypted-media"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"
         loading="lazy"
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         onError={() => setFailed(true)}

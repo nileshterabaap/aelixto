@@ -122,6 +122,7 @@ export const PinterestEmbed = ({ url, postId, suggestedHeight }: PinterestEmbedP
             frameBorder="0"
             scrolling="no"
             allowFullScreen
+            allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write"
             style={{
               border: 'none',
               display: 'block',
