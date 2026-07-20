@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "tokenHash": null,
+  "platforms": {
+    "x": {
+      "description": "X (Twitter) embed interaction, scoring, and navigation. Frozen 2026-07-20.",
+      "files": [
+        "src/hooks/useOriginalVisitTracker.ts",
+        "src/components/embeds/TwitterEmbed.tsx"
+      ],
+      "frozen": false,
+      "frozenAt": null,
+      "baseline": {}
+    },
+    "threads": {
+      "description": "Threads embed interaction, scoring, and navigation. Frozen 2026-07-20.",
+      "files": [
+        "src/hooks/useOriginalVisitTracker.ts"
+      ],
+      "frozen": false,
+      "frozenAt": null,
+      "baseline": {}
+    }
+  }
+}
