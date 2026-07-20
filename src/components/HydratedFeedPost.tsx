@@ -1,4 +1,4 @@
-import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, RefreshCw } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, RefreshCw, Pin, PinOff, EyeOff, Eye, MessageCircleOff, MessageCircle as MessageCircleOn, Pencil } from "lucide-react";
 import { motion, useAnimation } from "framer-motion";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -7,8 +7,17 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import type { Post } from "@/data/demoData";
 import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
 import { EmbedSkeleton } from "@/components/EmbedSkeleton";
@@ -37,7 +46,11 @@ import { YouTubeTitleFallback } from "@/components/YouTubeTitleFallback";
 import { resolveRenderer } from "@/lib/resolveRenderer";
 import { SharePostSheet } from "@/components/SharePostSheet";
 import { PostReportMenu } from "@/components/PostReportMenu";
-import { getPostThumb } from "@/lib/getPostThumb";
+import { getOriginalPostCaption } from "@/lib/originalCaption";
+import { supabase } from "@/integrations/supabase/client";
+import { markEmbedReady, startEmbedWatch } from "@/lib/embedReadiness";
+import { openExternalUrl } from "@/lib/openExternalUrl";
+import { markOriginalVisit } from "@/hooks/useOriginalVisitTracker";
 
 // Module-level cache: posts that have already completed their reveal cycle
 // skip all skeleton/transition machinery on subsequent renders (scroll back, remount, etc.)
@@ -45,12 +58,15 @@ const revealedPostsCache = new Set<string>();
 // Hydrate posts well ahead of the viewport so the next ~6–7 posts in the
 // feed are always ready to display the moment the user scrolls to them.
 const HYDRATION_ROOT_MARGIN = '4500px 0px';
+const captionHydrationRequested = new Set<string>();
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
   userId?: string;
   isActive?: boolean; // Controlled by parent - whether this post is near viewport
   startHydrated?: boolean; // Skip IntersectionObserver, hydrate immediately
+  fastReveal?: boolean; // Show the post shell quickly while slow embeds finish inside it
+  onDeleted?: () => void;
 }
 
 const formatTimestamp = (date: Date) => {
@@ -98,7 +114,7 @@ const detectPlatformFromUrl = (url?: string) => {
   return null;
 };
 
-export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false }: HydratedFeedPostProps) => {
+export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated = false, fastReveal = false, onDeleted }: HydratedFeedPostProps) => {
   // If this post was already revealed in a previous render, skip ALL skeleton/transition work
   const alreadyRevealed = revealedPostsCache.has(post.id);
 
@@ -122,6 +138,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const [displayLikeCount, setDisplayLikeCount] = useState<number>(Number((post as any).likes_count ?? (post as any).likes ?? 0));
   const [displayCommentCount] = useState<number>(Number((post as any).comments_count ?? (post as any).comments ?? 0));
   const [displayRepostCount, setDisplayRepostCount] = useState<number>(Number((post as any).reposts_count ?? (post as any).shares ?? 0));
+  const [hydratedSourceCaption, setHydratedSourceCaption] = useState("");
+  const [hydratedPreviewImageUrl, setHydratedPreviewImageUrl] = useState<string | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const embedRef = useRef<HTMLDivElement>(null);
 
@@ -153,6 +171,18 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     if (isHydrated || !isNearViewport) return;
     setIsHydrated(true);
   }, [isNearViewport, isHydrated]);
+
+  // Once hydration begins, start a slow-embed watchdog so the feed can
+  // demote this post if its embed doesn't finish loading in time.
+  useEffect(() => {
+    if (!isHydrated || alreadyRevealed) return;
+    startEmbedWatch(post.id);
+  }, [isHydrated, alreadyRevealed, post.id]);
+
+  // If a post was pre-revealed from cache, treat it as ready immediately.
+  useEffect(() => {
+    if (alreadyRevealed) markEmbedReady(post.id);
+  }, [alreadyRevealed, post.id]);
 
   // Unified embed detection: detect when embed content is ready or error
   // Single 4s fallback timeout for ALL platforms
@@ -247,9 +277,12 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       const iframes = mediaNodes.filter((node): node is HTMLIFrameElement => node instanceof HTMLIFrameElement);
       if (iframes.length > 0) {
-        if (attachIframeHandlers()) {
-          markReady();
-        }
+        // Reveal as soon as an iframe is mounted — waiting for its `load`
+        // event keeps our skeleton on top of SDK-driven embeds (Twitter,
+        // Reddit, Pinterest, YouTube, Facebook) for 5–8s. The iframe's
+        // own loading UI is a better UX than our skeleton at that point.
+        attachIframeHandlers();
+        markReady();
         return true;
       }
 
@@ -295,12 +328,15 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     const handleEmbedReady = () => { markReady(); };
     el.addEventListener('embedReady', handleEmbedReady);
 
-    // Soft fallback: only reveal early if no renderer is still actively loading.
-    // Facebook SDK divs take longer (5-8s), so extend the soft fallback for them.
+    // Soft fallback: reveal early if no renderer is still actively loading.
     const isFacebookPost = detectedPlatform === 'facebook';
-    const softTimeout = isFacebookPost ? 8000 : 4000;
+    const softTimeout = fastReveal ? 180 : isFacebookPost ? 2500 : 1500;
     const fallback = setTimeout(() => {
       if (settled) return;
+      if (fastReveal) {
+        markReady();
+        return;
+      }
       if (checkContent()) return;
       if (!getRendererStatuses().includes('loading')) {
         markReady();
@@ -317,11 +353,13 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       clearTimeout(fallback);
       clearTimeout(hardFallback);
     };
-  }, [isHydrated, embedState, alreadyRevealed]);
+  }, [isHydrated, embedState, alreadyRevealed, fastReveal]);
 
   // Unified reveal sequence: when embedState becomes 'ready', reveal card and sharpen
   useEffect(() => {
     if (embedState !== 'ready' || alreadyRevealed) return;
+    // Broadcast readiness so the feed can stop treating this post as a reorder candidate.
+    markEmbedReady(post.id);
     let cancelled = false;
 
     // Remove skeleton quickly
@@ -379,7 +417,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   
   // Normalize field access
   const thumbnailUrl = post.thumbnailUrl || (post as any).thumbnail_url;
-  const previewImageUrl = (post as any).preview_image_url;
+  const previewImageUrl = hydratedPreviewImageUrl || (post as any).preview_image_url;
   const mediaUrl = post.mediaUrl || (post as any).media_url;
   
   // Detect platform
@@ -387,9 +425,18 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   const isYouTubePost = detectedPlatform === 'youtube';
   const shouldRenderMediaTitle = isYouTubePost || r.kind === 'image' || r.kind === 'video';
   const platform = getPlatformIcon(detectedPlatform);
+  const originalPostCaption = useMemo(() => getOriginalPostCaption({
+    previewText: hydratedSourceCaption || (post as any).preview_text,
+    title: post.title,
+    userCaption: post.content,
+    platform: detectedPlatform,
+  }), [hydratedSourceCaption, post.content, post.title, detectedPlatform, (post as any).preview_text]);
   
   // Always call hooks unconditionally
-  const postActionsResult = usePostActions(post.id, userId || '');
+  const postActionsResult = usePostActions(post.id, userId || '', {
+    isRepost: !!post.isRepost,
+    onDeleted,
+  });
   const repostActionsResult = useRepost(post.id, userId || '');
   
   const canUseActions = post.isRealPost && !!userId;
@@ -410,12 +457,68 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     : { isReposted: false, toggleRepost: () => {}, isReposting: false };
 
   const { isLiked, isSaved, toggleLike, toggleSave, deletePost, isDeleting } = postActions;
+  const togglePin = (postActions as any).togglePin as ((v: { pinned: boolean; platform?: string | null }) => void) | undefined;
+  const toggleHideCounts = (postActions as any).toggleHideCounts as ((v: boolean) => void) | undefined;
+  const toggleCommentsDisabled = (postActions as any).toggleCommentsDisabled as ((v: boolean) => void) | undefined;
+  const editCaption = (postActions as any).editCaption as ((v: string) => void) | undefined;
+  const isPinned = !!(post as any).pinned_at;
+  const hideCounts = !!(post as any).hide_counts;
+  const commentsDisabled = !!(post as any).comments_disabled;
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDraft, setEditDraft] = useState<string>(post.content || "");
+  useEffect(() => { setEditDraft(post.content || ""); }, [post.id, post.content]);
   const { isReposted, toggleRepost } = repostActions;
 
   useEffect(() => {
     setDisplayLikeCount(Number((post as any).likes_count ?? (post as any).likes ?? 0));
     setDisplayRepostCount(Number((post as any).reposts_count ?? (post as any).shares ?? 0));
   }, [post.id, (post as any).likes_count, (post as any).likes, (post as any).reposts_count, (post as any).shares]);
+
+  useEffect(() => {
+    setHydratedSourceCaption("");
+    setHydratedPreviewImageUrl(null);
+  }, [post.id]);
+
+  useEffect(() => {
+    const isHydratablePlatform =
+      detectedPlatform === 'facebook' || detectedPlatform === 'linkedin';
+    const captionLooksClipped =
+      !!originalPostCaption &&
+      (/(?:\.\.\.|…)\s*$/.test(originalPostCaption) || originalPostCaption.length < 220);
+    const needsHydration =
+      isHydratablePlatform &&
+      !!mediaUrl &&
+      (!originalPostCaption ||
+        (detectedPlatform === 'linkedin' && captionLooksClipped) ||
+        (!thumbnailUrl && !previewImageUrl));
+    if (!needsHydration) return;
+    if (captionHydrationRequested.has(post.id)) return;
+    captionHydrationRequested.add(post.id);
+
+    supabase.functions
+      .invoke('fetch-post-preview', {
+        body: {
+          postId: post.isRealPost ? post.id : undefined,
+          url: mediaUrl,
+          platform: detectedPlatform,
+          previewOnly: !post.isRealPost,
+        },
+      })
+      .then(({ data }) => {
+        const recovered = getOriginalPostCaption({
+          previewText: data?.preview_text,
+          title: data?.title,
+          userCaption: post.content,
+          platform: detectedPlatform,
+        });
+        if (recovered) setHydratedSourceCaption(recovered);
+        const recoveredImage = data?.thumbnail_url || data?.preview_image_url;
+        if (recoveredImage && !thumbnailUrl && !previewImageUrl) setHydratedPreviewImageUrl(recoveredImage);
+      })
+      .catch(() => {
+        captionHydrationRequested.delete(post.id);
+      });
+  }, [detectedPlatform, originalPostCaption, mediaUrl, post.id, post.isRealPost, post.content, thumbnailUrl, previewImageUrl]);
 
   const handleLikeClick = useCallback(() => {
     if (!canUseActions) return;
@@ -439,15 +542,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     setIsHydrated(true);
   }, []);
 
-  // Derive thumbnail: filter misleading Reddit placeholders, then derive from URL
-  const effectiveThumbnail = getPostThumb({
-    platform: post.platform,
-    thumbnailUrl,
-    thumbnail_url: (post as any).thumbnail_url,
-    mediaUrl: mediaUrl,
-    media_url: (post as any).media_url,
-    author_avatar_url: post.author?.avatar,
-  }) || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
+  // Derive thumbnail: prefer stored, then derive from URL
+  const effectiveThumbnail = thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform);
 
   const showCard = isTextOnly || embedState === 'ready' || embedState === 'error';
 
@@ -467,18 +563,18 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       )}
 
-      {/* Real card — hidden until embed loads, fades in blurred, then sharpens */}
+      {/* Real card — mirrors the profile grid thumbnail reveal: pure opacity
+          fade with the same 300ms duration. No blur → sharpen step. */}
       <div
         ref={cardMeasureRef}
         className={`overflow-hidden rounded-xl ${!isTextOnly && skeletonVisible ? 'absolute inset-0' : ''}`}
         style={{
           opacity: showCard ? 1 : 0,
           visibility: showCard ? 'visible' : 'hidden',
-          filter: alreadyRevealed ? 'none' : (isSharpened ? 'blur(0px)' : 'blur(4px)'),
-          transition: 'opacity 250ms ease-in-out, filter 400ms ease-out',
+          transition: 'opacity 300ms ease-out',
         }}
       >
-    <Card className="post-card border-0 shadow-none">
+    <Card className="glass-post-card overflow-hidden rounded-[2rem]">
       {/* Repost Indicator */}
       {post.isRepost && post.repostedByUsername && (
         <div className="flex items-center gap-2 px-5 pt-4 text-sm text-muted-foreground">
@@ -505,20 +601,85 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
         <div className="flex items-center gap-2 shrink-0 text-foreground">
           {platform && (
-            <img 
-              src={platform.icon} 
-              alt={platform.name}
-              className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' ? 'w-6 h-6' : 'w-8 h-8'}`}
-            />
+            mediaUrl ? (
+              <button
+                type="button"
+                aria-label={`Open on ${platform.name}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  markOriginalVisit(post.id);
+                  void openExternalUrl(mediaUrl);
+                }}
+                className="p-0 bg-transparent border-0 cursor-pointer"
+              >
+                <img
+                  src={platform.icon}
+                  alt={platform.name}
+                  className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' ? 'w-6 h-6' : 'w-8 h-8'}`}
+                />
+              </button>
+            ) : (
+              <img
+                src={platform.icon}
+                alt={platform.name}
+                className={`object-contain ${detectedPlatform === 'threads' ? 'w-5 h-5' : detectedPlatform === 'facebook' || detectedPlatform === 'quora' || detectedPlatform === 'spotify' ? 'w-6 h-6' : 'w-8 h-8'}`}
+              />
+            )
           )}
-          {post.isRealPost && (post as any).user_id === userId && (
+          {post.isRealPost && !!userId && (post as any).user_id === userId && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                 <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
                   <MoreVertical className="h-5 w-5" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-background z-[100]">
+              <DropdownMenuContent align="end" className="bg-background z-[100] w-56">
+                {!post.isRepost && togglePin && (
+                  <DropdownMenuItem
+                    onClick={() => togglePin({ pinned: !isPinned, platform: (post as any).platform })}
+                    className="cursor-pointer"
+                  >
+                    {isPinned ? (
+                      <><PinOff className="h-4 w-4 mr-2" />Unpin from profile</>
+                    ) : (
+                      <><Pin className="h-4 w-4 mr-2" />Pin to profile</>
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {toggleHideCounts && (
+                  <DropdownMenuItem
+                    onClick={() => toggleHideCounts(!hideCounts)}
+                    className="cursor-pointer"
+                  >
+                    {hideCounts ? (
+                      <><Eye className="h-4 w-4 mr-2" />Show interaction count</>
+                    ) : (
+                      <><EyeOff className="h-4 w-4 mr-2" />Hide interaction count</>
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {toggleCommentsDisabled && (
+                  <DropdownMenuItem
+                    onClick={() => toggleCommentsDisabled(!commentsDisabled)}
+                    className="cursor-pointer"
+                  >
+                    {commentsDisabled ? (
+                      <><MessageCircleOn className="h-4 w-4 mr-2" />Turn on commenting</>
+                    ) : (
+                      <><MessageCircleOff className="h-4 w-4 mr-2" />Turn off commenting</>
+                    )}
+                  </DropdownMenuItem>
+                )}
+                {editCaption && (
+                  <DropdownMenuItem
+                    onClick={() => setEditOpen(true)}
+                    className="cursor-pointer"
+                  >
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit caption
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => deletePost()}
                   disabled={isDeleting}
@@ -540,17 +701,31 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </div>
       </div>
 
-      {/* Caption — Instagram captions intentionally hidden (media-only) */}
-      {(() => {
-        const captionText =
-          detectedPlatform === 'instagram' ? '' : (post.content?.trim() || '');
-        return captionText ? (
-          <div className="px-5 pb-3">
-            <CollapsibleCaption content={captionText} />
-          </div>
-        ) : null;
-      })()}
+      {/* Caption */}
+      {post.content?.trim() && (
+        <div className="px-5 pb-3">
+          <CollapsibleCaption content={post.content} />
+        </div>
+      )}
 
+
+      {(() => {
+        if (!originalPostCaption) return null;
+        // Reddit's own embed already renders the post title/body and a
+        // "Read more" toggle. Showing the same text above the iframe
+        // duplicates it, so skip the original caption for Reddit.
+        // Reddit/Threads/X embeds render the post text inside the iframe;
+        // showing the original caption above duplicates it.
+        if (detectedPlatform === 'reddit' || detectedPlatform === 'threads' || detectedPlatform === 'twitter' || detectedPlatform === 'linkedin' || detectedPlatform === 'tiktok') return null;
+        return (
+          <div className="px-5 pb-3">
+            <CollapsibleCaption
+              content={originalPostCaption}
+              className="text-sm text-muted-foreground"
+            />
+          </div>
+        );
+      })()}
 
       {/* FLUSH CONTENT: Edge-to-edge thumbnail/embed — skip entirely for posts with no media */}
       {r.kind !== 'none' ? (
@@ -623,21 +798,27 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
               transition: 'fill 200ms ease, color 200ms ease',
             }}
           />
-          {!(post as any).hide_likes && displayLikeCount > 0 && (
+          {!(post as any).hide_likes && !hideCounts && displayLikeCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground">{displayLikeCount}</span>
           )}
         </motion.button>
         <motion.button 
           onClick={() => {
+            if (commentsDisabled) return;
             setCommentsOpen(true);
             commentControls.start({ scale: [1, 1.2, 1], transition: { duration: 0.2, ease: 'easeOut' } });
           }}
+          disabled={commentsDisabled}
           animate={commentControls}
           whileTap={{ scale: 0.9 }}
-          className="action-btn p-1.5 flex items-center gap-1"
+          className={`action-btn p-1.5 flex items-center gap-1 ${commentsDisabled ? 'opacity-40' : ''}`}
         >
-          <MessageCircle className="h-6 w-6 stroke-[1.5] fill-none" />
-          {displayCommentCount > 0 && (
+          {commentsDisabled ? (
+            <MessageCircleOff className="h-6 w-6 stroke-[1.5] fill-none" />
+          ) : (
+            <MessageCircle className="h-6 w-6 stroke-[1.5] fill-none" />
+          )}
+          {!hideCounts && !commentsDisabled && displayCommentCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground">{displayCommentCount}</span>
           )}
         </motion.button>
@@ -654,7 +835,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
               transition: 'color 200ms ease',
             }}
           />
-          {displayRepostCount > 0 && (
+          {!hideCounts && displayRepostCount > 0 && (
             <span className="text-xs font-semibold text-muted-foreground">{displayRepostCount}</span>
           )}
         </motion.button>
@@ -714,6 +895,34 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           userId={userId}
         />
       )}
+
+      {editCaption && (
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit caption</DialogTitle>
+            </DialogHeader>
+            <Textarea
+              value={editDraft}
+              onChange={(e) => setEditDraft(e.target.value)}
+              rows={6}
+              maxLength={2200}
+              placeholder="Write a caption..."
+            />
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
+              <Button
+                onClick={() => {
+                  editCaption(editDraft.trim());
+                  setEditOpen(false);
+                }}
+              >
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
       </div>
     </div>
@@ -735,6 +944,9 @@ const arePropsEqual = (prev: HydratedFeedPostProps, next: HydratedFeedPostProps)
     p.title === n.title &&
     p.mediaUrl === n.mediaUrl &&
     p.thumbnailUrl === n.thumbnailUrl &&
+    (p as any).preview_text === (n as any).preview_text &&
+    (p as any).preview_title === (n as any).preview_title &&
+    (p as any).preview_image_url === (n as any).preview_image_url &&
     p.platform === n.platform &&
     p.saves === n.saves &&
     p.isRepost === n.isRepost &&

@@ -13,6 +13,7 @@ const DEFAULT_LOCK = {
     'src/lib/resolveRenderer.ts',
     'src/index.css',
   ],
+  frozen: { tokenHash: null, files: [] },
   baseline: {},
 };
 
@@ -38,6 +39,8 @@ const ensureLockFile = () => {
   const lock = readJson(LOCK_FILE);
   if (!Array.isArray(lock.protectedFiles)) lock.protectedFiles = [...DEFAULT_LOCK.protectedFiles];
   if (!lock.baseline || typeof lock.baseline !== 'object') lock.baseline = {};
+  if (!lock.frozen || typeof lock.frozen !== 'object') lock.frozen = { tokenHash: null, files: [] };
+  if (!Array.isArray(lock.frozen.files)) lock.frozen.files = [];
   return lock;
 };
 
@@ -107,15 +110,41 @@ if (ensureMissingBaselines(lock)) {
   save(lock);
 }
 
+const frozenSet = new Set((lock.frozen?.files || []).map(toPosixPath));
+const isFrozen = (file) => frozenSet.has(toPosixPath(file));
+
+const verifyFrozenToken = () => {
+  if (frozenSet.size === 0) return true;
+  const provided =
+    process.env.STABILITY_APPROVAL_TOKEN ||
+    (process.argv.find((a) => a.startsWith('--token=')) || '').slice(8);
+  if (!provided) return false;
+  const expected = lock.frozen?.tokenHash || '';
+  const hash = 'sha256:' + createHash('sha256').update(provided).digest('hex');
+  return hash === expected;
+};
+
 if (command === 'approve') {
+  const tokenOk = verifyFrozenToken();
   let approved = 0;
+  let skipped = [];
 
   for (const file of lock.protectedFiles.map(toPosixPath)) {
+    if (isFrozen(file) && !tokenOk) {
+      skipped.push(file);
+      continue;
+    }
     if (writeBaselineForFile(lock, file)) approved += 1;
   }
 
   save(lock);
   console.log(`✅ Stability baseline approved for ${approved} file(s).`);
+  if (skipped.length > 0) {
+    console.log('\n🔒 Frozen files skipped (missing/invalid STABILITY_APPROVAL_TOKEN):');
+    for (const f of skipped) console.log(`- ${f}`);
+    console.log('\nRe-run with: STABILITY_APPROVAL_TOKEN=<token> npm run stability:approve');
+    process.exit(2);
+  }
   process.exit(0);
 }
 
@@ -157,6 +186,10 @@ if (command === 'status') {
 
   if (drift.length === 0) {
     console.log('✅ Stability guard status: everything matches baseline.');
+    if (frozenSet.size > 0) {
+      console.log(`\n🔒 Frozen files (require STABILITY_APPROVAL_TOKEN to re-approve):`);
+      for (const f of frozenSet) console.log(`- ${f}`);
+    }
     process.exit(0);
   }
 

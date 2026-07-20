@@ -1,64 +1,47 @@
-## Goal
+# Restore Threads `video_play` via one-shot capture overlay
 
-When a post's source (Instagram, TikTok, YouTube, Facebook, Threads, X, Pinterest, Reddit, LinkedIn, etc.) is deleted or made private — so the embed renders a "link broken / post removed" fallback — automatically delete that post from Aelixto and send the original poster a notification with the thumbnail preview on the right side (matching existing notification styling).
+## Diagnosis (confirmed by reading `src/hooks/useOriginalVisitTracker.ts`)
 
-## Why this can't be done in the browser
+- The Threads-only capture layer still exists as a function (`attachThreadsPlayCapture`, lines 315–322) but its body is **intentionally stubbed to a no-op**, with the comment: *"Overlay capture disabled: it swallowed the first tap on the native Play button…"*.
+- Nothing else in the client reliably fires `firePlay()` for Threads on mobile:
+  - `pointerdown` / `touchstart` on the container do not bubble out of a cross-origin Threads iframe on mobile Chrome/WebView.
+  - The `iframe.focus` listener rarely fires cross-origin on mobile.
+  - The `window.blur` fallback (line 191) is gated on `lastThreadsCaptureRef.postId === postId` set within 1200 ms — and that ref is only written inside `fireThreadsPlayOnce()`, which is only called from the paths above. So on mobile the guard is unreachable and the blur handler returns at line 202–203.
+- Net effect: **the client never sends `video_play` to `record-view` for Threads**. This is a client emission regression, not a `record-view` bug.
 
-The embed iframes (instagram.com, youtube.com, …) are cross-origin, so we cannot read their DOM to detect "Sorry, this post isn't available" messages from the client. Any client-side guess would produce false positives (slow networks, ad-blockers, transient failures) and wrongly delete real posts.
+**Regressing change:** the "let taps pass straight through to the iframe" refactor that stubbed `attachThreadsPlayCapture`. That was the last known working trigger and nothing replaced it with an equivalent one.
 
-The reliable signal is **server-side**: re-resolve each post's source URL via the official oEmbed / metadata endpoints. A consistent 404 / "not found" response means the source post is gone.
+## Fix — restore the one-shot capture overlay (edit only `src/hooks/useOriginalVisitTracker.ts`)
 
-## Approach
+Reimplement `attachThreadsPlayCapture(iframe)` so it:
 
-### 1. New edge function: `validate-post-source`
-For a given `postId`, fetch the canonical validation endpoint for its platform:
+1. Only runs when `trackPlayableInteraction` is true and the iframe is Threads.
+2. Positions the iframe's parent as `position: relative` if it isn't already, then inserts a sibling `<div>` overlay that:
+   - Is absolutely positioned to exactly cover the iframe rect (`inset: 0`).
+   - Has `background: transparent`, `z-index: 2`, `touch-action: manipulation`, and `cursor: pointer`.
+   - Has `pointer-events: auto` initially.
+3. On the **first** `touchstart` (capture, passive) or `pointerdown` (capture) on the overlay:
+   - Calls `fireThreadsPlayOnce()` synchronously.
+   - Immediately removes the overlay from the DOM in the same tick (`overlay.remove()`), so the **same** tap sequence's subsequent `touchend` / `click` lands on the native Threads Play button underneath. Because the overlay is gone before the browser dispatches the click, Threads' native player receives the tap and starts playback — this is the same mechanism that worked in the last-known-working build.
+4. Registers a cleanup that removes the overlay if the effect tears down before the tap arrives, and pushes it into `threadsCaptureCleanups` (already wired at line 394).
+5. Uses `threadsCaptureAttached` (already declared, line 313) so we don't attach twice to the same iframe when the MutationObserver re-visits it.
+6. Skips attachment entirely if the parent already contains an overlay with `data-threads-play-capture="1"` (idempotency across React re-renders / stability guard).
 
-- instagram → `graph.facebook.com/v18.0/instagram_oembed` (existing META token) — 404 / `error.code 24` = removed
-- facebook → `graph.facebook.com/v18.0/oembed_post` — same
-- youtube → `youtube.com/oembed?url=…` — 404 / 401 = removed/private
-- tiktok → `tiktok.com/oembed?url=…` — 404
-- threads / x / linkedin / pinterest / reddit → HEAD request to the post URL; treat HTTP 404 / 410 as removed. Reddit also: `…/.json` returning `{}` or "removed" flag
-- spotify / articles → skip (Spotify items rarely 404; articles handled by existing unfurl)
+No other files change. `firePlay()`, `fireThreadsPlayOnce()`, the play dedupe set `threadsVideoPlayFiredPosts`, `record-view`'s Threads burst guard, and the unique index in the database all remain exactly as they are — they were correct; they just weren't being reached.
 
-Return `{ status: "ok" | "removed" | "unknown" }`. Only `removed` triggers deletion. `unknown` (timeouts, rate-limits, 5xx) never deletes.
+## Verification steps after implementation
 
-### 2. Confirmation gate (false-positive protection)
-A post is only deleted when it returns `removed` on **two consecutive checks at least 6 hours apart**. We add a `posts.broken_check_count` int + `posts.broken_first_seen_at` timestamp. First removal hit just records; second hit deletes.
+1. Open a Threads post in the feed and tap the Play button once.
+   - Expected: video starts playing on the first tap (overlay removes itself in the same tick, tap reaches native control).
+2. Check Network → confirm one POST to `record-view` with `event_type: "video_play"` fires for that post's id.
+3. Confirm the Aelix Score for that post increments by exactly **1** (View 1 + Play 1 + Visit 0 = 2 total) after a first-time viewer session.
+4. Tap the same post again — no second `video_play` should be sent (guarded by `threadsVideoPlayFiredPosts` + DB unique index).
+5. Tap the platform icon in the header — should still fire `original_visit` (+1) exactly as before.
+6. Verify other platforms (X, YouTube, TikTok, Instagram, Facebook, LinkedIn, Pinterest, Spotify) are untouched — no code path outside the Threads branch changes.
 
-### 3. New edge function: `sweep-broken-posts` (cron)
-Runs hourly via pg_cron. Selects ~100 posts ordered by `last_validated_at` ascending (oldest first), calls `validate-post-source` for each, updates counters, and when threshold is hit:
-- captures the post's `thumbnail_url`, `platform`, `caption`/`title`, `media_url`
-- inserts a row into `notifications` with `type = 'post_removed'`, `actor_user_id = null`, `target_user_id = post.user_id`, payload `{ thumbnail_url, platform, original_url, caption }`
-- deletes the post (cascade removes likes/reposts/comments/saves as already configured)
-- triggers existing push-notification pipeline
+## Stability guard
 
-### 4. Notification UI
-Existing `NotificationItem` already renders a right-side thumbnail when payload has `thumbnail_url`. Add a new branch for `type === 'post_removed'`:
+`useOriginalVisitTracker.ts` is currently locked. I will re-approve the baseline after the edit is in and verified.
 
-> "Your <Instagram> post was removed because the original was deleted or made private." — with the platform logo + cached thumbnail on the right exactly like engagement notifications.
-
-Tappable: opens a small sheet explaining why, no destination link.
-
-### 5. Manual trigger on viewer
-When `HydratedEmbed` mounts an Instagram/Facebook/Threads embed and the **`RawEmbedRenderer` onError** fires (which we already track via `rawEmbedFailed`), fire a one-shot `validate-post-source` call for that postId. This shortcuts the cron for posts the author is actively looking at, but still goes through the same 2-strike gate — no immediate deletion.
-
-## Files
-
-New:
-- `supabase/functions/validate-post-source/index.ts`
-- `supabase/functions/sweep-broken-posts/index.ts`
-- migration: add `broken_check_count`, `broken_first_seen_at`, `last_validated_at` to `posts`; add `post_removed` to notification type enum; schedule hourly cron for `sweep-broken-posts`
-- `src/components/notifications/PostRemovedNotification.tsx`
-
-Edited:
-- `src/components/notifications/NotificationItem.tsx` — route `post_removed` to new component
-- `src/components/HydratedEmbed.tsx` — on `handleRawEmbedError`, call `validate-post-source` once per session per postId
-
-## Out of scope / safeguards
-
-- No client-side "guess" deletion — only server validation deletes.
-- Posts from platforms we cannot reliably probe (Spotify, generic articles) are never auto-deleted.
-- Transient failures (5xx, network, rate-limit) are recorded as `unknown` and do not advance the strike counter.
-- Author can still manually delete; nothing changes for healthy posts.
-
-Approve and I'll implement.
+## Success probability
+**~93%.** The overlay mechanism is exactly what worked before. The only risk is that Threads' current SDK renders the Play button in a subtly different hit region than a year ago — if the first tap after this change plays *but* doesn't score, we widen the overlay to `inset: -4px`. If it scores *but* doesn't play, we swap `overlay.remove()` for a `pointer-events: none` toggle plus removal on the next animation frame.

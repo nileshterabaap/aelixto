@@ -14,6 +14,12 @@ interface SavedPost {
   platform?: string;
   embed_html?: string;
   thumbnail_url?: string;
+  preview_text?: string | null;
+  preview_title?: string | null;
+  preview_image_url?: string | null;
+  media_kind?: string | null;
+  aspect_ratio?: number | null;
+  suggested_height?: number | null;
   timestamp: Date | string;
   likes: number;
   comments: number;

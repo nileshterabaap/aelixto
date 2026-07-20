@@ -48,7 +48,7 @@ export default function SavedPosts() {
             id, user_id, content, created_at, likes_count, saves_count,
             comments_count, reposts_count, media_type, media_url,
             platform, embed_html, thumbnail_url, title, preview_text,
-            preview_title, preview_image_url, is_public,
+            preview_title, preview_image_url, media_kind, aspect_ratio, suggested_height, is_public,
             profiles:user_id (username, display_name, avatar_url)
           )
         `)
@@ -75,6 +75,9 @@ export default function SavedPosts() {
             preview_text: post.preview_text,
             preview_title: post.preview_title,
             preview_image_url: post.preview_image_url,
+            media_kind: post.media_kind,
+            aspect_ratio: post.aspect_ratio,
+            suggested_height: post.suggested_height,
             timestamp: new Date(post.created_at),
             likes: post.likes_count || 0,
             comments: post.comments_count || 0,
@@ -155,23 +158,25 @@ export default function SavedPosts() {
 
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="container max-w-2xl mx-auto px-4 py-6 animate-fade-in">
-          <h1 className="text-2xl font-bold mb-4">Saved</h1>
-
           {/* Tabs */}
-          <div className="flex gap-1 mb-6 bg-muted rounded-xl p-1">
-            {(["all", "collections", "drafts"] as const).map((tab) => (
+          <div className="flex gap-1 mb-6 bg-muted/60 rounded-full p-1.5">
+            {([
+              { key: "drafts", label: "Drafts" },
+              { key: "all", label: "Saved" },
+              { key: "collections", label: "Collection" },
+            ] as const).map(({ key, label }) => (
               <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize ${
-                  activeTab === tab
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground"
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`flex-1 py-2.5 text-[15px] rounded-full transition-all ${
+                  activeTab === key
+                    ? "bg-background text-foreground shadow-sm font-semibold"
+                    : "text-muted-foreground font-medium"
                 }`}
               >
-                {tab === "drafts" && drafts.length > 0
+                {key === "drafts" && drafts.length > 0
                   ? `Drafts (${drafts.length})`
-                  : tab}
+                  : label}
               </button>
             ))}
           </div>

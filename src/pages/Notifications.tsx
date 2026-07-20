@@ -10,6 +10,7 @@ import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 const getNotificationIcon = (type: string) => {
   switch (type) {
@@ -39,7 +40,7 @@ const getNotificationMessage = (type: string) => {
     case 'follow':
       return 'started following you';
     case 'follow_request':
-      return 'requested to follow you';
+      return 'asked to Follow';
     default:
       return 'interacted with you';
   }
@@ -56,11 +57,14 @@ const NotificationItem = ({
   const [resolved, setResolved] = useState<"deleted" | "kept" | null>(null);
   const [reqBusy, setReqBusy] = useState<"approve" | "decline" | null>(null);
   const [reqResolved, setReqResolved] = useState<"approved" | "declined" | null>(null);
+  const queryClient = useQueryClient();
   const { icon: Icon, bgColor, iconColor } = getNotificationIcon(notification.type);
   const message = getNotificationMessage(notification.type);
-  const actorName = notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
   const isReportOutcome = notification.type === 'report_outcome';
   const isFollowRequest = notification.type === 'follow_request';
+  const actorName = isFollowRequest && notification.actor?.username
+    ? `@${notification.actor.username}`
+    : notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
   const outcome = notification.metadata?.action as 'removed' | 'kept' | undefined;
   const reportKind = notification.metadata?.kind as
     | 'report_outcome'
@@ -99,6 +103,10 @@ const NotificationItem = ({
       return;
     }
     setReqResolved("approved");
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["notification-count"] });
+    queryClient.invalidateQueries({ queryKey: ["profile"] });
+    queryClient.invalidateQueries({ queryKey: ["user-profile"] });
     setReqBusy(null);
   };
 
@@ -116,6 +124,10 @@ const NotificationItem = ({
       return;
     }
     setReqResolved("declined");
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["notification-count"] });
+    queryClient.invalidateQueries({ queryKey: ["profile"] });
+    queryClient.invalidateQueries({ queryKey: ["user-profile"] });
     setReqBusy(null);
   };
 
@@ -143,10 +155,8 @@ const NotificationItem = ({
   return (
     <div 
       onClick={handleClick}
-      className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 ${
-        notification.is_read 
-          ? 'bg-card hover:border-primary/50' 
-          : 'bg-primary/5 border-primary/20 hover:bg-primary/10'
+      className={`glass-post-card p-4 rounded-xl cursor-pointer transition-all duration-200 ${
+        notification.is_read ? '' : 'ring-1 ring-primary/20'
       }`}
     >
       <div className="flex gap-3">
@@ -232,14 +242,14 @@ const NotificationItem = ({
                     disabled={reqBusy !== null}
                     className="text-xs font-medium px-3 py-1.5 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition disabled:opacity-50"
                   >
-                    {reqBusy === "approve" ? "Approving…" : "Approve"}
+                    {reqBusy === "approve" ? "Alright…" : "Alright"}
                   </button>
                   <button
                     onClick={handleDeclineFollow}
                     disabled={reqBusy !== null}
                     className="text-xs font-medium px-3 py-1.5 rounded-full bg-muted hover:bg-muted/70 transition disabled:opacity-50"
                   >
-                    {reqBusy === "decline" ? "Declining…" : "Decline"}
+                    {reqBusy === "decline" ? "Sorry…" : "Sorry"}
                   </button>
                 </>
               )}
@@ -267,7 +277,7 @@ const NotificationItem = ({
 };
 
 const NotificationSkeleton = () => (
-  <div className="p-4 rounded-xl border bg-card">
+  <div className="glass-post-card p-4 rounded-xl">
     <div className="flex gap-3">
       <Skeleton className="h-10 w-10 rounded-full shrink-0" />
       <div className="flex-1 space-y-2">

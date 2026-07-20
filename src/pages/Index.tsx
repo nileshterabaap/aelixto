@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { CheckCircle2 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
@@ -14,11 +13,13 @@ import { useSession } from "@/hooks/useSession";
 import { useFeedAnchorRestoration } from "@/hooks/useFeedAnchorRestoration";
 import { useMarkPostSeen } from "@/hooks/useMarkPostSeen";
 
-import { useQueryClient } from "@tanstack/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 import { SwipeableView } from "@/components/SwipeableView";
+import { markScrolledPast, reorderBySlowness, subscribeEmbedReadiness } from "@/lib/embedReadiness";
+import { useFeedWithAds } from "@/hooks/useFeedWithAds";
+import { NativeFeedAd } from "@/components/ads/NativeFeedAd";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -27,49 +28,54 @@ const Index = () => {
   const hasRenderedOnce = useRef(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
-  const { setObservedPostElement, flushNow } = useMarkPostSeen(user?.id);
+  const { observePost } = useMarkPostSeen(user?.id);
 
-  // Check if the user follows anyone (to differentiate empty state)
-  const { data: followingCount } = useQuery({
-    queryKey: ['following-count', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return 0;
-      const { count } = await supabase
-        .from('follows')
-        .select('*', { count: 'exact', head: true })
-        .eq('follower_id', user.id);
-      return count ?? 0;
-    },
-    enabled: Boolean(user?.id),
+  // How many people does this user follow? Used to differentiate the
+  // "Nothing here yet" (no follows) vs "No posts yet" (follows have no posts) states.
+  const seenFeedStorageKey = user?.id ? `aelixto-has-had-feed:${user.id}` : null;
+  const [hasHadFeedPosts, setHasHadFeedPosts] = useState(false);
+
+  useEffect(() => {
+    if (!seenFeedStorageKey) {
+      setHasHadFeedPosts(false);
+      return;
+    }
+    setHasHadFeedPosts(window.localStorage.getItem(seenFeedStorageKey) === "1");
+  }, [seenFeedStorageKey]);
+
+  const { data: followingCount, isLoading: followingCountLoading, isError: followingCountError } = useQuery({
+    queryKey: ["my-following-count", user?.id],
+    enabled: !!user?.id,
     staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_following_count" as any);
+      if (error) throw error;
+      return Number(data ?? 0);
+    },
   });
 
-  // Check if followings have any public posts at all (ignoring seen state).
-  // If yes but feed is empty → user has caught up on everything.
-  const { data: followingHasAnyPosts } = useQuery({
-    queryKey: ['following-has-posts', user?.id],
+  // Has the viewer seen any posts? Used to differentiate "no posts yet"
+  // (follows haven't posted anything) from "all caught up" (everything seen).
+  const { data: hasSeenAnyPosts } = useQuery({
+    queryKey: ["has-seen-any-posts", user?.id],
+    enabled: !!user?.id,
+    staleTime: 0,
+    refetchOnMount: "always",
     queryFn: async () => {
-      if (!user?.id) return false;
-      const { data: follows } = await supabase
-        .from('follows')
-        .select('following_id')
-        .eq('follower_id', user.id);
-      const ids = (follows ?? []).map((f) => f.following_id);
-      ids.push(user.id);
-      const { count } = await supabase
-        .from('posts')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_public', true)
-        .in('user_id', ids);
+      const { count } = await (supabase as any)
+        .from("post_seen")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user!.id)
+        .limit(1);
       return (count ?? 0) > 0;
     },
-    enabled: Boolean(user?.id),
-    staleTime: 60_000,
   });
   
   
-  // Demo feed for signed-out users
-  const { data: demoPostsData, isLoading: demoLoading } = usePosts();
+  // Demo feed for signed-out users — only fetched when actually shown
+  const isDemoModeEnv = import.meta.env.VITE_DEMO_MODE === "true";
+  const enableDemoFetch = !user && isDemoModeEnv;
+  const { data: demoPostsData, isLoading: demoLoading } = usePosts({ enabled: enableDemoFetch });
 
   // Following feed for signed-in users
   const {
@@ -78,10 +84,9 @@ const Index = () => {
     loading: followingLoading,
     loadMore,
     hasMore,
-    reachedEnd,
-  } = useFollowingFeed(user?.id);
+  } = useFollowingFeed();
 
-  const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
+  const isDemoMode = isDemoModeEnv;
   const isSignedOut = !user;
   const showDemoFeed = isSignedOut && isDemoMode;
 
@@ -105,6 +110,12 @@ const Index = () => {
         mediaType: post.media_type as "image" | "video" | "none",
         mediaUrl: post.media_url || undefined,
         thumbnailUrl: post.thumbnail_url || undefined,
+        preview_text: post.preview_text,
+        preview_title: post.preview_title,
+        preview_image_url: post.preview_image_url,
+        aspect_ratio: (post as any).aspect_ratio,
+        media_kind: (post as any).media_kind,
+        suggested_height: (post as any).suggested_height,
         platform: post.platform as
           | "youtube"
           | "instagram"
@@ -115,9 +126,9 @@ const Index = () => {
         embed_html: post.embed_html,
         timestamp: new Date(post.created_at),
         saves: post.saves_count,
-        likes_count: post.likes_count || 0,
-        comments_count: post.comments_count || 0,
-        hide_likes: post.profiles?.settings?.hide_likes || false,
+        likes_count: (post as any).likes_count || 0,
+        comments_count: (post as any).comments_count || 0,
+        hide_likes: (post.profiles as any)?.settings?.hide_likes || false,
         isRealPost: true,
       }))
       .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
@@ -142,6 +153,12 @@ const Index = () => {
       mediaType: post.media_type as "image" | "video" | "none",
       mediaUrl: post.media_url || undefined,
       thumbnailUrl: post.thumbnail_url || undefined,
+      preview_text: post.preview_text,
+      preview_title: post.preview_title,
+      preview_image_url: post.preview_image_url,
+      suggested_height: post.suggested_height,
+      aspect_ratio: post.aspect_ratio,
+      media_kind: post.media_kind,
       platform: post.platform as
         | "youtube"
         | "instagram"
@@ -158,84 +175,90 @@ const Index = () => {
       isRealPost: true,
       isRepost: post.is_repost,
       repostedByUsername: post.reposted_by_username,
-      media_kind: post.media_kind,
-      aspect_ratio: post.aspect_ratio,
-      suggested_height: post.suggested_height,
     }));
   }, [followingPosts, showDemoFeed]);
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
-  
+
+  // Subscribe to embed readiness so the feed reflows when slow posts time out
+  // or when previously-slow posts finish loading.
+  const [readinessTick, setReadinessTick] = useState(0);
+  useEffect(() => subscribeEmbedReadiness(() => setReadinessTick((t) => t + 1)), []);
+
+  // Reordered feed: posts whose embeds are still loading past the slow threshold
+  // sink below faster ones, but only for posts the user hasn't already committed
+  // to (rendered successfully or scrolled past).
+  const displayPosts = useMemo(
+    () => reorderBySlowness(allPosts as Array<{ id: string } & Record<string, any>>),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allPosts, readinessTick]
+  ) as typeof allPosts;
+
+  // Mark posts as "scrolled past" so they lock in place and never reshuffle
+  // under the user's eyes once they've moved beyond them.
+  const pastObserverRef = useRef<IntersectionObserver | null>(null);
+  useEffect(() => {
+    pastObserverRef.current = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = entry.target.getAttribute("data-feed-item-id");
+          if (!id) continue;
+          // boundingClientRect.bottom < 0 means the whole item is above the viewport top.
+          if (!entry.isIntersecting && entry.boundingClientRect.bottom < 0) {
+            markScrolledPast(id);
+          }
+        }
+      },
+      { rootMargin: "0px", threshold: 0 }
+    );
+    return () => pastObserverRef.current?.disconnect();
+  }, []);
+  const observeForPast = useCallback((el: HTMLElement | null) => {
+    const obs = pastObserverRef.current;
+    if (!obs || !el) return;
+    obs.observe(el);
+  }, []);
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
-    useMemo(() => allPosts.map((p) => p.id), [allPosts])
+    useMemo(() => displayPosts.map((p) => p.id), [displayPosts])
   );
 
+  // Interleave native ads after every N posts (only for eligible native users).
+  const feedWithAds = useFeedWithAds(displayPosts as Array<{ id: string } & Record<string, any>>);
+
   useEffect(() => {
-    if (sessionLoading || user || isDemoMode) return;
-    // Guard against a brief flash to /auth before the persisted Supabase
-    // session is rehydrated. If a token exists in localStorage, wait for
-    // onAuthStateChange to populate the user instead of redirecting.
-    let hasStoredToken = false;
-    try {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith("sb-") && k.endsWith("-auth-token")) {
-          hasStoredToken = true;
-          break;
-        }
-      }
-    } catch {
-      // ignore
+    if (!sessionLoading && !user && !isDemoMode) {
+      navigate("/auth");
     }
-    if (hasStoredToken) return;
-    navigate("/auth");
   }, [user, sessionLoading, isDemoMode, navigate]);
 
   // Mark first render complete to prevent flicker on subsequent renders
   useEffect(() => {
     if (allPosts.length > 0) {
       hasRenderedOnce.current = true;
+      if (seenFeedStorageKey) {
+        window.localStorage.setItem(seenFeedStorageKey, "1");
+        setHasHadFeedPosts(true);
+        queryClient.setQueryData(["has-seen-any-posts", user?.id], true);
+      }
     }
-  }, [allPosts.length]);
+  }, [allPosts.length, queryClient, seenFeedStorageKey, user?.id]);
 
   const handleRefresh = useCallback(async () => {
-    // Mark only posts the user actually saw, then clear any persisted/stale
-    // feed cache so refresh always asks the backend for the latest eligible feed.
-    try {
-      await flushNow();
-    } catch {
-      // best-effort — proceed with reload regardless
-    }
-
     await Promise.all([
-      queryClient.cancelQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.cancelQueries({ queryKey: ['following-has-posts', user?.id] }),
+      queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] }),
+      queryClient.invalidateQueries({ queryKey: ["my-following-count", user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ["has-seen-any-posts", user?.id] }),
     ]);
-
-    queryClient.removeQueries({ queryKey: ['following-feed', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-count', user?.id] });
-    queryClient.removeQueries({ queryKey: ['following-has-posts', user?.id] });
-
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['following-feed', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-count', user?.id] }),
-      queryClient.invalidateQueries({ queryKey: ['following-has-posts', user?.id] }),
-    ]);
-
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    window.location.reload();
-    await new Promise(() => {});
-  }, [flushNow, queryClient, user?.id]);
+  }, [queryClient, showDemoFeed, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
   // attached to that specific post so nothing fetches until it's actually
   // needed — and no loader is ever shown.
   const PREFETCH_OFFSET = 7;
-  const prefetchTriggerIndex = Math.max(0, allPosts.length - PREFETCH_OFFSET);
+  const prefetchTriggerIndex = Math.max(0, displayPosts.length - PREFETCH_OFFSET);
   const prefetchSentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!hasMore || showDemoFeed) return;
@@ -249,13 +272,20 @@ const Index = () => {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
+  }, [hasMore, loadMore, showDemoFeed, displayPosts.length, prefetchTriggerIndex]);
 
   // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
   const shouldShowSkeleton = !hasRenderedOnce.current && (sessionLoading || loading) && allPosts.length === 0;
+  const hasKnownSeenPosts = Boolean(hasSeenAnyPosts || hasHadFeedPosts);
+  const shouldWaitForEmptyState =
+    !showDemoFeed &&
+    followingEmpty &&
+    !hasKnownSeenPosts &&
+    (followingCountLoading || followingCount === undefined) &&
+    !followingCountError;
 
-  if (shouldShowSkeleton) {
+  if (shouldShowSkeleton || shouldWaitForEmptyState) {
     return (
       <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
         <div className="min-h-screen bg-background pb-20">
@@ -280,79 +310,78 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
-            followingCount === undefined || followingHasAnyPosts === undefined ? (
-              // Empty-state classifier queries haven't resolved yet —
-              // render nothing to avoid a flash of the wrong message.
-              <div className="py-16" />
-            ) : followingCount === 0 ? (
+            followingCount === 0 && !hasKnownSeenPosts && !followingCountError ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <h3 className="text-lg font-semibold">Nothing here yet 👀</h3>
-                <p className="text-sm text-muted-foreground mt-1 mb-4">
-                  No algorithm should decide your feed.. only your follows do.
+                <h2 className="text-xl font-semibold">Nothing here yet 👀</h2>
+                <p className="text-sm text-muted-foreground mt-2">
+                  No algorithm should decide your feed..
                 </p>
-                <Link to="/discover" className="text-sm font-medium text-primary">
+                <p className="text-sm text-muted-foreground mt-1">
+                  only your follows do.
+                </p>
+                <Link
+                  to="/discover"
+                  className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
+                >
                   Discover people to follow
                 </Link>
               </div>
-            ) : followingHasAnyPosts && reachedEnd ? (
+            ) : hasKnownSeenPosts ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
-                <h3 className="text-lg font-semibold">You're all caught up</h3>
-                <p className="text-sm text-muted-foreground mt-1">
+                <CheckCircle2 className="h-10 w-10 text-primary mb-3" strokeWidth={1.5} />
+                <h2 className="text-xl font-semibold">You're all caught up</h2>
+                <p className="text-sm text-muted-foreground mt-2">
                   You've seen all recent posts from people you follow.
                 </p>
               </div>
-            ) : followingHasAnyPosts ? (
-              <div className="py-16" />
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
-                <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
-                <h3 className="text-lg font-semibold">No posts yet</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  People you follow haven't posted anything yet. Check back soon.
+                <h2 className="text-xl font-semibold">No posts yet</h2>
+                <p className="text-sm text-muted-foreground mt-2">
+                  The people you follow haven't posted anything yet.
                 </p>
               </div>
             )
           ) : (
             <div className="space-y-6">
-              {allPosts.map((post, index) => (
-                <div 
-                  key={post.id} 
-                  ref={(el) => {
-                    registerItem(post.id)(el);
-                    if (!showDemoFeed) {
-                      setObservedPostElement(post.id, el as HTMLDivElement | null);
-                    }
-                    if (index === prefetchTriggerIndex) {
-                      prefetchSentinelRef.current = el;
-                    }
-                  }}
-                  data-feed-item-id={post.id}
-                >
-                  <FeedPost 
-                    post={post} 
-                    userId={user?.id} 
-                    startHydrated={index < 4}
-                  />
-                </div>
-              ))}
+              {feedWithAds.map((item) => {
+                if (item.kind === 'ad') {
+                  return <NativeFeedAd key={`ad-${item.slotIndex}`} />;
+                }
+                const post = item.post as any;
+                const index = item.slotIndex;
+                return (
+                  <div
+                    key={post.id}
+                    ref={(el) => {
+                      registerItem(post.id)(el);
+                      if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
+                      if (el) observeForPast(el);
+                      if (index === prefetchTriggerIndex) {
+                        prefetchSentinelRef.current = el;
+                      }
+                    }}
+                    data-feed-item-id={post.id}
+                  >
+                    <FeedPost
+                      post={post}
+                      userId={user?.id}
+                      startHydrated={index < 4}
+                    />
+                  </div>
+                );
+              })}
               {/* No visible loader — pagination happens silently far before
                   the user reaches the end. */}
               {/* All caught up message */}
-              {reachedEnd && !hasMore && !showDemoFeed && allPosts.length > 0 && (
-                <motion.div
-                  className="flex flex-col items-center justify-center pt-24 pb-10 text-center"
-                  initial={{ opacity: 0, y: 32 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, amount: 0.6 }}
-                  transition={{ type: 'spring', stiffness: 180, damping: 22 }}
-                >
+              {!hasMore && !showDemoFeed && allPosts.length > 0 && (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
                   <CheckCircle2 className="h-10 w-10 text-primary mb-3" />
                   <h3 className="text-lg font-semibold">You're all caught up</h3>
                   <p className="text-sm text-muted-foreground mt-1">
                     You've seen all recent posts from people you follow.
                   </p>
-                </motion.div>
+                </div>
               )}
             </div>
           )}

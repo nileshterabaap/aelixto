@@ -58,9 +58,16 @@ const Messages = () => {
             <div className="space-y-1">
               {conversations.map((conversation, i) => {
                 const hasUnread = conversation.unread_count > 0;
-                const lastContent = conversation.last_message?.content || "";
-                const isPostShare = /^https?:\/\/.+\/post\/[a-f0-9-]{36}$/.test(lastContent.trim());
-                const displayContent = isPostShare ? "Sent a post" : lastContent;
+                const rawContent = conversation.last_message?.content || "";
+                // Strip reply prefix: "↪️__REPLY__:<uuid>\n<body>"
+                const replyStripped = rawContent.replace(
+                  /^↪️__REPLY__:[a-f0-9-]{36}\n?/,
+                  ""
+                );
+                const isPostShare = /^https?:\/\/.+\/post\/[a-f0-9-]{36}$/.test(
+                  replyStripped.trim()
+                );
+                const displayContent = isPostShare ? "Sent a post" : replyStripped;
                 const lastMessagePreview = conversation.last_message
                   ? conversation.last_message.sender_id === user?.id
                     ? `You: ${displayContent}`
@@ -73,7 +80,7 @@ const Messages = () => {
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: Math.min(i * 0.06, 0.5), ease: [0.4, 0, 0.2, 1] }}
-                    className={`flex items-center gap-4 p-4 rounded-lg cursor-pointer transition-colors hover:bg-accent ${
+                    className={`press-in flex items-center gap-4 p-4 rounded-lg cursor-pointer transition-colors hover:bg-accent ${
                       hasUnread ? "bg-accent/50" : ""
                     }`}
                     onClick={() => navigate(`/conversation/${conversation.id}`)}
