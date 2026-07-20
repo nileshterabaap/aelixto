@@ -46,7 +46,7 @@ interface UseFollowingFeedResult {
 
 const PAGE_SIZE = 20;
 const fetchFeedPage = async (cursor?: string) => {
-  const { data, error } = await supabase.rpc('get_following_feed_v3', {
+  const { data, error } = await supabase.rpc('get_following_feed', {
     limit_count: PAGE_SIZE,
     cursor_key: cursor || null,
   } as any);
@@ -103,7 +103,6 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
   const {
     data,
     isLoading: feedLoading,
-    isFetching,
     error: feedError,
     fetchNextPage,
     hasNextPage,
@@ -113,10 +112,10 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 0, // feed depends on seen-state; always verify fresh data
+    staleTime: 2 * 60 * 1000, // 2 minutes - then background refetch
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: 'always',
+    refetchOnMount: true, // refetch if stale on mount/page reload
     refetchOnReconnect: true,
     structuralSharing: true,
   });
@@ -162,8 +161,8 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
 
   return {
     items,
-    empty: !feedLoading && !isFetching && items.length === 0,
-    loading: feedLoading || (isFetching && items.length === 0),
+    empty: !feedLoading && items.length === 0,
+    loading: feedLoading,
     error: feedError?.message ?? null,
     loadMore,
     hasMore: hasNextPage ?? false,

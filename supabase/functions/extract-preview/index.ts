@@ -6,24 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// SSRF Protection: block internal / private network targets
-function isValidExternalUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
-    const hostname = parsed.hostname.toLowerCase();
-    const blocked = ['localhost', 'metadata.google.internal', 'metadata.google', '169.254.169.254', 'instance-data'];
-    if (blocked.includes(hostname)) return false;
-    const privateIp = [
-      /^127\./, /^10\./, /^172\.(1[6-9]|2[0-9]|3[0-1])\./, /^192\.168\./,
-      /^169\.254\./, /^0\./, /^::1$/, /^fc00:/, /^fe80:/, /^fd/,
-    ];
-    return !privateIp.some((r) => r.test(hostname));
-  } catch {
-    return false;
-  }
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -35,13 +17,6 @@ serve(async (req) => {
     if (!url) {
       return new Response(
         JSON.stringify({ error: 'Missing url parameter' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!isValidExternalUrl(url)) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or disallowed URL' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -14,14 +14,11 @@ import facebookIcon from "@/assets/platforms/facebook.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import redditIcon from "@/assets/platforms/reddit.svg";
 import tiktokIcon from "@/assets/platforms/tiktok.svg";
-import pinterestIcon from "@/assets/platforms/pinterest.svg";
-import articlesIcon from "@/assets/platforms/articles.svg";
 
 const PLATFORM_ICONS: Record<string, string> = {
   instagram: instagramIcon, youtube: youtubeIcon, x: xIcon, twitter: xIcon,
   spotify: spotifyIcon, medium: mediumIcon, threads: threadsIcon,
   facebook: facebookIcon, linkedin: linkedinIcon, reddit: redditIcon, tiktok: tiktokIcon,
-  pinterest: pinterestIcon, article: articlesIcon,
 };
 
 const PLATFORM_GRADIENTS: Record<string, string> = {
@@ -89,7 +86,7 @@ function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void
     return (
       <button
         onClick={onClick}
-        className="press-in relative overflow-hidden rounded-2xl aspect-square block"
+        className="relative overflow-hidden rounded-2xl aspect-square block"
       >
         <TextCardThumbnail
           platform={post.platform}
@@ -105,7 +102,7 @@ function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void
   }
 
   return (
-    <button onClick={onClick} className="press-in relative overflow-hidden rounded-2xl aspect-square bg-muted/50 group">
+    <button onClick={onClick} className="relative overflow-hidden rounded-2xl aspect-square bg-muted/50 group">
       {!imageLoaded && (
         <div className="absolute inset-0 bg-muted/70 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-muted before:to-transparent before:animate-shimmer" />
       )}
