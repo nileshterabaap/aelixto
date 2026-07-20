@@ -134,10 +134,10 @@ export const PinterestEmbed = ({ url, postId, suggestedHeight }: PinterestEmbedP
             onLoad={() => setIframeLoaded(true)}
           />
         </div>
-        <div
-          className="flex items-center gap-3 p-3 cursor-pointer hover:opacity-80 transition-opacity"
-          onClick={() => window.open(resolvedUrl, '_blank', 'noopener,noreferrer')}
-        >
+        {/* Non-interactive label; opening the original post is handled by the
+            platform icon in the post header so the Aelix Score credits the
+            visit (matches the X/Threads behavior). */}
+        <div className="flex items-center gap-3 p-3">
           <img src={pinterestIcon} alt="Pinterest" className="w-6 h-6 flex-shrink-0" />
           <p className="text-xs text-muted-foreground">View on Pinterest</p>
         </div>
@@ -145,13 +145,11 @@ export const PinterestEmbed = ({ url, postId, suggestedHeight }: PinterestEmbedP
     );
   }
 
-  // Fallback: no pin ID extracted, show a link
+  // Fallback: no pin ID extracted — show a static label. The platform icon
+  // in the post header is the single source of the "visit original" action.
   return (
     <div data-embed-status="ready">
-      <div 
-        className="rounded-xl overflow-hidden border border-border bg-card cursor-pointer hover:opacity-95 transition-opacity max-w-[500px] mx-auto p-4"
-        onClick={() => window.open(resolvedUrl, '_blank', 'noopener,noreferrer')}
-      >
+      <div className="rounded-xl overflow-hidden border border-border bg-card max-w-[500px] mx-auto p-4">
         <div className="flex items-center gap-3">
           <img src={pinterestIcon} alt="Pinterest" className="w-6 h-6 flex-shrink-0" />
           <p className="text-sm text-muted-foreground">View on Pinterest</p>
