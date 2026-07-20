@@ -46,7 +46,7 @@ const revealedPostsCache = new Set<string>();
 // Hydrate posts well ahead of the viewport so the next ~6–7 posts in the
 // feed are always ready to display the moment the user scrolls to them.
 const HYDRATION_ROOT_MARGIN = '4500px 0px';
-const captionHydrationRequested = new Set<string>();
+const facebookCaptionHydrationRequested = new Set<string>();
 
 interface HydratedFeedPostProps {
   post: Post & { isRealPost?: boolean; isRepost?: boolean; repostedByUsername?: string };
@@ -437,27 +437,20 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   }, [post.id]);
 
   useEffect(() => {
-    const isHydratablePlatform =
-      detectedPlatform === 'facebook' || detectedPlatform === 'linkedin';
-    const captionLooksClipped =
-      !!originalPostCaption &&
-      (/(?:\.\.\.|…)\s*$/.test(originalPostCaption) || originalPostCaption.length < 220);
-    const needsHydration =
-      isHydratablePlatform &&
+    const needsFacebookHydration =
+      detectedPlatform === 'facebook' &&
       !!mediaUrl &&
-      (!originalPostCaption ||
-        (detectedPlatform === 'linkedin' && captionLooksClipped) ||
-        (!thumbnailUrl && !previewImageUrl));
-    if (!needsHydration) return;
-    if (captionHydrationRequested.has(post.id)) return;
-    captionHydrationRequested.add(post.id);
+      (!originalPostCaption || (!thumbnailUrl && !previewImageUrl));
+    if (!needsFacebookHydration) return;
+    if (facebookCaptionHydrationRequested.has(post.id)) return;
+    facebookCaptionHydrationRequested.add(post.id);
 
     supabase.functions
       .invoke('fetch-post-preview', {
         body: {
           postId: post.isRealPost ? post.id : undefined,
           url: mediaUrl,
-          platform: detectedPlatform,
+          platform: 'facebook',
           previewOnly: !post.isRealPost,
         },
       })
@@ -466,14 +459,14 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
           previewText: data?.preview_text,
           title: data?.title,
           userCaption: post.content,
-          platform: detectedPlatform,
+          platform: 'facebook',
         });
         if (recovered) setHydratedSourceCaption(recovered);
         const recoveredImage = data?.thumbnail_url || data?.preview_image_url;
         if (recoveredImage && !thumbnailUrl && !previewImageUrl) setHydratedPreviewImageUrl(recoveredImage);
       })
       .catch(() => {
-        captionHydrationRequested.delete(post.id);
+        facebookCaptionHydrationRequested.delete(post.id);
       });
   }, [detectedPlatform, originalPostCaption, mediaUrl, post.id, post.isRealPost, post.content, thumbnailUrl, previewImageUrl]);
 
@@ -603,10 +596,6 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
       {(() => {
         if (!originalPostCaption) return null;
-        // Reddit's own embed already renders the post title/body and a
-        // "Read more" toggle. Showing the same text above the iframe
-        // duplicates it, so skip the original caption for Reddit.
-        if (detectedPlatform === 'reddit') return null;
         return (
           <div className="px-5 pb-3">
             <CollapsibleCaption

@@ -41,19 +41,7 @@ const stripPageBootstrapDumpTail = (value: string) => {
 };
 
 const normalizeCaption = (value: string) =>
-  stripPageBootstrapDumpTail(decodeHtmlEntities(value))
-    // Normalise Windows / Mac line endings.
-    .replace(/\r\n?/g, '\n')
-    // Treat various unicode line/paragraph separators as plain newlines so
-    // the visible paragraph breaks from the source post survive.
-    .replace(/[\u2028\u2029]/g, '\n')
-    // Collapse horizontal whitespace runs (spaces / tabs) only — keep \n.
-    .replace(/[ \t\f\v]+/g, ' ')
-    // Trim spaces around each newline.
-    .replace(/[ \t]*\n[ \t]*/g, '\n')
-    // Cap consecutive blank lines at one (i.e. max double-newline).
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  stripPageBootstrapDumpTail(decodeHtmlEntities(value)).replace(/\s+/g, ' ').trim();
 
 const looksClipped = (value: string) => /(?:\.\.\.|…)\s*$/u.test(value.trim());
 
@@ -125,14 +113,14 @@ export const getOriginalPostCaption = ({
   const platformKey = (platform || '').toLowerCase();
 
   let candidate = rawPreview && !isJunkSourceCaption(rawPreview) ? rawPreview : '';
-  const titleCandidate = ['facebook', 'reddit', 'threads', 'twitter', 'x', 'tiktok', 'linkedin'].includes(platformKey)
+  const titleCandidate = ['facebook', 'reddit', 'threads', 'twitter', 'x', 'tiktok'].includes(platformKey)
     ? extractOriginalCaptionFromSourceTitle({ title, platform: platformKey })
     : '';
 
   // Facebook often gives a short OG description (~200 chars) but the oEmbed
   // title contains the complete original caption. If the preview text is
   // clipped, prefer the longer title-derived source caption.
-  if ((platformKey === 'facebook' || platformKey === 'linkedin') && titleCandidate) {
+  if (platformKey === 'facebook' && titleCandidate) {
     const normalizedPreview = candidate ? normalizeCaption(candidate) : '';
     if (!normalizedPreview || looksClipped(normalizedPreview) || titleCandidate.length > normalizedPreview.length + 80) {
       candidate = titleCandidate;
