@@ -167,15 +167,6 @@ span[data-pin-href] button {
   background-color: hsl(var(--profile-cover));
 }
 
-/* Premium glass translucent feed-post card */
-.glass-post-card {
-  background: hsl(0 0% 100%);
-  border: 1px solid hsl(220 13% 91%);
-  box-shadow:
-    0 1px 2px hsl(220 40% 12% / 0.04),
-    0 4px 16px -8px hsl(220 40% 12% / 0.06);
-}
-
 /* Instagram embed styles */
 .embed-container .instagram-media,
 .embed-container iframe[src*="instagram.com"] {
@@ -262,10 +253,4 @@ a:active:not(:disabled) {
    touch events which causes 1-2s scroll input delay on mobile */
 .scroll-freezing-iframes iframe {
   pointer-events: none !important;
-}
-
-/* Disable the browser's native pull-to-refresh so our in-app PullToRefresh
-   component owns the gesture on every page (especially short empty states). */
-html, body {
-  overscroll-behavior-y: none;
 }

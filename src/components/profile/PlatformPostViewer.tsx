@@ -37,9 +37,7 @@ interface ProfileData {
 // changes), until the user starts scrolling themselves.
 
 function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { isRealPost: boolean; user_id: string; likes_count: number; comments_count: number } {
-  // Ownership = the row's user_id (i.e. who owns this post/repost on this profile).
-  // Using original_user_id here would hide the Delete button on your own reposts.
-  const postUserId = post.is_repost ? String((post as any).profile_owner_id || post.user_id) : post.user_id;
+  const postUserId = post.original_user_id || post.user_id;
   return {
     id: post.id,
     user_id: postUserId,
@@ -53,16 +51,12 @@ function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { 
     mediaType: (post.media_type as "image" | "video") || "none",
     mediaUrl: post.media_url || undefined,
     thumbnailUrl: post.thumbnail_url || undefined,
-    preview_text: post.preview_text,
-    preview_title: post.preview_title,
-    preview_image_url: post.preview_image_url,
     platform: post.platform as any,
     embed_html: post.embed_html,
     timestamp: new Date(post.created_at),
     saves: post.saves_count,
     likes_count: post.likes_count || 0,
     comments_count: 0,
-    isRepost: !!post.is_repost,
     isRealPost: true,
   } as any;
 }
@@ -395,7 +389,6 @@ export const PlatformPostViewer = ({
                   post={transformPost(post, profileData)}
                   userId={user?.id}
                   startHydrated={true}
-                  onDeleted={onClose}
                 />
               </motion.div>
             ))

@@ -116,76 +116,20 @@ serve(async (req) => {
       const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : 1;
       sizing = { media_kind: 'image', aspect_ratio: clampAR(ar), suggested_height: null };
     }
-    // Facebook - use official oEmbed API first, then the public plugin HTML.
-    // Direct Facebook pages often return a login wall to server-side fetches;
-    // the plugin endpoint still exposes public post captions/media.
+    // Facebook - use official oEmbed API with Meta token
     else if (platform === 'facebook') {
-      let targetUrl = url;
-      // Expand Facebook share URLs
-      if (targetUrl.includes('facebook.com/share/') || targetUrl.includes('fb.watch') || targetUrl.includes('fb.me')) {
-        try {
-          const res = await fetch(targetUrl, { method: 'GET', redirect: 'follow', headers: { 'User-Agent': 'facebookexternalhit/1.1' } });
-          targetUrl = extractFacebookNextUrl(res.url) || res.url;
-        } catch (e) { console.error('[fetch-post-preview] FB expansion failed', e); }
-      }
-
-      const useThumb = async (imageUrl: string | null | undefined) => {
-        if (!imageUrl || isGenericPlaceholderImage(imageUrl)) return;
-        thumbnailUrl = isPreviewOnly ? imageUrl : await storeThumbnailPermanently(postId, imageUrl);
-      };
-
-      const isJunk = (t: string | null) => !cleanFacebookCaption(t);
-
-      const oembedData = await fetchFacebookOembed(targetUrl);
+      const oembedData = await fetchFacebookOembed(url);
       if (oembedData?.thumbnail_url) {
-        await useThumb(oembedData.thumbnail_url);
+        thumbnailUrl = await storeThumbnailPermanently(postId, oembedData.thumbnail_url);
       }
-      if (oembedData?.title) {
-        const cleanedTitle = cleanFacebookCaption(oembedData.title);
-        previewText = cleanedTitle;
-        previewTitle = cleanedTitle;
-      }
-      oembedThumbW = oembedData?.thumbnail_width ?? null;
-      oembedThumbH = oembedData?.thumbnail_height ?? null;
-
-      // Fallback: scrape OG metadata
-      if (!thumbnailUrl || !previewText) {
-        const ogData = await scrapeOgData(targetUrl, 'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)');
-        if (!thumbnailUrl && ogData.image && !isGenericPlaceholderImage(ogData.image)) {
-          await useThumb(ogData.image);
-        }
-        if (!previewText || isJunk(previewText)) {
-          const candidate = cleanFacebookCaption(ogData.description) || cleanFacebookCaption(ogData.title);
-          if (candidate) previewText = candidate;
-        }
-        if (!previewTitle || isJunk(previewTitle)) {
-          const cleanTitle = cleanFacebookCaption(ogData.title);
-          if (cleanTitle) previewTitle = cleanTitle;
-        }
-      }
-
-      // Final fallback: public Facebook plugin page. This is the path that
-      // recovers captions from data-testid="post_message" plus scontent images
-      // when both Graph oEmbed and OG scraping are blocked by login walls.
-      if (!thumbnailUrl || isJunk(previewText)) {
-        const pluginData = await scrapeFacebookPlugin(targetUrl, url);
-        if (!thumbnailUrl && pluginData.image) {
-          await useThumb(pluginData.image);
-        }
-        if (isJunk(previewText) && pluginData.caption) {
-          previewText = pluginData.caption;
-        }
-        if (isJunk(previewTitle) && pluginData.title) {
-          previewTitle = pluginData.title;
-        }
-        if (oembedThumbW === null) oembedThumbW = pluginData.imageWidth;
-        if (oembedThumbH === null) oembedThumbH = pluginData.imageHeight;
-      }
-
-      const isReel = /\/reel\//i.test(targetUrl);
-      const isVideo = /\/videos?\//i.test(targetUrl);
-      const ar = oembedThumbW && oembedThumbH ? oembedThumbW / oembedThumbH : (isReel ? 9 / 16 : (isVideo ? 16 / 9 : 4 / 5));
-      sizing = { media_kind: isVideo || isReel ? 'video' : 'image', aspect_ratio: clampAR(ar), suggested_height: null };
+      // /reel/ → 9:16 vertical, /videos/ → 16:9, else 4:5 portrait photo card
+      const isReel = /\/reel\//i.test(url);
+      const isVideo = /\/videos?\//i.test(url);
+      sizing = {
+        media_kind: 'video',
+        aspect_ratio: isReel ? 9 / 16 : (isVideo ? 16 / 9 : 4 / 5),
+        suggested_height: null,
+      };
     }
     // Reddit special handling
     else if (platform === 'reddit') {
@@ -307,12 +251,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({
-        thumbnail_url: thumbnailUrl,
-        preview_image_url: thumbnailUrl,
-        title: previewTitle,
-        preview_text: previewText,
-      }),
+      JSON.stringify({ thumbnail_url: thumbnailUrl, title: previewTitle, preview_text: previewText }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
@@ -373,7 +312,7 @@ async function fetchInstagramOembed(url: string): Promise<{ thumbnail_url: strin
 }
 
 // Fetch Facebook thumbnail using official oEmbed API
-async function fetchFacebookOembed(url: string): Promise<{ thumbnail_url: string | null; title: string | null; thumbnail_width: number | null; thumbnail_height: number | null } | null> {
+async function fetchFacebookOembed(url: string): Promise<{ thumbnail_url: string | null } | null> {
   const metaToken = Deno.env.get('META_APP_TOKEN');
   
   if (!metaToken) {
@@ -408,256 +347,11 @@ async function fetchFacebookOembed(url: string): Promise<{ thumbnail_url: string
       }
     }
 
-    return { thumbnail_url: thumbnailUrl, title: data.title || data.author_name || null, thumbnail_width: typeof data.thumbnail_width === "number" ? data.thumbnail_width : null, thumbnail_height: typeof data.thumbnail_height === "number" ? data.thumbnail_height : null };
+    return { thumbnail_url: thumbnailUrl };
   } catch (error) {
     console.error('[fetch-post-preview] Facebook oEmbed error:', error);
     return null;
   }
-}
-
-function extractFacebookNextUrl(raw: string): string | null {
-  try {
-    const parsed = new URL(raw);
-    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return null;
-    const next = parsed.searchParams.get('next');
-    if (!next) return null;
-    const nextUrl = new URL(decodeURIComponent(next));
-    if (!/(^|\.)facebook\.com$/i.test(nextUrl.hostname)) return null;
-    // Facebook share redirects add volatile rdid before share_url; the public
-    // plugin rejects otherwise-valid story.php URLs when that param is present.
-    nextUrl.searchParams.delete('rdid');
-    const looksLikePost =
-      /\/story\.php/i.test(nextUrl.pathname) ||
-      /\/permalink\.php/i.test(nextUrl.pathname) ||
-      /\/(?:photo|photos|posts|videos?|watch|reel)\b/i.test(nextUrl.pathname) ||
-      nextUrl.searchParams.has('story_fbid') ||
-      nextUrl.searchParams.has('fbid') ||
-      nextUrl.searchParams.has('v');
-    return looksLikePost ? nextUrl.toString() : null;
-  } catch {
-    return null;
-  }
-}
-
-async function scrapeFacebookPlugin(url: string, fallbackUrl?: string): Promise<{ caption: string | null; image: string | null; title: string | null; imageWidth: number | null; imageHeight: number | null }> {
-  const empty = { caption: null, image: null, title: null, imageWidth: null, imageHeight: null };
-  const hrefs = [...new Set(([url, fallbackUrl].filter(Boolean) as string[]).flatMap(getFacebookPluginHrefs))];
-  const endpoints = hrefs.flatMap((href) => [
-    `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
-    `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(href)}&show_text=true&width=500`,
-  ]);
-
-  for (const pluginUrl of endpoints) {
-    try {
-      const response = await fetch(pluginUrl, {
-        redirect: 'follow',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-      });
-      if (!response.ok) continue;
-
-      const html = await response.text();
-      const meta = extractArticleMetadata(html, pluginUrl);
-      const imageInfo = extractFacebookPluginImage(html, pluginUrl);
-      const caption = extractFacebookPluginCaption(html) || cleanFacebookCaption(meta.description);
-      const title = cleanFacebookCaption(meta.title);
-
-      if (caption || imageInfo.image || meta.image) {
-        return {
-          caption,
-          image: imageInfo.image || meta.image,
-          title,
-          imageWidth: imageInfo.width,
-          imageHeight: imageInfo.height,
-        };
-      }
-    } catch (error) {
-      console.error('[fetch-post-preview] Facebook plugin scrape error:', error);
-    }
-  }
-
-  return empty;
-}
-
-function normalizeFacebookPluginHref(raw: string): string {
-  try {
-    const parsed = new URL(raw);
-    if (/(^|\.)facebook\.com$/i.test(parsed.hostname)) {
-      parsed.searchParams.delete('rdid');
-      parsed.searchParams.delete('mibextid');
-      parsed.searchParams.delete('__cft__');
-      parsed.searchParams.delete('__tn__');
-    }
-    return parsed.toString();
-  } catch {
-    return raw;
-  }
-}
-
-function getFacebookPluginHrefs(raw: string): string[] {
-  const normalized = normalizeFacebookPluginHref(raw);
-  const candidates = [normalized];
-  try {
-    const parsed = new URL(normalized);
-    if (!/(^|\.)facebook\.com$/i.test(parsed.hostname)) return candidates;
-
-    let storyId = parsed.searchParams.get('story_fbid') || parsed.searchParams.get('fbid');
-    let pageId = parsed.searchParams.get('id');
-    const postId = parsed.searchParams.get('post_id');
-    if (postId?.includes('_')) {
-      const [postPageId, postStoryId] = postId.split('_');
-      pageId = pageId || postPageId;
-      storyId = storyId || postStoryId;
-    }
-    const pathPost = parsed.pathname.match(/^\/(\d+)\/posts\/(\d+)/i);
-    if (pathPost) {
-      pageId = pageId || pathPost[1];
-      storyId = storyId || pathPost[2];
-    }
-
-    if (storyId && pageId) {
-      candidates.push(`https://www.facebook.com/story.php?story_fbid=${encodeURIComponent(storyId)}&id=${encodeURIComponent(pageId)}`);
-      candidates.push(`https://www.facebook.com/permalink.php?story_fbid=${encodeURIComponent(storyId)}&id=${encodeURIComponent(pageId)}`);
-      candidates.push(`https://www.facebook.com/${encodeURIComponent(pageId)}/posts/${encodeURIComponent(storyId)}`);
-    }
-  } catch {
-    // keep normalized URL only
-  }
-  return candidates;
-}
-
-function extractFacebookPluginCaption(html: string): string | null {
-  const candidates: string[] = [];
-  const markerRegex = /data-testid=["']post_message["']/gi;
-  let marker: RegExpExecArray | null;
-  while ((marker = markerRegex.exec(html)) !== null) {
-    const start = html.lastIndexOf('<', marker.index);
-    const chunkStart = start >= 0 ? start : marker.index;
-    const nextMessage = html.indexOf('data-testid="post_message"', marker.index + 1);
-    const footerOffset = html.slice(marker.index).search(/(?:data-testid=["']UFI2CommentsCount["']|<form\b|aria-label=["']Like["'])/i);
-    const nextFooter = footerOffset >= 0 ? marker.index + footerOffset : -1;
-    const hardEnd = nextMessage > marker.index ? nextMessage : -1;
-    const softEnd = nextFooter > marker.index ? nextFooter : -1;
-    const end = [hardEnd, softEnd, chunkStart + 8000].filter((n) => n > chunkStart).sort((a, b) => a - b)[0] || chunkStart + 8000;
-    candidates.push(html.slice(chunkStart, Math.min(html.length, end)));
-  }
-
-  // Some plugin responses contain server-rendered text without the test id but
-  // keep it inside userContent/message containers.
-  const legacy = html.match(/<(?:div|span)[^>]+(?:userContent|post-message|post_message)[^>]*>([\s\S]*?)<\/(?:div|span)>/i)?.[0];
-  if (legacy) candidates.push(legacy);
-
-  for (const candidate of candidates) {
-    const cleaned = cleanFacebookCaption(stripHtml(candidate));
-    if (cleaned) return cleaned;
-  }
-  return null;
-}
-
-function cleanFacebookCaption(text: string | null | undefined): string | null {
-  if (!text) return null;
-  let cleaned = stripFacebookBootstrapTail(decodeHtmlEntities(text))
-    .replace(/\s+/g, ' ')
-    .replace(/(?:^|\s)(?:See more|See Translation|See translation)(?:\s|$)/gi, ' ')
-    .trim();
-  cleaned = cleaned.replace(/^Facebook\s*[-–—:]?\s*/i, '').trim();
-  const lower = cleaned.toLowerCase();
-  if (
-    !cleaned ||
-    lower === 'facebook' ||
-    lower.includes('log in to facebook') ||
-    lower.includes('see posts, photos and more on facebook') ||
-    isPageBootstrapDump(cleaned)
-  ) return null;
-  return cleaned.slice(0, 4000);
-}
-
-function stripFacebookBootstrapTail(value: string): string {
-  const markers = [
-    'function envFlush',
-    'ServerJSQueue.add',
-    'requireLazy',
-    'Bootloader',
-    'DTSGInitialData',
-    'window.Env',
-    'ajaxpipe_token',
-    'enableBootload',
-    'bumpVultureJSHash',
-    'AsyncRequest',
-    'IntlQtEventFalcoEvent',
-  ];
-  let earliest = -1;
-  for (const marker of markers) {
-    const idx = value.indexOf(marker);
-    if (idx >= 0 && (earliest === -1 || idx < earliest)) earliest = idx;
-  }
-  return earliest >= 0 ? value.slice(0, earliest).trim() : value;
-}
-
-function isPageBootstrapDump(value: string): boolean {
-  const stripped = stripFacebookBootstrapTail(value).trim();
-  if (stripped && stripped !== value.trim()) return false;
-  const text = value.slice(0, 4000);
-  const markers = [
-    'requireLazy',
-    'Bootloader',
-    'ServerJSQueue',
-    'envFlush',
-    'ajaxpipe_token',
-    'enableBootload',
-    'window.Env',
-    'bumpVultureJSHash',
-    'AsyncRequest',
-    'IntlQtEventFalcoEvent',
-    'DTSGInitialData',
-  ];
-  if (markers.some((marker) => text.includes(marker))) return true;
-  if (text.length > 120) {
-    const codey = (text.match(/[{}\[\]"`]/g) || []).length;
-    if (codey / text.length > 0.18) return true;
-  }
-  return false;
-}
-
-function extractFacebookPluginImage(html: string, baseUrl: string): { image: string | null; width: number | null; height: number | null } {
-  const images: Array<{ url: string; width: number | null; height: number | null; score: number }> = [];
-  const imgRegex = /<img\b[^>]*>/gi;
-  let match: RegExpExecArray | null;
-  while ((match = imgRegex.exec(html)) !== null) {
-    const tag = match[0];
-    const raw =
-      tag.match(/\s(?:data-src|src)=['"]([^'"]+)['"]/i)?.[1] ||
-      tag.match(/\s(?:data-src|src)=([^\s>]+)/i)?.[1];
-    if (!raw) continue;
-    const resolved = resolveUrl(decodeHtmlEntities(raw).replace(/\\\//g, '/'), baseUrl);
-    if (!resolved) continue;
-    const lower = resolved.toLowerCase();
-    if (!/(scontent|fbcdn)\./i.test(lower) && !lower.includes('scontent-')) continue;
-    if (lower.includes('emoji') || lower.includes('rsrc.php') || lower.includes('static.xx.fbcdn.net')) continue;
-    if (!isLikelyRealContentImage(resolved)) continue;
-
-    const width = readAttrNumber(tag, 'width');
-    const height = readAttrNumber(tag, 'height');
-    const area = width && height ? width * height : 0;
-    let score = area;
-    if (/\/v\/t(?:39|45|51|15|1\.)/i.test(lower)) score += 10000;
-    if (lower.includes('_n.jpg') || lower.includes('_n.png') || lower.includes('_n.webp')) score += 5000;
-    if (lower.includes('p100x100') || lower.includes('s100x100') || lower.includes('cp0_dst')) score -= 20000;
-    images.push({ url: resolved, width, height, score });
-  }
-
-  images.sort((a, b) => b.score - a.score);
-  const best = images[0];
-  return { image: best?.url || null, width: best?.width || null, height: best?.height || null };
-}
-
-function readAttrNumber(tag: string, attr: string): number | null {
-  const escaped = attr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const value = tag.match(new RegExp(`\\s${escaped}=["']?(\\d+)`, 'i'))?.[1];
-  const num = value ? parseInt(value, 10) : NaN;
-  return Number.isFinite(num) && num > 0 ? num : null;
 }
 
 // Store thumbnail permanently to avoid CDN expiration
@@ -737,9 +431,7 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
         return {
           thumbnail_url: thumbnail,
           title: typeof post?.title === 'string' ? post.title : oembedData.title,
-          description: typeof post?.selftext === 'string' && post.selftext.trim()
-            ? post.selftext
-            : (typeof post?.title === 'string' ? post.title : null),
+          description: typeof post?.selftext === 'string' && post.selftext.trim() ? post.selftext : oembedData.description,
           post_data: post ?? null,
         };
       }
@@ -752,7 +444,7 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
   return {
     thumbnail_url: ogData.image && !isMisleadingRedditThumbnail(ogData.image) ? ogData.image : null,
     title: oembedData.title || ogData.title,
-    description: ogData.description || oembedData.title,
+    description: oembedData.description || ogData.description,
     post_data: null,
   };
 }
@@ -953,11 +645,7 @@ function isMisleadingRedditThumbnail(url: string): boolean {
 
 function isGenericPlaceholderImage(url: string): boolean {
   const lower = url.toLowerCase();
-  return lower.includes('images.unsplash.com') ||
-    lower.includes('source.unsplash.com') ||
-    lower.includes('/images/login/qrcodeloginpizza') ||
-    lower.includes('static.xx.fbcdn.net') ||
-    lower.includes('/rsrc.php/');
+  return lower.includes('images.unsplash.com') || lower.includes('source.unsplash.com');
 }
 
 function stripHtml(text: string): string {
@@ -1047,55 +735,30 @@ function decodeHtmlEntities(text: string): string {
 }
 
 async function scrapeOgData(url: string, userAgent?: string): Promise<{ image: string | null; title: string | null; description: string | null; imageWidth: number | null; imageHeight: number | null; videoWidth: number | null; videoHeight: number | null; hasVideo: boolean }> {
-  const empty = { image: null, title: null, description: null, imageWidth: null, imageHeight: null, videoWidth: null, videoHeight: null, hasVideo: false };
-  const buildHeaders = (ua: string) => ({
-    'User-Agent': ua,
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Accept-Encoding': 'gzip, deflate, br',
-    'Connection': 'keep-alive',
-    'Upgrade-Insecure-Requests': '1',
-    'Sec-Fetch-Dest': 'document',
-    'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
-    'Cache-Control': 'max-age=0',
-  });
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent':
+          userAgent ||
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      redirect: 'follow',
+    });
 
-  const userAgents = userAgent
-    ? [userAgent]
-    : [
-        // Some article/news sites reject Googlebot/browser UAs from cloud IPs
-        // but still serve complete Open Graph metadata to social/link unfurlers.
-        'Slackbot-LinkExpanding 1.0 (+https://api.slack.com/robots)',
-        'facebookexternalhit/1.1 (+https://www.facebook.com/externalhit_uatext.php)',
-        'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      ];
-
-  for (const ua of userAgents) {
-    try {
-      const response = await fetch(url, {
-        headers: buildHeaders(ua),
-        redirect: 'follow',
-      });
-
-      if (!response.ok) {
-        console.log('[fetch-post-preview] OG scrape UA failed:', ua, response.status);
-        continue;
-      }
-
-      const html = await response.text();
-      const meta = extractArticleMetadata(html, response.url || url);
-      const sizing = extractSizingFromHtml(html);
-      if (meta.title || meta.image || meta.description) {
-        return { ...meta, ...sizing };
-      }
-    } catch (error) {
-      console.error('[fetch-post-preview] Scraping UA error:', ua, error);
+    if (!response.ok) {
+      return { image: null, title: null, description: null, imageWidth: null, imageHeight: null, videoWidth: null, videoHeight: null, hasVideo: false };
     }
-  }
 
-  return empty;
+    const html = await response.text();
+    const meta = extractArticleMetadata(html, response.url || url);
+    const sizing = extractSizingFromHtml(html);
+    return { ...meta, ...sizing };
+  } catch (error) {
+    console.error('[fetch-post-preview] Scraping error:', error);
+    return { image: null, title: null, description: null, imageWidth: null, imageHeight: null, videoWidth: null, videoHeight: null, hasVideo: false };
+  }
 }
 
 function extractSizingFromHtml(html: string): { imageWidth: number | null; imageHeight: number | null; videoWidth: number | null; videoHeight: number | null; hasVideo: boolean } {
