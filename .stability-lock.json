@@ -1,7 +1,7 @@
 {
   "version": 1,
   "frozen": {
-    "tokenHash": "sha256:b6a5d3c6a5f2f8c9e7d0a5b7b6c8d2e0f4a9b1c3d5e7f9a1b3c5d7e9f1a3b5c7",
+    "tokenHash": "sha256:2bd886aeb1f755b39b03af40a25e0ae4889da225ade5bc809d68d53f9a58e487",
     "files": [
       "src/hooks/useOriginalVisitTracker.ts",
       "src/hooks/useViewTracking.ts",
