@@ -309,16 +309,79 @@ export function useOriginalVisitTracker(
       }
     };
 
-    // Cleanup list retained for API compatibility with the effect teardown.
-    // The Threads play signal now rides on the container-level `touchstart`
-    // capture listener wired below (see `el.addEventListener('touchstart',
-    // onPointerDown, { capture: true, passive: true })`). On mobile Chrome
-    // and iOS Safari a touch that lands on a cross-origin iframe still
-    // dispatches `touchstart` on the parent in the capture phase, so
-    // `fireThreadsPlayOnce()` runs on the very first tap without inserting
-    // any visual/interactive overlay above the Threads player. This removes
-    // the duplicate "custom" Play affordance while preserving video_play.
     const threadsCaptureCleanups: Array<() => void> = [];
+    const threadsCaptureAttached = new WeakSet<HTMLIFrameElement>();
+
+    const attachThreadsPlayCapture = (iframe: HTMLIFrameElement) => {
+      // Threads renders as a cross-origin iframe. Mobile Chrome/WebView does
+      // not bubble pointerdown/touchstart out of it and rarely fires the
+      // parent-side `focus` event on the iframe element either, so the only
+      // reliable way to credit `video_play` on the very first tap is a
+      // transparent one-shot capture overlay above the iframe.
+      //
+      // The overlay:
+      //   1. Sits absolutely over the iframe (same rect).
+      //   2. On the first touchstart/pointerdown it calls
+      //      fireThreadsPlayOnce() and removes itself in the same tick.
+      //   3. Because the overlay is gone before the browser dispatches the
+      //      corresponding click, the SAME tap continues through to the
+      //      native Threads Play button underneath — so playback starts on
+      //      the first tap AND the score increments.
+      if (!trackPlayableInteraction) return;
+      if (threadsCaptureAttached.has(iframe)) return;
+      const parent = iframe.parentElement;
+      if (!parent) return;
+      // Idempotent across React re-renders / MutationObserver revisits.
+      if (parent.querySelector('[data-threads-play-capture="1"]')) {
+        threadsCaptureAttached.add(iframe);
+        return;
+      }
+      threadsCaptureAttached.add(iframe);
+
+      const prevPosition = parent.style.position;
+      if (!prevPosition || prevPosition === 'static') {
+        parent.style.position = 'relative';
+      }
+
+      const overlay = document.createElement('div');
+      overlay.dataset.threadsPlayCapture = '1';
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.style.cssText =
+        'position:absolute;inset:0;background:transparent;z-index:2;' +
+        'touch-action:manipulation;cursor:pointer;';
+      parent.appendChild(overlay);
+
+      let consumed = false;
+      const consume = () => {
+        if (consumed) return;
+        consumed = true;
+        try {
+          fireThreadsPlayOnce();
+        } finally {
+          try {
+            overlay.remove();
+          } catch {
+            /* noop */
+          }
+          overlay.removeEventListener('touchstart', onTouch, true);
+          overlay.removeEventListener('pointerdown', onPointer, true);
+        }
+      };
+      const onTouch = () => consume();
+      const onPointer = () => consume();
+      overlay.addEventListener('touchstart', onTouch, { capture: true, passive: true });
+      overlay.addEventListener('pointerdown', onPointer, true);
+
+      threadsCaptureCleanups.push(() => {
+        overlay.removeEventListener('touchstart', onTouch, true);
+        overlay.removeEventListener('pointerdown', onPointer, true);
+        try {
+          overlay.remove();
+        } catch {
+          /* noop */
+        }
+      });
+    };
 
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
       iframe.addEventListener('focus', handleIframeFocus);
@@ -329,6 +392,7 @@ export function useOriginalVisitTracker(
           // Cross-origin iframes may reject direct listener attachment.
         }
       }, { once: true });
+      attachThreadsPlayCapture(iframe);
       applyNavLockSandbox(iframe);
     };
 
