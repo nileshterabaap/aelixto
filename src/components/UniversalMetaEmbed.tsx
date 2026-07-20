@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { openExternalUrl } from '@/lib/openExternalUrl';
+import { LinkedInIframeEmbed, buildLinkedInEmbed } from '@/components/embeds/LinkedInEmbed';
 
 /**
  * Small pill-shaped overlay button rendered on top of an embed iframe so
@@ -442,7 +443,6 @@ const FacebookIframeEmbed = ({
         allowFullScreen
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"
         loading="lazy"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         onError={() => setFailed(true)}
         style={{
           border: 'none',
