@@ -1,5 +1,14 @@
 {
   "version": 1,
+  "frozen": {
+    "tokenHash": "sha256:b6a5d3c6a5f2f8c9e7d0a5b7b6c8d2e0f4a9b1c3d5e7f9a1b3c5d7e9f1a3b5c7",
+    "files": [
+      "src/hooks/useOriginalVisitTracker.ts",
+      "src/hooks/useViewTracking.ts",
+      "src/components/HydratedFeedPost.tsx",
+      "supabase/functions/record-view/index.ts"
+    ]
+  },
   "protectedFiles": [
     "src/components/RawEmbedRenderer.tsx",
     "src/lib/resolveRenderer.ts",
