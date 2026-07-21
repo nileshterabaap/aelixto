@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { openExternalUrl } from '@/lib/openExternalUrl';
+import { LinkedInIframeEmbed, buildLinkedInEmbed } from '@/components/embeds/LinkedInEmbed';
 
 /**
  * Small pill-shaped overlay button rendered on top of an embed iframe so
@@ -164,7 +165,7 @@ const ThreadsIframeEmbed = ({
         src={src}
         scrolling="no"
         allowFullScreen
-        allow="encrypted-media"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share"
         loading="lazy"
         onLoad={() => setHasLoaded(true)}
         onError={() => setFailed(true)}
@@ -440,9 +441,8 @@ const FacebookIframeEmbed = ({
         src={iframeSrc}
         scrolling="no"
         allowFullScreen
-        allow="encrypted-media"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"
         loading="lazy"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         onError={() => setFailed(true)}
         style={{
           border: 'none',
@@ -459,74 +459,7 @@ const FacebookIframeEmbed = ({
   );
 };
 
-/**
- * LinkedIn iframe that adapts to its content height. LinkedIn's embed
- * occasionally posts resize messages from linkedin.com; in all other cases
- * we seed from the persisted suggestedHeight and self-heal at view time.
- */
-const LI_MIN_HEIGHT = 260;
-const LI_MAX_HEIGHT = 1400;
-const LI_DEFAULT_HEIGHT = 460;
-
-const LinkedInIframeEmbed = ({
-  src,
-  postId,
-  suggestedHeight,
-  expandedUrl,
-}: {
-  src: string;
-  postId?: string | null;
-  suggestedHeight?: number | null;
-  expandedUrl?: string;
-}) => {
-  const [height, setHeight] = useState(() =>
-    suggestedHeight && suggestedHeight >= LI_MIN_HEIGHT
-      ? Math.min(LI_MAX_HEIGHT, suggestedHeight)
-      : LI_DEFAULT_HEIGHT
-  );
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const persistHeight = usePersistEmbedHeight(postId);
-
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      const iframeWindow = iframeRef.current?.contentWindow;
-      if (!iframeWindow || event.source !== iframeWindow) return;
-      const origin = event.origin || '';
-      if (!origin.includes('linkedin.com')) return;
-      const next = parseThreadsHeightFromMessage(event.data);
-      if (!next) return;
-      const clamped = Math.min(LI_MAX_HEIGHT, Math.max(LI_MIN_HEIGHT, Math.round(next)));
-      setHeight((prev) => (Math.abs(prev - clamped) > 4 ? clamped : prev));
-      persistHeight(clamped);
-    };
-    window.addEventListener('message', handler);
-    return () => window.removeEventListener('message', handler);
-  }, []);
-
-  return (
-    <div
-      className="relative w-full overflow-hidden"
-      style={{ width: '100%', height: `${height}px`, touchAction: 'pan-y' }}
-    >
-      <iframe
-        ref={iframeRef}
-        src={src}
-        scrolling="no"
-        allowFullScreen
-        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-        loading="lazy"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
-        style={{
-          border: 'none',
-          width: '100%',
-          height: '100%',
-          display: 'block',
-        }}
-      />
-    </div>
-  );
-};
-
+// LinkedIn embed moved to src/components/embeds/LinkedInEmbed.tsx (stability-guarded).
 /**
  * TikTok iframe that adapts to content height. TikTok's /embed/v2/ posts
  * cross-origin messages with the rendered card height.
@@ -770,39 +703,7 @@ const buildSpotifyEmbed = (url: string): string | null => {
   return `<iframe style="border-radius:12px;display:block;" src="${embedUrl}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
 };
 
-// Build LinkedIn embed HTML using their native embed endpoint
-const buildLinkedInEmbed = (url: string): string | null => {
-  try {
-    const u = new URL(url);
-
-    // Pattern 1: /feed/update/urn:li:activity:ID or urn:li:share:ID or urn:li:ugcPost:ID
-    const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
-    if (feedMatch) {
-      const urn = feedMatch[1];
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
-    }
-
-    // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
-    // Note: separator before type can be underscore or hyphen
-    const postMatch = u.pathname.match(/\/posts\/[^/]+[_-](?:ugcPost|activity)-(\d+)-/);
-    if (postMatch) {
-      const id = postMatch[1];
-      const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
-      const type = typeMatch ? typeMatch[1] : 'ugcPost';
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
-    }
-
-    // Pattern 3: /posts/username_slug-share-ID-hash
-    const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
-    if (shareMatch) {
-      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
-    }
-  } catch {
-    // Fall through to null
-  }
-  return null;
-};
-
+// buildLinkedInEmbed moved to src/components/embeds/LinkedInEmbed.tsx (stability-guarded).
 // Build Threads embed using direct iframe to the /embed page.
 //
 // Note: Threads' /embed page does NOT post resize messages, and their
@@ -832,7 +733,8 @@ const buildTikTokEmbed = (url: string): string | null => {
     const videoMatch = u.pathname.match(/\/@[^/]+\/video\/(\d+)/);
     if (videoMatch) {
       const videoId = videoMatch[1];
-      return `<iframe src="https://www.tiktok.com/embed/v2/${videoId}" style="border:none;width:100%;display:block;" allowfullscreen allow="encrypted-media; autoplay" loading="lazy"></iframe>`;
+      // autoplay=0 keeps TikTok paused until the user taps play.
+      return `<iframe src="https://www.tiktok.com/embed/v2/${videoId}?autoplay=0&music_info=1&description=1" style="border:none;width:100%;display:block;" allowfullscreen allow="encrypted-media; fullscreen" loading="lazy"></iframe>`;
     }
   } catch {
     // Fall through
@@ -945,11 +847,11 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
                   shouldShowFallback = true;
                 }
               }
-
-              if (expandData?.title?.toLowerCase().includes('log in to facebook')) {
-                
-                shouldShowFallback = true;
-              }
+              // NOTE: Do not fall back purely because the expand/OG scraper
+              // hit Facebook's anonymous login wall. FB's iframe plugin still
+              // renders the post in the user's browser regardless of what
+              // our server-side fetch sees, so trusting that signal produced
+              // false "View on Facebook" cards for perfectly good posts.
             } else {
               console.warn('[UniversalMetaEmbed] Expansion failed, using original URL:', expandError);
               urlForEmbed = url;
@@ -972,12 +874,8 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             if (!ogError && ogData) {
               const ogTitle = ogData.meta?.title || ogData.title;
 
-              // Check if the OG data indicates a login page
-              if (ogTitle?.toLowerCase().includes('log in to facebook') && platform === 'facebook') {
-                
-                shouldShowFallback = true;
-                setShowFallback(true);
-              }
+              // (Intentionally no longer flipping to fallback on FB login-wall
+              // OG titles — same reason as above.)
 
               setFallbackData({
                 title: ogTitle,
@@ -1066,14 +964,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
       if (isLinkedInIframe) {
         const srcMatch = sanitizedHtml.match(/src="([^"]+)"/);
         const iframeSrc = srcMatch ? srcMatch[1] : '';
-        return (
-          <LinkedInIframeEmbed
-            src={iframeSrc}
-            postId={postId}
-            suggestedHeight={suggestedHeight}
-            expandedUrl={expandedUrl}
-          />
-        );
+        return <LinkedInIframeEmbed src={iframeSrc} />;
       }
 
       if (isTikTokIframe) {

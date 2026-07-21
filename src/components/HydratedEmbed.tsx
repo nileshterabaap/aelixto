@@ -60,10 +60,19 @@ const getYouTubeVideoId = (url: string) => {
   return (match && match[2].length === 11) ? match[2] : null;
 };
 
-const isYouTubeShort = (url: string, title?: string | null, content?: string | null) => {
-  if (url.includes('/shorts/')) return true;
+const isYouTubeShort = (
+  url: string,
+  title?: string | null,
+  content?: string | null,
+  aspectRatio?: number | null,
+  mediaKind?: string | null,
+) => {
+  const normalizedUrl = decodeURIComponent(url).toLowerCase();
+  if (normalizedUrl.includes('/shorts/')) return true;
   if (title && /#shorts?\b/i.test(title)) return true;
   if (content && /#shorts?\b/i.test(content)) return true;
+  if (typeof aspectRatio === 'number' && aspectRatio > 0 && aspectRatio < 1) return true;
+  if (mediaKind && /short|reel|vertical|portrait/i.test(mediaKind)) return true;
   return false;
 };
 
@@ -181,26 +190,6 @@ export const HydratedEmbed = memo(({
       lowerUrl.includes('/share/r/') ||
       lowerUrl.includes('fb.watch/'));
 
-  const isLinkedInPost =
-    platformHint === 'linkedin' || lowerUrl.includes('linkedin.com/');
-
-  const isLinkedInVideoLike =
-    isLinkedInPost &&
-    (mediaTypeHint === 'video' ||
-      String((post as any).media_kind || '').toLowerCase() === 'video' ||
-      lowerUrl.includes('/video/') ||
-      lowerUrl.includes('/videos/') ||
-      // LinkedIn CDN video-thumbnail hints. When the fetched thumbnail is a
-      // video poster from media.licdn.com, treat this as a video so it renders
-      // in the iframe player instead of the photo-only branch (which strips
-      // the play button and hijacks taps to open LinkedIn).
-      (typeof thumbnailUrl === 'string' && (
-        thumbnailUrl.includes('/vc/') ||
-        thumbnailUrl.includes('dms-video') ||
-        thumbnailUrl.includes('video-thumbnail') ||
-        thumbnailUrl.includes('/videocover/')
-      )));
-
   useEffect(() => {
     if (!shouldHydrate) return;
     rememberHydratedPost(post.id);
@@ -222,12 +211,20 @@ export const HydratedEmbed = memo(({
     void openExternalUrl(mediaUrl);
   }, [handleOriginalVisit, mediaUrl]);
   
+  const isYouTubePost = platformHint === 'youtube' || (!!r.url && /youtube\.com|youtu\.be/i.test(r.url));
+
   // For YouTube, prefer their thumbnail
-  const effectiveThumbnail = post.platform === 'youtube' && r.url 
+  const effectiveThumbnail = isYouTubePost && r.url 
     ? getYouTubeThumbnail(r.url) || thumbnailUrl 
     : thumbnailUrl;
   
-  const aspectClass = post.platform === 'youtube' && r.url && isYouTubeShort(r.url, post.title, (post as any).content)
+  const aspectClass = isYouTubePost && r.url && isYouTubeShort(
+    r.url,
+    post.title,
+    (post as any).content,
+    (post as any).aspect_ratio ?? (post as any).aspectRatio ?? null,
+    (post as any).media_kind ?? (post as any).mediaKind ?? null,
+  )
     ? 'aspect-[9/16]'
     : 'aspect-video';
   
@@ -279,34 +276,6 @@ export const HydratedEmbed = memo(({
     );
   }
 
-  // LinkedIn image posts: mirror the Facebook treatment — the official
-  // LinkedIn embed iframe leaves a tall blank strip below the media for the
-  // reactions/comments stub. Rendering the fetched preview image directly
-  // gives a tight, flexible card just like Facebook image posts.
-  if (shouldHydrate && isLinkedInPost && effectiveThumbnail && !isLinkedInVideoLike) {
-    return (
-      <div ref={embedContainerRef} className="w-full" data-embed-status="ready">
-        <ImageViewTracker postId={post.id}>
-          <a
-            href={mediaUrl || '#'}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={handleExternalOriginalClick}
-            className="block w-full overflow-hidden bg-muted"
-          >
-            <img
-              src={effectiveThumbnail}
-              alt="LinkedIn post content"
-              className="w-full h-auto object-contain"
-              loading="eager"
-              decoding="async"
-            />
-          </a>
-        </ImageViewTracker>
-      </div>
-    );
-  }
-  
   // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
   if (!shouldHydrate) {
     return (
@@ -336,7 +305,7 @@ export const HydratedEmbed = memo(({
       <div className="w-full">
 
         {/* YouTube video */}
-        {r.kind === 'video' && post.platform === 'youtube' && r.url && (
+        {r.kind === 'video' && isYouTubePost && r.url && (
           <ImageViewTracker postId={post.id}>
             <div className={`w-full bg-black ${aspectClass}`}>
               <iframe
@@ -351,7 +320,7 @@ export const HydratedEmbed = memo(({
         )}
         
         {/* Non-YouTube video */}
-        {r.kind === 'video' && post.platform !== 'youtube' && r.url && (
+        {r.kind === 'video' && !isYouTubePost && r.url && (
           <ImageViewTracker postId={post.id}>
             <video 
               src={r.url} 

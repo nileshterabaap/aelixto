@@ -284,25 +284,6 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     const isNative = Capacitor.isNativePlatform();
     if (isNative) {
-      // 1) Try TRUE native Google Sign-In (system account picker, no browser tab).
-      try {
-        const { GoogleAuth } = await import("@codetrix-studio/capacitor-google-auth");
-        try { await GoogleAuth.initialize(); } catch { /* already initialized */ }
-        const gUser = await GoogleAuth.signIn();
-        const idToken = (gUser as { authentication?: { idToken?: string } })?.authentication?.idToken;
-        if (idToken) {
-          const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: idToken });
-          if (error) {
-            toast({ title: "Google sign-in failed", description: error.message, variant: "destructive" });
-            return;
-          }
-          return; // success — onAuthStateChange navigates
-        }
-        // No idToken → fall through to Custom Tabs fallback below.
-      } catch (nativeErr) {
-        console.warn("Native GoogleAuth failed, falling back to Custom Tabs", nativeErr);
-      }
-
       // Native flow (APK/AAB):
       // 1. Open Chrome Custom Tab to the OAuth broker.
       // 2. Broker finishes and redirects to our /~auth-bridge web page.

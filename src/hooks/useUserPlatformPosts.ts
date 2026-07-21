@@ -19,12 +19,18 @@ export interface PlatformPost {
   preview_text?: string | null;
   preview_title?: string | null;
   preview_image_url?: string | null;
+  media_kind?: string | null;
+  aspect_ratio?: number | null;
+  suggested_height?: number | null;
   is_public: boolean;
   is_repost: boolean;
   original_user_id: string | null;
   profile_username?: string | null;
   profile_display_name?: string | null;
   profile_avatar_url?: string | null;
+  pinned_at?: string | null;
+  hide_counts?: boolean;
+  comments_disabled?: boolean;
 }
 
 const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook", "reddit", "threads", "linkedin", "tiktok", "article", "medium"]);
@@ -47,7 +53,13 @@ const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
 const isGenericPlaceholderThumbnail = (url?: string | null) => {
   if (!url) return false;
   const lower = url.toLowerCase();
-  return lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com");
+  return (
+    lower.includes("images.unsplash.com") ||
+    lower.includes("source.unsplash.com") ||
+    // Reddit's branded fallback/logo thumbnails — never a real post preview.
+    lower.includes("redditstatic.com") ||
+    lower.includes("share.redd.it/preview/post")
+  );
 };
 
 const hasUsableTextThumbnail = (post: PlatformPost) => {
@@ -160,7 +172,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       const { data: postDetails } = postIds.length
         ? await supabase
             .from("posts")
-            .select("id, title, content, thumbnail_url, preview_text, preview_title, preview_image_url")
+            .select("id, title, content, thumbnail_url, preview_text, preview_title, preview_image_url, media_kind, aspect_ratio, suggested_height, pinned_at, hide_counts, comments_disabled")
             .in("id", postIds)
         : { data: [] };
 

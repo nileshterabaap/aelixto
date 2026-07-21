@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCompactCount } from "@/lib/formatCount";
@@ -21,6 +21,10 @@ import { FollowListDialog, getFollowVisibility } from "@/components/profile/Foll
 import { ProfileOptionsMenu } from "@/components/profile/ProfileOptionsMenu";
 import { AuthCTABar } from "@/components/AuthCTABar";
 import { Lock } from "lucide-react";
+import { useIsBlocked } from "@/hooks/useIsBlocked";
+import { useAmIBlockedBy } from "@/hooks/useAmIBlockedBy";
+import { AelixtoLoader } from "@/components/AelixtoLoader";
+import { Ban } from "lucide-react";
 
 interface UserProfileProps {
   usernameOverride?: string;
@@ -30,6 +34,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const { username: urlUsername } = useParams<{ username: string }>();
   const username = usernameOverride || urlUsername;
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useSession();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
@@ -57,6 +62,8 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
   const { isFollowing, isRequested, followsMe, follow, unfollow, loading: followLoading, counts, countsReady, refresh: refreshFollow } = useFollow(profile?.user_id);
   const isMe = user?.id === profile?.user_id;
+  const { isBlocked, refetch: refetchBlocked } = useIsBlocked(profile?.user_id);
+  const { amIBlockedBy, isLoading: amIBlockedByLoading } = useAmIBlockedBy(profile?.user_id);
   const { tabs, activeTab, setActiveTab, loading: tabsLoading } = useUserPlatformTabs(profile?.user_id);
   const { startConversation, loading: conversationLoading } = useStartConversation();
 
@@ -115,8 +122,14 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   const showSkeleton = !contentReady;
 
   const handleRefresh = useCallback(async () => {
-    await Promise.all([refetchProfile(), refreshFollow()]);
-  }, [refetchProfile, refreshFollow]);
+    await Promise.all([
+      refetchProfile(),
+      refreshFollow(),
+      queryClient.invalidateQueries({ queryKey: ["user-platform-tabs", profile?.user_id] }),
+      queryClient.invalidateQueries({ queryKey: ["platform-posts", profile?.user_id] }),
+      queryClient.invalidateQueries({ queryKey: ["mutuals", profile?.user_id] }),
+    ]);
+  }, [refetchProfile, refreshFollow, queryClient, profile?.user_id]);
 
   if (!isLoading && !profile) {
     return (
@@ -124,6 +137,33 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Profile not found</p>
           <Button onClick={() => navigate('/')}>Go Home</Button>
+        </div>
+      </div>
+    );
+  }
+
+  // If the profile owner has blocked me, show a minimal "blocked you" screen.
+  if (profile && !isMe && amIBlockedBy && !amIBlockedByLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <header className="sticky top-0 z-10 bg-background border-b border-border">
+          <div className="container max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg font-bold truncate">@{profile.username}</h1>
+            </div>
+          </div>
+        </header>
+        <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
+          <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Ban className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">This user has blocked you</h2>
+          <p className="text-sm text-muted-foreground max-w-sm">
+            You can't see their profile, posts, followers or activity.
+          </p>
         </div>
       </div>
     );
@@ -138,6 +178,10 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
         className="absolute inset-0 z-30 pb-20 pointer-events-none transition-opacity duration-500 ease-out"
         style={{ opacity: showSkeleton ? 1 : 0 }}
       >
+        {/* Centered morphing Aelixto logo — fades out with the rest of the skeleton */}
+        <div className="pointer-events-none fixed inset-0 flex items-center justify-center z-40">
+          <AelixtoLoader size={96} />
+        </div>
         <div className="mx-auto max-w-2xl">
           <div className="relative h-[400px] profile-cover-fallback animate-shimmer" />
           <div className="bg-background rounded-t-[32px] -mt-8 relative px-6 pb-6">
@@ -228,7 +272,9 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                   username={profile.username}
                   displayName={profile.display_name}
                   isFollowedByTarget={followsMe}
+                  isBlocked={isBlocked}
                   onBlocked={() => navigate('/')}
+                  onUnblocked={() => { refetchBlocked(); refreshFollow(); }}
                   onRemovedFollower={() => {
                     refreshFollow();
                   }}
@@ -320,6 +366,29 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
             >
               Edit Profile
             </Button>
+          ) : user && isBlocked ? (
+            <div className="mb-6">
+              <Button
+                onClick={async () => {
+                  const { data: { user: u } } = await supabase.auth.getUser();
+                  if (!u || !profile) return;
+                  await supabase
+                    .from("blocked_users")
+                    .delete()
+                    .eq("user_id", u.id)
+                    .eq("blocked_user_id", profile.user_id);
+                  await queryClient.invalidateQueries({ queryKey: ["is-blocked", u.id, profile.user_id] });
+                  await queryClient.invalidateQueries({ queryKey: ["user-platform-tabs", profile.user_id] });
+                  await queryClient.invalidateQueries({ queryKey: ["platform-posts", profile.user_id] });
+                  await queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+                  await refetchBlocked();
+                  await refreshFollow();
+                }}
+                className="w-full rounded-full py-4 text-sm font-bold border-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Unblock
+              </Button>
+            </div>
           ) : user ? (
             <div className="flex gap-3 mb-6">
               <Button 
@@ -382,7 +451,14 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
               <p className="text-sm text-muted-foreground">Follow @{profile.username} to see their posts.</p>
             </div>
           ) : !tabsLoading && tabs.length > 0 ? (
-            <ProfilePlatformGrid userId={profile.user_id} activeTab={activeTab} tabs={tabs} onTabChange={setActiveTab} />
+            <ProfilePlatformGrid
+              userId={profile.user_id}
+              activeTab={activeTab}
+              tabs={tabs}
+              onTabChange={setActiveTab}
+              isOwner={isMe}
+              currentUserId={user?.id}
+            />
           ) : !tabsLoading ? (
             <p className="text-center text-muted-foreground py-12 text-base">
               No posts yet
