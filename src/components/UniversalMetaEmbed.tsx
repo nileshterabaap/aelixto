@@ -5,7 +5,6 @@ import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { openExternalUrl } from '@/lib/openExternalUrl';
-import { LinkedInIframeEmbed, buildLinkedInEmbed } from '@/components/embeds/LinkedInEmbed';
 
 /**
  * Small pill-shaped overlay button rendered on top of an embed iframe so
@@ -443,6 +442,7 @@ const FacebookIframeEmbed = ({
         allowFullScreen
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"
         loading="lazy"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         onError={() => setFailed(true)}
         style={{
           border: 'none',
@@ -459,7 +459,49 @@ const FacebookIframeEmbed = ({
   );
 };
 
-// LinkedIn embed moved to src/components/embeds/LinkedInEmbed.tsx (stability-guarded).
+/**
+ * LinkedIn iframe restored to a fixed, internally scrollable viewport.
+ * LinkedIn cards can be taller than the Aelixto post card, so the iframe
+ * itself must scroll instead of expanding the outer feed item.
+ */
+const LI_VIEWPORT_HEIGHT = 760;
+
+const LinkedInIframeEmbed = ({
+  src,
+}: {
+  src: string;
+  postId?: string | null;
+  suggestedHeight?: number | null;
+  expandedUrl?: string;
+}) => {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
+  return (
+    <div
+      className="relative w-full overflow-hidden bg-background"
+      style={{ width: '100%', height: `${LI_VIEWPORT_HEIGHT}px`, minHeight: `${LI_VIEWPORT_HEIGHT}px`, touchAction: 'pan-y' }}
+    >
+      <iframe
+        ref={iframeRef}
+        src={src}
+        scrolling="auto"
+        allowFullScreen
+        allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+        loading="lazy"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
+        style={{
+          border: 'none',
+          width: '100%',
+          height: '100%',
+          minHeight: `${LI_VIEWPORT_HEIGHT}px`,
+          display: 'block',
+          background: 'hsl(var(--background))',
+        }}
+      />
+    </div>
+  );
+};
+
 /**
  * TikTok iframe that adapts to content height. TikTok's /embed/v2/ posts
  * cross-origin messages with the rendered card height.
@@ -703,7 +745,39 @@ const buildSpotifyEmbed = (url: string): string | null => {
   return `<iframe style="border-radius:12px;display:block;" src="${embedUrl}" width="100%" height="352" frameBorder="0" allowfullscreen="" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
 };
 
-// buildLinkedInEmbed moved to src/components/embeds/LinkedInEmbed.tsx (stability-guarded).
+// Build LinkedIn embed HTML using their native embed endpoint
+const buildLinkedInEmbed = (url: string): string | null => {
+  try {
+    const u = new URL(url);
+
+    // Pattern 1: /feed/update/urn:li:activity:ID or urn:li:share:ID or urn:li:ugcPost:ID
+    const feedMatch = u.pathname.match(/\/feed\/update\/(urn:li:\w+:\d+)/);
+    if (feedMatch) {
+      const urn = feedMatch[1];
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/${urn}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+    }
+
+    // Pattern 2: /posts/username_slug-ugcPost-ID-hash or -activity-ID-hash
+    // Note: separator before type can be underscore or hyphen
+    const postMatch = u.pathname.match(/\/posts\/[^/]+[_-](?:ugcPost|activity)-(\d+)-/);
+    if (postMatch) {
+      const id = postMatch[1];
+      const typeMatch = u.pathname.match(/[_-](ugcPost|activity)-/);
+      const type = typeMatch ? typeMatch[1] : 'ugcPost';
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:${type}:${id}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+    }
+
+    // Pattern 3: /posts/username_slug-share-ID-hash
+    const shareMatch = u.pathname.match(/\/posts\/[^/]+[_-]share-(\d+)-/);
+    if (shareMatch) {
+      return `<iframe src="https://www.linkedin.com/embed/feed/update/urn:li:share:${shareMatch[1]}" width="100%" frameborder="0" allowfullscreen="" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" style="border:none;overflow:hidden;display:block;" loading="lazy"></iframe>`;
+    }
+  } catch {
+    // Fall through to null
+  }
+  return null;
+};
+
 // Build Threads embed using direct iframe to the /embed page.
 //
 // Note: Threads' /embed page does NOT post resize messages, and their
@@ -847,11 +921,11 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
                   shouldShowFallback = true;
                 }
               }
-              // NOTE: Do not fall back purely because the expand/OG scraper
-              // hit Facebook's anonymous login wall. FB's iframe plugin still
-              // renders the post in the user's browser regardless of what
-              // our server-side fetch sees, so trusting that signal produced
-              // false "View on Facebook" cards for perfectly good posts.
+
+              if (expandData?.title?.toLowerCase().includes('log in to facebook')) {
+                
+                shouldShowFallback = true;
+              }
             } else {
               console.warn('[UniversalMetaEmbed] Expansion failed, using original URL:', expandError);
               urlForEmbed = url;
@@ -874,8 +948,12 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
             if (!ogError && ogData) {
               const ogTitle = ogData.meta?.title || ogData.title;
 
-              // (Intentionally no longer flipping to fallback on FB login-wall
-              // OG titles — same reason as above.)
+              // Check if the OG data indicates a login page
+              if (ogTitle?.toLowerCase().includes('log in to facebook') && platform === 'facebook') {
+                
+                shouldShowFallback = true;
+                setShowFallback(true);
+              }
 
               setFallbackData({
                 title: ogTitle,
