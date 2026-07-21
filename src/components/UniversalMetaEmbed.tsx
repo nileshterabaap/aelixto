@@ -353,6 +353,7 @@ const FacebookIframeEmbed = ({
 }) => {
   const [failed, setFailed] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
   // Unified interaction: tap the iframe's Play region plays the video
   // natively. To open the original post, the user taps the "Open on
@@ -361,20 +362,48 @@ const FacebookIframeEmbed = ({
   // the play button on some devices.
 
   const srcMatch = html.match(/src="([^"]+)"/);
-  const iframeSrc = srcMatch ? srcMatch[1] : '';
+  const rawIframeSrc = srcMatch ? srcMatch[1] : '';
 
   // Detect video vs static post — image posts get a tighter cap so there's
   // no large blank strip below the photo before our action bar.
-  const isVideo = /\/(video\.php|reel|videos|watch)/i.test(iframeSrc) || /fb\.watch/i.test(iframeSrc);
-  const MAX_HEIGHT = isVideo ? 1400 : 640;
-  const DEFAULT_HEIGHT = isVideo ? 520 : 360;
+  const isVideo = /\/(video\.php|reel|videos|watch)/i.test(rawIframeSrc) || /fb\.watch/i.test(rawIframeSrc);
+  // Facebook's plugin lays itself out from the `width` URL param (capped at
+  // 500 by FB) and posts the resulting content height back via postMessage.
+  // We let the plugin drive height entirely — no hard-coded aspect ratios.
+  const MAX_HEIGHT = isVideo ? 2000 : 800;
+  const DEFAULT_HEIGHT = isVideo ? 560 : 360;
   const MIN_HEIGHT = 160;
   // For image posts, the Facebook plugin appends a reactions/like/share footer
   // (~120-150px) that creates a large blank strip above Aelix's own action
   // bar. Render the iframe at full measured height but clip the wrapper so
   // only the media area shows.
   const FB_FOOTER_TRIM = isVideo ? 0 : 130;
-  const MAX_TRUSTED_SUGGESTED = isVideo ? 1400 : 760;
+  const MAX_TRUSTED_SUGGESTED = isVideo ? 2000 : 760;
+
+  // Rebuild the plugin src with a `width` param that matches the actual
+  // rendered container width (capped at 500). This makes FB compute the
+  // correct native aspect ratio for reels/videos instead of stretching a
+  // fixed-width plugin into an arbitrarily sized frame.
+  const [iframeSrc, setIframeSrc] = useState(rawIframeSrc);
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el || !rawIframeSrc) return;
+    const applyWidth = () => {
+      const w = Math.max(280, Math.min(500, Math.round(el.getBoundingClientRect().width)));
+      try {
+        const u = new URL(rawIframeSrc);
+        u.searchParams.set('width', String(w));
+        const next = u.toString();
+        setIframeSrc((prev) => (prev === next ? prev : next));
+      } catch {
+        setIframeSrc(rawIframeSrc);
+      }
+    };
+    applyWidth();
+    const ro = new ResizeObserver(applyWidth);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [rawIframeSrc]);
 
   const [height, setHeight] = useState(() => {
     if (suggestedHeight && suggestedHeight >= MIN_HEIGHT && suggestedHeight <= MAX_TRUSTED_SUGGESTED) {
@@ -428,6 +457,7 @@ const FacebookIframeEmbed = ({
 
   return (
     <div
+      ref={wrapperRef}
       className="relative w-full overflow-hidden"
       style={{
         touchAction: 'pan-y',
@@ -442,7 +472,6 @@ const FacebookIframeEmbed = ({
         allowFullScreen
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"
         loading="lazy"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         onError={() => setFailed(true)}
         style={{
           border: 'none',
@@ -714,10 +743,10 @@ const buildFacebookEmbed = (url: string): string | null => {
     ? `href=${encodedUrl}&width=500`
     : `href=${encodedUrl}&show_text=true&width=500`;
 
-  // Reels / vertical video → 9:16, regular posts → 4:5
-  const aspectRatio = isVideo ? '9/16' : '4/5';
-
-  return `<iframe src="https://www.facebook.com/plugins/${pluginEndpoint}?${query}" style="border:none;width:100%;aspect-ratio:${aspectRatio};overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
+  // No hard-coded aspect-ratio: FacebookIframeEmbed rebuilds the src with
+  // the real container width and lets Facebook's plugin drive the height
+  // via postMessage so the embed matches Facebook's native viewport.
+  return `<iframe src="https://www.facebook.com/plugins/${pluginEndpoint}?${query}" style="border:none;width:100%;overflow:hidden;" scrolling="no" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share" loading="lazy"></iframe>`;
 };
 
 // Check if Spotify URL is embeddable (not wrapped-share or other special pages)
