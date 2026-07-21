@@ -279,10 +279,14 @@ a:active:not(:disabled) {
   pointer-events: none !important;
 }
 
-/* NOTE: intentionally NOT disabling iframe pointer-events at scroll-top.
-   Blanket-disabling iframes blocked the first tap on Facebook / Pinterest
-   video players (which are the first cards on a fresh feed). PTR still
-   works from any non-iframe surface via window-capture touch listeners. */
+/* When the page is at scroll-top, disable pointer-events on iframes so
+   Pull-to-Refresh can capture touchstart from anywhere on the feed
+   (including over YouTube/Instagram/Twitter embeds). Once the user
+   scrolls down at all, this class is removed and iframes become
+   interactive again. */
+body.at-scroll-top iframe {
+  pointer-events: none !important;
+}
 
 /* Disable the browser's native pull-to-refresh so our in-app PullToRefresh
    component owns the gesture on every page (especially short empty states). */

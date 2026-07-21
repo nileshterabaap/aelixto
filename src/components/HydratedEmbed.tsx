@@ -412,10 +412,9 @@ export const HydratedEmbed = memo(({
         
         {/* Article embed */}
         {r.kind === 'article' && r.url && (
-          /* No ImageViewTracker: articles/quora/external only score on
-             explicit visit (article_open / external_visit) — total 1 point,
-             not 1 (view) + 1 (visit) = 2. */
-          <ArticleEmbed url={r.url} postId={post.id} platform={post.platform} />
+          <ImageViewTracker postId={post.id}>
+            <ArticleEmbed url={r.url} postId={post.id} platform={post.platform} />
+          </ImageViewTracker>
         )}
         
         {/* Universal Meta embed (Instagram, Facebook, etc) */}

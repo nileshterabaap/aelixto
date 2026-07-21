@@ -625,9 +625,9 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
                 autoLoad={false}
               >
-                {/* No ImageViewTracker for articles: visit is the single
-                    scoring event (article_open / external_visit = +1 total). */}
-                <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
+                <ImageViewTracker postId={post.id}>
+                  <ArticleEmbed url={r.url} onFaviconLoaded={setBlogFavicon} />
+                </ImageViewTracker>
               </LazyEmbed>
             )}
             {r.kind === 'article' && !post.isRealPost && (
