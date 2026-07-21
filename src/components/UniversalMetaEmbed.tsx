@@ -412,10 +412,15 @@ const FacebookIframeEmbed = ({
     return DEFAULT_HEIGHT;
   });
 
-  // Listen for Facebook's cross-origin resize messages. FB plugins post a
-  // few different shapes (`{type:"resize",height}`, nested xdArbiter payloads,
-  // `frame.height`, etc.) — use the generic extractor so we catch them all
-  // and snap the container to the real rendered height (kills blank space).
+  // Listen for Facebook's cross-origin resize messages. FB posts multiple
+  // heights during a session — one on initial layout, then more when the
+  // player controls fade in/out on play/pause. Snapping the container to
+  // every value causes the visible viewport to jump (the reported reel
+  // problem). For videos we lock to the FIRST substantial height reported
+  // by Facebook so the container matches the plugin's native viewport and
+  // never re-shifts on play/pause. For static posts we keep the previous
+  // grow-only behaviour so tall photos still expand fully.
+  const lockedRef = useRef(false);
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const iframeWindow = iframeRef.current?.contentWindow;
@@ -425,12 +430,19 @@ const FacebookIframeEmbed = ({
       const next = parseThreadsHeightFromMessage(event.data);
       if (!next || next < 80) return;
       const clamped = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.round(next)));
-      setHeight((prev) => (Math.abs(prev - clamped) > 4 ? clamped : prev));
-      persistHeight(clamped);
+      if (isVideo) {
+        if (lockedRef.current) return; // ignore later play/pause resize events
+        lockedRef.current = true;
+        setHeight(clamped);
+        persistHeight(clamped);
+      } else {
+        setHeight((prev) => (clamped > prev + 4 ? clamped : prev));
+        persistHeight(clamped);
+      }
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [MAX_HEIGHT]);
+  }, [MAX_HEIGHT, isVideo, persistHeight]);
 
   // Fallback: if iframe doesn't render in 12s, show OG card
   useEffect(() => {
