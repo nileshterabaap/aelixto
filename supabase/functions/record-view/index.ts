@@ -80,10 +80,10 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get post author_id and platform
+    // Get post author_id
     const { data: post, error: postError } = await supabase
       .from('posts')
-      .select('user_id, platform')
+      .select('user_id')
       .eq('id', post_id)
       .single();
 
@@ -102,53 +102,6 @@ Deno.serve(async (req) => {
         JSON.stringify({ ok: true, skipped: true, reason: 'Self-view not counted' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-
-    // Threads embeds can emit multiple parent-page signals from a single user
-    // action when several Threads posts are mounted (the SDK inflates an
-    // in-page blockquote, so one tap can trigger listeners on siblings). X
-    // does NOT have this problem — its iframe blur check is scoped per-post
-    // and its image_view timer is per-tracker — so X must NOT be collapsed
-    // here or legitimate sequential views get silently dropped.
-    const platform = String(post.platform || '').toLowerCase();
-    const isThreadsPost = platform.includes('threads');
-    const isBurstyPlatform = isThreadsPost;
-    const platformPattern = '%threads%';
-    // Only collapse the events that actually leak across mounted Threads posts
-    // from a single interaction. image_view is per-post-timer and safe.
-    const isBurstEvent = ['video_play', 'original_visit'].includes(event_type);
-
-    if (isBurstyPlatform && isBurstEvent) {
-      // Tight window: a single blur/pointer event on one iframe reaches every
-      // mounted sibling listener within a few frames. 800ms is comfortably
-      // above that, well below any plausible sequential user interaction.
-      const since = new Date(Date.now() - 800).toISOString();
-      const { data: recentViews, error: burstError } = await supabase
-        .from('post_views')
-        .select('post_id')
-        .eq('event_type', event_type)
-        .neq('post_id', post_id)
-        .eq('device_hash', device_hash)
-        .gte('created_at', since)
-        .limit(8);
-
-      if (!burstError && recentViews && recentViews.length > 0) {
-        const recentPostIds = [...new Set(recentViews.map((row: { post_id: string }) => row.post_id))];
-        const { data: recentSamePlatformPost } = await supabase
-          .from('posts')
-          .select('id')
-          .in('id', recentPostIds)
-          .ilike('platform', platformPattern)
-          .limit(1);
-
-        if (recentSamePlatformPost && recentSamePlatformPost.length > 0) {
-          console.log('[record-view] Skipping burst duplicate', { post_id, event_type, platform });
-          return new Response(
-            JSON.stringify({ ok: true, skipped: true, reason: 'Platform burst duplicate' }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      }
     }
 
     // Hash IP server-side

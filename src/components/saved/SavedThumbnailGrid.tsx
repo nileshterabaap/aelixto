@@ -89,7 +89,7 @@ function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void
     return (
       <button
         onClick={onClick}
-        className="press-in relative overflow-hidden rounded-2xl aspect-square block"
+        className="relative overflow-hidden rounded-2xl aspect-square block"
       >
         <TextCardThumbnail
           platform={post.platform}
@@ -105,7 +105,7 @@ function ThumbnailCard({ post, onClick }: { post: SavedPost; onClick: () => void
   }
 
   return (
-    <button onClick={onClick} className="press-in relative overflow-hidden rounded-2xl aspect-square bg-muted/50 group">
+    <button onClick={onClick} className="relative overflow-hidden rounded-2xl aspect-square bg-muted/50 group">
       {!imageLoaded && (
         <div className="absolute inset-0 bg-muted/70 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-muted before:to-transparent before:animate-shimmer" />
       )}

@@ -12,7 +12,6 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Post } from "@/data/demoData";
 import type { PlatformPost } from "@/hooks/useUserPlatformPosts";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
-import { getEmbedStatus, subscribeEmbedReadiness } from "@/lib/embedReadiness";
 
 interface PlatformPostViewerProps {
   userId: string;
@@ -31,21 +30,6 @@ interface ProfileData {
   display_name: string | null;
   avatar_url: string | null;
 }
-
-const X_PLATFORMS = new Set(["x", "twitter"]);
-const INITIAL_X_WINDOW_RADIUS = 0;
-const BACKGROUND_X_WINDOW_RADIUS = 2;
-const X_WINDOW_EXPAND_STEP = 4;
-const X_WINDOW_EDGE_PX = 900;
-
-const getXViewerRange = (length: number, index: number, radius: number) => {
-  if (length === 0) return { start: 0, end: -1 };
-  const safeIndex = index >= 0 ? index : 0;
-  return {
-    start: Math.max(0, safeIndex - radius),
-    end: Math.min(length - 1, safeIndex + radius),
-  };
-};
 
 // Render all posts so users can scroll UP to see posts above the tapped one
 // and DOWN to see posts below. We anchor the scroll position to the tapped
@@ -72,9 +56,6 @@ function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { 
     preview_text: post.preview_text,
     preview_title: post.preview_title,
     preview_image_url: post.preview_image_url,
-    media_kind: post.media_kind,
-    aspect_ratio: post.aspect_ratio,
-    suggested_height: post.suggested_height,
     platform: post.platform as any,
     embed_html: post.embed_html,
     timestamp: new Date(post.created_at),
@@ -83,9 +64,6 @@ function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { 
     comments_count: 0,
     isRepost: !!post.is_repost,
     isRealPost: true,
-    pinned_at: (post as any).pinned_at ?? null,
-    hide_counts: !!(post as any).hide_counts,
-    comments_disabled: !!(post as any).comments_disabled,
   } as any;
 }
 
@@ -122,7 +100,6 @@ export const PlatformPostViewer = ({
   const [portalReady, setPortalReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const pendingPrependAnchor = useRef<{ postId: string; top: number } | null>(null);
   // Fires exactly once when the tapped target post is first attached to
   // the DOM — used to synchronously scroll the container to that post
   // BEFORE the browser paints, so post #0 never flashes.
@@ -134,19 +111,8 @@ export const PlatformPostViewer = ({
   const [targetReady, setTargetReady] = useState(false);
   useEffect(() => {
     setTargetReady(false);
-    // Let the post shell appear almost instantly; the embed renders its own
-    // skeleton while third-party SDKs finish inside the card.
-    const check = () => {
-      if (getEmbedStatus(initialPostId) === "ready") {
-        setTargetReady(true);
-        return true;
-      }
-      return false;
-    };
-    if (check()) return;
-    const unsub = subscribeEmbedReadiness(() => { check(); });
-    const cap = window.setTimeout(() => setTargetReady(true), 180);
-    return () => { unsub(); window.clearTimeout(cap); };
+    const t = window.setTimeout(() => setTargetReady(true), 1400);
+    return () => window.clearTimeout(t);
   }, [initialPostId]);
   // Persist scroll-locked state across effect re-runs. Without this, if
   // `posts`/`profileData`/etc change after the user has already started
@@ -170,84 +136,6 @@ export const PlatformPostViewer = ({
     [posts, initialPostId, initialPostIndex]
   );
   const targetPostId = initialIdx >= 0 ? posts[initialIdx]?.id : undefined;
-  const isXViewer = useMemo(() => {
-    const tab = (activeTab || "").toLowerCase();
-    const targetPlatform = String(posts[initialIdx]?.platform || "").toLowerCase();
-    return X_PLATFORMS.has(tab) || X_PLATFORMS.has(targetPlatform);
-  }, [activeTab, posts, initialIdx]);
-  const [renderRange, setRenderRange] = useState(() =>
-    getXViewerRange(posts.length, initialIdx, INITIAL_X_WINDOW_RADIUS)
-  );
-  const renderedPosts = useMemo(
-    () => isXViewer ? posts.slice(renderRange.start, renderRange.end + 1) : posts,
-    [isXViewer, posts, renderRange.start, renderRange.end]
-  );
-
-  useEffect(() => {
-    postRefs.current.clear();
-    pendingPrependAnchor.current = null;
-    if (isXViewer) {
-      setRenderRange(getXViewerRange(posts.length, initialIdx, INITIAL_X_WINDOW_RADIUS));
-    } else {
-      setRenderRange({ start: 0, end: posts.length - 1 });
-    }
-  }, [isXViewer, posts.length, initialIdx, initialPostId, activeTab]);
-
-  useEffect(() => {
-    if (!isXViewer || initialIdx < 0) return;
-    const t = window.setTimeout(() => {
-      setRenderRange(getXViewerRange(posts.length, initialIdx, BACKGROUND_X_WINDOW_RADIUS));
-    }, 900);
-    return () => window.clearTimeout(t);
-  }, [isXViewer, posts.length, initialIdx, initialPostId]);
-
-  useLayoutEffect(() => {
-    if (!isXViewer) return;
-    const anchor = pendingPrependAnchor.current;
-    const container = scrollContainerRef.current;
-    if (!anchor || !container) return;
-    const el = postRefs.current.get(anchor.postId);
-    if (el) {
-      container.scrollTop += el.getBoundingClientRect().top - anchor.top;
-    }
-    pendingPrependAnchor.current = null;
-  }, [isXViewer, renderRange.start]);
-
-  const expandXWindowIfNeeded = useCallback(() => {
-    if (!isXViewer) return;
-    const container = scrollContainerRef.current;
-    if (!container) return;
-
-    if (container.scrollTop < X_WINDOW_EDGE_PX && renderRange.start > 0 && renderedPosts.length > 0) {
-      const firstPost = renderedPosts[0];
-      const firstEl = postRefs.current.get(firstPost.id);
-      if (firstEl) {
-        pendingPrependAnchor.current = { postId: firstPost.id, top: firstEl.getBoundingClientRect().top };
-      }
-      setRenderRange((current) => ({
-        ...current,
-        start: Math.max(0, current.start - X_WINDOW_EXPAND_STEP),
-      }));
-    }
-
-    const distanceFromBottom = container.scrollHeight - container.clientHeight - container.scrollTop;
-    if (distanceFromBottom < X_WINDOW_EDGE_PX && renderRange.end < posts.length - 1) {
-      setRenderRange((current) => ({
-        ...current,
-        end: Math.min(posts.length - 1, current.end + X_WINDOW_EXPAND_STEP),
-      }));
-    }
-  }, [isXViewer, posts.length, renderRange.end, renderRange.start, renderedPosts]);
-
-  useEffect(() => {
-    if (!isXViewer) return;
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const onScroll = () => expandXWindowIfNeeded();
-    container.addEventListener("scroll", onScroll, { passive: true });
-    requestAnimationFrame(onScroll);
-    return () => container.removeEventListener("scroll", onScroll);
-  }, [isXViewer, expandXWindowIfNeeded]);
   
   // Touch handling for swipe
   const touchStartX = useRef<number>(0);
@@ -331,6 +219,8 @@ export const PlatformPostViewer = ({
     };
     container.addEventListener("wheel", markScrolled, { passive: true });
     container.addEventListener("touchmove", markScrolled, { passive: true });
+    container.addEventListener("pointerdown", markScrolled, { passive: true });
+    container.addEventListener("touchstart", markScrolled, { passive: true });
     container.addEventListener("keydown", markScrolled, { passive: true });
     // Last-resort: any genuine scroll delta the observers didn't catch
     // (momentum, scrollbar drag, programmatic-but-user-initiated) trips
@@ -352,7 +242,7 @@ export const PlatformPostViewer = ({
       cancelled = true;
       ro.disconnect();
       mo.disconnect();
-    }, 12000);
+    }, 4000);
 
     return () => {
       cancelled = true;
@@ -361,6 +251,8 @@ export const PlatformPostViewer = ({
       window.clearTimeout(safetyTimeout);
       container.removeEventListener("wheel", markScrolled);
       container.removeEventListener("touchmove", markScrolled);
+      container.removeEventListener("pointerdown", markScrolled);
+      container.removeEventListener("touchstart", markScrolled);
       container.removeEventListener("keydown", markScrolled);
       container.removeEventListener("scroll", onScroll);
       container.removeEventListener("load", onAnyLoad, true);
@@ -488,9 +380,7 @@ export const PlatformPostViewer = ({
               <p className="text-muted-foreground">No posts in this section</p>
             </div>
           ) : (
-            renderedPosts.map((post, idx) => {
-              const absoluteIdx = isXViewer ? renderRange.start + idx : idx;
-              return (
+            posts.map((post, idx) => (
               <motion.div
                 key={post.id}
                 ref={(el) => {
@@ -513,6 +403,52 @@ export const PlatformPostViewer = ({
                         container.scrollTop + (targetRect.top - containerRect.top);
                       initialAnchorDoneRef.current = true;
                     }
+                    // Reveal only after the embed's height has been
+                    // stable for ~250ms following its first load. This
+                    // avoids the Instagram "tall-then-trim" flash where
+                    // the iframe first paints with IG's own footer, then
+                    // shrinks after the MEASURE postMessage arrives.
+                    let stableTimer: number | null = null;
+                    let lastHeight = -1;
+                    let revealed = false;
+                    const reveal = () => {
+                      if (revealed) return;
+                      revealed = true;
+                      setTargetReady(true);
+                    };
+                    const scheduleStable = () => {
+                      if (stableTimer) window.clearTimeout(stableTimer);
+                      stableTimer = window.setTimeout(reveal, 250);
+                    };
+                    const ro = new ResizeObserver((entries) => {
+                      const h = Math.round(entries[0]?.contentRect.height || 0);
+                      if (h <= 0) return;
+                      if (h !== lastHeight) {
+                        lastHeight = h;
+                        scheduleStable();
+                      }
+                    });
+                    ro.observe(el);
+                    const armOnLoad = () => {
+                      const media = el.querySelector("iframe, img") as HTMLIFrameElement | HTMLImageElement | null;
+                      if (!media) return false;
+                      if ((media as HTMLImageElement).complete) {
+                        scheduleStable();
+                      } else {
+                        media.addEventListener("load", scheduleStable, { once: true });
+                      }
+                      return true;
+                    };
+                    if (!armOnLoad()) {
+                      const mo = new MutationObserver(() => {
+                        if (armOnLoad()) mo.disconnect();
+                      });
+                      mo.observe(el, { childList: true, subtree: true });
+                      window.setTimeout(() => mo.disconnect(), 1500);
+                    }
+                    // Safety cap — always reveal by 1.4s even if the
+                    // embed never stabilises (slow network, no MEASURE).
+                    window.setTimeout(reveal, 1400);
                   }
                 }}
                 initial={post.id === targetPostId ? false : { opacity: 0, y: 6 }}
@@ -524,31 +460,22 @@ export const PlatformPostViewer = ({
                 }
                 transition={{
                   duration: 0.28,
-                  delay: Math.min(Math.abs(absoluteIdx - initialIdx), 4) * 0.04,
+                  delay: Math.min(Math.abs(idx - initialIdx), 4) * 0.04,
                   ease: [0.22, 1, 0.36, 1],
                 }}
               >
-                <div className="relative">
-                  {post.id === targetPostId && !targetReady && (
-                    <div className="absolute inset-0 z-10">
-                      <PostSkeleton />
-                    </div>
-                  )}
-                  <HydratedFeedPost
-                    post={transformPost(post, profileData)}
-                    onDeleted={() => {
-                      // Stay inside the viewer after deleting. Only close it
-                      // when this was the last post in the grid.
-                      if (posts.length <= 1) onClose();
-                    }}
-                    userId={user?.id}
-                    startHydrated={true}
-                    fastReveal={isXViewer && post.id === targetPostId}
-                  />
-                </div>
+                <HydratedFeedPost
+                  post={transformPost(post, profileData)}
+                  onDeleted={() => {
+                    // Stay inside the viewer after deleting. Only close it
+                    // when this was the last post in the grid.
+                    if (posts.length <= 1) onClose();
+                  }}
+                  userId={user?.id}
+                  startHydrated={true}
+                />
               </motion.div>
-              );
-            })
+            ))
           )}
         </div>
       </div>

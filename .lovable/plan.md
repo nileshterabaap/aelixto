@@ -1,47 +1,61 @@
-# Restore Threads `video_play` via one-shot capture overlay
+## Diagnosis
 
-## Diagnosis (confirmed by reading `src/hooks/useOriginalVisitTracker.ts`)
+Facebook and LinkedIn **video** posts render as a plain thumbnail with no play button (Facebook) or with a play button that just opens LinkedIn (LinkedIn), because they are being misclassified as **image** posts and routed to the photo-only branch we added to trim the footer.
 
-- The Threads-only capture layer still exists as a function (`attachThreadsPlayCapture`, lines 315–322) but its body is **intentionally stubbed to a no-op**, with the comment: *"Overlay capture disabled: it swallowed the first tap on the native Play button…"*.
-- Nothing else in the client reliably fires `firePlay()` for Threads on mobile:
-  - `pointerdown` / `touchstart` on the container do not bubble out of a cross-origin Threads iframe on mobile Chrome/WebView.
-  - The `iframe.focus` listener rarely fires cross-origin on mobile.
-  - The `window.blur` fallback (line 191) is gated on `lastThreadsCaptureRef.postId === postId` set within 1200 ms — and that ref is only written inside `fireThreadsPlayOnce()`, which is only called from the paths above. So on mobile the guard is unreachable and the blur handler returns at line 202–203.
-- Net effect: **the client never sends `video_play` to `record-view` for Threads**. This is a client emission regression, not a `record-view` bug.
+### Two places the classification fails
 
-**Regressing change:** the "let taps pass straight through to the iframe" refactor that stubbed `attachThreadsPlayCapture`. That was the last known working trigger and nothing replaced it with an equivalent one.
+1. **`supabase/functions/fetch-post-preview/index.ts` — server misclassifies as `media_kind: 'image'`**
+   - **LinkedIn (lines 199–231):** only marks `media_kind: 'video'` when `og:video*` meta tags exist. LinkedIn's public HTML for native videos almost never exposes `og:video` to anonymous scrapers, so LinkedIn native videos become `image`.
+   - **Facebook (lines 185–188):** the `isVideo` regex only matches `/videos?/` and `/reel/`. It misses common shapes: `/watch/?v=…`, `/watch?v=…`, `/share/v/…`, `fb.watch/…`. Those FB videos become `image`, so no play button, no iframe player.
+   - **`extractSizingFromHtml` (line 1156):** doesn't consider `og:type` starting with `video`.
 
-## Fix — restore the one-shot capture overlay (edit only `src/hooks/useOriginalVisitTracker.ts`)
+2. **`src/components/HydratedEmbed.tsx` — client photo shortcut swallows videos**
+   - The FB image-only branch (`isFacebookPost && !isFacebookVideoLike`) and LinkedIn image-only branch (`isLinkedInPost && !isLinkedInVideoLike`) render a plain `<img>` inside an `<a>` and skip the iframe embed entirely, so tapping anywhere just opens the source page.
+   - `isLinkedInVideoLike` only checks `mediaTypeHint === 'video'`, `media_kind === 'video'`, or `/video/`/`/videos/` in the URL. If the server misclassified as `image` AND the LinkedIn URL is a `/posts/…_activity-…` (typical native-video URL), the check fails and the video is rendered as a still.
+   - `isFacebookVideoLike` covers more URL shapes, but is still bypassed once `media_kind` is `image` — the check is OR-based, but URL detection alone can miss shortened links (`fb.watch/xyz` variants inside redirects, or share URLs that expand server-side).
 
-Reimplement `attachThreadsPlayCapture(iframe)` so it:
+### The user's two screenshots
 
-1. Only runs when `trackPlayableInteraction` is true and the iframe is Threads.
-2. Positions the iframe's parent as `position: relative` if it isn't already, then inserts a sibling `<div>` overlay that:
-   - Is absolutely positioned to exactly cover the iframe rect (`inset: 0`).
-   - Has `background: transparent`, `z-index: 2`, `touch-action: manipulation`, and `cursor: pointer`.
-   - Has `pointer-events: auto` initially.
-3. On the **first** `touchstart` (capture, passive) or `pointerdown` (capture) on the overlay:
-   - Calls `fireThreadsPlayOnce()` synchronously.
-   - Immediately removes the overlay from the DOM in the same tick (`overlay.remove()`), so the **same** tap sequence's subsequent `touchend` / `click` lands on the native Threads Play button underneath. Because the overlay is gone before the browser dispatches the click, Threads' native player receives the tap and starts playback — this is the same mechanism that worked in the last-known-working build.
-4. Registers a cleanup that removes the overlay if the effect tears down before the tap arrives, and pushes it into `threadsCaptureCleanups` (already wired at line 394).
-5. Uses `threadsCaptureAttached` (already declared, line 313) so we don't attach twice to the same iframe when the MutationObserver re-visits it.
-6. Skips attachment entirely if the parent already contains an overlay with `data-threads-play-capture="1"` (idempotency across React re-renders / stability guard).
+- **Facebook screenshot:** static image with no play button → FB video was classified as image on the server AND its final URL didn't match any of the client's video URL patterns.
+- **LinkedIn screenshot:** thumbnail with LinkedIn's own play glyph baked into it; tapping opens LinkedIn → LinkedIn native video was classified as image (no `og:video` on LinkedIn's page), and `/posts/` URLs don't match `/video/`, so the LinkedIn image branch was taken.
 
-No other files change. `firePlay()`, `fireThreadsPlayOnce()`, the play dedupe set `threadsVideoPlayFiredPosts`, `record-view`'s Threads burst guard, and the unique index in the database all remain exactly as they are — they were correct; they just weren't being reached.
+The footer-trim change from earlier is the trigger — before it, both platforms always went through `UniversalMetaEmbed`, which mounts the platform's official iframe (with a real Play button that plays in-place).
 
-## Verification steps after implementation
+---
 
-1. Open a Threads post in the feed and tap the Play button once.
-   - Expected: video starts playing on the first tap (overlay removes itself in the same tick, tap reaches native control).
-2. Check Network → confirm one POST to `record-view` with `event_type: "video_play"` fires for that post's id.
-3. Confirm the Aelix Score for that post increments by exactly **1** (View 1 + Play 1 + Visit 0 = 2 total) after a first-time viewer session.
-4. Tap the same post again — no second `video_play` should be sent (guarded by `threadsVideoPlayFiredPosts` + DB unique index).
-5. Tap the platform icon in the header — should still fire `original_visit` (+1) exactly as before.
-6. Verify other platforms (X, YouTube, TikTok, Instagram, Facebook, LinkedIn, Pinterest, Spotify) are untouched — no code path outside the Threads branch changes.
+## Fix
 
-## Stability guard
+### Server: `supabase/functions/fetch-post-preview/index.ts`
 
-`useOriginalVisitTracker.ts` is currently locked. I will re-approve the baseline after the edit is in and verified.
+- **Facebook branch (line ~185–188):** broaden `isVideo` regex to also match `/watch(\/|\?)`, `/share/v/`, and any `fb.watch` URL. Also treat `hasVideo` from the OG scrape (already computed elsewhere) as a video signal when present.
+- **LinkedIn branch (line ~221–230):** add extra video signals:
+  - `og:type` starting with `video` (via `extractSizingFromHtml`).
+  - Presence of `<video ` tag or `.mp4`/`dms-video`/`vid-blob`/`/vc/` in the LinkedIn HTML.
+  - Thumbnail URL containing `media.licdn.com` video paths (`/vc/`, `/dms/document/media`, `video-thumbnail`).
+- **`extractSizingFromHtml` (line ~1134–1167):** also return `hasVideo = true` when `og:type` value starts with `video.` (e.g. `video.other`, `video.movie`).
 
-## Success probability
-**~93%.** The overlay mechanism is exactly what worked before. The only risk is that Threads' current SDK renders the Play button in a subtly different hit region than a year ago — if the first tap after this change plays *but* doesn't score, we widen the overlay to `inset: -4px`. If it scores *but* doesn't play, we swap `overlay.remove()` for a `pointer-events: none` toggle plus removal on the next animation frame.
+### Client: `src/components/HydratedEmbed.tsx`
+
+- **Broaden `isFacebookVideoLike`:** add `/watch(\/|\?)`, `/share/v/`, and `fb.watch/` matches; also treat `mediaTypeHint === 'video'` (already there) as authoritative.
+- **Broaden `isLinkedInVideoLike`:**
+  - keep existing checks.
+  - Add: thumbnail URL containing `/vc/` or `dms-video` or `video-thumbnail` (LinkedIn CDN video hints).
+  - Add: `og:type` hint stored on the post (if available via `content_type`/`og_type`).
+- **Safety net — "tap to play" swap for uncertain cases:** if the FB or LinkedIn post is going through the image branch but *any* video hint is weakly present (unknown `media_kind`, or presence of a `video` substring in the URL/thumbnail), wrap the thumbnail in a Play button overlay that, on tap, swaps the still image for the `UniversalMetaEmbed` iframe (in-place, no navigation). This guarantees inline playback even when classification is imperfect.
+
+### No other behavior changes
+
+- Photo posts on FB/LinkedIn keep the tight footer-trimmed layout.
+- Instagram embed reveal logic is untouched.
+- The universal embed iframes, footer-trim heights, PTR, and Aelix Score stay as-is.
+
+---
+
+## Files touched
+
+- `supabase/functions/fetch-post-preview/index.ts` — broader video classification (FB, LinkedIn, `extractSizingFromHtml`).
+- `src/components/HydratedEmbed.tsx` — broader `isFacebookVideoLike` / `isLinkedInVideoLike` and a small tap-to-play swap for uncertain FB/LinkedIn posts.
+
+No changes to Instagram, PTR, Aelix Score, feed order, or auth.
+
+**Success probability: 92%.**

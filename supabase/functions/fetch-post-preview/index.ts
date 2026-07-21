@@ -225,7 +225,10 @@ serve(async (req) => {
       const hasVideo = ogData.hasVideo;
       const dims = ogData.imageWidth && ogData.imageHeight ? { w: ogData.imageWidth, h: ogData.imageHeight } : null;
       const ar = dims ? clampAR(dims.w / dims.h) : null;
-      if (hasVideo) {
+      const linkedInVideoHint =
+        hasVideo ||
+        (thumbnailUrl && /(\/vc\/|dms-video|video-thumbnail|\/videocover\/)/i.test(thumbnailUrl));
+      if (linkedInVideoHint) {
         sizing = { media_kind: 'video', aspect_ratio: ar ?? 16 / 9, suggested_height: null };
       } else if (thumbnailUrl) {
         sizing = { media_kind: 'image', aspect_ratio: ar ?? 4 / 5, suggested_height: null };

@@ -45,8 +45,6 @@ export function useBlockedUsers() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
-      // Blocked user should reappear in search/feed/profile — refetch broadly.
-      queryClient.invalidateQueries();
     },
   });
 

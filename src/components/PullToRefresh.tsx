@@ -42,6 +42,9 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   }, []);
 
   useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
     const handleTouchStart = (event: TouchEvent) => {
       if (refreshing) return;
       if (shouldIgnorePullTarget(event.target)) return;
@@ -54,22 +57,6 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       // while still dragging downward (Instagram-style).
       pulling.current = true;
     };
-
-    // Toggle `body.at-scroll-top` so iframes become pointer-events:none
-    // when at the top of the page — this is what lets the finger start
-    // a pull gesture over a YouTube/Instagram/Twitter embed. As soon as
-    // the user scrolls down, iframes become interactive again.
-    const updateAtTop = () => {
-      const pageScrollTop =
-        window.scrollY ||
-        document.scrollingElement?.scrollTop ||
-        document.documentElement.scrollTop ||
-        0;
-      const atTop = pageScrollTop <= 2;
-      document.body.classList.toggle("at-scroll-top", atTop);
-    };
-    updateAtTop();
-    window.addEventListener("scroll", updateAtTop, { passive: true });
 
     const handleTouchMove = (event: TouchEvent) => {
       if (!pulling.current || refreshing) return;
@@ -121,21 +108,16 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       animate(pullY, 0, { type: "spring", stiffness: 350, damping: 28 });
     };
 
-    // Listen on window (capture phase) so touches over iframes, overlays,
-    // and embeds still trigger PTR — matching Instagram's "pull from anywhere".
-    const opts: AddEventListenerOptions = { passive: true, capture: true };
-    window.addEventListener("touchstart", handleTouchStart, opts);
-    window.addEventListener("touchmove", handleTouchMove, opts);
-    window.addEventListener("touchend", handleTouchEnd, opts);
-    window.addEventListener("touchcancel", handleTouchEnd, opts);
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
+    el.addEventListener("touchmove", handleTouchMove, { passive: true });
+    el.addEventListener("touchend", handleTouchEnd, { passive: true });
+    el.addEventListener("touchcancel", handleTouchEnd, { passive: true });
 
     return () => {
-      window.removeEventListener("touchstart", handleTouchStart, opts);
-      window.removeEventListener("touchmove", handleTouchMove, opts);
-      window.removeEventListener("touchend", handleTouchEnd, opts);
-      window.removeEventListener("touchcancel", handleTouchEnd, opts);
-      window.removeEventListener("scroll", updateAtTop);
-      document.body.classList.remove("at-scroll-top");
+      el.removeEventListener("touchstart", handleTouchStart);
+      el.removeEventListener("touchmove", handleTouchMove);
+      el.removeEventListener("touchend", handleTouchEnd);
+      el.removeEventListener("touchcancel", handleTouchEnd);
     };
   }, [isAtTop, onRefresh, pullY, refreshing]);
 
