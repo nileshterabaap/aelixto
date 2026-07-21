@@ -370,15 +370,14 @@ const FacebookIframeEmbed = ({
   // Facebook's plugin lays itself out from the `width` URL param (capped at
   // 500 by FB) and posts the resulting content height back via postMessage.
   // We let the plugin drive height entirely — no hard-coded aspect ratios.
-  const MAX_HEIGHT = isVideo ? 2000 : 800;
+  // Safety bounds only — Facebook's plugin drives the real height via
+  // postMessage. We accept whatever it reports and never trim/offset it,
+  // so the visible viewport matches Facebook's native plugin frame and
+  // doesn't shift when player chrome fades in/out on play/pause.
+  const MAX_HEIGHT = isVideo ? 2000 : 1200;
   const DEFAULT_HEIGHT = isVideo ? 560 : 360;
   const MIN_HEIGHT = 160;
-  // For image posts, the Facebook plugin appends a reactions/like/share footer
-  // (~120-150px) that creates a large blank strip above Aelix's own action
-  // bar. Render the iframe at full measured height but clip the wrapper so
-  // only the media area shows.
-  const FB_FOOTER_TRIM = isVideo ? 0 : 130;
-  const MAX_TRUSTED_SUGGESTED = isVideo ? 2000 : 760;
+  const MAX_TRUSTED_SUGGESTED = isVideo ? 2000 : 1000;
 
   // Rebuild the plugin src with a `width` param that matches the actual
   // rendered container width (capped at 500). This makes FB compute the
@@ -412,15 +411,9 @@ const FacebookIframeEmbed = ({
     return DEFAULT_HEIGHT;
   });
 
-  // Listen for Facebook's cross-origin resize messages. FB posts multiple
-  // heights during a session — one on initial layout, then more when the
-  // player controls fade in/out on play/pause. Snapping the container to
-  // every value causes the visible viewport to jump (the reported reel
-  // problem). For videos we lock to the FIRST substantial height reported
-  // by Facebook so the container matches the plugin's native viewport and
-  // never re-shifts on play/pause. For static posts we keep the previous
-  // grow-only behaviour so tall photos still expand fully.
-  const lockedRef = useRef(false);
+  // Adopt whatever height Facebook reports, exactly as reported. No
+  // first-message freeze, no grow-only clamp, no trim offset — the plugin
+  // frame is Facebook's native chrome and we let it flow.
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       const iframeWindow = iframeRef.current?.contentWindow;
@@ -430,19 +423,12 @@ const FacebookIframeEmbed = ({
       const next = parseThreadsHeightFromMessage(event.data);
       if (!next || next < 80) return;
       const clamped = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.round(next)));
-      if (isVideo) {
-        if (lockedRef.current) return; // ignore later play/pause resize events
-        lockedRef.current = true;
-        setHeight(clamped);
-        persistHeight(clamped);
-      } else {
-        setHeight((prev) => (clamped > prev + 4 ? clamped : prev));
-        persistHeight(clamped);
-      }
+      setHeight((prev) => (Math.abs(prev - clamped) > 2 ? clamped : prev));
+      persistHeight(clamped);
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [MAX_HEIGHT, isVideo, persistHeight]);
+  }, [MAX_HEIGHT, persistHeight]);
 
   // Fallback: if iframe doesn't render in 12s, show OG card
   useEffect(() => {
@@ -474,7 +460,7 @@ const FacebookIframeEmbed = ({
       style={{
         touchAction: 'pan-y',
         width: '100%',
-        height: `${Math.max(MIN_HEIGHT, height - FB_FOOTER_TRIM)}px`,
+        height: `${height}px`,
       }}
     >
       <iframe
