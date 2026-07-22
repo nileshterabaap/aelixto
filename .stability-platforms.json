@@ -109,6 +109,13 @@
         }
       },
       "frozenAt": "2026-07-22T21:00:24.765Z"
+    },
+    "spotify": {
+      "description": "Spotify embed sandbox blocks top-nav; only header icon opens original. Frozen 2026-07-22.",
+      "files": [
+        "src/components/RawEmbedRenderer.tsx"
+      ],
+      "frozen": false
     }
   }
 }
