@@ -252,6 +252,11 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit }: RawEmb
     sanitizedHtml = transformFacebookEmbed(sanitizedHtml);
   }
 
+  // Sandbox Spotify iframes so taps can't navigate the top window (matches Pinterest).
+  if (/open\.spotify\.com|spotify\.com\/embed/i.test(embedHtml)) {
+    sanitizedHtml = normalizeSpotifyIframeEmbed(sanitizedHtml);
+  }
+
 
   // Extract URL from embed HTML for double-tap redirection
   const getEmbedUrl = () => {
