@@ -31,20 +31,21 @@ interface UnfurlResult {
   };
 }
 
-// Clean malformed URLs (handle duplicates, spaces, etc.)
+// Clean malformed URLs (handle share-sheet text like
+// "Answer to X by Y https://www.quora.com/..." where the URL is embedded
+// at the end of a sentence, plus stray whitespace / duplicates).
 const cleanUrl = (url: string): string => {
   if (!url) return url;
-  
   try {
-    // Trim and take first segment if there are spaces/duplicates
-    const cleaned = url.trim().split(/\s+/)[0];
-    
-    // Ensure it has a protocol
-    if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
-      return `https://${cleaned}`;
-    }
-    
-    return cleaned;
+    const trimmed = url.trim();
+    // Prefer the first fully-qualified http(s) URL anywhere in the string.
+    const match = trimmed.match(/https?:\/\/[^\s<>"']+/i);
+    if (match) return match[0].replace(/[.,;:!?)\]]+$/, '');
+    // Fall back to the first token; add protocol if it looks like a domain.
+    const first = trimmed.split(/\s+/)[0];
+    if (!first) return trimmed;
+    if (!/^https?:\/\//i.test(first)) return `https://${first}`;
+    return first;
   } catch {
     return url;
   }
