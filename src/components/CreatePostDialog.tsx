@@ -88,19 +88,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   }, [open, initialDraft]);
 
   const handleLinkSubmit = async () => {
-    const rawInput = linkUrl;
-    if (!rawInput.trim()) return;
-    // Normalize pasted content: extract a clean URL from surrounding text
-    // (e.g. Quora share text). Reflect the cleaned value back to the input
-    // so the user sees what will actually be used.
-    const cleaned = extractUrlFromText(rawInput);
-    if (cleaned !== rawInput) {
-      setLinkUrl(cleaned);
-    }
-    // Shadow the outer state binding so the rest of this function operates
-    // on the cleaned URL immediately without waiting for a re-render.
-    // eslint-disable-next-line @typescript-eslint/no-shadow
-    const linkUrl = cleaned;
+    if (!linkUrl.trim()) return;
     fetchedPreviewTextRef.current = null;
     measuredHeightRef.current = null;
     measurePromiseRef.current = null;
