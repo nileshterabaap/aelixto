@@ -454,6 +454,10 @@ serve(async (req) => {
 
       if (fcKey) {
         try {
+          // Bound Firecrawl to ~10s so a slow Quora scrape doesn't stall
+          // the whole client render. The synthesized card is still returned.
+          const fcAbort = new AbortController();
+          const fcTimer = setTimeout(() => fcAbort.abort(), 10_000);
           const fc = await fetch('https://api.firecrawl.dev/v2/scrape', {
             method: 'POST',
             headers: {
@@ -464,9 +468,10 @@ serve(async (req) => {
               url: targetUrl,
               formats: ['markdown', 'html'],
               onlyMainContent: false,
-              waitFor: 3500,
+              waitFor: 1500,
             }),
-          });
+            signal: fcAbort.signal,
+          }).finally(() => clearTimeout(fcTimer));
 
           if (fc.ok) {
             const fcData = await fc.json();
