@@ -27,6 +27,20 @@ import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 
 const isYouTubeShortUrl = (url: string) => decodeURIComponent(url).toLowerCase().includes('/shorts/');
 
+// Extract the first http(s) URL from a pasted string (which may include
+// share-sheet text like "Answer to ... by X https://...?ch=...").
+const extractUrlFromText = (raw: string): string => {
+  if (!raw) return raw;
+  const trimmed = raw.trim();
+  const match = trimmed.match(/https?:\/\/[^\s<>"']+/i);
+  if (match) return match[0].replace(/[.,;:!?)\]]+$/, '');
+  // No protocol found — take the first whitespace-delimited token and
+  // add https:// if it looks like a domain.
+  const first = trimmed.split(/\s+/)[0];
+  if (/^[a-z0-9-]+\.[a-z]{2,}/i.test(first)) return `https://${first}`;
+  return trimmed;
+};
+
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -75,6 +89,13 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
   const handleLinkSubmit = async () => {
     if (!linkUrl.trim()) return;
+    // Normalize pasted content: extract a clean URL from surrounding text
+    // (e.g. Quora share text). If we extracted a different value, reflect it
+    // back into the input so the user sees what will be used.
+    const normalizedUrl = extractUrlFromText(linkUrl);
+    if (normalizedUrl !== linkUrl) {
+      setLinkUrl(normalizedUrl);
+    }
     fetchedPreviewTextRef.current = null;
     measuredHeightRef.current = null;
     measurePromiseRef.current = null;
