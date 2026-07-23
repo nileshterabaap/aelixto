@@ -27,6 +27,20 @@ import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 
 const isYouTubeShortUrl = (url: string) => decodeURIComponent(url).toLowerCase().includes('/shorts/');
 
+// Extract the first http(s) URL from a pasted string (which may include
+// share-sheet text like "Answer to ... by X https://...?ch=...").
+const extractUrlFromText = (raw: string): string => {
+  if (!raw) return raw;
+  const trimmed = raw.trim();
+  const match = trimmed.match(/https?:\/\/[^\s<>"']+/i);
+  if (match) return match[0].replace(/[.,;:!?)\]]+$/, '');
+  // No protocol found — take the first whitespace-delimited token and
+  // add https:// if it looks like a domain.
+  const first = trimmed.split(/\s+/)[0];
+  if (/^[a-z0-9-]+\.[a-z]{2,}/i.test(first)) return `https://${first}`;
+  return trimmed;
+};
+
 interface CreatePostDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -725,7 +739,16 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                               type="url"
                               placeholder=" "
                               value={linkUrl}
-                              onChange={(e) => setLinkUrl(e.target.value)}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                // If user pasted share text like
+                                // "Answer to ... by X https://quora.com/...",
+                                // auto-extract the URL so downstream logic
+                                // recognises the platform.
+                                const looksLikeText = /\s/.test(raw.trim()) || /^[A-Za-z]/.test(raw.trim());
+                                const cleaned = looksLikeText ? extractUrlFromText(raw) : raw;
+                                setLinkUrl(cleaned);
+                              }}
                               className="mt-2 h-14 w-full rounded-[24px] border border-input bg-background px-4 text-base outline-none shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04),0_0_0_4px_hsl(var(--muted)/0.75)] transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04),0_0_0_5px_hsl(var(--foreground)/0.06)]"
                             />
                           </div>

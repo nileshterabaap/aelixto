@@ -31,20 +31,21 @@ interface UnfurlResult {
   };
 }
 
-// Clean malformed URLs (handle duplicates, spaces, etc.)
+// Clean malformed URLs (handle share-sheet text like
+// "Answer to X by Y https://www.quora.com/..." where the URL is embedded
+// at the end of a sentence, plus stray whitespace / duplicates).
 const cleanUrl = (url: string): string => {
   if (!url) return url;
-  
   try {
-    // Trim and take first segment if there are spaces/duplicates
-    const cleaned = url.trim().split(/\s+/)[0];
-    
-    // Ensure it has a protocol
-    if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
-      return `https://${cleaned}`;
-    }
-    
-    return cleaned;
+    const trimmed = url.trim();
+    // Prefer the first fully-qualified http(s) URL anywhere in the string.
+    const match = trimmed.match(/https?:\/\/[^\s<>"']+/i);
+    if (match) return match[0].replace(/[.,;:!?)\]]+$/, '');
+    // Fall back to the first token; add protocol if it looks like a domain.
+    const first = trimmed.split(/\s+/)[0];
+    if (!first) return trimmed;
+    if (!/^https?:\/\//i.test(first)) return `https://${first}`;
+    return first;
   } catch {
     return url;
   }
@@ -81,6 +82,37 @@ export const ArticleEmbed = ({ url, onFaviconLoaded, postId, platform }: Article
         setError(null);
 
         console.log('[ArticleEmbed] Unfurling URL:', cleanedUrl);
+
+        // Quora scrapes can take 10s+ on a cache miss. Show a synthesized
+        // card immediately so the feed doesn't stall; the real result then
+        // replaces it in the background once unfurl-article returns.
+        if (rendererType === 'quora') {
+          const slugTitle = (() => {
+            try {
+              const u = new URL(cleanedUrl);
+              const parts = u.pathname.split('/').filter(Boolean);
+              const last = parts[parts.length - 1] || 'Quora Post';
+              return last
+                .split('-')
+                .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                .join(' ');
+            } catch {
+              return 'Quora Post';
+            }
+          })();
+          setData({
+            kind: 'quora-post',
+            resolvedUrl: cleanedUrl,
+            site: {
+              name: 'Quora',
+              domain: 'quora.com',
+              favicon: 'https://www.google.com/s2/favicons?domain=quora.com&sz=64',
+            },
+            meta: { title: slugTitle, description: '', image: null, publishedTime: null },
+            content: { html: '' },
+          });
+          setIsLoading(false);
+        }
 
         const { data: result, error: fetchError } = await supabase.functions.invoke(
           'unfurl-article',
