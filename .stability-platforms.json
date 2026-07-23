@@ -123,6 +123,16 @@
         }
       },
       "frozenAt": "2026-07-22T21:46:53.112Z"
+    },
+    "quora": {
+      "description": "Quora/Articles/External Links: single original_visit, fast unfurl with skeleton-until-ready. Frozen 2026-07-23.",
+      "files": [
+        "src/features/article-embeds/ArticleEmbed.tsx",
+        "src/features/article-embeds/ArticleContentEmbed.tsx",
+        "supabase/functions/unfurl-article/index.ts"
+      ],
+      "frozen": false,
+      "baseline": {}
     }
   }
 }
