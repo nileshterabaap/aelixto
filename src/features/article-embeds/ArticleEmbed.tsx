@@ -83,37 +83,6 @@ export const ArticleEmbed = ({ url, onFaviconLoaded, postId, platform }: Article
 
         console.log('[ArticleEmbed] Unfurling URL:', cleanedUrl);
 
-        // Quora scrapes can take 10s+ on a cache miss. Show a synthesized
-        // card immediately so the feed doesn't stall; the real result then
-        // replaces it in the background once unfurl-article returns.
-        if (rendererType === 'quora') {
-          const slugTitle = (() => {
-            try {
-              const u = new URL(cleanedUrl);
-              const parts = u.pathname.split('/').filter(Boolean);
-              const last = parts[parts.length - 1] || 'Quora Post';
-              return last
-                .split('-')
-                .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-                .join(' ');
-            } catch {
-              return 'Quora Post';
-            }
-          })();
-          setData({
-            kind: 'quora-post',
-            resolvedUrl: cleanedUrl,
-            site: {
-              name: 'Quora',
-              domain: 'quora.com',
-              favicon: 'https://www.google.com/s2/favicons?domain=quora.com&sz=64',
-            },
-            meta: { title: slugTitle, description: '', image: null, publishedTime: null },
-            content: { html: '' },
-          });
-          setIsLoading(false);
-        }
-
         const { data: result, error: fetchError } = await supabase.functions.invoke(
           'unfurl-article',
           {
