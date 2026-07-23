@@ -96,6 +96,10 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     if (normalizedUrl !== linkUrl) {
       setLinkUrl(normalizedUrl);
     }
+    // Shadow the outer state binding so the rest of this function operates
+    // on the cleaned URL immediately without waiting for a re-render.
+    // eslint-disable-next-line @typescript-eslint/no-shadow
+    const linkUrl = normalizedUrl;
     fetchedPreviewTextRef.current = null;
     measuredHeightRef.current = null;
     measurePromiseRef.current = null;
