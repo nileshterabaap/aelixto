@@ -16,8 +16,11 @@ type RedditEmbedProps = {
   suggestedHeight?: number | null;
 };
 
-const REDDIT_EMBED_MIN_HEIGHT = 240;
-const REDDIT_EMBED_MAX_HEIGHT = 1600;
+// Allow the iframe to hug very short text previews (Reddit collapses the body
+// behind a "Read more" toggle, so the pre-expand height can be well under
+// 240px) and to grow far enough for long expanded threads without clipping.
+const REDDIT_EMBED_MIN_HEIGHT = 120;
+const REDDIT_EMBED_MAX_HEIGHT = 4000;
 const REDDIT_EMBED_INITIAL_HEIGHT = 380;
 const REDDIT_IFRAME_TIMEOUT = 8500;
 
@@ -159,7 +162,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
       // official embed. Start tight so there's no blank strip below the
       // action bar; the postMessage listener below grows the iframe when
       // the user expands the body.
-      return 360;
+      return 240;
     }
     if (aspectRatio && aspectRatio > 0 && (mediaKind === 'video' || mediaKind === 'image' || mediaKind === 'gallery')) {
       // Reddit's chrome (header + action bar + comments button) takes ~210px.
@@ -373,7 +376,12 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
         title={title || "Reddit post"}
         width="640"
         height={iframeHeight}
-        scrolling="no"
+        // Reddit's embed only postMessages a new height on initial render, not
+        // reliably after the in-iframe "Read more" toggle. Falling back to
+        // `auto` lets the expanded body scroll inside the card instead of
+        // spilling out, while still letting the postMessage-driven grow path
+        // run when Reddit does emit a resize.
+        scrolling="auto"
         allowFullScreen
         sandbox="allow-scripts allow-same-origin allow-popups"
         allow="clipboard-read; clipboard-write"
