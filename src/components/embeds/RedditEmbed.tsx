@@ -175,6 +175,14 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     return REDDIT_EMBED_INITIAL_HEIGHT;
   };
   const [iframeHeight, setIframeHeight] = useState<number>(computeInitialHeight);
+  // Reddit's iframe reports the FULL post height even while the body is
+  // visually collapsed behind "Read more", producing a large blank strip
+  // under the preview. Cap the height for text posts until the user actually
+  // interacts with the iframe (tap = likely "Read more"), then follow
+  // Reddit's reported height freely.
+  const COLLAPSED_TEXT_CAP = 380;
+  const [userExpanded, setUserExpanded] = useState(false);
+  const firstHeightLoggedRef = useRef(false);
   const isDirectMedia = isDirectRedditMediaUrl(normalizedUrl);
   const effectiveThumb = thumbnailUrl || fetchedThumb;
   const validThumb = !!effectiveThumb && !thumbBroken && !sameUrl(effectiveThumb, authorAvatar);
@@ -299,14 +307,41 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
           ? data.data.height
           : null;
       if (typeof candidate === "number" && candidate > 0) {
-        const clamped = Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, Math.ceil(candidate)));
-        setIframeHeight(clamped);
-        persistHeight(clamped, aspectRatio ?? null);
+        let clamped = Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, Math.ceil(candidate)));
+        // For collapsed text posts, ignore Reddit's oversized initial
+        // report and cap to the visible-preview size. Once the user taps
+        // (userExpanded), follow Reddit's reported height so the card can
+        // grow naturally.
+        const isCollapsedText = mediaKind === 'text' && !userExpanded;
+        const applied = isCollapsedText ? Math.min(clamped, COLLAPSED_TEXT_CAP) : clamped;
+        if (!firstHeightLoggedRef.current) {
+          firstHeightLoggedRef.current = true;
+          console.log('[RedditEmbed] first-height', { postId, reported: Math.ceil(candidate), applied, mediaKind, userExpanded });
+        } else {
+          console.log('[RedditEmbed] resize', { postId, reported: Math.ceil(candidate), applied, userExpanded });
+        }
+        setIframeHeight(applied);
+        persistHeight(applied, aspectRatio ?? null);
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [embedSrc, persistHeight, aspectRatio]);
+  }, [embedSrc, persistHeight, aspectRatio, mediaKind, userExpanded, postId]);
+
+  // Detect user interaction with the Reddit iframe (tap on "Read more",
+  // upvote, etc.). Cross-origin iframes swallow events, but we can infer a
+  // tap by watching window blur while the iframe is the activeElement.
+  useEffect(() => {
+    if (!embedSrc || mediaKind !== 'text' || userExpanded) return;
+    const onBlur = () => {
+      if (document.activeElement === iframeRef.current) {
+        console.log('[RedditEmbed] user-expanded (iframe focus)', { postId });
+        setUserExpanded(true);
+      }
+    };
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, [embedSrc, mediaKind, userExpanded, postId]);
 
   if (resolving || (!resolvedUrl && !failed)) {
     return <div data-embed-status="loading" className="w-full" style={{ minHeight: iframeHeight }} />;
