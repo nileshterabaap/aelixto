@@ -63,7 +63,15 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
   const { uploadImage, uploading: uploadingThumbnail } = useImageUpload();
-  const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
+  const {
+    reached: limitReached,
+    remaining,
+    limit,
+    increment: incrementDailyCount,
+    isUnlimited,
+    resetCountdown,
+    resetLabel,
+  } = useDailyPostLimit();
   // Height measured offscreen at create-time so the very first viewer
   // (including the creator) opens the card at its real size — no blank space.
   const measuredHeightRef = useRef<number | null>(null);
@@ -445,7 +453,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     if (!linkUrl.trim()) return;
 
     if (limitReached) {
-      toast.error(`You've reached your ${limit} post limit for today. Resets at midnight.`);
+      toast.error(`Your daily slots reset in ${resetCountdown}`, {
+        description: resetLabel,
+      });
       return;
     }
 
