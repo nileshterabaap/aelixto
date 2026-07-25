@@ -309,18 +309,72 @@ export function useOriginalVisitTracker(
       }
     };
 
-    // Cleanup list retained for API compatibility with the effect teardown.
-    // The Threads play signal now rides on the container-level `touchstart`
-    // capture listener wired below (see `el.addEventListener('touchstart',
-    // onPointerDown, { capture: true, passive: true })`). On mobile Chrome
-    // and iOS Safari a touch that lands on a cross-origin iframe still
-    // dispatches `touchstart` on the parent in the capture phase, so
-    // `fireThreadsPlayOnce()` runs on the very first tap without inserting
-    // any visual/interactive overlay above the Threads player. This removes
-    // the duplicate "custom" Play affordance while preserving video_play.
+    // Threads-only one-shot capture overlay (restored to pre-2026-07-21
+    // verified behavior). A transparent absolute <div> is placed over the
+    // cross-origin Threads iframe. On the FIRST touchstart/pointerdown/
+    // mousedown/click the overlay records `video_play` exactly once, then
+    // sets pointer-events:none and removes itself in the same tick so the
+    // same tap sequence continues through to the native Threads Play
+    // button underneath. No visible affordance is added (fully transparent,
+    // no background, no cursor change on touch devices). This is required
+    // because on mobile Chrome/WebView a tap on a cross-origin iframe does
+    // NOT bubble pointerdown/touchstart to the parent container, so the
+    // container-level capture listener never fires for Threads.
     const threadsCaptureCleanups: Array<() => void> = [];
+    const threadsCaptureAttached = new WeakSet<HTMLIFrameElement>();
+
+    const attachThreadsPlayCapture = (iframe: HTMLIFrameElement) => {
+      if (!trackPlayableInteraction) return;
+      if (threadsCaptureAttached.has(iframe)) return;
+      const src = (iframe.getAttribute('src') || '').toLowerCase();
+      const isThreads =
+        src.includes('threads.net') || src.includes('threads.com');
+      if (!isThreads) return;
+      const parent = iframe.parentElement;
+      if (!parent) return;
+      if (parent.querySelector('[data-threads-play-capture="1"]')) return;
+      threadsCaptureAttached.add(iframe);
+
+      const parentPosition = window.getComputedStyle(parent).position;
+      if (parentPosition === 'static' || !parentPosition) {
+        parent.style.position = 'relative';
+      }
+
+      const overlay = document.createElement('div');
+      overlay.dataset.threadsPlayCapture = '1';
+      overlay.style.cssText =
+        'position:absolute;inset:0;z-index:2;background:transparent;pointer-events:auto;';
+
+      let consumed = false;
+      const consume = (ev: Event) => {
+        if (consumed) return;
+        consumed = true;
+        fireThreadsPlayOnce();
+        overlay.style.pointerEvents = 'none';
+        // Remove synchronously so the same tap sequence's touchend/click
+        // lands on the native Threads Play button underneath.
+        overlay.remove();
+      };
+
+      const opts: AddEventListenerOptions = { capture: true, passive: true };
+      overlay.addEventListener('touchstart', consume, opts);
+      overlay.addEventListener('pointerdown', consume, opts);
+      overlay.addEventListener('mousedown', consume, opts);
+      overlay.addEventListener('click', consume, { capture: true });
+
+      parent.appendChild(overlay);
+
+      threadsCaptureCleanups.push(() => {
+        overlay.removeEventListener('touchstart', consume, opts);
+        overlay.removeEventListener('pointerdown', consume, opts);
+        overlay.removeEventListener('mousedown', consume, opts);
+        overlay.removeEventListener('click', consume, { capture: true });
+        if (overlay.isConnected) overlay.remove();
+      });
+    };
 
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
+      attachThreadsPlayCapture(iframe);
       iframe.addEventListener('focus', handleIframeFocus);
       iframe.addEventListener('load', () => {
         try {
