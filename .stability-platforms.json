@@ -26,7 +26,7 @@
       "files": [
         "src/hooks/useOriginalVisitTracker.ts"
       ],
-      "frozen": true,
+      "frozen": false,
       "frozenAt": "2026-07-20T21:30:51.847Z",
       "baseline": {
         "src/hooks/useOriginalVisitTracker.ts": {
