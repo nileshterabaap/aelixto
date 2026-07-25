@@ -341,6 +341,18 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit }: RawEmb
     return () => observer.disconnect();
   }, [isInstagram]);
 
+  // Threads-only navigation lock: sandbox every iframe the Threads SDK
+  // injects so link taps inside the embed can't top-navigate. Mirrors the
+  // Pinterest/Spotify approach. Does not touch play/visit tracking.
+  useEffect(() => {
+    if (platform !== 'threads' || !containerRef.current) return;
+    const root = containerRef.current;
+    applyThreadsIframeNavLock(root);
+    const observer = new MutationObserver(() => applyThreadsIframeNavLock(root));
+    observer.observe(root, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [platform]);
+
   useEffect(() => {
     const processEmbed = async () => {
       if (!containerRef.current) return;
