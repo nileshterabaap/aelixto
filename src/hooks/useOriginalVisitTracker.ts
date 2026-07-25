@@ -1,8 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
 
-// no-op stub kept to minimize diff after removing temporary diagnostic logger
-const traceLog = (..._args: unknown[]) => {};
+// TEMP: Threads runtime diagnostic. Emits to console so we can verify the
+// one-shot capture path is executing end-to-end. Remove after verification.
+const traceLog = (...args: unknown[]) => {
+  try {
+    // eslint-disable-next-line no-console
+    console.log('[THREADS-DIAG]', ...args);
+  } catch {}
+};
 
 const threadsVideoPlayFiredPosts = new Set<string>();
 const lastThreadsCaptureRef: { postId: string | null; time: number } = {
