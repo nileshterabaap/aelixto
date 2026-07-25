@@ -154,14 +154,11 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   // and anything unclassified falls back to the legacy initial value.
   const computeInitialHeight = (): number => {
     const viewportWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth, 640) : 400;
-    if (mediaKind === 'text' && suggestedHeight && suggestedHeight > 0) {
-      return Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, suggestedHeight));
-    }
     if (mediaKind === 'text') {
-      // Text-only Reddit posts collapse behind a "Read more" toggle in the
-      // official embed. Start tight so there's no blank strip below the
-      // action bar; the postMessage listener below grows the iframe when
-      // the user expands the body.
+      // Do not seed collapsed text posts from `suggested_height`: Reddit can
+      // report/persist the full expanded post height while the visible body is
+      // still collapsed behind "Read more", which creates the blank iframe
+      // viewport underneath the preview on first render.
       return 240;
     }
     if (aspectRatio && aspectRatio > 0 && (mediaKind === 'video' || mediaKind === 'image' || mediaKind === 'gallery')) {
@@ -321,7 +318,9 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
           console.log('[RedditEmbed] resize', { postId, reported: Math.ceil(candidate), applied, userExpanded });
         }
         setIframeHeight(applied);
-        persistHeight(applied, aspectRatio ?? null);
+        if (!isCollapsedText) {
+          persistHeight(applied, aspectRatio ?? null);
+        }
       }
     };
     window.addEventListener("message", onMessage);
