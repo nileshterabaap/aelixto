@@ -216,7 +216,7 @@ export const usePostActions = (
         description: result?.deletedRepost
           ? "Removed from your profile."
           : refunded
-          ? "Your post has been removed. Daily credit refunded."
+          ? "You got your slot back."
           : "Your post has been removed.",
       });
     },
