@@ -118,23 +118,6 @@ const normalizeSpotifyIframeEmbed = (html: string): string => {
   }
 };
 
-// Sandbox Threads iframes so link taps inside the embed can't navigate the
-// top window. The header platform-icon button remains the only path that
-// opens the original Threads post. Uses the same allowlist as Pinterest.
-const applyThreadsIframeNavLock = (root: HTMLElement) => {
-  const iframes = root.querySelectorAll<HTMLIFrameElement>(
-    'iframe[src*="threads.net"], iframe[src*="threads.com"]'
-  );
-  iframes.forEach((iframe) => {
-    if (iframe.dataset.threadsNavLock === '1') return;
-    iframe.dataset.threadsNavLock = '1';
-    iframe.setAttribute(
-      'sandbox',
-      'allow-scripts allow-same-origin allow-presentation'
-    );
-  });
-};
-
 /**
  * Decode HTML entities inside blockquote text nodes so raw codes like &#064;
  * don't flash before the Threads SDK replaces them with an iframe.
@@ -340,18 +323,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit }: RawEmb
 
     return () => observer.disconnect();
   }, [isInstagram]);
-
-  // Threads-only navigation lock: sandbox every iframe the Threads SDK
-  // injects so link taps inside the embed can't top-navigate. Mirrors the
-  // Pinterest/Spotify approach. Does not touch play/visit tracking.
-  useEffect(() => {
-    if (platform !== 'threads' || !containerRef.current) return;
-    const root = containerRef.current;
-    applyThreadsIframeNavLock(root);
-    const observer = new MutationObserver(() => applyThreadsIframeNavLock(root));
-    observer.observe(root, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [platform]);
 
   useEffect(() => {
     const processEmbed = async () => {
