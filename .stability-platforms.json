@@ -8,7 +8,7 @@
         "src/hooks/useOriginalVisitTracker.ts",
         "src/components/embeds/TwitterEmbed.tsx"
       ],
-      "frozen": false,
+      "frozen": true,
       "frozenAt": "2026-07-20T21:30:51.752Z",
       "baseline": {
         "src/hooks/useOriginalVisitTracker.ts": {
@@ -26,7 +26,7 @@
       "files": [
         "src/hooks/useOriginalVisitTracker.ts"
       ],
-      "frozen": false,
+      "frozen": true,
       "frozenAt": "2026-07-20T21:30:51.847Z",
       "baseline": {
         "src/hooks/useOriginalVisitTracker.ts": {
@@ -69,7 +69,7 @@
         "src/components/UniversalMetaEmbed.tsx",
         "src/hooks/useOriginalVisitTracker.ts"
       ],
-      "frozen": false,
+      "frozen": true,
       "baseline": {
         "src/components/UniversalMetaEmbed.tsx": {
           "hash": "d01d9da3d58577c067fd4d56b563d591a3de86377babc432a894795f66b66af2",
