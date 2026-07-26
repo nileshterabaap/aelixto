@@ -109,6 +109,10 @@ async function persistExistingThumbnail(post: PlatformPost) {
   if (!post.thumbnail_url) return;
   const platform = (post.platform || "").toLowerCase();
   if (!THUMB_BACKFILL_PLATFORMS.has(platform)) return;
+  // Never re-host a Threads author avatar into our storage — once copied it
+  // loses the Meta "-19" bucket marker and starts rendering as the post's
+  // thumbnail instead of the typographic text card.
+  if (platform === "threads" && isMetaAvatarUrl(post.thumbnail_url)) return;
   if (!isLikelyExpiringMetaCdnUrl(post.thumbnail_url)) return;
 
   const key = `${post.id}:persist:${platform}`;
