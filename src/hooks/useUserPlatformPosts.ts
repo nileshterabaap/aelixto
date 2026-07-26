@@ -50,11 +50,6 @@ const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
   );
 };
 
-const isGenericPlaceholderThumbnail = (url?: string | null) => {
-  if (!url) return false;
-  return false || isGenericPlaceholderThumbnailInner(url);
-};
-
 const isMetaAvatarUrl = (url?: string | null) => {
   if (!url) return false;
   const lower = url.toLowerCase();
@@ -64,7 +59,7 @@ const isMetaAvatarUrl = (url?: string | null) => {
   return false;
 };
 
-const isGenericPlaceholderThumbnailInner = (url?: string | null) => {
+const isGenericPlaceholderThumbnail = (url?: string | null) => {
   if (!url) return false;
   const lower = url.toLowerCase();
   return (
