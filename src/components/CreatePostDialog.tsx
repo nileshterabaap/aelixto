@@ -340,6 +340,22 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
         console.error('[CreatePostDialog] oEmbed fetch failed:', error);
       }
 
+      // Threads' og:image is the author's profile picture, never the post's
+      // own media. Drop it so the typographic text card renders instead
+      // (matches X / Reddit behavior).
+      {
+        const lowerLink = linkUrl.toLowerCase();
+        const isThreadsLink = lowerLink.includes('threads.net') || lowerLink.includes('threads.com');
+        if (isThreadsLink && thumbnail) {
+          const t = thumbnail.toLowerCase();
+          const isMetaAvatar =
+            t.includes('profile_pic') ||
+            /\/t\d+\.[\d-]*-19\//.test(t) ||
+            /[?&]stp=[^&]*_19/.test(t);
+          if (isMetaAvatar) thumbnail = "";
+        }
+      }
+
       setThumbnailUrl(thumbnail);
       setTitle(videoTitle);
 
