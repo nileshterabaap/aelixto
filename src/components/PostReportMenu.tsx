@@ -41,7 +41,7 @@ export const PostReportMenu = ({
             <MoreVertical className="h-5 w-5" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="bg-background z-50">
+        <DropdownMenuContent align="end" className="bg-background z-[110]">
           <DropdownMenuItem
             onClick={() => setReportOpen(true)}
             className="text-destructive focus:text-destructive cursor-pointer"
