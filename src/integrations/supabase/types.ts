@@ -1186,6 +1186,10 @@ export type Database = {
         Returns: undefined
       }
       create_short_link: { Args: { p_target_path: string }; Returns: string }
+      delete_conversation: {
+        Args: { _conversation_id: string }
+        Returns: boolean
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
