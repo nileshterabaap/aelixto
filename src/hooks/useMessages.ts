@@ -75,7 +75,9 @@ export const useMessages = (conversationId: string | null) => {
         },
         (payload) => {
           setMessages(prev => {
-            const next = [...prev, payload.new as Message];
+            const incoming = payload.new as Message;
+            if (prev.some(m => m.id === incoming.id)) return prev;
+            const next = [...prev, incoming];
             if (cacheKey) {
               try {
                 window.localStorage.setItem(cacheKey, JSON.stringify(next.slice(-100)));
@@ -198,7 +200,12 @@ export const useMessages = (conversationId: string | null) => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      const list = data || [];
+      const seen = new Set<string>();
+      const list = (data || []).filter(m => {
+        if (seen.has(m.id)) return false;
+        seen.add(m.id);
+        return true;
+      });
       setMessages(list);
       if (cacheKey) {
         try {
