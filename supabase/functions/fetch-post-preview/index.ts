@@ -1180,6 +1180,12 @@ function isThreadsProfilePicture(url: string): boolean {
   if ((lower.includes('cdninstagram.com/v/') || lower.includes('fbcdn.net/v/')) && lower.includes('profile_pic')) return true;
   if (lower.includes('/t51.82787-19/')) return true;
   if (lower.includes('stp=dst-jpg') && lower.includes('profile_pic')) return true;
+  // Meta CDN profile-picture buckets always end in "-19"
+  // (t51.2885-19, t51.82787-19, t51.30982-19, ...). Any asset served
+  // from one of those buckets is an avatar, never the post's own media.
+  if (/\/t\d+\.[\d-]*-19\//.test(lower)) return true;
+  if (/[?&]stp=[^&]*_19/.test(lower)) return true;
+  if (lower.includes('profile_pic')) return true;
   try {
     const parsed = new URL(url);
     const efg = parsed.searchParams.get('efg');

@@ -50,6 +50,15 @@ const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
   );
 };
 
+const isMetaAvatarUrl = (url?: string | null) => {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  if (lower.includes("profile_pic")) return true;
+  if (/\/t\d+\.[\d-]*-19\//.test(lower)) return true;
+  if (/[?&]stp=[^&]*_19/.test(lower)) return true;
+  return false;
+};
+
 const isGenericPlaceholderThumbnail = (url?: string | null) => {
   if (!url) return false;
   const lower = url.toLowerCase();
@@ -109,6 +118,10 @@ async function persistExistingThumbnail(post: PlatformPost) {
   if (!post.thumbnail_url) return;
   const platform = (post.platform || "").toLowerCase();
   if (!THUMB_BACKFILL_PLATFORMS.has(platform)) return;
+  // Never re-host a Threads author avatar into our storage — once copied it
+  // loses the Meta "-19" bucket marker and starts rendering as the post's
+  // thumbnail instead of the typographic text card.
+  if (platform === "threads" && isMetaAvatarUrl(post.thumbnail_url)) return;
   if (!isLikelyExpiringMetaCdnUrl(post.thumbnail_url)) return;
 
   const key = `${post.id}:persist:${platform}`;
