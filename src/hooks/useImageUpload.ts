@@ -36,9 +36,30 @@ export const useImageUpload = () => {
         return null;
       }
 
+      // Always derive the owner folder from the LIVE auth session. Storage RLS
+      // checks `auth.uid() = foldername(name)[1]`, so a stale/expired session
+      // (common on the native APK after it has been backgrounded) produced
+      // "new row violates row-level security policy".
+      const { data: sessionData } = await supabase.auth.getSession();
+      let authedId = sessionData.session?.user?.id;
+
+      if (!authedId) {
+        const { data: refreshed } = await supabase.auth.refreshSession();
+        authedId = refreshed.session?.user?.id;
+      }
+
+      if (!authedId) {
+        toast({
+          title: "Session expired",
+          description: "Please sign in again to upload images",
+          variant: "destructive",
+        });
+        return null;
+      }
+
       // Generate unique filename
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${userId}/${Date.now()}.${fileExt}`;
+      const fileExt = (file.name.split(".").pop() || "jpg").toLowerCase();
+      const fileName = `${authedId}/${Date.now()}.${fileExt}`;
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
@@ -50,9 +71,12 @@ export const useImageUpload = () => {
 
       if (uploadError) {
         console.error("Upload error:", uploadError);
+        const isRls = /row-level security/i.test(uploadError.message);
         toast({
           title: "Upload failed",
-          description: uploadError.message,
+          description: isRls
+            ? "Your session expired. Please sign in again and retry."
+            : uploadError.message,
           variant: "destructive",
         });
         return null;
