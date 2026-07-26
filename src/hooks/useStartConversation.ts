@@ -134,13 +134,20 @@ export const useStartConversation = () => {
       }
 
       console.log('Adding participants to conversation...');
-      // Add both participants
+      // Insert self first: the RLS policy for adding the other participant
+      // requires the current user to already be a participant, and rows from
+      // the same multi-row statement are not visible to that check.
+      const { error: selfParticipantError } = await supabase
+        .from('conversation_participants')
+        .insert({ conversation_id: newConversation.id, user_id: user.id });
+      if (selfParticipantError) {
+        console.error('Error adding self participant:', selfParticipantError);
+        throw selfParticipantError;
+      }
+
       const { error: participantsError } = await supabase
         .from('conversation_participants')
-        .insert([
-          { conversation_id: newConversation.id, user_id: user.id },
-          { conversation_id: newConversation.id, user_id: otherUserId },
-        ]);
+        .insert({ conversation_id: newConversation.id, user_id: otherUserId });
 
       console.log('Participants insert result:', { participantsError });
       if (participantsError) {
