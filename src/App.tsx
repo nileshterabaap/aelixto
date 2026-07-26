@@ -10,7 +10,6 @@ import { preloadEmbedSDKs } from "@/lib/ScriptLoader";
 import { prefetchCoreData } from "@/lib/prefetch";
 import { useGlobalMediaPauseOnNavigate } from "@/hooks/useMediaPauseOnScroll";
 import { useRealtimeInvalidations } from "@/hooks/useRealtimeInvalidations";
-import { useThreadsNavLock } from "@/hooks/useThreadsNavLock";
 import { PageTransition } from "@/components/PageTransition";
 import { KeepAliveRoutes } from "@/components/KeepAliveRoutes";
 import { PersistentBottomNav } from "@/components/PersistentBottomNav";
@@ -59,7 +58,6 @@ const AnimatedRoutes = () => {
   const location = useLocation();
   useGlobalMediaPauseOnNavigate();
   useRealtimeInvalidations();
-  useThreadsNavLock();
   
   // Disable browser's automatic scroll restoration
   useEffect(() => {
