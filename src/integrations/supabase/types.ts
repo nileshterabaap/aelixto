@@ -1584,6 +1584,7 @@ export type Database = {
           username: string
         }[]
       }
+      start_conversation: { Args: { _other_user_id: string }; Returns: string }
       update_post_dimensions: {
         Args: { _aspect?: number; _height: number; _post_id: string }
         Returns: undefined
