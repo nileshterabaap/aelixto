@@ -59,19 +59,42 @@ export const useImageUpload = () => {
 
       // Generate unique filename
       const fileExt = (file.name.split(".").pop() || "jpg").toLowerCase();
-      const fileName = `${authedId}/${Date.now()}.${fileExt}`;
 
-      // Upload to storage
-      const { error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(fileName, file, {
-          cacheControl: "3600",
-          upsert: false,
-        });
+      const doUpload = (ownerId: string) => {
+        const fileName = `${ownerId}/${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 8)}.${fileExt}`;
+        return supabase.storage
+          .from(bucket)
+          .upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: file.type || "image/jpeg",
+          })
+          .then((res) => ({ ...res, fileName }));
+      };
+
+      let { error: uploadError, fileName } = await doUpload(authedId);
+
+      // On the native APK the access token can expire mid-session; force a
+      // refresh and retry once before surfacing an error to the user.
+      if (uploadError) {
+        const retryable =
+          /row-level security|jwt|expired|401|403|unauthorized|Failed to fetch|network/i.test(
+            uploadError.message
+          );
+        if (retryable) {
+          const { data: refreshed } = await supabase.auth.refreshSession();
+          const retryId = refreshed.session?.user?.id ?? authedId;
+          const retry = await doUpload(retryId);
+          uploadError = retry.error;
+          fileName = retry.fileName;
+        }
+      }
 
       if (uploadError) {
         console.error("Upload error:", uploadError);
-        const isRls = /row-level security/i.test(uploadError.message);
+        const isRls = /row-level security|jwt|401|403/i.test(uploadError.message);
         toast({
           title: "Upload failed",
           description: isRls
