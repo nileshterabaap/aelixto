@@ -159,6 +159,13 @@ function stageAResume(root: HTMLElement) {
   restoreHardSuspended(root);
   root.dataset.aelixHasBeenActive = 'true';
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (iframe.dataset[MUTE_FLAG] === '1') {
+      // Undo the mute side-effects, otherwise the iframe stays
+      // pointer-events:none forever and taps (e.g. Threads play) never land.
+      iframe.style.pointerEvents = '';
+      iframe.removeAttribute('aria-hidden');
+      iframe.removeAttribute('tabindex');
+    }
     delete iframe.dataset[MUTE_FLAG];
   });
   unfreezeIframes(root);
