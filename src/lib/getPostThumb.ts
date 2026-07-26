@@ -66,6 +66,13 @@ function isTextOnlySocialAvatar(platform: string, url: string): boolean {
 function isThreadsProfilePictureUrl(lowerUrl: string): boolean {
   if (lowerUrl.includes("profile_pic")) return true;
   if (lowerUrl.includes("/t51.82787-19/")) return true;
+  // Meta CDN profile-picture buckets all end in "-19" (t51.2885-19,
+  // t51.82787-19, t51.30982-19, ...). Any Threads/IG CDN asset served from
+  // one of those buckets is an avatar, never the post's own media.
+  if (/\/t\d+\.[\d-]*-19\//.test(lowerUrl)) return true;
+  if (/[?&]stp=[^&]*_19/.test(lowerUrl)) return true;
+  if (lowerUrl.includes("cdninstagram.com") && lowerUrl.includes("-19/")) return true;
+  if (lowerUrl.includes("fbcdn.net") && lowerUrl.includes("-19/")) return true;
   return false;
 }
 
