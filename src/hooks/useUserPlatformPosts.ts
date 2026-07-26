@@ -52,6 +52,20 @@ const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
 
 const isGenericPlaceholderThumbnail = (url?: string | null) => {
   if (!url) return false;
+  return false || isGenericPlaceholderThumbnailInner(url);
+};
+
+const isMetaAvatarUrl = (url?: string | null) => {
+  if (!url) return false;
+  const lower = url.toLowerCase();
+  if (lower.includes("profile_pic")) return true;
+  if (/\/t\d+\.[\d-]*-19\//.test(lower)) return true;
+  if (/[?&]stp=[^&]*_19/.test(lower)) return true;
+  return false;
+};
+
+const isGenericPlaceholderThumbnailInner = (url?: string | null) => {
+  if (!url) return false;
   const lower = url.toLowerCase();
   return (
     lower.includes("images.unsplash.com") ||
