@@ -564,7 +564,9 @@ const Conversation = () => {
                                 }`}
                                 style={{ paddingBottom: 14 }}
                               >
-                                <span className="line-clamp-2 break-words">{repliedBody}</span>
+                                <span className="line-clamp-2 break-words">
+                                  {parseImageContent(repliedBody || '') ? 'Photo' : repliedBody}
+                                </span>
                               </div>
                             )}
                           </button>
@@ -672,7 +674,12 @@ const Conversation = () => {
       {replyTo && (
         <div className="bg-muted/50 border-t border-border px-4 py-2 flex items-center justify-between">
           <div className="text-xs text-muted-foreground truncate flex-1">
-            Replying to: <span className="text-foreground">{parseReply(replyTo.content).body}</span>
+            Replying to:{' '}
+            <span className="text-foreground">
+              {parseImageContent(parseReply(replyTo.content).body)
+                ? 'Photo'
+                : parseReply(replyTo.content).body}
+            </span>
           </div>
           <button onClick={() => setReplyTo(null)} className="text-xs text-muted-foreground ml-2">✕</button>
         </div>
@@ -689,6 +696,27 @@ const Conversation = () => {
             }}
             className="flex gap-2"
           >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImagePick}
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              disabled={uploading}
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Send a photo"
+            >
+              {uploading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <ImagePlus className="h-5 w-5" />
+              )}
+            </Button>
             <Input
               placeholder="Type a message..."
               value={newMessage}
