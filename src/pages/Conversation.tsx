@@ -174,11 +174,15 @@ const Conversation = () => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !user) return;
-    const url = await uploadImage(file, "posts", user.id);
+    const isVideo = file.type.startsWith("video/");
+    const url = await uploadImage(file, "posts", user.id, {
+      silent: true,
+      allowVideo: true,
+    });
     if (!url) return;
     const activeReply = replyTo;
     setReplyTo(null);
-    const content = `${IMAGE_PREFIX}${url}`;
+    const content = `${isVideo ? VIDEO_PREFIX : IMAGE_PREFIX}${url}`;
     await sendMessage(
       activeReply ? `↪️__REPLY__:${activeReply.id}\n${content}` : content
     );
@@ -379,7 +383,6 @@ const Conversation = () => {
         .eq('id', menu.message.id)
         .eq('sender_id', user!.id);
       if (error) throw error;
-      toast({ description: "Message unsent" });
     } catch {
       toast({ title: "Error", description: "Failed to unsend message", variant: "destructive" });
     }
