@@ -25,12 +25,30 @@ interface MessageMenuState {
 
 const EDIT_TIME_LIMIT_MS = 15 * 60 * 1000; // 15 minutes
 const IMAGE_PREFIX = "🖼️__IMAGE__:";
+const VIDEO_PREFIX = "🎞️__VIDEO__:";
 
 export const parseImageContent = (body: string): string | null => {
   const trimmed = body.trim();
   return trimmed.startsWith(IMAGE_PREFIX)
     ? trimmed.slice(IMAGE_PREFIX.length).trim()
     : null;
+};
+
+export const parseVideoContent = (body: string): string | null => {
+  const trimmed = body.trim();
+  return trimmed.startsWith(VIDEO_PREFIX)
+    ? trimmed.slice(VIDEO_PREFIX.length).trim()
+    : null;
+};
+
+const parseMediaContent = (
+  body: string
+): { url: string; kind: "image" | "video" } | null => {
+  const img = parseImageContent(body);
+  if (img) return { url: img, kind: "image" };
+  const vid = parseVideoContent(body);
+  if (vid) return { url: vid, kind: "video" };
+  return null;
 };
 
 const Conversation = () => {
