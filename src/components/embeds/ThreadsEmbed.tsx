@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
+import { trackView } from '@/hooks/useViewTracking';
+
+// One-shot guard so a Threads post never records more than one video_play per
+// session from this path (the guarded tracker may also fire; the server's
+// unique index on (post_id, viewer, event_type) dedupes any overlap).
+const threadsPlayFired = new Set<string>();
 
 /**
  * Threads-only embed. Extracted out of UniversalMetaEmbed so Threads fixes
@@ -98,37 +104,16 @@ const ThreadsIframeEmbed = ({
   const [attempt, setAttempt] = useState(0);
   const persistHeight = usePersistEmbedHeight(postId);
 
-  // TEMPORARY Threads-only runtime trace (removed after diagnosis).
+  // Self-contained one-shot play capture. Guarantees the same behavior for a
+  // newly mounted embed as for one that existed when the tracker effect ran.
   useEffect(() => {
     const wrapper = wrapperRef.current;
-    if (!wrapper) return;
+    if (!wrapper || !postId) return;
     const onTap = () => {
-      const iframe = wrapper.querySelector(
-        'iframe[src*="threads.net"], iframe[src*="threads.com"]',
-      ) as HTMLIFrameElement | null;
-      // The tracked container is the nearest ancestor that owns the
-      // capture-phase touchstart listener wired by useOriginalVisitTracker.
-      let container: HTMLElement | null = wrapper.parentElement;
-      while (container && !container.classList.contains('w-full')) {
-        container = container.parentElement;
-      }
-      // eslint-disable-next-line no-console
-      console.log('[THREADS_TAP_TRACE]', {
-        postId,
-        iframeFound: !!iframe,
-        iframeSrc: iframe?.getAttribute('src') || null,
-        navLockApplied: iframe?.dataset.navLockApplied === '1',
-        sandbox: iframe?.getAttribute('sandbox') || null,
-        trackedContainerFound: !!container,
-        containerHasThreadsIframe: !!container?.querySelector(
-          'iframe[src*="threads.net"], iframe[src*="threads.com"]',
-        ),
-        isVisible,
-        hasLoaded,
-        failed,
-        attempt,
-        pointerEvents: iframe ? getComputedStyle(iframe).pointerEvents : null,
-        atScrollTop: document.body.classList.contains('at-scroll-top'),
+      if (threadsPlayFired.has(postId)) return;
+      threadsPlayFired.add(postId);
+      trackView({ postId, eventType: 'video_play' }).catch(() => {
+        threadsPlayFired.delete(postId);
       });
     };
     wrapper.addEventListener('touchstart', onTap, { capture: true, passive: true });
@@ -137,7 +122,7 @@ const ThreadsIframeEmbed = ({
       wrapper.removeEventListener('touchstart', onTap, true);
       wrapper.removeEventListener('pointerdown', onTap, true);
     };
-  }, [postId, isVisible, hasLoaded, failed, attempt]);
+  }, [postId]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -219,6 +204,8 @@ const ThreadsIframeEmbed = ({
           src={src}
           scrolling="no"
           allowFullScreen
+          sandbox="allow-scripts allow-same-origin allow-presentation"
+          data-nav-lock-applied="1"
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share"
           loading="lazy"
           onLoad={() => {
