@@ -1,4 +1,4 @@
-import { useState, memo, useCallback, useEffect, useMemo, useRef, type MouseEvent } from 'react';
+import { useState, memo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
 import type { Post } from '@/data/demoData';
@@ -88,25 +88,7 @@ export const HydratedEmbed = memo(({
   isHydrated, 
   onPlayClick 
 }: HydratedEmbedProps) => {
-  // Attachment point for useOriginalVisitTracker (nav-lock sandbox + one-shot
-  // play capture). The tracker resolves `containerRef.current` exactly once per
-  // effect run and its deps do not include the DOM node, so a container element
-  // that appears (or is swapped for a different branch's div) after that run
-  // leaves the tracker bound to nothing — no MutationObserver, therefore no
-  // sandbox nav-lock and no touchstart play capture. That is exactly what
-  // happens to a Threads post that mounts into the kept-alive (display:none)
-  // Home feed after publishing from Profile. Using a callback ref + an element
-  // keyed ref object makes the tracker's single attachment effect re-run (with
-  // its own cleanup, so no duplicate listeners) as soon as the real container
-  // node exists.
-  const [embedEl, setEmbedEl] = useState<HTMLDivElement | null>(null);
-  const setEmbedContainer = useCallback((node: HTMLDivElement | null) => {
-    setEmbedEl((prev) => (prev === node ? prev : node));
-  }, []);
-  const embedContainerRef = useMemo(
-    () => ({ current: embedEl }) as React.RefObject<HTMLDivElement>,
-    [embedEl],
-  );
+  const embedContainerRef = useRef<HTMLDivElement>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
@@ -253,7 +235,7 @@ export const HydratedEmbed = memo(({
   // IMAGES: Load directly without play button (swift loading)
   if (r.kind === 'image' && r.url) {
     return (
-      <div ref={setEmbedContainer} className="w-full">
+      <div ref={embedContainerRef} className="w-full">
         <ImageViewTracker postId={post.id}>
           <img 
             src={r.url} 
@@ -272,7 +254,7 @@ export const HydratedEmbed = memo(({
   // strip the user reported; videos still use the iframe/player path.
   if (shouldHydrate && isFacebookPost && effectiveThumbnail && !isFacebookVideoLike) {
     return (
-      <div ref={setEmbedContainer} className="w-full" data-embed-status="ready">
+      <div ref={embedContainerRef} className="w-full" data-embed-status="ready">
         <ImageViewTracker postId={post.id}>
           <a
             href={mediaUrl || '#'}
@@ -297,7 +279,7 @@ export const HydratedEmbed = memo(({
   // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
   if (!shouldHydrate) {
     return (
-      <div ref={setEmbedContainer} className={`relative w-full bg-muted ${aspectClass}`}>
+      <div ref={embedContainerRef} className={`relative w-full bg-muted ${aspectClass}`}>
         {effectiveThumbnail && !imageError ? (
           <img
             src={effectiveThumbnail}
@@ -319,7 +301,7 @@ export const HydratedEmbed = memo(({
   
   // HYDRATED STATE: Show skeleton → fade into actual embed
   return (
-    <div ref={setEmbedContainer} className="relative w-full" style={{ contain: 'layout paint' }}>
+    <div ref={embedContainerRef} className="relative w-full" style={{ contain: 'layout paint' }}>
       <div className="w-full">
 
         {/* YouTube video */}
