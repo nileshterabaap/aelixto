@@ -5,27 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-let threadsTraceSeq = 0;
-const threadsTrace = (
-  functionName: string,
-  args: Record<string, unknown>,
-  returnValue: unknown,
-  continued: boolean,
-  nextFunction?: string,
-) => {
-  if (args.event_type !== 'video_play') return;
-  console.log('[THREADS_VIDEO_PLAY_TRACE]', JSON.stringify({
-    seq: ++threadsTraceSeq,
-    ts: Date.now(),
-    postId: args.post_id || null,
-    functionName,
-    args,
-    returnValue,
-    continued,
-    nextFunction: nextFunction || null,
-  }));
-};
-
 // Hash helper using Web Crypto API
 async function sha256(text: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -71,17 +50,9 @@ Deno.serve(async (req) => {
 
     // Parse request body
     const { post_id, event_type, duration_ms, device_hash, viewer_id } = await req.json();
-    threadsTrace(
-      'record-view.request',
-      { post_id, event_type, duration_ms, has_device_hash: !!device_hash, has_viewer_id: !!viewer_id },
-      'entered',
-      true,
-      'validate-event-type',
-    );
 
     // Validate event_type
     if (!['video_play', 'image_view', 'article_open', 'external_visit', 'original_visit'].includes(event_type)) {
-      threadsTrace('validate-event-type', { post_id, event_type }, 'invalid-event-type', false);
       return new Response(
         JSON.stringify({ ok: false, reason: 'Invalid event_type' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -98,12 +69,6 @@ Deno.serve(async (req) => {
 
     // Validate required fields
     if (!post_id || !device_hash) {
-      threadsTrace(
-        'validate-required-fields',
-        { post_id, event_type, has_device_hash: !!device_hash },
-        'missing-required-fields',
-        false,
-      );
       return new Response(
         JSON.stringify({ ok: false, reason: 'Missing required fields' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -122,14 +87,6 @@ Deno.serve(async (req) => {
       .eq('id', post_id)
       .single();
 
-    threadsTrace(
-      'posts.lookup',
-      { post_id, event_type },
-      { found: !!post, platform: post?.platform || null, error: postError?.message || null },
-      !!post && !postError,
-      !!post && !postError ? 'self-view-check' : undefined,
-    );
-
     if (postError || !post) {
       console.error('Post lookup error:', postError);
       return new Response(
@@ -140,12 +97,6 @@ Deno.serve(async (req) => {
 
     // Silently skip self-view tracking (not an error, just don't count it)
     if (viewer_id && viewer_id === post.user_id) {
-      threadsTrace(
-        'self-view-check',
-        { post_id, event_type, has_viewer_id: !!viewer_id },
-        'skipped-self-view',
-        false,
-      );
       console.log('[record-view] Skipping self-view', { post_id, viewer_id });
       return new Response(
         JSON.stringify({ ok: true, skipped: true, reason: 'Self-view not counted' }),
@@ -168,13 +119,6 @@ Deno.serve(async (req) => {
     const isBurstEvent = ['video_play', 'original_visit'].includes(event_type);
 
     if (isBurstyPlatform && isBurstEvent) {
-      threadsTrace(
-        'threads-burst-check',
-        { post_id, event_type, platform },
-        'query-recent-views',
-        true,
-        'recentViews.lookup',
-      );
       // Tight window: a single blur/pointer event on one iframe reaches every
       // mounted sibling listener within a few frames. 800ms is comfortably
       // above that, well below any plausible sequential user interaction.
@@ -198,12 +142,6 @@ Deno.serve(async (req) => {
           .limit(1);
 
         if (recentSamePlatformPost && recentSamePlatformPost.length > 0) {
-          threadsTrace(
-            'threads-burst-check.return',
-            { post_id, event_type, platform, recent_views: recentViews.length },
-            'skipped-platform-burst-duplicate',
-            false,
-          );
           console.log('[record-view] Skipping burst duplicate', { post_id, event_type, platform });
           return new Response(
             JSON.stringify({ ok: true, skipped: true, reason: 'Platform burst duplicate' }),
@@ -211,13 +149,6 @@ Deno.serve(async (req) => {
           );
         }
       }
-      threadsTrace(
-        'threads-burst-check.return',
-        { post_id, event_type, platform, recent_views: recentViews?.length || 0, burst_error: burstError?.message || null },
-        'continued-to-insert',
-        true,
-        'post_views.insert',
-      );
     }
 
     // Hash IP server-side
@@ -239,23 +170,9 @@ Deno.serve(async (req) => {
         duration_ms: duration_ms || 0,
       });
 
-    threadsTrace(
-      'post_views.insert',
-      { post_id, event_type, platform },
-      insertError ? { error_code: insertError.code, error_message: insertError.message } : { inserted: true },
-      !insertError,
-      !insertError ? 'record-view.response' : undefined,
-    );
-
     if (insertError) {
       // Check if it's a unique constraint violation (cooldown active)
       if (insertError.code === '23505') {
-        threadsTrace(
-          'post_views.insert.return',
-          { post_id, event_type, platform },
-          'already-counted-cooldown',
-          false,
-        );
         return new Response(
           JSON.stringify({ ok: true, reason: 'Already counted (cooldown)' }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -268,8 +185,6 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    threadsTrace('record-view.response', { post_id, event_type, platform }, { ok: true }, false);
 
     return new Response(
       JSON.stringify({ ok: true }),

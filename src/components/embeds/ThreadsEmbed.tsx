@@ -1,12 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
-import { trackView } from '@/hooks/useViewTracking';
-
-// One-shot guard so a Threads post never records more than one video_play per
-// session from this path (the guarded tracker may also fire; the server's
-// unique index on (post_id, viewer, event_type) dedupes any overlap).
-const threadsPlayFired = new Set<string>();
 
 /**
  * Threads-only embed. Extracted out of UniversalMetaEmbed so Threads fixes
@@ -104,55 +98,6 @@ const ThreadsIframeEmbed = ({
   const [attempt, setAttempt] = useState(0);
   const persistHeight = usePersistEmbedHeight(postId);
 
-  // Self-contained one-shot play capture (historical overlay behavior).
-  // A tap that lands on a cross-origin iframe is delivered to the iframe's
-  // own document — the parent never sees touchstart/pointerdown — so an
-  // ancestor listener on the wrapper can never observe the first tap. The
-  // capture must therefore be a real hit-target element stacked ABOVE the
-  // iframe. It is fully transparent, fires video_play exactly once, then
-  // disables pointer-events and removes itself synchronously so the same
-  // tap sequence continues through to the native Threads Play button.
-  useEffect(() => {
-    const wrapper = wrapperRef.current;
-    if (!wrapper || !postId || !isVisible) return;
-    if (threadsPlayFired.has(postId)) return;
-    if (wrapper.querySelector('[data-threads-play-capture="1"]')) return;
-
-    const overlay = document.createElement('div');
-    overlay.dataset.threadsPlayCapture = '1';
-    overlay.style.cssText =
-      'position:absolute;inset:0;z-index:2;background:transparent;pointer-events:auto;';
-
-    let consumed = false;
-    const consume = () => {
-      if (consumed) return;
-      consumed = true;
-      overlay.style.pointerEvents = 'none';
-      overlay.remove();
-      if (threadsPlayFired.has(postId)) return;
-      threadsPlayFired.add(postId);
-      trackView({ postId, eventType: 'video_play' }).catch(() => {
-        threadsPlayFired.delete(postId);
-      });
-    };
-
-    const opts: AddEventListenerOptions = { capture: true, passive: true };
-    overlay.addEventListener('touchstart', consume, opts);
-    overlay.addEventListener('pointerdown', consume, opts);
-    overlay.addEventListener('mousedown', consume, opts);
-    overlay.addEventListener('click', consume, { capture: true });
-
-    wrapper.appendChild(overlay);
-
-    return () => {
-      overlay.removeEventListener('touchstart', consume, opts);
-      overlay.removeEventListener('pointerdown', consume, opts);
-      overlay.removeEventListener('mousedown', consume, opts);
-      overlay.removeEventListener('click', consume, { capture: true });
-      if (overlay.isConnected) overlay.remove();
-    };
-  }, [postId, isVisible, attempt]);
-
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const iframeWindow = iframeRef.current?.contentWindow;
@@ -226,33 +171,29 @@ const ThreadsIframeEmbed = ({
       className="relative w-full overflow-hidden"
       style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
     >
-      {isVisible && (
-        <iframe
-          key={attempt}
-          ref={iframeRef}
-          src={src}
-          scrolling="no"
-          allowFullScreen
-          sandbox="allow-scripts allow-same-origin allow-presentation"
-          data-nav-lock-applied="1"
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share"
-          loading="lazy"
-          onLoad={() => {
-            setHasLoaded(true);
-            setFailed(false);
-          }}
-          onError={() => setFailed(true)}
-          style={{
-            border: 'none',
-            width: '100%',
-            height: '100%',
-            display: 'block',
-            margin: 0,
-            padding: 0,
-            background: 'transparent',
-          }}
-        />
-      )}
+      <iframe
+        key={attempt}
+        ref={iframeRef}
+        src={src}
+        scrolling="no"
+        allowFullScreen
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share"
+        loading="lazy"
+        onLoad={() => {
+          setHasLoaded(true);
+          setFailed(false);
+        }}
+        onError={() => setFailed(true)}
+        style={{
+          border: 'none',
+          width: '100%',
+          height: '100%',
+          display: 'block',
+          margin: 0,
+          padding: 0,
+          background: 'transparent',
+        }}
+      />
     </div>
   );
 };
