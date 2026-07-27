@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2, Check, CheckCheck } from "lucide-react";
+import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2, Check, CheckCheck, ImagePlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SharedPostCard } from "@/components/messages/SharedPostCard";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMessages, Message } from "@/hooks/useMessages";
 import { useSession } from "@/hooks/useSession";
+import { useImageUpload } from "@/hooks/useImageUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,6 +24,14 @@ interface MessageMenuState {
 }
 
 const EDIT_TIME_LIMIT_MS = 15 * 60 * 1000; // 15 minutes
+const IMAGE_PREFIX = "🖼️__IMAGE__:";
+
+export const parseImageContent = (body: string): string | null => {
+  const trimmed = body.trim();
+  return trimmed.startsWith(IMAGE_PREFIX)
+    ? trimmed.slice(IMAGE_PREFIX.length).trim()
+    : null;
+};
 
 const Conversation = () => {
   const { conversationId } = useParams();
@@ -33,6 +42,10 @@ const Conversation = () => {
   const [newMessage, setNewMessage] = useState("");
   const [otherUser, setOtherUser] = useState<ConversationUser | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLElement>(null);
+  const didInitialScroll = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { uploadImage, uploading } = useImageUpload();
   const [menu, setMenu] = useState<MessageMenuState>({ message: null, x: 0, y: 0 });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
@@ -63,8 +76,27 @@ const Conversation = () => {
   }, [conversationId, user]);
 
   useEffect(() => {
+    if (!didInitialScroll.current) {
+      if (messages.length === 0) return;
+      // Land at the bottom instantly on open (no visible scroll animation).
+      didInitialScroll.current = true;
+      const jump = () => {
+        const el = scrollAreaRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+        messagesEndRef.current?.scrollIntoView({ block: "end" });
+      };
+      jump();
+      requestAnimationFrame(jump);
+      window.setTimeout(jump, 60);
+      return;
+    }
     scrollToBottom();
   }, [messages]);
+
+  // Reset the instant-jump flag when switching chats
+  useEffect(() => {
+    didInitialScroll.current = false;
+  }, [conversationId]);
 
   // When user triggers reply (via swipe or menu), scroll to bottom so the
   // reply banner + input remain visible above the keyboard.
@@ -118,6 +150,20 @@ const Conversation = () => {
     } catch (error) {
       console.error('Error fetching other user:', error);
     }
+  };
+
+  const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !user) return;
+    const url = await uploadImage(file, "posts", user.id);
+    if (!url) return;
+    const activeReply = replyTo;
+    setReplyTo(null);
+    const content = `${IMAGE_PREFIX}${url}`;
+    await sendMessage(
+      activeReply ? `↪️__REPLY__:${activeReply.id}\n${content}` : content
+    );
   };
 
   const handleSend = async () => {
@@ -384,7 +430,7 @@ const Conversation = () => {
       </header>
 
       {/* Messages */}
-      <main className="flex-1 overflow-y-auto flex flex-col">
+      <main ref={scrollAreaRef} className="flex-1 overflow-y-auto flex flex-col">
         <div className="container max-w-2xl mx-auto w-full px-4 py-4 space-y-1 animate-fade-in mt-auto">
           {messages.map((message, idx) => {
             const isOwn = message.sender_id === user?.id;
@@ -518,7 +564,9 @@ const Conversation = () => {
                                 }`}
                                 style={{ paddingBottom: 14 }}
                               >
-                                <span className="line-clamp-2 break-words">{repliedBody}</span>
+                                <span className="line-clamp-2 break-words">
+                                  {parseImageContent(repliedBody || '') ? 'Photo' : repliedBody}
+                                </span>
                               </div>
                             )}
                           </button>
@@ -526,14 +574,30 @@ const Conversation = () => {
                       );
                     })()}
                     <div
-                      className={`rounded-lg px-3 py-1.5 ${
+                      className={`rounded-lg ${parseImageContent(body) ? 'p-1' : 'px-3 py-1.5'} ${
                         isOwn
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-muted text-foreground'
                       } ${replyToId && repliedMessage ? 'relative z-10' : ''}`}
                     >
-                      <p className="text-sm whitespace-pre-wrap break-words">
-                        {body}
+                      {parseImageContent(body) && (
+                        <a
+                          href={parseImageContent(body) as string}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block"
+                        >
+                          <img
+                            src={parseImageContent(body) as string}
+                            alt="Shared photo"
+                            loading="lazy"
+                            onLoad={() => scrollToBottom()}
+                            className="rounded-md max-h-[320px] w-auto max-w-full object-cover"
+                          />
+                        </a>
+                      )}
+                      <p className={`text-sm whitespace-pre-wrap break-words ${parseImageContent(body) ? 'px-2 pb-0.5' : ''}`}>
+                        {parseImageContent(body) ? '' : body}
                         <span
                           className={`float-right ml-2 text-[10px] leading-none select-none relative top-[6px] ${
                             isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
@@ -610,7 +674,12 @@ const Conversation = () => {
       {replyTo && (
         <div className="bg-muted/50 border-t border-border px-4 py-2 flex items-center justify-between">
           <div className="text-xs text-muted-foreground truncate flex-1">
-            Replying to: <span className="text-foreground">{parseReply(replyTo.content).body}</span>
+            Replying to:{' '}
+            <span className="text-foreground">
+              {parseImageContent(parseReply(replyTo.content).body)
+                ? 'Photo'
+                : parseReply(replyTo.content).body}
+            </span>
           </div>
           <button onClick={() => setReplyTo(null)} className="text-xs text-muted-foreground ml-2">✕</button>
         </div>
@@ -627,6 +696,27 @@ const Conversation = () => {
             }}
             className="flex gap-2"
           >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImagePick}
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              disabled={uploading}
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Send a photo"
+            >
+              {uploading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <ImagePlus className="h-5 w-5" />
+              )}
+            </Button>
             <Input
               placeholder="Type a message..."
               value={newMessage}
