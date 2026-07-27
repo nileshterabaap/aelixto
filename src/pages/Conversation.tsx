@@ -715,7 +715,9 @@ const Conversation = () => {
             <span className="text-foreground">
               {parseImageContent(parseReply(replyTo.content).body)
                 ? 'Photo'
-                : parseReply(replyTo.content).body}
+                : parseVideoContent(parseReply(replyTo.content).body)
+                  ? 'Video'
+                  : parseReply(replyTo.content).body}
             </span>
           </div>
           <button onClick={() => setReplyTo(null)} className="text-xs text-muted-foreground ml-2">✕</button>
@@ -736,7 +738,7 @@ const Conversation = () => {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               className="hidden"
               onChange={handleImagePick}
             />
@@ -746,7 +748,7 @@ const Conversation = () => {
               variant="ghost"
               disabled={uploading}
               onClick={() => fileInputRef.current?.click()}
-              aria-label="Send a photo"
+              aria-label="Send a photo or video"
             >
               {uploading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
