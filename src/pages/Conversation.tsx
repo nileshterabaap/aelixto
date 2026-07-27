@@ -430,7 +430,7 @@ const Conversation = () => {
       </header>
 
       {/* Messages */}
-      <main className="flex-1 overflow-y-auto flex flex-col">
+      <main ref={scrollAreaRef} className="flex-1 overflow-y-auto flex flex-col">
         <div className="container max-w-2xl mx-auto w-full px-4 py-4 space-y-1 animate-fade-in mt-auto">
           {messages.map((message, idx) => {
             const isOwn = message.sender_id === user?.id;
