@@ -171,6 +171,16 @@ const ThreadsIframeEmbed = ({
       className="relative w-full overflow-hidden"
       style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
     >
+      {/* Initialization parity: the iframe is only inserted once the wrapper is
+          actually visible. A post published on another route mounts into the
+          kept-alive Home feed while it is display:none — inserting the frame
+          there starts no load (lazy frames in a hidden subtree never fetch)
+          yet still hands the visit tracker a frame to sandbox/attach to, so
+          the nav-lock + one-shot play capture bind to a frame that never
+          initializes. Deferring the insert makes newly mounted embeds run the
+          exact same sequence as embeds that mount while on screen:
+          insert -> MutationObserver picks it up -> nav-lock + play capture. */}
+      {isVisible && (
       <iframe
         key={attempt}
         ref={iframeRef}
@@ -178,7 +188,7 @@ const ThreadsIframeEmbed = ({
         scrolling="no"
         allowFullScreen
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share"
-        loading="lazy"
+        loading="eager"
         onLoad={() => {
           setHasLoaded(true);
           setFailed(false);
@@ -194,6 +204,7 @@ const ThreadsIframeEmbed = ({
           background: 'transparent',
         }}
       />
+      )}
     </div>
   );
 };
