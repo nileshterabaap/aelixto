@@ -25,12 +25,30 @@ interface MessageMenuState {
 
 const EDIT_TIME_LIMIT_MS = 15 * 60 * 1000; // 15 minutes
 const IMAGE_PREFIX = "🖼️__IMAGE__:";
+const VIDEO_PREFIX = "🎞️__VIDEO__:";
 
 export const parseImageContent = (body: string): string | null => {
   const trimmed = body.trim();
   return trimmed.startsWith(IMAGE_PREFIX)
     ? trimmed.slice(IMAGE_PREFIX.length).trim()
     : null;
+};
+
+export const parseVideoContent = (body: string): string | null => {
+  const trimmed = body.trim();
+  return trimmed.startsWith(VIDEO_PREFIX)
+    ? trimmed.slice(VIDEO_PREFIX.length).trim()
+    : null;
+};
+
+const parseMediaContent = (
+  body: string
+): { url: string; kind: "image" | "video" } | null => {
+  const img = parseImageContent(body);
+  if (img) return { url: img, kind: "image" };
+  const vid = parseVideoContent(body);
+  if (vid) return { url: vid, kind: "video" };
+  return null;
 };
 
 const Conversation = () => {
@@ -156,11 +174,15 @@ const Conversation = () => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file || !user) return;
-    const url = await uploadImage(file, "posts", user.id);
+    const isVideo = file.type.startsWith("video/");
+    const url = await uploadImage(file, "posts", user.id, {
+      silent: true,
+      allowVideo: true,
+    });
     if (!url) return;
     const activeReply = replyTo;
     setReplyTo(null);
-    const content = `${IMAGE_PREFIX}${url}`;
+    const content = `${isVideo ? VIDEO_PREFIX : IMAGE_PREFIX}${url}`;
     await sendMessage(
       activeReply ? `↪️__REPLY__:${activeReply.id}\n${content}` : content
     );
@@ -361,7 +383,6 @@ const Conversation = () => {
         .eq('id', menu.message.id)
         .eq('sender_id', user!.id);
       if (error) throw error;
-      toast({ description: "Message unsent" });
     } catch {
       toast({ title: "Error", description: "Failed to unsend message", variant: "destructive" });
     }
@@ -565,7 +586,11 @@ const Conversation = () => {
                                 style={{ paddingBottom: 14 }}
                               >
                                 <span className="line-clamp-2 break-words">
-                                  {parseImageContent(repliedBody || '') ? 'Photo' : repliedBody}
+                                  {parseImageContent(repliedBody || '')
+                                    ? 'Photo'
+                                    : parseVideoContent(repliedBody || '')
+                                      ? 'Video'
+                                      : repliedBody}
                                 </span>
                               </div>
                             )}
@@ -573,22 +598,23 @@ const Conversation = () => {
                         </>
                       );
                     })()}
+                    {(() => { const media = parseMediaContent(body); return (
                     <div
-                      className={`rounded-lg ${parseImageContent(body) ? 'p-1' : 'px-3 py-1.5'} ${
+                      className={`rounded-lg ${media ? 'p-1' : 'px-3 py-1.5'} ${
                         isOwn
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-muted text-foreground'
                       } ${replyToId && repliedMessage ? 'relative z-10' : ''}`}
                     >
-                      {parseImageContent(body) && (
+                      {media?.kind === 'image' && (
                         <a
-                          href={parseImageContent(body) as string}
+                          href={media.url}
                           target="_blank"
                           rel="noreferrer"
                           className="block"
                         >
                           <img
-                            src={parseImageContent(body) as string}
+                            src={media.url}
                             alt="Shared photo"
                             loading="lazy"
                             onLoad={() => scrollToBottom()}
@@ -596,8 +622,18 @@ const Conversation = () => {
                           />
                         </a>
                       )}
-                      <p className={`text-sm whitespace-pre-wrap break-words ${parseImageContent(body) ? 'px-2 pb-0.5' : ''}`}>
-                        {parseImageContent(body) ? '' : body}
+                      {media?.kind === 'video' && (
+                        <video
+                          src={media.url}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          onLoadedMetadata={() => scrollToBottom()}
+                          className="rounded-md max-h-[320px] w-auto max-w-full"
+                        />
+                      )}
+                      <p className={`text-sm whitespace-pre-wrap break-words ${media ? 'px-2 pb-0.5' : ''}`}>
+                        {media ? '' : body}
                         <span
                           className={`float-right ml-2 text-[10px] leading-none select-none relative top-[6px] ${
                             isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
@@ -618,6 +654,7 @@ const Conversation = () => {
                         </span>
                       </p>
                     </div>
+                    ); })()}
                   </div>
                 )}
                   </div>
@@ -678,7 +715,9 @@ const Conversation = () => {
             <span className="text-foreground">
               {parseImageContent(parseReply(replyTo.content).body)
                 ? 'Photo'
-                : parseReply(replyTo.content).body}
+                : parseVideoContent(parseReply(replyTo.content).body)
+                  ? 'Video'
+                  : parseReply(replyTo.content).body}
             </span>
           </div>
           <button onClick={() => setReplyTo(null)} className="text-xs text-muted-foreground ml-2">✕</button>
@@ -699,7 +738,7 @@ const Conversation = () => {
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               className="hidden"
               onChange={handleImagePick}
             />
@@ -709,7 +748,7 @@ const Conversation = () => {
               variant="ghost"
               disabled={uploading}
               onClick={() => fileInputRef.current?.click()}
-              aria-label="Send a photo"
+              aria-label="Send a photo or video"
             >
               {uploading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
