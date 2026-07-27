@@ -253,7 +253,7 @@ export const HydratedEmbed = memo(({
   // IMAGES: Load directly without play button (swift loading)
   if (r.kind === 'image' && r.url) {
     return (
-      <div ref={embedContainerRef} className="w-full">
+      <div ref={setEmbedContainer} className="w-full">
         <ImageViewTracker postId={post.id}>
           <img 
             src={r.url} 
@@ -272,7 +272,7 @@ export const HydratedEmbed = memo(({
   // strip the user reported; videos still use the iframe/player path.
   if (shouldHydrate && isFacebookPost && effectiveThumbnail && !isFacebookVideoLike) {
     return (
-      <div ref={embedContainerRef} className="w-full" data-embed-status="ready">
+      <div ref={setEmbedContainer} className="w-full" data-embed-status="ready">
         <ImageViewTracker postId={post.id}>
           <a
             href={mediaUrl || '#'}
@@ -297,7 +297,7 @@ export const HydratedEmbed = memo(({
   // THUMBNAIL PLACEHOLDER: Shows while waiting for auto-hydration
   if (!shouldHydrate) {
     return (
-      <div ref={embedContainerRef} className={`relative w-full bg-muted ${aspectClass}`}>
+      <div ref={setEmbedContainer} className={`relative w-full bg-muted ${aspectClass}`}>
         {effectiveThumbnail && !imageError ? (
           <img
             src={effectiveThumbnail}
@@ -319,7 +319,7 @@ export const HydratedEmbed = memo(({
   
   // HYDRATED STATE: Show skeleton → fade into actual embed
   return (
-    <div ref={embedContainerRef} className="relative w-full" style={{ contain: 'layout paint' }}>
+    <div ref={setEmbedContainer} className="relative w-full" style={{ contain: 'layout paint' }}>
       <div className="w-full">
 
         {/* YouTube video */}
