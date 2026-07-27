@@ -45,7 +45,7 @@ export const useImageUpload = () => {
       }
 
       // Validate file size
-      const limit = maxBytes ?? (isVideo ? 50 * 1024 * 1024 : 5 * 1024 * 1024);
+      const limit = maxBytes ?? (isVideo ? 100 * 1024 * 1024 : 5 * 1024 * 1024);
       if (file.size > limit) {
         toast({
           title: "File too large",
