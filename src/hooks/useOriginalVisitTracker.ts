@@ -4,40 +4,6 @@ import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
 // no-op stub kept to minimize diff after removing temporary diagnostic logger
 const traceLog = (..._args: unknown[]) => {};
 
-let threadsTraceSeq = 0;
-const THREADS_TRACE_PREFIX = '[THREADS_VIDEO_PLAY_TRACE]';
-
-const describeTraceTarget = (target: EventTarget | null) => {
-  if (!(target instanceof Element)) return { tag: null, className: null, id: null };
-  return {
-    tag: target.tagName,
-    className: String(target.className || ''),
-    id: target.id || null,
-  };
-};
-
-const threadsTrace = (
-  postId: string,
-  functionName: string,
-  args: Record<string, unknown>,
-  returnValue: unknown,
-  continued: boolean,
-  nextFunction?: string,
-) => {
-  // Temporary production trace for the Threads video_play regression. This is
-  // intentionally console-only and does not alter behavior.
-  console.info(THREADS_TRACE_PREFIX, {
-    seq: ++threadsTraceSeq,
-    ts: Date.now(),
-    postId,
-    functionName,
-    args,
-    returnValue,
-    continued,
-    nextFunction: nextFunction || null,
-  });
-};
-
 const threadsVideoPlayFiredPosts = new Set<string>();
 const lastThreadsCaptureRef: { postId: string | null; time: number } = {
   postId: null,
@@ -87,35 +53,13 @@ export function useOriginalVisitTracker(
 
     const firePlay = () => {
       traceLog('firePlay', 'called', { postId, detail: { alreadyFired: playFiredRef.current, trackPlayableInteraction } });
-      threadsTrace(
-        postId,
-        'firePlay',
-        { trackPlayableInteraction, alreadyFired: playFiredRef.current },
-        trackPlayableInteraction && !playFiredRef.current ? 'will-dispatch-video_play' : 'skipped',
-        trackPlayableInteraction && !playFiredRef.current,
-        trackPlayableInteraction && !playFiredRef.current ? 'trackView' : undefined,
-      );
       if (trackPlayableInteraction && !playFiredRef.current) {
         playFiredRef.current = true;
         traceLog('firePlay', 'dispatch:trackView(video_play)', { postId });
         trackView({ postId, eventType: 'video_play' }).then((ok) => {
           traceLog('firePlay', 'trackView:result', { postId, detail: { ok } });
-          threadsTrace(
-            postId,
-            'firePlay.trackView.then',
-            { eventType: 'video_play' },
-            { ok },
-            false,
-          );
         }).catch((err) => {
           traceLog('firePlay', 'trackView:error', { postId, error: err });
-          threadsTrace(
-            postId,
-            'firePlay.trackView.catch',
-            { eventType: 'video_play' },
-            { error: err instanceof Error ? err.message : String(err) },
-            false,
-          );
           playFiredRef.current = false;
         });
       }
@@ -144,17 +88,16 @@ export function useOriginalVisitTracker(
     };
 
     const isInsideIframe = (node: EventTarget | null): boolean => {
-      const result = node instanceof Element && (node.tagName === 'IFRAME' || !!node.closest('iframe'));
-      threadsTrace(postId, 'isInsideIframe', { target: describeTraceTarget(node) }, result, true, 'onPointerDown.branch');
-      return result;
+      if (!(node instanceof Element)) return false;
+      if (node.tagName === 'IFRAME') return true;
+      return !!node.closest('iframe');
     };
 
     const THREADS_EMBED_SELECTOR =
       '.js-threads-embed, [data-threads-embed], blockquote.text-post-media';
     const isInsideThreadsEmbed = (node: EventTarget | null): boolean => {
-      const result = node instanceof Element && !!node.closest(THREADS_EMBED_SELECTOR);
-      threadsTrace(postId, 'isInsideThreadsEmbed', { target: describeTraceTarget(node) }, result, true, 'onPointerDown.branch');
-      return result;
+      if (!(node instanceof Element)) return false;
+      return !!node.closest(THREADS_EMBED_SELECTOR);
     };
 
     const isXPost = (): boolean => {
@@ -165,36 +108,14 @@ export function useOriginalVisitTracker(
     };
 
     const getThreadsIframe = (): HTMLIFrameElement | null => {
-      const iframe = el.querySelector(
+      return el.querySelector(
         'iframe[src*="threads.net"], iframe[src*="threads.com"]',
       ) as HTMLIFrameElement | null;
-      threadsTrace(
-        postId,
-        'getThreadsIframe',
-        {},
-        iframe ? { found: true, src: iframe.getAttribute('src'), sandbox: iframe.getAttribute('sandbox') } : { found: false },
-        true,
-        'isThreadsPost',
-      );
-      return iframe;
     };
-    const isThreadsPost = (): boolean => {
-      const result = !!getThreadsIframe();
-      threadsTrace(postId, 'isThreadsPost', {}, result, true, 'caller-branch');
-      return result;
-    };
+    const isThreadsPost = (): boolean => !!getThreadsIframe();
 
     const fireThreadsPlayOnce = () => {
-      const alreadyFiredForPost = threadsVideoPlayFiredPosts.has(postId);
-      threadsTrace(
-        postId,
-        'fireThreadsPlayOnce',
-        { alreadyFiredForPost },
-        alreadyFiredForPost ? 'skipped-existing-post-set' : 'will-call-firePlay',
-        !alreadyFiredForPost,
-        alreadyFiredForPost ? undefined : 'firePlay',
-      );
-      if (alreadyFiredForPost) return;
+      if (threadsVideoPlayFiredPosts.has(postId)) return;
       lastThreadsCaptureRef.postId = postId;
       lastThreadsCaptureRef.time = Date.now();
       threadsVideoPlayFiredPosts.add(postId);
@@ -224,37 +145,12 @@ export function useOriginalVisitTracker(
           path,
         },
       });
-      const insideIframe = isInsideIframe(e.target);
-      const insideThreadsEmbed = isInsideThreadsEmbed(e.target);
-      const threadsPost = isThreadsPost();
-      threadsTrace(
-        postId,
-        'onPointerDown',
-        {
-          type: e.type,
-          target: describeTraceTarget(e.target),
-          trackPlayableInteraction,
-          insideIframe,
-          insideThreadsEmbed,
-          threadsPost,
-          path,
-        },
-        'branch-evaluated',
-        insideIframe || (trackPlayableInteraction && insideThreadsEmbed) || (trackPlayableInteraction && threadsPost),
-        insideIframe
-          ? 'insideIframe-branch'
-          : trackPlayableInteraction && insideThreadsEmbed
-            ? 'fireThreadsPlayOnce'
-            : trackPlayableInteraction && threadsPost
-              ? 'fireThreadsPlayOnce'
-              : undefined,
-      );
-      if (insideIframe) {
+      if (isInsideIframe(e.target)) {
         if (trackPlayableInteraction) {
           // Playable posts: tapping into the iframe = Play (+1) only.
           // "Visited the original source" is intentionally NOT inferred here;
           // it must come from an explicit anchor click or the platform-icon button.
-          if (threadsPost) {
+          if (isThreadsPost()) {
             fireThreadsPlayOnce();
           } else {
             firePlay();
@@ -263,12 +159,12 @@ export function useOriginalVisitTracker(
         } else {
           fireOriginal();
         }
-      } else if (trackPlayableInteraction && insideThreadsEmbed) {
+      } else if (trackPlayableInteraction && isInsideThreadsEmbed(e.target)) {
         // Threads SDK inflates a same-origin <blockquote> (no iframe), so the
         // isInsideIframe check above never matches. Treat a pointerdown on the
         // inflated Threads embed as a play interaction (+1 only).
         fireThreadsPlayOnce();
-      } else if (trackPlayableInteraction && threadsPost) {
+      } else if (trackPlayableInteraction && isThreadsPost()) {
         // Threads is rendered as a direct cross-origin iframe. On mobile the
         // event target for a tap on the iframe surface is often reported as
         // an ancestor element (not IFRAME), *and* body.at-scroll-top applies
@@ -292,23 +188,11 @@ export function useOriginalVisitTracker(
       // iframe. If this post has a Threads iframe and it's on-screen, credit
       // one video_play. This runs a short delay so we can confirm the page did
       // not go hidden (that would be an app backgrounding, handled elsewhere).
-      const threadsPost = isThreadsPost();
-      threadsTrace(
-        postId,
-        'onWindowBlur',
-        { trackPlayableInteraction, threadsPost, alreadyFired: playFiredRef.current },
-        trackPlayableInteraction && threadsPost && !playFiredRef.current ? 'will-check-iframe' : 'skipped-threads-blur-path',
-        trackPlayableInteraction && threadsPost && !playFiredRef.current,
-        trackPlayableInteraction && threadsPost && !playFiredRef.current ? 'getThreadsIframe' : undefined,
-      );
-      if (trackPlayableInteraction && threadsPost && !playFiredRef.current) {
+      if (trackPlayableInteraction && isThreadsPost() && !playFiredRef.current) {
         const iframe = getThreadsIframe();
         if (iframe) {
           setTimeout(() => {
-            if (playFiredRef.current) {
-              threadsTrace(postId, 'onWindowBlur.timeout', { alreadyFired: true }, 'skipped-already-fired', false);
-              return;
-            }
+            if (playFiredRef.current) return;
             // Each mounted Threads post owns a window.blur listener. A single
             // iframe tap blurs the window globally, so only the post whose
             // capture layer saw the tap may use this fallback; otherwise every
@@ -316,44 +200,15 @@ export function useOriginalVisitTracker(
             if (
               lastThreadsCaptureRef.postId !== postId ||
               Date.now() - lastThreadsCaptureRef.time > 1200
-            ) {
-              threadsTrace(
-                postId,
-                'onWindowBlur.timeout',
-                { lastCapturePostId: lastThreadsCaptureRef.postId, msSinceCapture: Date.now() - lastThreadsCaptureRef.time },
-                'skipped-capture-mismatch',
-                false,
-              );
-              return;
-            }
-            if (document.visibilityState === 'hidden') {
-              threadsTrace(postId, 'onWindowBlur.timeout', { visibilityState: document.visibilityState }, 'skipped-hidden', false);
-              return;
-            }
+            ) return;
+            if (document.visibilityState === 'hidden') return;
             const r = iframe.getBoundingClientRect();
             const onScreen =
               r.width > 0 &&
               r.height > 0 &&
               r.bottom > 0 &&
               r.top < (window.innerHeight || document.documentElement.clientHeight);
-            if (!onScreen) {
-              threadsTrace(
-                postId,
-                'onWindowBlur.timeout',
-                { rect: { width: r.width, height: r.height, top: r.top, bottom: r.bottom } },
-                'skipped-offscreen',
-                false,
-              );
-              return;
-            }
-            threadsTrace(
-              postId,
-              'onWindowBlur.timeout',
-              { rect: { width: r.width, height: r.height, top: r.top, bottom: r.bottom } },
-              'will-call-firePlay',
-              true,
-              'firePlay',
-            );
+            if (!onScreen) return;
             firePlay();
             lastIframeInteractionRef.current = Date.now();
           }, 120);
@@ -442,17 +297,8 @@ export function useOriginalVisitTracker(
 
     const handleIframeFocus = () => {
       const now = Date.now();
-      const threadsPost = isThreadsPost();
-      threadsTrace(
-        postId,
-        'handleIframeFocus',
-        { trackPlayableInteraction, threadsPost },
-        trackPlayableInteraction ? (threadsPost ? 'will-call-fireThreadsPlayOnce' : 'will-call-firePlay') : 'will-call-fireOriginal',
-        true,
-        trackPlayableInteraction ? (threadsPost ? 'fireThreadsPlayOnce' : 'firePlay') : 'fireOriginal',
-      );
       if (trackPlayableInteraction) {
-        if (threadsPost) {
+        if (isThreadsPost()) {
           fireThreadsPlayOnce();
         } else {
           firePlay();
@@ -475,17 +321,6 @@ export function useOriginalVisitTracker(
     const threadsCaptureCleanups: Array<() => void> = [];
 
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
-      const src = iframe.getAttribute('src') || '';
-      if (src.includes('threads.net') || src.includes('threads.com')) {
-        threadsTrace(
-          postId,
-          'attachIframeListeners',
-          { src, sandboxBefore: iframe.getAttribute('sandbox') },
-          'will-attach-focus-load-and-nav-lock',
-          true,
-          'applyNavLockSandbox',
-        );
-      }
       iframe.addEventListener('focus', handleIframeFocus);
       iframe.addEventListener('load', () => {
         try {
@@ -520,18 +355,7 @@ export function useOriginalVisitTracker(
         title.includes('tweet');
       const isThreads =
         src.includes('threads.net') || src.includes('threads.com');
-      if (!isX && !isThreads) {
-        return;
-      }
-      if (isThreads) {
-        threadsTrace(
-          postId,
-          'applyNavLockSandbox',
-          { src, alreadyApplied: iframe.dataset.navLockApplied === '1' },
-          'will-set-sandbox',
-          false,
-        );
-      }
+      if (!isX && !isThreads) return;
       iframe.dataset.navLockApplied = '1';
       // Setting sandbox on an already-loaded iframe reloads it once; that's
       // acceptable and only happens the first time we see the frame.
@@ -545,18 +369,6 @@ export function useOriginalVisitTracker(
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         mutation.addedNodes.forEach((node) => {
-          if (
-            node instanceof HTMLIFrameElement &&
-            ((node.getAttribute('src') || '').includes('threads.net') || (node.getAttribute('src') || '').includes('threads.com'))
-          ) {
-            threadsTrace(postId, 'MutationObserver', { node: 'threads-iframe' }, 'will-call-attachIframeListeners', true, 'attachIframeListeners');
-          }
-          if (node instanceof HTMLElement) {
-            const threadsIframes = Array.from(node.querySelectorAll('iframe[src*="threads.net"], iframe[src*="threads.com"]'));
-            if (threadsIframes.length > 0) {
-              threadsTrace(postId, 'MutationObserver', { nestedThreadsIframes: threadsIframes.length }, 'will-call-attachIframeListeners', true, 'attachIframeListeners');
-            }
-          }
           if (node instanceof HTMLIFrameElement) attachIframeListeners(node);
           if (node instanceof HTMLElement) node.querySelectorAll('iframe').forEach(attachIframeListeners);
         });
