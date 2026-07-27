@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2, Check, CheckCheck } from "lucide-react";
+import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2, Check, CheckCheck, ImagePlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SharedPostCard } from "@/components/messages/SharedPostCard";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMessages, Message } from "@/hooks/useMessages";
 import { useSession } from "@/hooks/useSession";
+import { useImageUpload } from "@/hooks/useImageUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -23,6 +24,14 @@ interface MessageMenuState {
 }
 
 const EDIT_TIME_LIMIT_MS = 15 * 60 * 1000; // 15 minutes
+const IMAGE_PREFIX = "🖼️__IMAGE__:";
+
+export const parseImageContent = (body: string): string | null => {
+  const trimmed = body.trim();
+  return trimmed.startsWith(IMAGE_PREFIX)
+    ? trimmed.slice(IMAGE_PREFIX.length).trim()
+    : null;
+};
 
 const Conversation = () => {
   const { conversationId } = useParams();
@@ -33,6 +42,10 @@ const Conversation = () => {
   const [newMessage, setNewMessage] = useState("");
   const [otherUser, setOtherUser] = useState<ConversationUser | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLElement>(null);
+  const didInitialScroll = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { uploadImage, uploading } = useImageUpload();
   const [menu, setMenu] = useState<MessageMenuState>({ message: null, x: 0, y: 0 });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
@@ -63,8 +76,27 @@ const Conversation = () => {
   }, [conversationId, user]);
 
   useEffect(() => {
+    if (!didInitialScroll.current) {
+      if (messages.length === 0) return;
+      // Land at the bottom instantly on open (no visible scroll animation).
+      didInitialScroll.current = true;
+      const jump = () => {
+        const el = scrollAreaRef.current;
+        if (el) el.scrollTop = el.scrollHeight;
+        messagesEndRef.current?.scrollIntoView({ block: "end" });
+      };
+      jump();
+      requestAnimationFrame(jump);
+      window.setTimeout(jump, 60);
+      return;
+    }
     scrollToBottom();
   }, [messages]);
+
+  // Reset the instant-jump flag when switching chats
+  useEffect(() => {
+    didInitialScroll.current = false;
+  }, [conversationId]);
 
   // When user triggers reply (via swipe or menu), scroll to bottom so the
   // reply banner + input remain visible above the keyboard.
@@ -118,6 +150,20 @@ const Conversation = () => {
     } catch (error) {
       console.error('Error fetching other user:', error);
     }
+  };
+
+  const handleImagePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file || !user) return;
+    const url = await uploadImage(file, "posts", user.id);
+    if (!url) return;
+    const activeReply = replyTo;
+    setReplyTo(null);
+    const content = `${IMAGE_PREFIX}${url}`;
+    await sendMessage(
+      activeReply ? `↪️__REPLY__:${activeReply.id}\n${content}` : content
+    );
   };
 
   const handleSend = async () => {
