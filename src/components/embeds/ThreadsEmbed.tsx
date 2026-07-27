@@ -98,6 +98,47 @@ const ThreadsIframeEmbed = ({
   const [attempt, setAttempt] = useState(0);
   const persistHeight = usePersistEmbedHeight(postId);
 
+  // TEMPORARY Threads-only runtime trace (removed after diagnosis).
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const onTap = () => {
+      const iframe = wrapper.querySelector(
+        'iframe[src*="threads.net"], iframe[src*="threads.com"]',
+      ) as HTMLIFrameElement | null;
+      // The tracked container is the nearest ancestor that owns the
+      // capture-phase touchstart listener wired by useOriginalVisitTracker.
+      let container: HTMLElement | null = wrapper.parentElement;
+      while (container && !container.classList.contains('w-full')) {
+        container = container.parentElement;
+      }
+      // eslint-disable-next-line no-console
+      console.log('[THREADS_TAP_TRACE]', {
+        postId,
+        iframeFound: !!iframe,
+        iframeSrc: iframe?.getAttribute('src') || null,
+        navLockApplied: iframe?.dataset.navLockApplied === '1',
+        sandbox: iframe?.getAttribute('sandbox') || null,
+        trackedContainerFound: !!container,
+        containerHasThreadsIframe: !!container?.querySelector(
+          'iframe[src*="threads.net"], iframe[src*="threads.com"]',
+        ),
+        isVisible,
+        hasLoaded,
+        failed,
+        attempt,
+        pointerEvents: iframe ? getComputedStyle(iframe).pointerEvents : null,
+        atScrollTop: document.body.classList.contains('at-scroll-top'),
+      });
+    };
+    wrapper.addEventListener('touchstart', onTap, { capture: true, passive: true });
+    wrapper.addEventListener('pointerdown', onTap, true);
+    return () => {
+      wrapper.removeEventListener('touchstart', onTap, true);
+      wrapper.removeEventListener('pointerdown', onTap, true);
+    };
+  }, [postId, isVisible, hasLoaded, failed, attempt]);
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const iframeWindow = iframeRef.current?.contentWindow;
