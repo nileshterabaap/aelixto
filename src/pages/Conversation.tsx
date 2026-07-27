@@ -586,7 +586,11 @@ const Conversation = () => {
                                 style={{ paddingBottom: 14 }}
                               >
                                 <span className="line-clamp-2 break-words">
-                                  {parseImageContent(repliedBody || '') ? 'Photo' : repliedBody}
+                                  {parseImageContent(repliedBody || '')
+                                    ? 'Photo'
+                                    : parseVideoContent(repliedBody || '')
+                                      ? 'Video'
+                                      : repliedBody}
                                 </span>
                               </div>
                             )}
@@ -594,22 +598,23 @@ const Conversation = () => {
                         </>
                       );
                     })()}
+                    {(() => { const media = parseMediaContent(body); return (
                     <div
-                      className={`rounded-lg ${parseImageContent(body) ? 'p-1' : 'px-3 py-1.5'} ${
+                      className={`rounded-lg ${media ? 'p-1' : 'px-3 py-1.5'} ${
                         isOwn
                           ? 'bg-primary text-primary-foreground'
                           : 'bg-muted text-foreground'
                       } ${replyToId && repliedMessage ? 'relative z-10' : ''}`}
                     >
-                      {parseImageContent(body) && (
+                      {media?.kind === 'image' && (
                         <a
-                          href={parseImageContent(body) as string}
+                          href={media.url}
                           target="_blank"
                           rel="noreferrer"
                           className="block"
                         >
                           <img
-                            src={parseImageContent(body) as string}
+                            src={media.url}
                             alt="Shared photo"
                             loading="lazy"
                             onLoad={() => scrollToBottom()}
@@ -617,8 +622,18 @@ const Conversation = () => {
                           />
                         </a>
                       )}
-                      <p className={`text-sm whitespace-pre-wrap break-words ${parseImageContent(body) ? 'px-2 pb-0.5' : ''}`}>
-                        {parseImageContent(body) ? '' : body}
+                      {media?.kind === 'video' && (
+                        <video
+                          src={media.url}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          onLoadedMetadata={() => scrollToBottom()}
+                          className="rounded-md max-h-[320px] w-auto max-w-full"
+                        />
+                      )}
+                      <p className={`text-sm whitespace-pre-wrap break-words ${media ? 'px-2 pb-0.5' : ''}`}>
+                        {media ? '' : body}
                         <span
                           className={`float-right ml-2 text-[10px] leading-none select-none relative top-[6px] ${
                             isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
@@ -639,6 +654,7 @@ const Conversation = () => {
                         </span>
                       </p>
                     </div>
+                    ); })()}
                   </div>
                 )}
                   </div>
