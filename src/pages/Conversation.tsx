@@ -38,6 +38,8 @@ const Conversation = () => {
   const [editText, setEditText] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sendingRef = useRef(false);
+  const [isSending, setIsSending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -119,21 +121,22 @@ const Conversation = () => {
   };
 
   const handleSend = async () => {
-    if (!newMessage.trim()) return;
-    let content = newMessage;
-    if (replyTo) {
-      content = `↪️__REPLY__:${replyTo.id}\n${newMessage}`;
-    }
-    await sendMessage(content);
+    const body = newMessage.trim();
+    if (!body || sendingRef.current) return;
+
+    sendingRef.current = true;
+    setIsSending(true);
+
+    const activeReply = replyTo;
     setNewMessage("");
     setReplyTo(null);
-  };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
+    const content = activeReply ? `↪️__REPLY__:${activeReply.id}\n${body}` : body;
+
+    await sendMessage(content);
+
+    sendingRef.current = false;
+    setIsSending(false);
   };
 
   const formatTime = (dateString: string) => {
@@ -628,7 +631,6 @@ const Conversation = () => {
               placeholder="Type a message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
               className="flex-1"
               // type="search" + autocomplete off suppresses Chrome Android's
               // key/location/card autofill toolbar above the keyboard.
@@ -647,8 +649,7 @@ const Conversation = () => {
             <Button
               type="submit"
               size="icon"
-              onClick={handleSend}
-              disabled={!newMessage.trim()}
+              disabled={!newMessage.trim() || isSending}
             >
               <Send className="h-5 w-5" />
             </Button>
