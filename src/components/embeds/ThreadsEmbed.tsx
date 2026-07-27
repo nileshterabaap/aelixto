@@ -171,29 +171,31 @@ const ThreadsIframeEmbed = ({
       className="relative w-full overflow-hidden"
       style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
     >
-      <iframe
-        key={attempt}
-        ref={iframeRef}
-        src={src}
-        scrolling="no"
-        allowFullScreen
-        allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share"
-        loading="lazy"
-        onLoad={() => {
-          setHasLoaded(true);
-          setFailed(false);
-        }}
-        onError={() => setFailed(true)}
-        style={{
-          border: 'none',
-          width: '100%',
-          height: '100%',
-          display: 'block',
-          margin: 0,
-          padding: 0,
-          background: 'transparent',
-        }}
-      />
+      {isVisible && (
+        <iframe
+          key={attempt}
+          ref={iframeRef}
+          src={src}
+          scrolling="no"
+          allowFullScreen
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share"
+          loading="lazy"
+          onLoad={() => {
+            setHasLoaded(true);
+            setFailed(false);
+          }}
+          onError={() => setFailed(true)}
+          style={{
+            border: 'none',
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            margin: 0,
+            padding: 0,
+            background: 'transparent',
+          }}
+        />
+      )}
     </div>
   );
 };
