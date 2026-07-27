@@ -1,4 +1,4 @@
-import { useState, memo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
+import { useState, memo, useCallback, useEffect, useMemo, useRef, type MouseEvent } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
 import type { Post } from '@/data/demoData';
@@ -88,7 +88,25 @@ export const HydratedEmbed = memo(({
   isHydrated, 
   onPlayClick 
 }: HydratedEmbedProps) => {
-  const embedContainerRef = useRef<HTMLDivElement>(null);
+  // Attachment point for useOriginalVisitTracker (nav-lock sandbox + one-shot
+  // play capture). The tracker resolves `containerRef.current` exactly once per
+  // effect run and its deps do not include the DOM node, so a container element
+  // that appears (or is swapped for a different branch's div) after that run
+  // leaves the tracker bound to nothing — no MutationObserver, therefore no
+  // sandbox nav-lock and no touchstart play capture. That is exactly what
+  // happens to a Threads post that mounts into the kept-alive (display:none)
+  // Home feed after publishing from Profile. Using a callback ref + an element
+  // keyed ref object makes the tracker's single attachment effect re-run (with
+  // its own cleanup, so no duplicate listeners) as soon as the real container
+  // node exists.
+  const [embedEl, setEmbedEl] = useState<HTMLDivElement | null>(null);
+  const setEmbedContainer = useCallback((node: HTMLDivElement | null) => {
+    setEmbedEl((prev) => (prev === node ? prev : node));
+  }, []);
+  const embedContainerRef = useMemo(
+    () => ({ current: embedEl }) as React.RefObject<HTMLDivElement>,
+    [embedEl],
+  );
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const [rawEmbedFailed, setRawEmbedFailed] = useState(false);
