@@ -116,11 +116,14 @@ const Messages = () => {
                   replyStripped.trim()
                 );
                 const isPhoto = replyStripped.trim().startsWith("🖼️__IMAGE__:");
+                const isVideo = replyStripped.trim().startsWith("🎞️__VIDEO__:");
                 const displayContent = isPostShare
                   ? "Sent a post"
                   : isPhoto
                     ? "Sent a photo"
-                    : replyStripped;
+                    : isVideo
+                      ? "Sent a video"
+                      : replyStripped;
                 const lastMessagePreview = conversation.last_message
                   ? conversation.last_message.sender_id === user?.id
                     ? `You: ${displayContent}`
