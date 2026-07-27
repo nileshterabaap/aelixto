@@ -109,16 +109,6 @@ const ThreadsIframeEmbed = ({
   );
   const [hasLoaded, setHasLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-  // Newly mounted Threads embeds (e.g. a post published on another route and
-  // then surfaced by a feed refresh) can mount while the container is still
-  // offscreen or hidden. With loading="lazy" the iframe never fires `load`,
-  // so the old unconditional 6s timer flipped them to the "View on Threads"
-  // card permanently — which also removed the iframe the nav-lock sandbox and
-  // the one-shot play capture attach to. The timer now only runs while the
-  // embed is actually visible, and we retry once before giving up.
-  const [isVisible, setIsVisible] = useState(false);
-  const [attempt, setAttempt] = useState(0);
   const persistHeight = usePersistEmbedHeight(postId);
 
   useEffect(() => {
@@ -143,38 +133,14 @@ const ThreadsIframeEmbed = ({
   }, []);
 
   useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el || isVisible) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '600px 0px', threshold: 0 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [isVisible]);
-
-  useEffect(() => {
-    if (hasLoaded || !isVisible) return;
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-
     const timeout = setTimeout(() => {
-      if (hasLoaded) return;
-      if (attempt < 1) {
-        // Remount the iframe once — covers embeds whose first request was
-        // started while the tab/route was hidden and silently dropped.
-        setAttempt((prev) => prev + 1);
-      } else {
+      if (!hasLoaded) {
         setFailed(true);
       }
     }, 6000);
 
     return () => clearTimeout(timeout);
-  }, [hasLoaded, isVisible, attempt]);
+  }, [hasLoaded]);
 
   if (failed) {
     return (
@@ -190,22 +156,17 @@ const ThreadsIframeEmbed = ({
 
   return (
     <div
-      ref={wrapperRef}
       className="relative w-full overflow-hidden"
       style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
     >
       <iframe
-        key={attempt}
         ref={iframeRef}
         src={src}
         scrolling="no"
         allowFullScreen
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share"
         loading="lazy"
-        onLoad={() => {
-          setHasLoaded(true);
-          setFailed(false);
-        }}
+        onLoad={() => setHasLoaded(true)}
         onError={() => setFailed(true)}
         style={{
           border: 'none',
