@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { smoothFadeStyle, useSmoothReveal } from "@/components/embeds/SmoothEmbedFrame";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
@@ -40,6 +41,7 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const revealed = useSmoothReveal(!loading);
 
   useEffect(() => {
     const loadEmbed = async () => {
