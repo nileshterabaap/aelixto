@@ -196,6 +196,17 @@ export const PlatformPostViewer = ({
   useEffect(() => {
     if (!isXViewer || initialIdx < 0) return;
     const t = window.setTimeout(() => {
+      // Record a scroll anchor BEFORE widening the window backwards.
+      // Without this, prepending posts above pushes the content down and the
+      // viewer ends up showing a different post than the one that was tapped.
+      const container = scrollContainerRef.current;
+      const firstId = renderedPostsRef.current[0]?.id;
+      if (container && firstId) {
+        const el = postRefs.current.get(firstId);
+        if (el) {
+          pendingPrependAnchor.current = { postId: firstId, top: el.getBoundingClientRect().top };
+        }
+      }
       setRenderRange(getXViewerRange(posts.length, initialIdx, BACKGROUND_X_WINDOW_RADIUS));
     }, 900);
     return () => window.clearTimeout(t);
