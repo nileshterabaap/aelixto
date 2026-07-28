@@ -182,6 +182,8 @@ export const PlatformPostViewer = ({
     () => isXViewer ? posts.slice(renderRange.start, renderRange.end + 1) : posts,
     [isXViewer, posts, renderRange.start, renderRange.end]
   );
+  const renderedPostsRef = useRef(renderedPosts);
+  renderedPostsRef.current = renderedPosts;
 
   useEffect(() => {
     postRefs.current.clear();
@@ -196,6 +198,17 @@ export const PlatformPostViewer = ({
   useEffect(() => {
     if (!isXViewer || initialIdx < 0) return;
     const t = window.setTimeout(() => {
+      // Record a scroll anchor BEFORE widening the window backwards.
+      // Without this, prepending posts above pushes the content down and the
+      // viewer ends up showing a different post than the one that was tapped.
+      const container = scrollContainerRef.current;
+      const firstId = renderedPostsRef.current[0]?.id;
+      if (container && firstId) {
+        const el = postRefs.current.get(firstId);
+        if (el) {
+          pendingPrependAnchor.current = { postId: firstId, top: el.getBoundingClientRect().top };
+        }
+      }
       setRenderRange(getXViewerRange(posts.length, initialIdx, BACKGROUND_X_WINDOW_RADIUS));
     }, 900);
     return () => window.clearTimeout(t);
@@ -271,6 +284,10 @@ export const PlatformPostViewer = ({
 
     let cancelled = false;
     let lastScrollTop = container.scrollTop;
+    // Timestamp of the last genuine pointer/touch contact inside the viewer.
+    // Scroll deltas that happen without recent contact are layout-driven
+    // (embed hydration, browser scroll anchoring) — never user intent.
+    let lastPointerAt = 0;
 
     const anchor = () => {
       if (cancelled || userScrolledRef.current) return;
@@ -338,13 +355,17 @@ export const PlatformPostViewer = ({
     const onScroll = () => {
       if (userScrolledRef.current) return;
       const delta = Math.abs(container.scrollTop - lastScrollTop);
-      // Ignore tiny sub-pixel adjustments from our own anchor() writes.
-      if (delta > 8) {
+      // Ignore adjustments that aren't backed by a recent finger/pointer
+      // contact — those come from embeds resizing above the target.
+      if (delta > 8 && performance.now() - lastPointerAt < 700) {
         markScrolled();
       }
       lastScrollTop = container.scrollTop;
     };
     container.addEventListener("scroll", onScroll, { passive: true });
+    const onPointerContact = () => { lastPointerAt = performance.now(); };
+    container.addEventListener("pointerdown", onPointerContact, { passive: true, capture: true });
+    container.addEventListener("touchstart", onPointerContact, { passive: true, capture: true });
 
     // Safety: stop anchoring after 12s — long enough for slow embeds to
     // finish hydrating, short enough to never feel sticky.
@@ -363,6 +384,8 @@ export const PlatformPostViewer = ({
       container.removeEventListener("touchmove", markScrolled);
       container.removeEventListener("keydown", markScrolled);
       container.removeEventListener("scroll", onScroll);
+      container.removeEventListener("pointerdown", onPointerContact, true);
+      container.removeEventListener("touchstart", onPointerContact, true);
       container.removeEventListener("load", onAnyLoad, true);
     };
   }, [portalReady, targetPostId, posts, initialIdx, activeTab]);
