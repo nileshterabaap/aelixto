@@ -8,7 +8,7 @@
         "src/hooks/useOriginalVisitTracker.ts",
         "src/components/embeds/TwitterEmbed.tsx"
       ],
-      "frozen": true,
+      "frozen": false,
       "frozenAt": "2026-07-20T21:30:51.752Z",
       "baseline": {
         "src/hooks/useOriginalVisitTracker.ts": {
@@ -26,7 +26,7 @@
       "files": [
         "src/hooks/useOriginalVisitTracker.ts"
       ],
-      "frozen": true,
+      "frozen": false,
       "frozenAt": "2026-07-20T21:30:51.847Z",
       "baseline": {
         "src/hooks/useOriginalVisitTracker.ts": {
@@ -40,7 +40,7 @@
       "files": [
         "src/components/embeds/LinkedInEmbed.tsx"
       ],
-      "frozen": true,
+      "frozen": false,
       "baseline": {
         "src/components/embeds/LinkedInEmbed.tsx": {
           "hash": "38e0293c82e880de8b0015e78456d20940b525d18d2a0cdad0200b5306ed6061",
@@ -54,7 +54,7 @@
       "files": [
         "src/components/UniversalMetaEmbed.tsx"
       ],
-      "frozen": true,
+      "frozen": false,
       "baseline": {
         "src/components/UniversalMetaEmbed.tsx": {
           "hash": "d01d9da3d58577c067fd4d56b563d591a3de86377babc432a894795f66b66af2",
@@ -69,7 +69,7 @@
         "src/components/UniversalMetaEmbed.tsx",
         "src/hooks/useOriginalVisitTracker.ts"
       ],
-      "frozen": true,
+      "frozen": false,
       "baseline": {
         "src/components/UniversalMetaEmbed.tsx": {
           "hash": "d01d9da3d58577c067fd4d56b563d591a3de86377babc432a894795f66b66af2",
@@ -87,7 +87,7 @@
       "files": [
         "src/hooks/useCurrentProfile.ts"
       ],
-      "frozen": true,
+      "frozen": false,
       "baseline": {
         "src/hooks/useCurrentProfile.ts": {
           "hash": "ffc0e56395f943b3890fa581cb6c4406944fabbc97cfbe81b1560bd6fc9bd4bd",
@@ -101,7 +101,7 @@
       "files": [
         "src/components/embeds/PinterestEmbed.tsx"
       ],
-      "frozen": true,
+      "frozen": false,
       "baseline": {
         "src/components/embeds/PinterestEmbed.tsx": {
           "hash": "2dd39221000fd8f8f7c0d8919ac3443243578e846a933eea2534bf4696bca95b",
@@ -115,7 +115,7 @@
       "files": [
         "src/components/RawEmbedRenderer.tsx"
       ],
-      "frozen": true,
+      "frozen": false,
       "baseline": {
         "src/components/RawEmbedRenderer.tsx": {
           "hash": "d7263bd9470337b31e9d610d36b5f9cf542796f00471dfd73e628d62faf62f94",
@@ -131,7 +131,7 @@
         "src/features/article-embeds/ArticleContentEmbed.tsx",
         "supabase/functions/unfurl-article/index.ts"
       ],
-      "frozen": true,
+      "frozen": false,
       "baseline": {
         "src/features/article-embeds/ArticleEmbed.tsx": {
           "hash": "1104279dedc2b028c43b0a0e2e4940d162e32fe1b4823fef3cb287da4e7ec277",
@@ -159,7 +159,7 @@
         "supabase/functions/fetch-og/index.ts",
         "supabase/functions/extract-preview/index.ts"
       ],
-      "frozen": true,
+      "frozen": false,
       "baseline": {
         "src/features/article-embeds/LinkPreviewCard.tsx": {
           "hash": "87977a0af0897ce6f1aa0e78c97765ab5fa4629cdea74065ddd14711718fffe6",
