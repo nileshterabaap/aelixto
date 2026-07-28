@@ -118,10 +118,14 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
 
   return (
     <div className="relative" data-embed-status={loading ? 'loading' : 'ready'}>
-      {loading && (
+      {!revealed && (
         <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       )}
-      <div ref={containerRef} className="twitter-embed-container" />
+      <div
+        ref={containerRef}
+        className="twitter-embed-container"
+        style={smoothFadeStyle(revealed)}
+      />
       <style>{`
         .twitter-embed-container iframe {
           margin-bottom: -85px !important;
