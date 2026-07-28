@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { openExternalUrl } from '@/lib/openExternalUrl';
+import { EMBED_FADE_MS, EmbedFadeSkeleton, useSmoothReveal } from '@/components/embeds/SmoothEmbedFrame';
 
 /**
  * Small pill-shaped overlay button rendered on top of an embed iframe so
@@ -355,6 +356,8 @@ const FacebookIframeEmbed = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
+  const [fbLoaded, setFbLoaded] = useState(false);
+  const fbRevealed = useSmoothReveal(fbLoaded);
   // Render Facebook's plugin iframe at fixed dimensions, matching Facebook's
   // official embed exactly. For reels/videos we use 267x476 (Facebook's own
   // Reel embed size) so the plugin renders its native viewport with no
