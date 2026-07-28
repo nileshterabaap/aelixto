@@ -182,6 +182,8 @@ export const PlatformPostViewer = ({
     () => isXViewer ? posts.slice(renderRange.start, renderRange.end + 1) : posts,
     [isXViewer, posts, renderRange.start, renderRange.end]
   );
+  const renderedPostsRef = useRef(renderedPosts);
+  renderedPostsRef.current = renderedPosts;
 
   useEffect(() => {
     postRefs.current.clear();
