@@ -103,6 +103,9 @@ const ThreadsIframeEmbed = ({
   const [isVisible, setIsVisible] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const persistHeight = usePersistEmbedHeight(postId);
+  // Pinterest-style smooth reveal (presentational only — the overlay below
+  // stays at z-index 2 and keeps owning the first-tap video_play).
+  const threadsRevealed = useSmoothReveal(hasLoaded);
 
   // Self-contained one-shot play capture (historical overlay behavior).
   // A tap that lands on a cross-origin iframe is delivered to the iframe's
@@ -226,6 +229,7 @@ const ThreadsIframeEmbed = ({
       className="relative w-full overflow-hidden"
       style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
     >
+      <EmbedFadeSkeleton visible={!threadsRevealed} />
       <iframe
         key={attempt}
         ref={iframeRef}
@@ -247,6 +251,10 @@ const ThreadsIframeEmbed = ({
           margin: 0,
           padding: 0,
           background: 'transparent',
+          position: 'relative',
+          zIndex: 1,
+          opacity: threadsRevealed ? 1 : 0,
+          transition: `opacity ${EMBED_FADE_MS}ms ease`,
         }}
       />
     </div>
