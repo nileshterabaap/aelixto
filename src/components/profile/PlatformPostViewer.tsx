@@ -361,12 +361,6 @@ export const PlatformPostViewer = ({
     container.addEventListener("wheel", markScrolled, { passive: true });
     container.addEventListener("touchmove", markScrolled, { passive: true });
     container.addEventListener("keydown", markScrolled, { passive: true });
-    // Touches that start on a cross-origin embed iframe (X, etc.) never
-    // bubble to the container, so the container-level listeners above never
-    // fire and anchoring keeps fighting the user ("treadmill"). Listen on
-    // window in capture phase as well.
-    window.addEventListener("wheel", markScrolled, { passive: true, capture: true });
-    window.addEventListener("touchmove", markScrolled, { passive: true, capture: true });
     // Last-resort: any genuine scroll delta the observers didn't catch
     // (momentum, scrollbar drag, programmatic-but-user-initiated) trips
     // the lock so anchoring can never fight the user.
@@ -384,8 +378,6 @@ export const PlatformPostViewer = ({
     const onPointerContact = () => { lastPointerAt = performance.now(); };
     container.addEventListener("pointerdown", onPointerContact, { passive: true, capture: true });
     container.addEventListener("touchstart", onPointerContact, { passive: true, capture: true });
-    window.addEventListener("pointerdown", onPointerContact, { passive: true, capture: true });
-    window.addEventListener("touchstart", onPointerContact, { passive: true, capture: true });
 
     // Safety: stop anchoring after 12s — long enough for slow embeds to
     // finish hydrating, short enough to never feel sticky.
@@ -403,13 +395,9 @@ export const PlatformPostViewer = ({
       container.removeEventListener("wheel", markScrolled);
       container.removeEventListener("touchmove", markScrolled);
       container.removeEventListener("keydown", markScrolled);
-      window.removeEventListener("wheel", markScrolled, true);
-      window.removeEventListener("touchmove", markScrolled, true);
       container.removeEventListener("scroll", onScroll);
       container.removeEventListener("pointerdown", onPointerContact, true);
       container.removeEventListener("touchstart", onPointerContact, true);
-      window.removeEventListener("pointerdown", onPointerContact, true);
-      window.removeEventListener("touchstart", onPointerContact, true);
       container.removeEventListener("load", onAnyLoad, true);
     };
   }, [portalReady, targetPostId, posts, initialIdx, activeTab]);
