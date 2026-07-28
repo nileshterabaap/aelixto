@@ -4,7 +4,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import RedditEmbed from "@/components/embeds/RedditEmbed";
 import { ArticleContentEmbed } from "./ArticleContentEmbed";
 import { LinkPreviewCard } from "./LinkPreviewCard";
-import { EMBED_FADE_MS } from "@/components/embeds/SmoothEmbedFrame";
 
 interface ArticleEmbedProps {
   url: string;
@@ -229,7 +228,7 @@ export const ArticleEmbed = ({ url, onFaviconLoaded, postId, platform }: Article
     }
     
     return (
-      <div data-embed-status="ready" style={{ animation: `fade-in ${EMBED_FADE_MS}ms ease` }}>
+      <div data-embed-status="ready">
         <LinkPreviewCard
           url={cleanedUrl}
           title={data?.meta.title || fallbackDomain}
@@ -258,7 +257,7 @@ export const ArticleEmbed = ({ url, onFaviconLoaded, postId, platform }: Article
 
   // Quora + everything else - rich article card
   return (
-    <div data-embed-status="ready" style={{ animation: `fade-in ${EMBED_FADE_MS}ms ease` }}>
+    <div data-embed-status="ready">
       <ArticleContentEmbed
         data={data}
         postId={postId}

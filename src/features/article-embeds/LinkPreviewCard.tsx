@@ -1,7 +1,5 @@
 import { ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { useState } from "react";
-import { EmbedFadeSkeleton, smoothFadeStyle, useSmoothReveal } from "@/components/embeds/SmoothEmbedFrame";
 
 interface LinkPreviewCardProps {
   url: string;
@@ -22,8 +20,6 @@ export const LinkPreviewCard = ({
   favicon,
   siteName,
 }: LinkPreviewCardProps) => {
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const imgRevealed = useSmoothReveal(imgLoaded);
   return (
     <Card className="rounded-2xl overflow-hidden border border-border hover:shadow-lg transition-all">
       <a
@@ -35,17 +31,13 @@ export const LinkPreviewCard = ({
         {/* Thumbnail Image - displayed at the top */}
         {image && (
           <div className="relative w-full aspect-[16/9] bg-muted">
-            <EmbedFadeSkeleton visible={!imgRevealed} />
             <img
               src={image}
               alt={title}
-              className="relative w-full h-full object-cover"
-              style={smoothFadeStyle(imgRevealed)}
+              className="w-full h-full object-cover"
               loading="lazy"
-              onLoad={() => setImgLoaded(true)}
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
-                setImgLoaded(true);
               }}
             />
           </div>

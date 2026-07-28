@@ -1,7 +1,5 @@
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import { EmbedFadeSkeleton, smoothFadeStyle, useSmoothReveal } from "@/components/embeds/SmoothEmbedFrame";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 
@@ -205,8 +203,6 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
   const { excerpt, heroImage } = parseContent();
   const displayImage = proxiedImage(heroImage);
   const isCompact = !excerpt;
-  const [imgLoaded, setImgLoaded] = useState(false);
-  const imgRevealed = useSmoothReveal(imgLoaded);
 
   return (
     <article className="rounded-2xl overflow-hidden border border-border bg-card hover:shadow-lg transition-all">
@@ -220,16 +216,13 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
         {/* Thumbnail */}
         {displayImage && (
           <div className={`relative w-full ${isCompact ? "h-40" : "h-48"} rounded-xl overflow-hidden bg-muted mx-auto`}>
-            <EmbedFadeSkeleton visible={!imgRevealed} />
             <img
               src={displayImage}
               alt={data.meta.title}
-              className="relative w-full h-full object-cover object-center"
-              style={smoothFadeStyle(imgRevealed)}
+              className="w-full h-full object-cover object-center"
               loading="lazy"
               width="400"
               height={isCompact ? 160 : 192}
-              onLoad={() => setImgLoaded(true)}
               onError={(e) => {
                 const img = e.target as HTMLImageElement;
                 // If the proxied image fails, try the raw URL as a last resort
@@ -237,7 +230,6 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
                   img.src = heroImage;
                 } else {
                   img.style.display = 'none';
-                  setImgLoaded(true);
                 }
               }}
             />

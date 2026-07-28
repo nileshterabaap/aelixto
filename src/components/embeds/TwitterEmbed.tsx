@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { smoothFadeStyle, useSmoothReveal } from "@/components/embeds/SmoothEmbedFrame";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
@@ -41,7 +40,6 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const revealed = useSmoothReveal(!loading);
 
   useEffect(() => {
     const loadEmbed = async () => {
@@ -120,14 +118,10 @@ export const TwitterEmbed = ({ url }: TwitterEmbedProps) => {
 
   return (
     <div className="relative" data-embed-status={loading ? 'loading' : 'ready'}>
-      {!revealed && (
+      {loading && (
         <div className="rounded-2xl overflow-hidden bg-muted animate-pulse aspect-[4/3]" />
       )}
-      <div
-        ref={containerRef}
-        className="twitter-embed-container"
-        style={smoothFadeStyle(revealed)}
-      />
+      <div ref={containerRef} className="twitter-embed-container" />
       <style>{`
         .twitter-embed-container iframe {
           margin-bottom: -85px !important;
