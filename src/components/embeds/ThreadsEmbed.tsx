@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { trackView } from '@/hooks/useViewTracking';
+import { EMBED_FADE_MS, EmbedFadeSkeleton, useSmoothReveal } from '@/components/embeds/SmoothEmbedFrame';
 
 // One-shot guard so a Threads post never records more than one video_play per
 // session from this path (the guarded tracker may also fire; the server's
