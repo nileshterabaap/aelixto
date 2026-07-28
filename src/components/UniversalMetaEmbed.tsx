@@ -328,7 +328,7 @@ const InstagramIframeEmbed = ({
           display: 'block',
           opacity: ready ? 1 : 0,
           pointerEvents: ready ? 'auto' : 'none',
-          transition: 'opacity 180ms ease-out',
+          transition: `opacity ${EMBED_FADE_MS}ms ease`,
         }}
       />
     </div>
