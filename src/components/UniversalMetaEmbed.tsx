@@ -455,6 +455,7 @@ const FacebookIframeEmbed = ({
         className="relative w-full overflow-hidden flex justify-center"
         style={{ touchAction: 'pan-y', width: '100%', height: `${VIDEO_HEIGHT}px` }}
       >
+        <EmbedFadeSkeleton visible={!fbRevealed} />
         <iframe
           ref={iframeRef}
           src={iframeSrc}
@@ -464,6 +465,7 @@ const FacebookIframeEmbed = ({
           allowFullScreen
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"
           loading="lazy"
+          onLoad={() => setFbLoaded(true)}
           onError={() => setFailed(true)}
           style={{
             border: 'none',
@@ -471,6 +473,10 @@ const FacebookIframeEmbed = ({
             height: `${VIDEO_HEIGHT}px`,
             overflow: 'hidden',
             display: 'block',
+            position: 'relative',
+            zIndex: 1,
+            opacity: fbRevealed ? 1 : 0,
+            transition: `opacity ${EMBED_FADE_MS}ms ease`,
           }}
         />
       </div>
@@ -484,6 +490,7 @@ const FacebookIframeEmbed = ({
       className="relative w-full overflow-hidden"
       style={{ touchAction: 'pan-y', width: '100%', height: `${postHeight}px` }}
     >
+      <EmbedFadeSkeleton visible={!fbRevealed} />
       <iframe
         ref={iframeRef}
         src={iframeSrc}
@@ -491,6 +498,7 @@ const FacebookIframeEmbed = ({
         allowFullScreen
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"
         loading="lazy"
+        onLoad={() => setFbLoaded(true)}
         onError={() => setFailed(true)}
         style={{
           border: 'none',
@@ -501,6 +509,9 @@ const FacebookIframeEmbed = ({
           height: `${postHeight}px`,
           overflow: 'hidden',
           display: 'block',
+          zIndex: 1,
+          opacity: fbRevealed ? 1 : 0,
+          transition: `opacity ${EMBED_FADE_MS}ms ease`,
         }}
       />
     </div>
