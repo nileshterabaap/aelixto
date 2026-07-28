@@ -537,12 +537,15 @@ const LinkedInIframeEmbed = ({
   expandedUrl?: string;
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [liLoaded, setLiLoaded] = useState(false);
+  const liRevealed = useSmoothReveal(liLoaded);
 
   return (
     <div
       className="relative w-full overflow-hidden bg-background"
       style={{ width: '100%', height: `${LI_VIEWPORT_HEIGHT}px`, minHeight: `${LI_VIEWPORT_HEIGHT}px`, touchAction: 'pan-y' }}
     >
+      <EmbedFadeSkeleton visible={!liRevealed} />
       <iframe
         ref={iframeRef}
         src={src}
@@ -550,6 +553,7 @@ const LinkedInIframeEmbed = ({
         allowFullScreen
         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
         loading="lazy"
+        onLoad={() => setLiLoaded(true)}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         style={{
           border: 'none',
@@ -558,6 +562,10 @@ const LinkedInIframeEmbed = ({
           minHeight: `${LI_VIEWPORT_HEIGHT}px`,
           display: 'block',
           background: 'hsl(var(--background))',
+          position: 'relative',
+          zIndex: 1,
+          opacity: liRevealed ? 1 : 0,
+          transition: `opacity ${EMBED_FADE_MS}ms ease`,
         }}
       />
     </div>
@@ -588,6 +596,8 @@ const TikTokIframeEmbed = ({
   );
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
+  const [ttLoaded, setTtLoaded] = useState(false);
+  const ttRevealed = useSmoothReveal(ttLoaded);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -610,6 +620,7 @@ const TikTokIframeEmbed = ({
       className="relative w-full overflow-hidden"
       style={{ width: '100%', height: `${height}px`, touchAction: 'pan-y' }}
     >
+      <EmbedFadeSkeleton visible={!ttRevealed} />
       <iframe
         ref={iframeRef}
         src={src}
@@ -617,11 +628,16 @@ const TikTokIframeEmbed = ({
         allowFullScreen
         allow="encrypted-media; autoplay"
         loading="lazy"
+        onLoad={() => setTtLoaded(true)}
         style={{
           border: 'none',
           width: '100%',
           height: '100%',
           display: 'block',
+          position: 'relative',
+          zIndex: 1,
+          opacity: ttRevealed ? 1 : 0,
+          transition: `opacity ${EMBED_FADE_MS}ms ease`,
         }}
       />
     </div>
