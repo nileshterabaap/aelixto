@@ -1,4 +1,5 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
+import { EMBED_FADE_MS, EmbedFadeSkeleton, useSmoothReveal } from '@/components/embeds/SmoothEmbedFrame';
 
 /**
  * LinkedIn iframe restored to a fixed, internally scrollable viewport.
@@ -20,12 +21,15 @@ export const LinkedInIframeEmbed = ({
   expandedUrl?: string;
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const revealed = useSmoothReveal(hasLoaded);
 
   return (
     <div
       className="relative w-full overflow-hidden bg-background"
       style={{ width: '100%', height: `${LI_VIEWPORT_HEIGHT}px`, minHeight: `${LI_VIEWPORT_HEIGHT}px`, touchAction: 'pan-y' }}
     >
+      <EmbedFadeSkeleton visible={!revealed} />
       <iframe
         ref={iframeRef}
         src={src}
@@ -33,6 +37,7 @@ export const LinkedInIframeEmbed = ({
         allowFullScreen
         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
         loading="lazy"
+        onLoad={() => setHasLoaded(true)}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         style={{
           border: 'none',
@@ -41,6 +46,10 @@ export const LinkedInIframeEmbed = ({
           minHeight: `${LI_VIEWPORT_HEIGHT}px`,
           display: 'block',
           background: 'hsl(var(--background))',
+          position: 'relative',
+          zIndex: 1,
+          opacity: revealed ? 1 : 0,
+          transition: `opacity ${EMBED_FADE_MS}ms ease`,
         }}
       />
     </div>
