@@ -400,10 +400,11 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   return (
     <div
       ref={containerRef}
-      className="relative w-full"
+      className="relative w-full overflow-hidden"
       style={{ height: iframeHeight }}
       data-embed-status={loaded ? "ready" : "loading"}
     >
+      <EmbedFadeSkeleton visible={!redditRevealed} />
       <iframe
         ref={iframeRef}
         src={embedSrc}
@@ -420,6 +421,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
         sandbox="allow-scripts allow-same-origin allow-popups"
         allow="clipboard-read; clipboard-write"
         className="mx-auto block w-full h-full max-w-full rounded-lg border-0"
+        style={{ position: "relative", zIndex: 1, ...smoothFadeStyle(redditRevealed) }}
       />
     </div>
   );
