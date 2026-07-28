@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import DOMPurify from 'dompurify';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { openExternalUrl } from '@/lib/openExternalUrl';
+import { EMBED_FADE_MS, EmbedFadeSkeleton, useSmoothReveal } from '@/components/embeds/SmoothEmbedFrame';
 
 /**
  * Small pill-shaped overlay button rendered on top of an embed iframe so
@@ -327,7 +328,7 @@ const InstagramIframeEmbed = ({
           display: 'block',
           opacity: ready ? 1 : 0,
           pointerEvents: ready ? 'auto' : 'none',
-          transition: 'opacity 180ms ease-out',
+          transition: `opacity ${EMBED_FADE_MS}ms ease`,
         }}
       />
     </div>
@@ -355,6 +356,8 @@ const FacebookIframeEmbed = ({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
+  const [fbLoaded, setFbLoaded] = useState(false);
+  const fbRevealed = useSmoothReveal(fbLoaded);
   // Render Facebook's plugin iframe at fixed dimensions, matching Facebook's
   // official embed exactly. For reels/videos we use 267x476 (Facebook's own
   // Reel embed size) so the plugin renders its native viewport with no
@@ -455,6 +458,7 @@ const FacebookIframeEmbed = ({
         className="relative w-full overflow-hidden flex justify-center"
         style={{ touchAction: 'pan-y', width: '100%', height: `${VIDEO_HEIGHT}px` }}
       >
+        <EmbedFadeSkeleton visible={!fbRevealed} />
         <iframe
           ref={iframeRef}
           src={iframeSrc}
@@ -464,6 +468,7 @@ const FacebookIframeEmbed = ({
           allowFullScreen
           allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"
           loading="lazy"
+          onLoad={() => setFbLoaded(true)}
           onError={() => setFailed(true)}
           style={{
             border: 'none',
@@ -471,6 +476,10 @@ const FacebookIframeEmbed = ({
             height: `${VIDEO_HEIGHT}px`,
             overflow: 'hidden',
             display: 'block',
+            position: 'relative',
+            zIndex: 1,
+            opacity: fbRevealed ? 1 : 0,
+            transition: `opacity ${EMBED_FADE_MS}ms ease`,
           }}
         />
       </div>
@@ -484,6 +493,7 @@ const FacebookIframeEmbed = ({
       className="relative w-full overflow-hidden"
       style={{ touchAction: 'pan-y', width: '100%', height: `${postHeight}px` }}
     >
+      <EmbedFadeSkeleton visible={!fbRevealed} />
       <iframe
         ref={iframeRef}
         src={iframeSrc}
@@ -491,6 +501,7 @@ const FacebookIframeEmbed = ({
         allowFullScreen
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"
         loading="lazy"
+        onLoad={() => setFbLoaded(true)}
         onError={() => setFailed(true)}
         style={{
           border: 'none',
@@ -501,6 +512,9 @@ const FacebookIframeEmbed = ({
           height: `${postHeight}px`,
           overflow: 'hidden',
           display: 'block',
+          zIndex: 1,
+          opacity: fbRevealed ? 1 : 0,
+          transition: `opacity ${EMBED_FADE_MS}ms ease`,
         }}
       />
     </div>
@@ -523,12 +537,15 @@ const LinkedInIframeEmbed = ({
   expandedUrl?: string;
 }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [liLoaded, setLiLoaded] = useState(false);
+  const liRevealed = useSmoothReveal(liLoaded);
 
   return (
     <div
       className="relative w-full overflow-hidden bg-background"
       style={{ width: '100%', height: `${LI_VIEWPORT_HEIGHT}px`, minHeight: `${LI_VIEWPORT_HEIGHT}px`, touchAction: 'pan-y' }}
     >
+      <EmbedFadeSkeleton visible={!liRevealed} />
       <iframe
         ref={iframeRef}
         src={src}
@@ -536,6 +553,7 @@ const LinkedInIframeEmbed = ({
         allowFullScreen
         allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
         loading="lazy"
+        onLoad={() => setLiLoaded(true)}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         style={{
           border: 'none',
@@ -544,6 +562,10 @@ const LinkedInIframeEmbed = ({
           minHeight: `${LI_VIEWPORT_HEIGHT}px`,
           display: 'block',
           background: 'hsl(var(--background))',
+          position: 'relative',
+          zIndex: 1,
+          opacity: liRevealed ? 1 : 0,
+          transition: `opacity ${EMBED_FADE_MS}ms ease`,
         }}
       />
     </div>
@@ -574,6 +596,8 @@ const TikTokIframeEmbed = ({
   );
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
+  const [ttLoaded, setTtLoaded] = useState(false);
+  const ttRevealed = useSmoothReveal(ttLoaded);
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
@@ -596,6 +620,7 @@ const TikTokIframeEmbed = ({
       className="relative w-full overflow-hidden"
       style={{ width: '100%', height: `${height}px`, touchAction: 'pan-y' }}
     >
+      <EmbedFadeSkeleton visible={!ttRevealed} />
       <iframe
         ref={iframeRef}
         src={src}
@@ -603,11 +628,16 @@ const TikTokIframeEmbed = ({
         allowFullScreen
         allow="encrypted-media; autoplay"
         loading="lazy"
+        onLoad={() => setTtLoaded(true)}
         style={{
           border: 'none',
           width: '100%',
           height: '100%',
           display: 'block',
+          position: 'relative',
+          zIndex: 1,
+          opacity: ttRevealed ? 1 : 0,
+          transition: `opacity ${EMBED_FADE_MS}ms ease`,
         }}
       />
     </div>
