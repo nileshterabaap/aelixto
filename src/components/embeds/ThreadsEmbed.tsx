@@ -104,6 +104,36 @@ const ThreadsIframeEmbed = ({
   const [isVisible, setIsVisible] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const persistHeight = usePersistEmbedHeight(postId);
+  const catcherRef = useRef<HTMLDivElement>(null);
+
+  // Pull-to-refresh catcher: while the page is at scroll top, this transparent
+  // layer sits over the Threads iframe so the parent document can observe the
+  // touch (cross-origin iframes swallow touches otherwise). On touchstart it
+  // immediately disables its own pointer-events, so the tap still passes
+  // through to the native Threads player — identical to the play-overlay
+  // hand-off. The play overlay is appended after it in the DOM, so the
+  // one-shot video_play capture still owns the very first tap.
+  useEffect(() => {
+    const el = catcherRef.current;
+    if (!el) return;
+
+    let restoreTimer: ReturnType<typeof setTimeout> | undefined;
+    const onStart = () => {
+      el.style.pointerEvents = 'none';
+      if (restoreTimer) clearTimeout(restoreTimer);
+      restoreTimer = setTimeout(() => {
+        el.style.pointerEvents = '';
+      }, 600);
+    };
+
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('pointerdown', onStart, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('pointerdown', onStart);
+      if (restoreTimer) clearTimeout(restoreTimer);
+    };
+  }, []);
   // Pinterest-style smooth reveal (presentational only — the overlay below
   // stays at z-index 2 and keeps owning the first-tap video_play).
   const threadsRevealed = useSmoothReveal(hasLoaded);
@@ -200,17 +230,34 @@ const ThreadsIframeEmbed = ({
 
     const timeout = setTimeout(() => {
       if (hasLoaded) return;
-      if (attempt < 1) {
+      if (attempt < 3) {
         // Remount the iframe once — covers embeds whose first request was
         // started while the tab/route was hidden and silently dropped.
         setAttempt((prev) => prev + 1);
       } else {
         setFailed(true);
       }
-    }, 6000);
+    }, 9000);
 
     return () => clearTimeout(timeout);
   }, [hasLoaded, isVisible, attempt]);
+
+  // Never leave a Threads post stuck on the "View on Threads" card: when the
+  // tab/route becomes visible again, give the real embed another chance.
+  useEffect(() => {
+    if (!failed) return;
+    const retry = () => {
+      if (document.visibilityState !== 'visible') return;
+      setFailed(false);
+      setAttempt((prev) => prev + 1);
+    };
+    document.addEventListener('visibilitychange', retry);
+    const timer = setTimeout(retry, 4000);
+    return () => {
+      document.removeEventListener('visibilitychange', retry);
+      clearTimeout(timer);
+    };
+  }, [failed]);
 
   if (failed) {
     return (
@@ -231,6 +278,12 @@ const ThreadsIframeEmbed = ({
       style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
     >
       <EmbedFadeSkeleton visible={!threadsRevealed} />
+      <div
+        ref={catcherRef}
+        data-threads-ptr-catcher="1"
+        className="threads-ptr-catcher"
+        aria-hidden="true"
+      />
       <iframe
         key={attempt}
         ref={iframeRef}
