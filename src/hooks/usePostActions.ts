@@ -17,6 +17,8 @@ export const usePostActions = (
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { decrement: decrementDailyCount } = useDailyPostLimit();
+  // Ref mirror so rapid taps never read a stale `isLiked` closure.
+  const likedRef = useRef(false);
 
   // Check if post is liked
   const { data: isLiked } = useQuery({
@@ -79,8 +81,6 @@ export const usePostActions = (
     },
   });
 
-  // Ref mirror so rapid taps never read a stale `isLiked` closure.
-  const likedRef = useRef(false);
   useEffect(() => {
     if (!likeMutation.isPending) likedRef.current = !!isLiked;
   }, [isLiked, likeMutation.isPending]);
