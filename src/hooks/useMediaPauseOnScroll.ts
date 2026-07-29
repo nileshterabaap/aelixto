@@ -29,6 +29,18 @@ const SUSPENDED_FLAG = 'aelixSuspended';
 const SUSPENDED_SRC = 'aelixSuspendedSrc';
 const FROZEN_FLAG = 'aelixFrozen';
 
+/** Container attribute set once the user has actually started media in this embed. */
+const PLAYED_ATTR = 'data-aelix-played';
+
+/**
+ * Dwell required in the far ring before an embed is allowed to go dormant.
+ * Prevents rapid scrolling from ever recreating an iframe.
+ */
+const DORMANT_DWELL_MS = 1200;
+
+/** Suppress dormancy transitions entirely while the user is flinging. */
+const FLING_VELOCITY_PX_S = 800;
+
 const API_PAUSABLE_SELECTOR = [YOUTUBE_SELECTOR, SPOTIFY_SELECTOR].join(', ');
 
 // ── Detection ─────────────────────────────────────────────────────────
@@ -179,6 +191,12 @@ function hardSuspendIframes(root: HTMLElement) {
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
     const src = iframe.getAttribute('src');
     if (!src || src === 'about:blank') return;
+    // Pin the current box before blanking so the restore can never shift layout.
+    const rect = iframe.getBoundingClientRect();
+    if (rect.height > 0 && !iframe.style.height) {
+      iframe.dataset.aelixPinnedHeight = '1';
+      iframe.style.height = `${Math.round(rect.height)}px`;
+    }
     iframe.dataset[SUSPENDED_SRC] = src;
     iframe.dataset[SUSPENDED_FLAG] = '1';
     iframe.setAttribute('src', 'about:blank');
@@ -194,6 +212,10 @@ function restoreHardSuspended(root: HTMLElement) {
     delete iframe.dataset[SUSPENDED_FLAG];
     delete iframe.dataset[SUSPENDED_SRC];
     iframe.style.visibility = '';
+    if (iframe.dataset.aelixPinnedHeight === '1') {
+      delete iframe.dataset.aelixPinnedHeight;
+      iframe.style.height = '';
+    }
   });
 }
 
