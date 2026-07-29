@@ -446,7 +446,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     : { 
         isLiked: false, 
         isSaved: false, 
-        toggleLike: () => {}, 
+        toggleLike: () => false, 
         toggleSave: () => {}, 
         deletePost: () => {},
         isDeleting: false 
