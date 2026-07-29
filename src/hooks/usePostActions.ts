@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -49,44 +50,50 @@ export const usePostActions = (
     enabled: !!userId,
   });
 
+  // Ref-driven liked state so rapid taps never read a stale render value.
+  const likedRef = useRef<boolean>(!!isLiked);
+  useEffect(() => {
+    likedRef.current = !!isLiked;
+  }, [isLiked]);
+
   // Toggle like with optimistic update
   const likeMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (nextLiked: boolean) => {
       if (!userId) throw new Error("Not authenticated");
 
-      if (isLiked) {
+      if (!nextLiked) {
         await supabase
           .from("likes")
           .delete()
           .eq("post_id", postId)
           .eq("user_id", userId);
       } else {
-        await supabase.from("likes").insert({ post_id: postId, user_id: userId });
+        await supabase
+          .from("likes")
+          .upsert(
+            { post_id: postId, user_id: userId },
+            { onConflict: "user_id,post_id", ignoreDuplicates: true }
+          );
       }
     },
-    onMutate: async () => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ["like", postId, userId] });
-      
-      // Snapshot previous value
-      const previousLike = queryClient.getQueryData(["like", postId, userId]);
-      
-      // Optimistically update
-      queryClient.setQueryData(["like", postId, userId], !isLiked);
-      
-      return { previousLike };
-    },
-    onError: (err, variables, context) => {
-      // Rollback on error
-      if (context?.previousLike !== undefined) {
-        queryClient.setQueryData(["like", postId, userId], context.previousLike);
-      }
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["like", postId, userId] });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["like", postId, userId] });
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
   });
+
+  // Returns the new liked state so callers can drive their own optimistic
+  // count/animation without depending on the (possibly stale) isLiked render value.
+  const toggleLike = useCallback((): boolean => {
+    const next = !likedRef.current;
+    likedRef.current = next;
+    queryClient.setQueryData(["like", postId, userId], next);
+    likeMutation.mutate(next);
+    return next;
+  }, [likeMutation, queryClient, postId, userId]);
 
   // Toggle save with optimistic update
   const saveMutation = useMutation({
@@ -320,7 +327,7 @@ export const usePostActions = (
   return {
     isLiked: isLiked || false,
     isSaved: isSaved || false,
-    toggleLike: likeMutation.mutate,
+    toggleLike,
     toggleSave: saveMutation.mutate,
     handleShare,
     deletePost: deleteMutation.mutate,

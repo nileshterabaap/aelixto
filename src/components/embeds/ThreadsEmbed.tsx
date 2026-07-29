@@ -268,7 +268,7 @@ export const buildThreadsEmbedSrc = (url: string): string | null => {
     const u = new URL(url);
     const postMatch = u.pathname.match(/\/@([^/]+)\/post\/([A-Za-z0-9_-]+)/);
     if (postMatch) {
-      return `https://www.threads.net${u.pathname.replace(/\/$/, '')}/embed`;
+      return `https://www.threads.net/@${postMatch[1]}/post/${postMatch[2]}/embed`;
     }
   } catch {
     // ignore
@@ -290,8 +290,6 @@ export const ThreadsEmbed = ({
   return (
     <ThreadsIframeEmbed
       src={src}
-      expandedUrl={url}
-      fallbackData={null}
       postId={postId}
       suggestedHeight={suggestedHeight}
     />
