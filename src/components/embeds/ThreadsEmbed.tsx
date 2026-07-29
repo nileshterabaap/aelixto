@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { trackView } from '@/hooks/useViewTracking';
+import { markEmbedPlayed } from '@/hooks/useMediaPauseOnScroll';
 import { EMBED_FADE_MS, EmbedFadeSkeleton, useSmoothReveal } from '@/components/embeds/SmoothEmbedFrame';
 
 // One-shot guard so a Threads post never records more than one video_play per
@@ -121,6 +122,8 @@ const ThreadsIframeEmbed = ({
       // Hand the tap straight back to the native player.
       suppressed = true;
       disarm();
+      // Lifecycle bookkeeping only — does not affect scoring.
+      markEmbedPlayed(el);
       if (postId && !threadsPlayFired.has(postId)) {
         threadsPlayFired.add(postId);
         trackView({ postId, eventType: 'video_play' }).catch(() => {

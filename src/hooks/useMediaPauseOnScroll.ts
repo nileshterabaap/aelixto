@@ -29,6 +29,18 @@ const SUSPENDED_FLAG = 'aelixSuspended';
 const SUSPENDED_SRC = 'aelixSuspendedSrc';
 const FROZEN_FLAG = 'aelixFrozen';
 
+/** Container attribute set once the user has actually started media in this embed. */
+const PLAYED_ATTR = 'data-aelix-played';
+
+/**
+ * Dwell required in the far ring before an embed is allowed to go dormant.
+ * Prevents rapid scrolling from ever recreating an iframe.
+ */
+const DORMANT_DWELL_MS = 1200;
+
+/** Suppress dormancy transitions entirely while the user is flinging. */
+const FLING_VELOCITY_PX_S = 800;
+
 const API_PAUSABLE_SELECTOR = [YOUTUBE_SELECTOR, SPOTIFY_SELECTOR].join(', ');
 
 // ── Detection ─────────────────────────────────────────────────────────
@@ -179,6 +191,12 @@ function hardSuspendIframes(root: HTMLElement) {
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
     const src = iframe.getAttribute('src');
     if (!src || src === 'about:blank') return;
+    // Pin the current box before blanking so the restore can never shift layout.
+    const rect = iframe.getBoundingClientRect();
+    if (rect.height > 0 && !iframe.style.height) {
+      iframe.dataset.aelixPinnedHeight = '1';
+      iframe.style.height = `${Math.round(rect.height)}px`;
+    }
     iframe.dataset[SUSPENDED_SRC] = src;
     iframe.dataset[SUSPENDED_FLAG] = '1';
     iframe.setAttribute('src', 'about:blank');
@@ -194,6 +212,10 @@ function restoreHardSuspended(root: HTMLElement) {
     delete iframe.dataset[SUSPENDED_FLAG];
     delete iframe.dataset[SUSPENDED_SRC];
     iframe.style.visibility = '';
+    if (iframe.dataset.aelixPinnedHeight === '1') {
+      delete iframe.dataset.aelixPinnedHeight;
+      iframe.style.height = '';
+    }
   });
 }
 
@@ -208,6 +230,10 @@ interface RegisteredElement {
   active: boolean;
   state: LifecycleState;
   disableHardSuspend: boolean;
+  /** Pending dormancy timer (hysteresis). */
+  dormantTimer: number | null;
+  /** Detach the played-detection listeners. */
+  detachPlayWatch?: () => void;
 }
 
 const elementStates = new Map<HTMLElement, RegisteredElement>();
@@ -215,7 +241,53 @@ const elementStates = new Map<HTMLElement, RegisteredElement>();
 let sharedNearObserver: IntersectionObserver | null = null;
 let sharedActiveObserver: IntersectionObserver | null = null;
 let sharedResizeHandler: (() => void) | null = null;
+let sharedVelocityHandler: (() => void) | null = null;
+let sharedVisibilityHandler: (() => void) | null = null;
 let observerRefCount = 0;
+
+// ── Played detection + fling gate ─────────────────────────────────────
+
+function hasBeenPlayed(el: HTMLElement): boolean {
+  return el.getAttribute(PLAYED_ATTR) === '1';
+}
+
+export function markEmbedPlayed(el: HTMLElement | null | undefined) {
+  if (!el) return;
+  const host = el.closest('[data-embed-lifecycle]') as HTMLElement | null;
+  (host || el).setAttribute(PLAYED_ATTR, '1');
+}
+
+/**
+ * Observes (never intercepts) the signals that mean "media actually started"
+ * in this embed: a native media `play`, or a pointer landing inside a
+ * cross-origin iframe. Purely passive/capture — scoring paths are untouched.
+ */
+function attachPlayWatch(el: HTMLElement): () => void {
+  const onPlay = () => el.setAttribute(PLAYED_ATTR, '1');
+  const onPointerDown = (e: Event) => {
+    const target = e.target as Element | null;
+    if (!target) return;
+    if (target.tagName === 'IFRAME' || target.closest('iframe')) {
+      el.setAttribute(PLAYED_ATTR, '1');
+    }
+  };
+  el.addEventListener('play', onPlay, { capture: true, passive: true });
+  el.addEventListener('pointerdown', onPointerDown, { capture: true, passive: true });
+  el.addEventListener('touchstart', onPointerDown, { capture: true, passive: true });
+  return () => {
+    el.removeEventListener('play', onPlay, true);
+    el.removeEventListener('pointerdown', onPointerDown, true);
+    el.removeEventListener('touchstart', onPointerDown, true);
+  };
+}
+
+let lastScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+let lastScrollAt = 0;
+let flingUntil = 0;
+
+function isFlinging(): boolean {
+  return Date.now() < flingUntil;
+}
 
 function transitionElement(el: HTMLElement, reg: RegisteredElement, target: LifecycleState) {
   const current = reg.state;
@@ -239,10 +311,60 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
   reg.state = target;
 }
 
+function clearDormantTimer(reg: RegisteredElement) {
+  if (reg.dormantTimer !== null) {
+    window.clearTimeout(reg.dormantTimer);
+    reg.dormantTimer = null;
+  }
+}
+
+/**
+ * Ring C entry. Gated by:
+ *  - dwell (the element must stay far away for DORMANT_DWELL_MS),
+ *  - no active fling,
+ *  - the embed must have actually been played (or the tab is backgrounded).
+ * Anything that fails a gate simply stays in ring B ("paused"), which is
+ * flicker-free because the iframe document is never touched.
+ */
+function scheduleDormant(el: HTMLElement, reg: RegisteredElement) {
+  if (reg.disableHardSuspend) {
+    transitionElement(el, reg, 'paused');
+    return;
+  }
+  if (reg.state === 'suspended' || reg.dormantTimer !== null) return;
+
+  // Always stop what we can immediately; recreation is the slow path only.
+  transitionElement(el, reg, 'paused');
+
+  const eligible = () => hasBeenPlayed(el) || document.visibilityState === 'hidden';
+  if (!eligible()) return;
+
+  const delay = document.visibilityState === 'hidden' ? 0 : DORMANT_DWELL_MS;
+  reg.dormantTimer = window.setTimeout(() => {
+    reg.dormantTimer = null;
+    if (reg.near || reg.active) return;
+    if (isFlinging()) {
+      // Re-arm after the fling settles instead of recreating mid-scroll.
+      scheduleDormant(el, reg);
+      return;
+    }
+    if (!eligible()) return;
+    transitionElement(el, reg, 'suspended');
+  }, delay);
+}
+
 function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
-  if (reg.active) transitionElement(el, reg, 'active');
-  else if (reg.near) transitionElement(el, reg, 'paused');
-  else transitionElement(el, reg, 'suspended');
+  if (reg.active) {
+    clearDormantTimer(reg);
+    transitionElement(el, reg, 'active');
+  } else if (reg.near) {
+    // Restoring here gives ~6 screens of runway before the embed is visible,
+    // so a recreated iframe finishes loading entirely off-screen.
+    clearDormantTimer(reg);
+    transitionElement(el, reg, 'paused');
+  } else {
+    scheduleDormant(el, reg);
+  }
 }
 
 function ensureSharedObservers() {
@@ -288,22 +410,64 @@ function ensureSharedObservers() {
   };
 
   window.addEventListener('resize', sharedResizeHandler);
+
+  sharedVelocityHandler = () => {
+    const now = Date.now();
+    const y = window.scrollY;
+    const dt = now - lastScrollAt;
+    if (dt > 0 && dt < 400) {
+      const velocity = (Math.abs(y - lastScrollY) / dt) * 1000;
+      if (velocity > FLING_VELOCITY_PX_S) flingUntil = now + 250;
+    }
+    lastScrollY = y;
+    lastScrollAt = now;
+  };
+  window.addEventListener('scroll', sharedVelocityHandler, { passive: true });
+
+  sharedVisibilityHandler = () => {
+    const hidden = document.visibilityState === 'hidden';
+    elementStates.forEach((reg, el) => {
+      if (hidden) {
+        stageAPause(el);
+        if (reg.state === 'active') reg.state = 'paused';
+        if (!reg.near && !reg.active) {
+          clearDormantTimer(reg);
+          scheduleDormant(el, reg);
+        }
+      } else {
+        reconcileElement(el, reg);
+      }
+    });
+  };
+  document.addEventListener('visibilitychange', sharedVisibilityHandler);
 }
 
 function destroySharedObservers() {
   sharedNearObserver?.disconnect();
   sharedActiveObserver?.disconnect();
   if (sharedResizeHandler) window.removeEventListener('resize', sharedResizeHandler);
+  if (sharedVelocityHandler) window.removeEventListener('scroll', sharedVelocityHandler);
+  if (sharedVisibilityHandler) document.removeEventListener('visibilitychange', sharedVisibilityHandler);
   sharedNearObserver = null;
   sharedActiveObserver = null;
   sharedResizeHandler = null;
+  sharedVelocityHandler = null;
+  sharedVisibilityHandler = null;
 }
 
 function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
   ensureSharedObservers();
   observerRefCount++;
 
-  const reg: RegisteredElement = { near: false, active: false, state: 'active', disableHardSuspend };
+  const reg: RegisteredElement = {
+    near: false,
+    active: false,
+    state: 'active',
+    disableHardSuspend,
+    dormantTimer: null,
+  };
+  el.setAttribute('data-embed-lifecycle', '1');
+  reg.detachPlayWatch = attachPlayWatch(el);
   elementStates.set(el, reg);
   sharedNearObserver!.observe(el);
   sharedActiveObserver!.observe(el);
@@ -319,6 +483,11 @@ function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
 }
 
 function unregisterElement(el: HTMLElement) {
+  const reg = elementStates.get(el);
+  if (reg) {
+    clearDormantTimer(reg);
+    reg.detachPlayWatch?.();
+  }
   elementStates.delete(el);
   sharedNearObserver?.unobserve(el);
   sharedActiveObserver?.unobserve(el);

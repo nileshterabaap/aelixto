@@ -1,5 +1,6 @@
 import { useState, memo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
+import { AUTO_STOP_ENABLED } from '@/config/embedFeatureFlags';
 import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
 import type { Post } from '@/data/demoData';
 import { supabase } from '@/integrations/supabase/client';
@@ -140,7 +141,13 @@ export const HydratedEmbed = memo(({
   useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
-    { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: true }
+    {
+      enabled: mediaLifecycleEnabled,
+      hardSuspendDistanceVh: 6,
+      // Universal Auto Stop: dormancy is additionally gated by dwell, fling
+      // state and "was actually played" inside the lifecycle engine.
+      disableHardSuspend: !AUTO_STOP_ENABLED,
+    }
   );
 
   // Track click-throughs to the original platform (iframe focus or anchor clicks).
