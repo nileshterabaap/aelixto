@@ -21,3 +21,9 @@ export type EmbedPlatform = keyof typeof EMBED_FEATURE_FLAGS;
 export const isEmbedEnabled = (platform: EmbedPlatform): boolean => {
   return EMBED_FEATURE_FLAGS[platform] ?? false;
 };
+
+/**
+ * Universal Auto Stop for embeds (Feed + Grid).
+ * When false, embeds behave exactly as before (ring A/B only, no recreation).
+ */
+export const AUTO_STOP_ENABLED = true;
