@@ -32,19 +32,7 @@ interface ProfileData {
   avatar_url: string | null;
 }
 
-// Platforms whose embeds hydrate late and resize a lot. For these we render a
-// tight window around the tapped post first (radius 0) and widen it in the
-// background with scroll anchoring — this is what removed the "treadmill"
-// feel on X, and it applies identically to the other heavy embed platforms.
-const X_PLATFORMS = new Set([
-  "x",
-  "twitter",
-  "instagram",
-  "pinterest",
-  "facebook",
-  "youtube",
-  "tiktok",
-]);
+const X_PLATFORMS = new Set(["x", "twitter"]);
 const INITIAL_X_WINDOW_RADIUS = 0;
 const BACKGROUND_X_WINDOW_RADIUS = 2;
 const X_WINDOW_EXPAND_STEP = 4;
