@@ -311,10 +311,60 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
   reg.state = target;
 }
 
+function clearDormantTimer(reg: RegisteredElement) {
+  if (reg.dormantTimer !== null) {
+    window.clearTimeout(reg.dormantTimer);
+    reg.dormantTimer = null;
+  }
+}
+
+/**
+ * Ring C entry. Gated by:
+ *  - dwell (the element must stay far away for DORMANT_DWELL_MS),
+ *  - no active fling,
+ *  - the embed must have actually been played (or the tab is backgrounded).
+ * Anything that fails a gate simply stays in ring B ("paused"), which is
+ * flicker-free because the iframe document is never touched.
+ */
+function scheduleDormant(el: HTMLElement, reg: RegisteredElement) {
+  if (reg.disableHardSuspend) {
+    transitionElement(el, reg, 'paused');
+    return;
+  }
+  if (reg.state === 'suspended' || reg.dormantTimer !== null) return;
+
+  // Always stop what we can immediately; recreation is the slow path only.
+  transitionElement(el, reg, 'paused');
+
+  const eligible = () => hasBeenPlayed(el) || document.visibilityState === 'hidden';
+  if (!eligible()) return;
+
+  const delay = document.visibilityState === 'hidden' ? 0 : DORMANT_DWELL_MS;
+  reg.dormantTimer = window.setTimeout(() => {
+    reg.dormantTimer = null;
+    if (reg.near || reg.active) return;
+    if (isFlinging()) {
+      // Re-arm after the fling settles instead of recreating mid-scroll.
+      scheduleDormant(el, reg);
+      return;
+    }
+    if (!eligible()) return;
+    transitionElement(el, reg, 'suspended');
+  }, delay);
+}
+
 function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
-  if (reg.active) transitionElement(el, reg, 'active');
-  else if (reg.near) transitionElement(el, reg, 'paused');
-  else transitionElement(el, reg, 'suspended');
+  if (reg.active) {
+    clearDormantTimer(reg);
+    transitionElement(el, reg, 'active');
+  } else if (reg.near) {
+    // Restoring here gives ~6 screens of runway before the embed is visible,
+    // so a recreated iframe finishes loading entirely off-screen.
+    clearDormantTimer(reg);
+    transitionElement(el, reg, 'paused');
+  } else {
+    scheduleDormant(el, reg);
+  }
 }
 
 function ensureSharedObservers() {
@@ -360,22 +410,64 @@ function ensureSharedObservers() {
   };
 
   window.addEventListener('resize', sharedResizeHandler);
+
+  sharedVelocityHandler = () => {
+    const now = Date.now();
+    const y = window.scrollY;
+    const dt = now - lastScrollAt;
+    if (dt > 0 && dt < 400) {
+      const velocity = (Math.abs(y - lastScrollY) / dt) * 1000;
+      if (velocity > FLING_VELOCITY_PX_S) flingUntil = now + 250;
+    }
+    lastScrollY = y;
+    lastScrollAt = now;
+  };
+  window.addEventListener('scroll', sharedVelocityHandler, { passive: true });
+
+  sharedVisibilityHandler = () => {
+    const hidden = document.visibilityState === 'hidden';
+    elementStates.forEach((reg, el) => {
+      if (hidden) {
+        stageAPause(el);
+        if (reg.state === 'active') reg.state = 'paused';
+        if (!reg.near && !reg.active) {
+          clearDormantTimer(reg);
+          scheduleDormant(el, reg);
+        }
+      } else {
+        reconcileElement(el, reg);
+      }
+    });
+  };
+  document.addEventListener('visibilitychange', sharedVisibilityHandler);
 }
 
 function destroySharedObservers() {
   sharedNearObserver?.disconnect();
   sharedActiveObserver?.disconnect();
   if (sharedResizeHandler) window.removeEventListener('resize', sharedResizeHandler);
+  if (sharedVelocityHandler) window.removeEventListener('scroll', sharedVelocityHandler);
+  if (sharedVisibilityHandler) document.removeEventListener('visibilitychange', sharedVisibilityHandler);
   sharedNearObserver = null;
   sharedActiveObserver = null;
   sharedResizeHandler = null;
+  sharedVelocityHandler = null;
+  sharedVisibilityHandler = null;
 }
 
 function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
   ensureSharedObservers();
   observerRefCount++;
 
-  const reg: RegisteredElement = { near: false, active: false, state: 'active', disableHardSuspend };
+  const reg: RegisteredElement = {
+    near: false,
+    active: false,
+    state: 'active',
+    disableHardSuspend,
+    dormantTimer: null,
+  };
+  el.setAttribute('data-embed-lifecycle', '1');
+  reg.detachPlayWatch = attachPlayWatch(el);
   elementStates.set(el, reg);
   sharedNearObserver!.observe(el);
   sharedActiveObserver!.observe(el);
@@ -391,6 +483,11 @@ function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
 }
 
 function unregisterElement(el: HTMLElement) {
+  const reg = elementStates.get(el);
+  if (reg) {
+    clearDormantTimer(reg);
+    reg.detachPlayWatch?.();
+  }
   elementStates.delete(el);
   sharedNearObserver?.unobserve(el);
   sharedActiveObserver?.unobserve(el);
