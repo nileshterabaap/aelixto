@@ -288,6 +288,20 @@ body.at-scroll-top iframe:not([src*="threads."]) {
   pointer-events: none !important;
 }
 
+/* Threads iframes stay interactive (tap-to-play), so a transparent catcher
+   layer above them lets Pull-to-Refresh see the touch while the page is at
+   scroll-top. It hands the tap straight back to the iframe on touchstart. */
+.threads-ptr-catcher {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: transparent;
+  pointer-events: none;
+}
+body.at-scroll-top .threads-ptr-catcher {
+  pointer-events: auto;
+}
+
 /* Disable the browser's native pull-to-refresh so our in-app PullToRefresh
    component owns the gesture on every page (especially short empty states). */
 html, body {
