@@ -74,13 +74,18 @@ const parseThreadsHeightFromMessage = (data: unknown): number | null => {
  */
 const ThreadsIframeEmbed = ({
   src,
+  expandedUrl,
+  fallbackData,
   postId,
   suggestedHeight,
 }: {
   src: string;
+  expandedUrl: string;
+  fallbackData: { title?: string; image?: string; description?: string } | null;
   postId?: string | null;
   suggestedHeight?: number | null;
 }) => {
+  const [failed, setFailed] = useState(false);
   const [height, setHeight] = useState(() =>
     suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
       ? Math.min(THREADS_MAX_HEIGHT, suggestedHeight)
@@ -89,10 +94,15 @@ const ThreadsIframeEmbed = ({
   const [hasLoaded, setHasLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  // Newly mounted Threads embeds must keep the real iframe mounted. Threads can
-  // be slow or skip a parent-side load event while routes are hidden/lazy; a
-  // watchdog fallback removes the iframe and breaks nav-lock + first-tap play.
+  // Newly mounted Threads embeds (e.g. a post published on another route and
+  // then surfaced by a feed refresh) can mount while the container is still
+  // offscreen or hidden. With loading="lazy" the iframe never fires `load`,
+  // so the old unconditional 6s timer flipped them to the "View on Threads"
+  // card permanently — which also removed the iframe the nav-lock sandbox and
+  // the one-shot play capture attach to. The timer now only runs while the
+  // embed is actually visible, and we retry once before giving up.
   const [isVisible, setIsVisible] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const persistHeight = usePersistEmbedHeight(postId);
   const catcherRef = useRef<HTMLDivElement>(null);
 
@@ -175,7 +185,7 @@ const ThreadsIframeEmbed = ({
       overlay.removeEventListener('click', consume, { capture: true });
       if (overlay.isConnected) overlay.remove();
     };
-  }, [postId, isVisible]);
+  }, [postId, isVisible, attempt]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -214,6 +224,36 @@ const ThreadsIframeEmbed = ({
     return () => observer.disconnect();
   }, [isVisible]);
 
+  useEffect(() => {
+    if (hasLoaded || !isVisible) return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+
+    const timeout = setTimeout(() => {
+      if (hasLoaded) return;
+      if (attempt < 1) {
+        // Remount the iframe once — covers embeds whose first request was
+        // started while the tab/route was hidden and silently dropped.
+        setAttempt((prev) => prev + 1);
+      } else {
+        setFailed(true);
+      }
+    }, 6000);
+
+    return () => clearTimeout(timeout);
+  }, [hasLoaded, isVisible, attempt]);
+
+  if (failed) {
+    return (
+      <OgCardFallback
+        url={expandedUrl}
+        title={fallbackData?.title}
+        image={fallbackData?.image}
+        description={fallbackData?.description}
+        platform="Threads"
+      />
+    );
+  }
+
   return (
     <div
       ref={wrapperRef}
@@ -228,17 +268,18 @@ const ThreadsIframeEmbed = ({
         aria-hidden="true"
       />
       <iframe
+        key={attempt}
         ref={iframeRef}
         src={src}
         scrolling="no"
         allowFullScreen
-        sandbox="allow-scripts allow-same-origin allow-presentation"
-        data-nav-lock-applied="1"
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share"
         loading="lazy"
         onLoad={() => {
           setHasLoaded(true);
+          setFailed(false);
         }}
+        onError={() => setFailed(true)}
         style={{
           border: 'none',
           width: '100%',
@@ -271,11 +312,7 @@ export const buildThreadsEmbedSrc = (url: string): string | null => {
     const u = new URL(url);
     const postMatch = u.pathname.match(/\/@([^/]+)\/post\/([A-Za-z0-9_-]+)/);
     if (postMatch) {
-      // Threads share URLs can include extra path suffixes such as `/media`.
-      // The embed endpoint only accepts the canonical /@user/post/id path;
-      // keeping suffixes makes Threads render a link preview / fallback card.
-      const canonicalPath = `/@${postMatch[1]}/post/${postMatch[2]}`;
-      return `https://www.threads.net${canonicalPath}/embed`;
+      return `https://www.threads.net${u.pathname.replace(/\/$/, '')}/embed`;
     }
   } catch {
     // ignore
@@ -297,6 +334,8 @@ export const ThreadsEmbed = ({
   return (
     <ThreadsIframeEmbed
       src={src}
+      expandedUrl={url}
+      fallbackData={null}
       postId={postId}
       suggestedHeight={suggestedHeight}
     />
