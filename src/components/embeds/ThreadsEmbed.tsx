@@ -230,17 +230,34 @@ const ThreadsIframeEmbed = ({
 
     const timeout = setTimeout(() => {
       if (hasLoaded) return;
-      if (attempt < 1) {
+      if (attempt < 3) {
         // Remount the iframe once — covers embeds whose first request was
         // started while the tab/route was hidden and silently dropped.
         setAttempt((prev) => prev + 1);
       } else {
         setFailed(true);
       }
-    }, 6000);
+    }, 9000);
 
     return () => clearTimeout(timeout);
   }, [hasLoaded, isVisible, attempt]);
+
+  // Never leave a Threads post stuck on the "View on Threads" card: when the
+  // tab/route becomes visible again, give the real embed another chance.
+  useEffect(() => {
+    if (!failed) return;
+    const retry = () => {
+      if (document.visibilityState !== 'visible') return;
+      setFailed(false);
+      setAttempt((prev) => prev + 1);
+    };
+    document.addEventListener('visibilitychange', retry);
+    const timer = setTimeout(retry, 4000);
+    return () => {
+      document.removeEventListener('visibilitychange', retry);
+      clearTimeout(timer);
+    };
+  }, [failed]);
 
   if (failed) {
     return (
