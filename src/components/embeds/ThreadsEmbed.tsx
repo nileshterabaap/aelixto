@@ -269,7 +269,11 @@ export const buildThreadsEmbedSrc = (url: string): string | null => {
     const u = new URL(url);
     const postMatch = u.pathname.match(/\/@([^/]+)\/post\/([A-Za-z0-9_-]+)/);
     if (postMatch) {
-      return `https://www.threads.net${u.pathname.replace(/\/$/, '')}/embed`;
+      // Threads share URLs can include extra path suffixes such as `/media`.
+      // The embed endpoint only accepts the canonical /@user/post/id path;
+      // keeping suffixes makes Threads render a link preview / fallback card.
+      const canonicalPath = `/@${postMatch[1]}/post/${postMatch[2]}`;
+      return `https://www.threads.net${canonicalPath}/embed`;
     }
   } catch {
     // ignore
