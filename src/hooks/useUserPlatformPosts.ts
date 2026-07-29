@@ -182,6 +182,18 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
         if (!cursor) break;
       }
 
+      // Pinned posts are returned first by the RPC, which breaks the
+      // created_at cursor ordering and can re-emit the same post on a later
+      // page. Keep only the first occurrence of each post id.
+      const seenIds = new Set<string>();
+      const deduped = all.filter((post) => {
+        if (!post.id || seenIds.has(post.id)) return false;
+        seenIds.add(post.id);
+        return true;
+      });
+      all.length = 0;
+      all.push(...deduped);
+
       const postIds = all.map((post) => post.id).filter(Boolean);
       const { data: postDetails } = postIds.length
         ? await supabase
