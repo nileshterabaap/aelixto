@@ -1,5 +1,6 @@
 import { useState, memo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
+import { AUTO_STOP_ENABLED } from '@/config/embedFeatureFlags';
 import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
 import type { Post } from '@/data/demoData';
 import { supabase } from '@/integrations/supabase/client';
