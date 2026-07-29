@@ -230,6 +230,10 @@ interface RegisteredElement {
   active: boolean;
   state: LifecycleState;
   disableHardSuspend: boolean;
+  /** Pending dormancy timer (hysteresis). */
+  dormantTimer: number | null;
+  /** Detach the played-detection listeners. */
+  detachPlayWatch?: () => void;
 }
 
 const elementStates = new Map<HTMLElement, RegisteredElement>();
@@ -237,7 +241,53 @@ const elementStates = new Map<HTMLElement, RegisteredElement>();
 let sharedNearObserver: IntersectionObserver | null = null;
 let sharedActiveObserver: IntersectionObserver | null = null;
 let sharedResizeHandler: (() => void) | null = null;
+let sharedVelocityHandler: (() => void) | null = null;
+let sharedVisibilityHandler: (() => void) | null = null;
 let observerRefCount = 0;
+
+// ── Played detection + fling gate ─────────────────────────────────────
+
+function hasBeenPlayed(el: HTMLElement): boolean {
+  return el.getAttribute(PLAYED_ATTR) === '1';
+}
+
+export function markEmbedPlayed(el: HTMLElement | null | undefined) {
+  if (!el) return;
+  const host = el.closest('[data-embed-lifecycle]') as HTMLElement | null;
+  (host || el).setAttribute(PLAYED_ATTR, '1');
+}
+
+/**
+ * Observes (never intercepts) the signals that mean "media actually started"
+ * in this embed: a native media `play`, or a pointer landing inside a
+ * cross-origin iframe. Purely passive/capture — scoring paths are untouched.
+ */
+function attachPlayWatch(el: HTMLElement): () => void {
+  const onPlay = () => el.setAttribute(PLAYED_ATTR, '1');
+  const onPointerDown = (e: Event) => {
+    const target = e.target as Element | null;
+    if (!target) return;
+    if (target.tagName === 'IFRAME' || target.closest('iframe')) {
+      el.setAttribute(PLAYED_ATTR, '1');
+    }
+  };
+  el.addEventListener('play', onPlay, { capture: true, passive: true });
+  el.addEventListener('pointerdown', onPointerDown, { capture: true, passive: true });
+  el.addEventListener('touchstart', onPointerDown, { capture: true, passive: true });
+  return () => {
+    el.removeEventListener('play', onPlay, true);
+    el.removeEventListener('pointerdown', onPointerDown, true);
+    el.removeEventListener('touchstart', onPointerDown, true);
+  };
+}
+
+let lastScrollY = typeof window !== 'undefined' ? window.scrollY : 0;
+let lastScrollAt = 0;
+let flingUntil = 0;
+
+function isFlinging(): boolean {
+  return Date.now() < flingUntil;
+}
 
 function transitionElement(el: HTMLElement, reg: RegisteredElement, target: LifecycleState) {
   const current = reg.state;
