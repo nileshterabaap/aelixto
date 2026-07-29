@@ -74,18 +74,13 @@ const parseThreadsHeightFromMessage = (data: unknown): number | null => {
  */
 const ThreadsIframeEmbed = ({
   src,
-  expandedUrl,
-  fallbackData,
   postId,
   suggestedHeight,
 }: {
   src: string;
-  expandedUrl: string;
-  fallbackData: { title?: string; image?: string; description?: string } | null;
   postId?: string | null;
   suggestedHeight?: number | null;
 }) => {
-  const [failed, setFailed] = useState(false);
   const [height, setHeight] = useState(() =>
     suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
       ? Math.min(THREADS_MAX_HEIGHT, suggestedHeight)
@@ -94,15 +89,10 @@ const ThreadsIframeEmbed = ({
   const [hasLoaded, setHasLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  // Newly mounted Threads embeds (e.g. a post published on another route and
-  // then surfaced by a feed refresh) can mount while the container is still
-  // offscreen or hidden. With loading="lazy" the iframe never fires `load`,
-  // so the old unconditional 6s timer flipped them to the "View on Threads"
-  // card permanently — which also removed the iframe the nav-lock sandbox and
-  // the one-shot play capture attach to. The timer now only runs while the
-  // embed is actually visible, and we retry once before giving up.
+  // Newly mounted Threads embeds must keep the real iframe mounted. Threads can
+  // be slow or skip a parent-side load event while routes are hidden/lazy; a
+  // watchdog fallback removes the iframe and breaks nav-lock + first-tap play.
   const [isVisible, setIsVisible] = useState(false);
-  const [attempt, setAttempt] = useState(0);
   const persistHeight = usePersistEmbedHeight(postId);
   const catcherRef = useRef<HTMLDivElement>(null);
 
@@ -185,7 +175,7 @@ const ThreadsIframeEmbed = ({
       overlay.removeEventListener('click', consume, { capture: true });
       if (overlay.isConnected) overlay.remove();
     };
-  }, [postId, isVisible, attempt]);
+  }, [postId, isVisible]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -224,53 +214,6 @@ const ThreadsIframeEmbed = ({
     return () => observer.disconnect();
   }, [isVisible]);
 
-  useEffect(() => {
-    if (hasLoaded || !isVisible) return;
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-
-    const timeout = setTimeout(() => {
-      if (hasLoaded) return;
-      if (attempt < 3) {
-        // Remount the iframe once — covers embeds whose first request was
-        // started while the tab/route was hidden and silently dropped.
-        setAttempt((prev) => prev + 1);
-      } else {
-        setFailed(true);
-      }
-    }, 9000);
-
-    return () => clearTimeout(timeout);
-  }, [hasLoaded, isVisible, attempt]);
-
-  // Never leave a Threads post stuck on the "View on Threads" card: when the
-  // tab/route becomes visible again, give the real embed another chance.
-  useEffect(() => {
-    if (!failed) return;
-    const retry = () => {
-      if (document.visibilityState !== 'visible') return;
-      setFailed(false);
-      setAttempt((prev) => prev + 1);
-    };
-    document.addEventListener('visibilitychange', retry);
-    const timer = setTimeout(retry, 4000);
-    return () => {
-      document.removeEventListener('visibilitychange', retry);
-      clearTimeout(timer);
-    };
-  }, [failed]);
-
-  if (failed) {
-    return (
-      <OgCardFallback
-        url={expandedUrl}
-        title={fallbackData?.title}
-        image={fallbackData?.image}
-        description={fallbackData?.description}
-        platform="Threads"
-      />
-    );
-  }
-
   return (
     <div
       ref={wrapperRef}
@@ -285,7 +228,6 @@ const ThreadsIframeEmbed = ({
         aria-hidden="true"
       />
       <iframe
-        key={attempt}
         ref={iframeRef}
         src={src}
         scrolling="no"
@@ -294,9 +236,7 @@ const ThreadsIframeEmbed = ({
         loading="lazy"
         onLoad={() => {
           setHasLoaded(true);
-          setFailed(false);
         }}
-        onError={() => setFailed(true)}
         style={{
           border: 'none',
           width: '100%',
@@ -351,8 +291,6 @@ export const ThreadsEmbed = ({
   return (
     <ThreadsIframeEmbed
       src={src}
-      expandedUrl={url}
-      fallbackData={null}
       postId={postId}
       suggestedHeight={suggestedHeight}
     />
