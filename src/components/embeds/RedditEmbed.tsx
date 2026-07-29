@@ -3,6 +3,7 @@ import { OgCardFallback } from "@/components/OgCardFallback";
 import { supabase } from "@/integrations/supabase/client";
 import redditIcon from "@/assets/platforms/reddit.svg";
 import { usePersistEmbedHeight } from "@/hooks/usePersistEmbedHeight";
+import { EmbedFadeSkeleton, smoothFadeStyle, useSmoothReveal } from "@/components/embeds/SmoothEmbedFrame";
 
 type RedditEmbedProps = {
   url: string;
@@ -145,6 +146,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const [resolving, setResolving] = useState(needsExpansion && !directUrl);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const redditRevealed = useSmoothReveal(loaded);
   const [thumbBroken, setThumbBroken] = useState(false);
   const [fetchedThumb, setFetchedThumb] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -400,10 +402,11 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   return (
     <div
       ref={containerRef}
-      className="relative w-full"
+      className="relative w-full overflow-hidden"
       style={{ height: iframeHeight }}
       data-embed-status={loaded ? "ready" : "loading"}
     >
+      <EmbedFadeSkeleton visible={!redditRevealed} />
       <iframe
         ref={iframeRef}
         src={embedSrc}
@@ -420,6 +423,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
         sandbox="allow-scripts allow-same-origin allow-popups"
         allow="clipboard-read; clipboard-write"
         className="mx-auto block w-full h-full max-w-full rounded-lg border-0"
+        style={{ position: "relative", zIndex: 1, ...smoothFadeStyle(redditRevealed) }}
       />
     </div>
   );

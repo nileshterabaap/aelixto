@@ -115,7 +115,15 @@ const Messages = () => {
                 const isPostShare = /^https?:\/\/.+\/post\/[a-f0-9-]{36}$/.test(
                   replyStripped.trim()
                 );
-                const displayContent = isPostShare ? "Sent a post" : replyStripped;
+                const isPhoto = replyStripped.trim().startsWith("🖼️__IMAGE__:");
+                const isVideo = replyStripped.trim().startsWith("🎞️__VIDEO__:");
+                const displayContent = isPostShare
+                  ? "Sent a post"
+                  : isPhoto
+                    ? "Sent a photo"
+                    : isVideo
+                      ? "Sent a video"
+                      : replyStripped;
                 const lastMessagePreview = conversation.last_message
                   ? conversation.last_message.sender_id === user?.id
                     ? `You: ${displayContent}`

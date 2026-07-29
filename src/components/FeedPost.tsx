@@ -31,7 +31,7 @@ import linkedinIcon from "@/assets/platforms/linkedin.svg";
 import { TwitterEmbed } from "@/components/embeds/TwitterEmbed";
 import { PinterestEmbed } from "@/components/embeds/PinterestEmbed";
 import { RawEmbedRenderer } from "@/components/RawEmbedRenderer";
-import { UniversalMetaEmbed } from "@/components/UniversalMetaEmbed";
+import { ThreadsAwareMetaEmbed as UniversalMetaEmbed } from "@/components/ThreadsAwareMetaEmbed";
 import { OgCardFallback } from "@/components/OgCardFallback";
 import { isEmbedEnabled, type EmbedPlatform, EMBED_FEATURE_FLAGS } from "@/config/embedFeatureFlags";
 import { ArticleEmbed } from "@/features/article-embeds";
