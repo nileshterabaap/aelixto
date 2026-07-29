@@ -93,86 +93,60 @@ const ThreadsIframeEmbed = ({
   const persistHeight = usePersistEmbedHeight(postId);
   const catcherRef = useRef<HTMLDivElement>(null);
 
-  // Pull-to-refresh catcher: while the page is at scroll top, this transparent
-  // layer sits over the Threads iframe so the parent document can observe the
-  // touch (cross-origin iframes swallow touches otherwise). On touchstart it
-  // immediately disables its own pointer-events, so the tap still passes
-  // through to the native Threads player — identical to the play-overlay
-  // hand-off. The play overlay is appended after it in the DOM, so the
-  // one-shot video_play capture still owns the very first tap.
+  // Single transparent capture layer that owns BOTH jobs:
+  //  1. one-shot video_play capture (scoring), and
+  //  2. letting Pull-to-Refresh observe a touch that would otherwise be
+  //     swallowed by the cross-origin Threads iframe.
+  // Two stacked layers used to each eat a tap and re-arm on a timer, which is
+  // why taps needed 6-7 tries. This layer is armed only while it still has a
+  // job to do (play not yet recorded, or the page is at scroll-top), consumes
+  // exactly one touch, and does not re-arm until the user actually scrolls.
   useEffect(() => {
     const el = catcherRef.current;
     if (!el) return;
 
-    let restoreTimer: ReturnType<typeof setTimeout> | undefined;
-    const onStart = () => {
-      el.style.pointerEvents = 'none';
-      if (restoreTimer) clearTimeout(restoreTimer);
-      restoreTimer = setTimeout(() => {
-        el.style.pointerEvents = '';
-      }, 600);
+    const atTop = () => window.scrollY <= 2;
+    const played = () => !!postId && threadsPlayFired.has(postId);
+    let suppressed = false;
+
+    const arm = () => { el.style.pointerEvents = 'auto'; };
+    const disarm = () => { el.style.pointerEvents = 'none'; };
+    const sync = () => {
+      if (suppressed) { disarm(); return; }
+      if (!played() || atTop()) arm();
+      else disarm();
     };
 
+    const onStart = () => {
+      // Hand the tap straight back to the native player.
+      suppressed = true;
+      disarm();
+      if (postId && !threadsPlayFired.has(postId)) {
+        threadsPlayFired.add(postId);
+        trackView({ postId, eventType: 'video_play' }).catch(() => {
+          threadsPlayFired.delete(postId);
+        });
+      }
+    };
+
+    const onScroll = () => {
+      suppressed = false;
+      sync();
+    };
+
+    sync();
     el.addEventListener('touchstart', onStart, { passive: true });
     el.addEventListener('pointerdown', onStart, { passive: true });
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       el.removeEventListener('touchstart', onStart);
       el.removeEventListener('pointerdown', onStart);
-      if (restoreTimer) clearTimeout(restoreTimer);
+      window.removeEventListener('scroll', onScroll);
     };
-  }, []);
+  }, [postId]);
   // Pinterest-style smooth reveal (presentational only — the overlay below
   // stays at z-index 2 and keeps owning the first-tap video_play).
   const threadsRevealed = useSmoothReveal(hasLoaded);
-
-  // Self-contained one-shot play capture (historical overlay behavior).
-  // A tap that lands on a cross-origin iframe is delivered to the iframe's
-  // own document — the parent never sees touchstart/pointerdown — so an
-  // ancestor listener on the wrapper can never observe the first tap. The
-  // capture must therefore be a real hit-target element stacked ABOVE the
-  // iframe. It is fully transparent, fires video_play exactly once, then
-  // disables pointer-events and removes itself synchronously so the same
-  // tap sequence continues through to the native Threads Play button.
-  useEffect(() => {
-    const wrapper = wrapperRef.current;
-    if (!wrapper || !postId || !isVisible) return;
-    if (threadsPlayFired.has(postId)) return;
-    if (wrapper.querySelector('[data-threads-play-capture="1"]')) return;
-
-    const overlay = document.createElement('div');
-    overlay.dataset.threadsPlayCapture = '1';
-    overlay.style.cssText =
-      'position:absolute;inset:0;z-index:2;background:transparent;pointer-events:auto;';
-
-    let consumed = false;
-    const consume = () => {
-      if (consumed) return;
-      consumed = true;
-      overlay.style.pointerEvents = 'none';
-      overlay.remove();
-      if (threadsPlayFired.has(postId)) return;
-      threadsPlayFired.add(postId);
-      trackView({ postId, eventType: 'video_play' }).catch(() => {
-        threadsPlayFired.delete(postId);
-      });
-    };
-
-    const opts: AddEventListenerOptions = { capture: true, passive: true };
-    overlay.addEventListener('touchstart', consume, opts);
-    overlay.addEventListener('pointerdown', consume, opts);
-    overlay.addEventListener('mousedown', consume, opts);
-    overlay.addEventListener('click', consume, { capture: true });
-
-    wrapper.appendChild(overlay);
-
-    return () => {
-      overlay.removeEventListener('touchstart', consume, opts);
-      overlay.removeEventListener('pointerdown', consume, opts);
-      overlay.removeEventListener('mousedown', consume, opts);
-      overlay.removeEventListener('click', consume, { capture: true });
-      if (overlay.isConnected) overlay.remove();
-    };
-  }, [postId, isVisible]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -221,6 +195,7 @@ const ThreadsIframeEmbed = ({
       <div
         ref={catcherRef}
         data-threads-ptr-catcher="1"
+        data-threads-play-capture="1"
         className="threads-ptr-catcher"
         aria-hidden="true"
       />
