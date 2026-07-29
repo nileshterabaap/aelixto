@@ -4,15 +4,6 @@ import { useToast } from "@/hooks/use-toast";
 
 type BucketName = "avatars" | "covers" | "posts";
 
-interface UploadOptions {
-  /** Suppress success/failure toasts (used in chat where UI shows progress). */
-  silent?: boolean;
-  /** Allow video files in addition to images. */
-  allowVideo?: boolean;
-  /** Max file size in bytes (defaults to 5MB). */
-  maxBytes?: number;
-}
-
 export const useImageUpload = () => {
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
@@ -20,38 +11,26 @@ export const useImageUpload = () => {
   const uploadImage = async (
     file: File,
     bucket: BucketName,
-    userId: string,
-    options: UploadOptions = {}
+    userId: string
   ): Promise<string | null> => {
-    const { silent = false, allowVideo = false, maxBytes } = options;
-    const notify = (args: Parameters<typeof toast>[0]) => {
-      if (!silent) toast(args);
-    };
     try {
       setUploading(true);
 
       // Validate file type
-      const isVideo = file.type.startsWith("video/");
-      const isImage = file.type.startsWith("image/");
-      if (!(isImage || (allowVideo && isVideo))) {
+      if (!file.type.startsWith("image/")) {
         toast({
           title: "Invalid file type",
-          description: allowVideo
-            ? "Please upload an image or video file"
-            : "Please upload an image file",
+          description: "Please upload an image file",
           variant: "destructive",
         });
         return null;
       }
 
-      // Validate file size
-      const limit = maxBytes ?? (isVideo ? 100 * 1024 * 1024 : 5 * 1024 * 1024);
-      if (file.size > limit) {
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
         toast({
           title: "File too large",
-          description: `Please upload a file smaller than ${Math.round(
-            limit / (1024 * 1024)
-          )}MB`,
+          description: "Please upload an image smaller than 5MB",
           variant: "destructive",
         });
         return null;
@@ -90,7 +69,7 @@ export const useImageUpload = () => {
           .upload(fileName, file, {
             cacheControl: "3600",
             upsert: false,
-            contentType: file.type || (isVideo ? "video/mp4" : "image/jpeg"),
+            contentType: file.type || "image/jpeg",
           })
           .then((res) => ({ ...res, fileName }));
       };
@@ -129,7 +108,7 @@ export const useImageUpload = () => {
       // Get public URL
       const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
 
-      notify({
+      toast({
         title: "Upload successful",
         description: "Your image has been uploaded",
       });

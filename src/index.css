@@ -284,7 +284,7 @@ a:active:not(:disabled) {
    (including over YouTube/Instagram/Twitter embeds). Once the user
    scrolls down at all, this class is removed and iframes become
    interactive again. */
-body.at-scroll-top iframe:not([src*="threads."]) {
+body.at-scroll-top iframe {
   pointer-events: none !important;
 }
 
