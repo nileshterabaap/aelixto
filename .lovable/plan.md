@@ -1,54 +1,103 @@
-# Why Pinterest Feels Smoother — Analysis + Minimal Shared Fix
+# Universal Auto Stop for Embeds (Feed + Grid) — Design
 
-Read-only investigation complete. No files changed.
+## 1. What exists today
 
-## 1. Exact reasons Pinterest feels smoother
+The app already has a two-stage lifecycle engine in `src/hooks/useMediaPauseOnScroll.ts`, mounted from `src/components/HydratedEmbed.tsx` — the single embed entry point shared by Feed (`Index.tsx` -> `HydratedFeedPost`) and Grid (`PlatformPostViewer` -> `HydratedFeedPost`). So "identical behaviour in Feed and Grid" is already structurally guaranteed; no duplicate engine is needed.
 
-`src/components/embeds/PinterestEmbed.tsx` is the only embed that combines all four smoothness mechanisms at once:
+Current stages:
+- Stage A (near viewport): pause `<video>/<audio>`, postMessage-pause YouTube and Spotify, freeze pointer events, "mute" non-API iframes.
+- Stage B (far away): hard-suspend by swapping `src` -> `about:blank`.
 
-1. **Zero-roundtrip URL resolution** — the pin ID is pulled out with a synchronous regex (line 12-17), so `loading` starts as `false` for normal `/pin/<id>/` links and the iframe src (`assets.pinterest.com/ext/embed.html?id=…`, line 119) exists on the very first render. No oEmbed call, no OG scrape, no SDK script.
-2. **Height reserved before the iframe exists** — the wrapper div gets a fixed pixel height seeded from the stored `suggestedHeight` (clamped 320–1400, default 600) at lines 31-35 and 113. Nothing shifts when content arrives.
-3. **Skeleton stacked underneath, not swapped** — the pulse is `absolute inset-0` inside the same fixed-height relative wrapper (line 112-117), so skeleton and iframe occupy the identical box; the handoff causes no reflow.
-4. **A real 300 ms opacity fade driven by the iframe's own `onLoad`** (lines 132-135) — one native event, no MutationObserver, no artificial timer.
+Two problems:
+- Stage B is currently disabled everywhere (`disableHardSuspend: true` at `HydratedEmbed.tsx:143`) — this is exactly the February approach that caused reload flicker, so it was switched off. Cross-origin embeds (Threads, X, IG, FB, Pinterest, Reddit, LinkedIn) therefore keep playing audio/video off-screen.
+- Stage A's "mute" path is cosmetic: setting `pointer-events: none` does not stop a cross-origin video.
 
-The smoothness is **our implementation**, not the browser or Pinterest's SDK. Notably, Pinterest *opts out* of the shared `SkeletonGate`/`LazyEmbed` MutationObserver plumbing (it's rendered directly in `HydratedEmbed.tsx:403-411`) and self-manages a tight load→fade instead.
+## 2. Platform capability matrix
 
-## 2. Differences from every other platform
+| Platform | Can truly pause? | Mechanism |
+|---|---|---|
+| YouTube | Yes | postMessage `pauseVideo` (already wired; needs `enablejsapi=1` + origin) |
+| Spotify | Yes | postMessage `{command:'pause'}` (already wired) |
+| Native `<video>`/`<audio>` (uploads, some OG media) | Yes | `.pause()` |
+| Vimeo / Player.js-style | Yes | postMessage (if ever added) |
+| Threads, Instagram, Facebook | No public pause API | cross-origin; only recreation or focus tricks |
+| X (Twitter) | No | cross-origin widget iframe |
+| Pinterest, Reddit, LinkedIn, TikTok | No | cross-origin |
 
-| | Instant src | Pre-reserved height | Stacked skeleton | Fade on load |
-|---|---|---|---|---|
-| **Pinterest** | yes | yes (fixed px) | yes | yes, 300 ms via `onLoad` |
-| **Reddit** | no — async normalize + possible `expand-url` call before any iframe (`RedditEmbed.tsx:217-259`) | heuristic, changes after load | partial | no fade; readiness via `load` + 8.5 s fallback timer |
-| **X / Twitter** | no — SDK script then `twttr.widgets.createTweet()` DOM replacement (`TwitterEmbed.tsx:55-79`) | no (generic `aspect-[4/3]` block + `-85px` margin hack) | no | none |
-| **Threads** | src is sync, but mount is gated behind an IntersectionObserver + 6 s retry (`ThreadsEmbed.tsx:177-209`) | yes (default 280) | no | none |
-| **LinkedIn** | yes | fixed 760 px always, never matches content | no | none, no loading state at all |
-| **Instagram** | yes | estimate → postMessage MEASURE | yes | yes but only 180 ms, gated by a 2200 ms fallback timer, not `onLoad` |
-| **Facebook** | yes | postMessage only, 12 s failure fallback | no | none |
+So: 3 truly-pausable classes, everything else needs an indirect strategy.
 
-Two structural gaps dominate: **no fade** (X, Threads, LinkedIn, Facebook, Reddit) and **no height reserved before mount** (X, Reddit partially).
+## 3. Strategies evaluated
 
-## 3. Risk assessment for applying this globally
+1. **Unmount / conditional render** — kills embed state, forces full re-fetch + skeleton on scroll-back. This is the February failure mode. Rejected.
+2. **`src` -> `about:blank` hard suspend (current Stage B)** — reliably stops audio, but re-navigation costs 300-1500ms and a visible reload. Acceptable only very far off-screen with hysteresis. Keep, but gate it hard.
+3. **`display:none` on the iframe** — Chrome/WebKit do NOT reliably stop cross-origin media, and it destroys layout box -> layout shift. Rejected.
+4. **`content-visibility: auto` + `contain-intrinsic-size`** — big win for paint/layout cost on long feeds, zero flicker, but does not stop audio. Keep as a performance layer, not as the stop mechanism.
+5. **`visibility: hidden`** — no playback effect, causes the scroll bugs already noted in `KeepAlive.tsx`. Rejected.
+6. **Muting via `allow` attribute mutation** — changing `allow` after load has no retroactive effect. Rejected.
+7. **`src` reassignment to the *same* URL with a hash** — same cost as (2) with no benefit. Rejected.
+8. **Volume trick / Web Audio interception** — impossible cross-origin. Rejected.
+9. **`iframe.setAttribute('sandbox', ...)` re-application** — triggers a document reload (same cost as (2)) and would break the guarded nav-lock contract. Rejected.
+10. **Focus-steal / blur** — no effect on autoplaying cross-origin video; also risks stealing the tap that drives `video_play`. Rejected.
+11. **Page Visibility API** — only for tab/app background; keep as a separate global rule (pause everything on `visibilitychange`), which is cheap and correct.
+12. **Per-platform hybrid** — the only design that meets all constraints.
 
-- **Low risk / purely visual:** adding a `relative` fixed-height wrapper + absolute pulse + opacity fade on `onLoad`. It changes no scoring, no navigation lock, no postMessage handling.
-- **Medium risk:** the fade can *mask* a slow embed and, if the readiness signal never fires, leave content at `opacity: 0`. Mitigation: always pair the fade with a fallback reveal timer, and never gate `pointer-events` on it.
-- **Blocked by the stability guard:** `PinterestEmbed.tsx`, `TwitterEmbed.tsx`, `LinkedInEmbed.tsx`, and `UniversalMetaEmbed.tsx` (Facebook + Instagram) are all frozen in `.stability-platforms.json`. Any edit fails `platform:check` and the production build. So X, LinkedIn, Facebook and Instagram **cannot** receive this without you clearing their baselines.
-- **Threads-specific risk:** the transparent first-tap overlay is the single source of truth for `video_play`. A fade wrapper must sit *below* that overlay in z-order and must not intercept pointer events, or the one-shot play regresses.
+## 4. Recommended architecture — "Three-ring lifecycle with hysteresis"
 
-## 4. Recommended smallest shared improvement
+A single shared engine (extend `useMediaPauseOnScroll.ts`, keep the shared-observer design) with three rings around the viewport instead of the current two, plus dwell-based hysteresis so rapid scrolling never triggers the expensive ring.
 
-Extract Pinterest's pattern into one tiny reusable presentational wrapper and apply it only to the **unguarded** platforms.
+```text
+        |<---- ring C: DORMANT (>= ~5 screens, dwell >= 1200ms) ---->|
+             |<---- ring B: STOPPED (~0.5-5 screens) ---->|
+                    |<-- ring A: ACTIVE (in viewport) -->|
+```
 
-### New file: `src/components/embeds/SmoothEmbedFrame.tsx`
-A ~40-line presentational component: `relative` wrapper with a caller-supplied fixed height, an `absolute inset-0 animate-pulse bg-muted` skeleton while not ready, `opacity 0→1 / 300 ms ease` on the child, plus a safety timer (~2.5 s) that force-reveals so nothing can get stuck invisible. `pointer-events` untouched. No data fetching, no measurement logic.
+- **Ring A — ACTIVE.** Nothing is touched. Pointer events restored, scoring overlays armed. Identical to today's `active`.
+- **Ring B — STOPPED (the new default "auto stop").** For pausable platforms: real pause (`.pause()`, YouTube/Spotify postMessage). For cross-origin platforms: no `src` change — instead the iframe is *interaction-frozen* (pointer-events off) and, critically, **only started at all once it entered Ring A**. Because every platform here requires a manual tap to play (there is no cross-origin autoplay on mobile in this app; TikTok/Reddit are already strict manual-play by policy), an embed that has never been tapped has nothing to stop. The only true leak is an embed the user *did* play and then scrolled past.
+- **Ring C — DORMANT.** Only here do we `src` -> `about:blank`, and only when all three hold: (a) element is >= ~5 viewport heights away, (b) it has stayed there for >= 1200ms of dwell (hysteresis timer, cancelled if it re-enters ring B), (c) the embed was actually played (`data-aelix-played="1"`) or the tab is backgrounded. Height is pinned first via `contain-intrinsic-size` from the already-persisted embed height, so restoring produces zero layout shift.
+- **Restore** happens at ring B on the way back — i.e. up to ~4 screens of runway before the user sees it — so the reload has finished long before the embed is on screen. This is the single most important difference from February, which restored at/near the viewport and therefore always showed the reload.
+- **Played-flag.** The existing one-shot `video_play` capture paths (Threads catcher layer, `useOriginalVisitTracker`) already know when a post was played. They set a `data-aelix-played` attribute on the container; the lifecycle engine reads it. No changes to scoring logic, dedup, or nav lock — read-only consumption of a flag that gets written where the score already fires.
+- **Global page-visibility rule.** On `document.visibilitychange -> hidden`, run the pausable-platform pause for everything and mark all played cross-origin embeds dormant-eligible immediately (no dwell). On return, restore ring A/B normally.
+- **Scroll-velocity gate.** Reuse `src/hooks/useScrollVelocity.ts`: while flinging, suppress all ring transitions except pausing pausable media. No iframe recreation during a fling, ever.
 
-### Apply to (all unguarded):
-- **Reddit** (`RedditEmbed.tsx`) — wrap the existing iframe; keep the current `computeInitialHeight`, postMessage height sync, collapsed-text cap and 8.5 s fallback exactly as-is. Only the fade + stacked skeleton are added.
-- **Threads** (`ThreadsEmbed.tsx`) — wrap the iframe only, with the fade layer rendered strictly *beneath* the existing transparent play overlay. Visibility gate, retry, navigation lock and `video_play` capture untouched.
+### Why this beats the February attempt
+| February | This design |
+|---|---|
+| Unmount / visibility toggle at/near viewport | Ring C only, >= 5 screens away |
+| Instant transitions | 1200ms dwell hysteresis + velocity gate |
+| Applied to every embed | Only embeds that were actually played |
+| Restored when visible -> skeleton flash | Restored ~4 screens early -> invisible |
+| Height recomputed on restore -> layout shift | Height pinned from persisted `suggestedHeight` |
+| One strategy for all platforms | Real pause where APIs exist, recreation only as last resort |
 
-### Explicitly out of scope
-Pinterest (already correct and frozen), X, LinkedIn, Facebook, Instagram — frozen. If you want those included later, you'd need to clear their guard baselines first; I'd do that as a separate, per-platform request.
+## 5. Expected impact
 
-### Verification
-`npm run platform:check` must pass unchanged (all 10 platforms), plus a typecheck and build. Then manual confirmation that Reddit and Threads still play, still score, and still size correctly.
+- **Memory:** meaningful reduction. Each live cross-origin embed is a separate document (~8-25MB for FB/IG/Threads video). Dormant-ring recycling should cut steady-state feed memory 30-50% on long sessions, which also reduces WebView OOM kills in the APK.
+- **CPU:** lower. Off-screen video decode is the largest sustained cost; stopping played embeds removes it. Observer cost is unchanged (still 2-3 shared observers, not per-post).
+- **Battery:** the biggest win — off-screen decode + audio is the dominant drain today.
+- **Scroll performance:** neutral-to-better. `content-visibility: auto` cuts style/layout work on off-screen cards; the velocity gate guarantees zero iframe work during flings.
 
-Probability of success: **93%** — the change is presentational and confined to two unguarded files.
+## 6. Files that would change
+
+Unguarded (safe to edit):
+- `src/hooks/useMediaPauseOnScroll.ts` — core: third ring, dwell hysteresis, velocity gate, played-flag gate, visibilitychange rule.
+- `src/components/HydratedEmbed.tsx` — pass real options (stop forcing `disableHardSuspend: true`), pass persisted height for intrinsic sizing, pass platform hint.
+- `src/components/HydratedFeedPost.tsx` — set `data-aelix-played` when a play is registered; apply `content-visibility`/`contain-intrinsic-size` on the card wrapper.
+- `src/components/embeds/ThreadsEmbed.tsx` — set the played flag inside the existing one-shot capture (one line; no change to the capture mechanics).
+- `src/components/embeds/RedditEmbed.tsx`, `src/components/embeds/SmoothEmbedFrame.tsx` — keep the fade suppressed on lifecycle-driven restore so no skeleton flashes.
+- `src/index.css` — intrinsic-size / containment utility classes.
+- `src/App.tsx` — extend `useGlobalMediaPauseOnNavigate` with the visibilitychange rule.
+
+Guarded — read-only, no edits planned: `useOriginalVisitTracker.ts` (x/threads/instagram), `UniversalMetaEmbed.tsx` (facebook/instagram), `TwitterEmbed.tsx`, `PinterestEmbed.tsx`, `LinkedInEmbed.tsx`, `RawEmbedRenderer.tsx` (spotify), article/Quora files. The played-flag is written from unguarded call sites only. `npm run platform:check` must pass unchanged.
+
+## 7. Complexity and risk
+
+- Complexity: medium. ~1 substantial file rewrite + 6 small edits. No schema, no edge functions, no new deps.
+- Risk: medium-low, concentrated in two places: (1) accidentally suspending a Threads/X embed that owns a pending scoring tap — mitigated by never touching ring A/B iframes and by the played-flag gate; (2) restore timing on very fast long scrolls — mitigated by the 4-screen restore runway plus keeping the persisted-height placeholder.
+- Rollback: a single `AUTO_STOP_ENABLED` flag in `src/config/embedFeatureFlags.ts` returns behaviour to today's exactly.
+
+## 8. Suggested rollout
+
+1. Engine + flag off, verify no behaviour change and guards pass.
+2. Enable for pausable platforms only (YouTube, Spotify, native video) — zero recreation risk.
+3. Enable ring C for played cross-origin embeds in Feed.
+4. Enable in Grid, verify no treadmill regression in `PlatformPostViewer`.
