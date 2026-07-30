@@ -305,9 +305,9 @@ body.at-scroll-top .twitter-embed-container iframe {
   background: transparent;
   pointer-events: none;
 }
-body.at-scroll-top .threads-ptr-catcher {
-  pointer-events: auto;
-}
+/* Never armed: an armed catcher swallowed the first tap on the native
+   Threads player in the feed. Same tradeoff as X — PTR from directly over a
+   Threads media area at scroll-top is given up in favour of first-tap play. */
 
 /* Disable the browser's native pull-to-refresh so our in-app PullToRefresh
    component owns the gesture on every page (especially short empty states). */
