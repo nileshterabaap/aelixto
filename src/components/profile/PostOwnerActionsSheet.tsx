@@ -59,9 +59,10 @@ export const PostOwnerActionsSheet = ({
 
   // Show the score-deduction warning only for in-cycle posts that actually earned score.
   const requestDelete = async () => {
-    if (isRepost) return deletePost();
+    const plainDelete = () => { deletePost(); close(); };
+    if (isRepost) return plainDelete();
     try {
-      if (localStorage.getItem(SKIP_KEY) === "1") return deletePost();
+      if (localStorage.getItem(SKIP_KEY) === "1") return plainDelete();
       const { data } = await supabase.rpc("post_delete_score_preview", {
         p_post_id: postId,
       });
@@ -74,12 +75,12 @@ export const PostOwnerActionsSheet = ({
     } catch {
       // fall through to plain delete
     }
-    deletePost();
+    plainDelete();
   };
 
-  const Row = ({ icon: Icon, label, onClick, destructive, disabled }: any) => (
+  const Row = ({ icon: Icon, label, onClick, destructive, disabled, noClose }: any) => (
     <button
-      onClick={() => { onClick(); close(); }}
+      onClick={() => { onClick(); if (!noClose) close(); }}
       disabled={disabled}
       className={`w-full flex items-center gap-3 px-5 py-4 text-left text-[15px] active:bg-muted disabled:opacity-50 ${destructive ? "text-destructive" : ""}`}
     >
@@ -124,6 +125,7 @@ export const PostOwnerActionsSheet = ({
               label="Delete"
               destructive
               disabled={isDeleting}
+              noClose
               onClick={() => requestDelete()}
             />
           </div>
@@ -173,6 +175,7 @@ export const PostOwnerActionsSheet = ({
                 }
                 setConfirmOpen(false);
                 deletePost();
+                close();
               }}
             >
               Delete
