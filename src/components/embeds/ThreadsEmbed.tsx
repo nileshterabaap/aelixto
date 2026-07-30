@@ -106,14 +106,17 @@ const ThreadsIframeEmbed = ({
     if (!el) return;
 
     const atTop = () => window.scrollY <= 2;
-    const played = () => !!postId && threadsPlayFired.has(postId);
     let suppressed = false;
 
     const arm = () => { el.style.pointerEvents = 'auto'; };
     const disarm = () => { el.style.pointerEvents = 'none'; };
     const sync = () => {
       if (suppressed) { disarm(); return; }
-      if (!played() || atTop()) arm();
+      // Only ever armed to let Pull-to-Refresh observe a touch at scroll-top.
+      // It is NOT armed for scoring: the guarded tracker already owns the
+      // one-shot Threads video_play, so taps elsewhere (grid, scrolled feed)
+      // reach the native player on the very first tap.
+      if (atTop()) arm();
       else disarm();
     };
 
