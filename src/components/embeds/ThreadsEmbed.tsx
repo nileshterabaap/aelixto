@@ -106,7 +106,6 @@ const ThreadsIframeEmbed = ({
     if (!el) return;
 
     const disarm = () => { el.style.pointerEvents = 'none'; };
-    const arm = () => { el.style.pointerEvents = 'auto'; };
 
     const onStart = () => {
       disarm();
@@ -118,11 +117,9 @@ const ThreadsIframeEmbed = ({
       }
     };
 
-    // Verified one-shot interaction capture: armed until this post has
-    // recorded its single video_play, then permanently disarmed so every
-    // later tap reaches the native Threads player untouched.
-    if (postId && !threadsPlayFired.has(postId)) arm();
-    else disarm();
+    // The layer is permanently disarmed: the guarded tracker owns the one-shot
+    // video_play, so the very first tap must reach the native Threads player.
+    disarm();
     el.addEventListener('touchstart', onStart, { passive: true });
     el.addEventListener('pointerdown', onStart, { passive: true });
     return () => {
@@ -130,7 +127,6 @@ const ThreadsIframeEmbed = ({
       el.removeEventListener('pointerdown', onStart);
     };
   }, [postId]);
-
   // Pinterest-style smooth reveal (presentational only — the overlay below
   // stays at z-index 2 and keeps owning the first-tap video_play).
   const threadsRevealed = useSmoothReveal(hasLoaded);
