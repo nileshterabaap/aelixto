@@ -295,6 +295,15 @@ body.at-scroll-top .twitter-embed-container iframe {
   pointer-events: auto !important;
 }
 
+/* YouTube only: the player iframe must stay tappable at scroll-top, otherwise
+   taps on the native play button are swallowed by the Pull-to-Refresh iframe
+   lock above. Same tradeoff as X. */
+body.at-scroll-top iframe[src*="youtube.com"],
+body.at-scroll-top iframe[src*="youtube-nocookie.com"],
+body.at-scroll-top iframe[src*="youtu.be"] {
+  pointer-events: auto !important;
+}
+
 /* Threads iframes stay interactive (tap-to-play), so a transparent catcher
    layer above them lets Pull-to-Refresh see the touch while the page is at
    scroll-top. It hands the tap straight back to the iframe on touchstart. */
