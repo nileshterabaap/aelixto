@@ -312,6 +312,13 @@ body.at-scroll-top iframe[src*="spotify.com/embed"] {
   pointer-events: auto !important;
 }
 
+/* Reddit only: the embed iframe must stay tappable at scroll-top so the
+   "Read more" control isn't swallowed by the Pull-to-Refresh iframe lock. */
+body.at-scroll-top iframe[src*="redditmedia.com"],
+body.at-scroll-top iframe[src*="reddit.com"] {
+  pointer-events: auto !important;
+}
+
 /* Threads iframes stay interactive (tap-to-play), so a transparent catcher
    layer above them lets Pull-to-Refresh see the touch while the page is at
    scroll-top. It hands the tap straight back to the iframe on touchstart. */
