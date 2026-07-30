@@ -127,54 +127,6 @@ const ThreadsIframeEmbed = ({
       el.removeEventListener('pointerdown', onStart);
     };
   }, [postId]);
-
-  // Scoring fallback (no tap interception): with the capture layer permanently
-  // disarmed, a tap on the cross-origin Threads iframe produces no parent-side
-  // pointer event, so the guarded tracker's blur path can never attribute it.
-  // Focus moving into a child iframe while the page is still visible is the
-  // only observable signal. Attribute it to the Threads iframe closest to the
-  // viewport centre — the one the user actually tapped — and fire once.
-  useEffect(() => {
-    if (!postId) return;
-
-    const onBlur = () => {
-      if (threadsPlayFired.has(postId)) return;
-      const iframe = iframeRef.current;
-      if (!iframe) return;
-
-      setTimeout(() => {
-        if (threadsPlayFired.has(postId)) return;
-        if (document.visibilityState === 'hidden') return;
-
-        const viewportCenter = (window.innerHeight || 0) / 2;
-        const distanceOf = (node: Element) => {
-          const r = node.getBoundingClientRect();
-          if (r.width <= 0 || r.height <= 0) return Number.POSITIVE_INFINITY;
-          if (r.bottom <= 0 || r.top >= (window.innerHeight || 0)) return Number.POSITIVE_INFINITY;
-          return Math.abs((r.top + r.bottom) / 2 - viewportCenter);
-        };
-
-        const own = distanceOf(iframe);
-        if (!Number.isFinite(own)) return;
-
-        const all = Array.from(
-          document.querySelectorAll<HTMLIFrameElement>(
-            'iframe[src*="threads.net"], iframe[src*="threads.com"]'
-          )
-        );
-        const isClosest = all.every((node) => node === iframe || distanceOf(node) >= own);
-        if (!isClosest) return;
-
-        threadsPlayFired.add(postId);
-        trackView({ postId, eventType: 'video_play' }).catch(() => {
-          threadsPlayFired.delete(postId);
-        });
-      }, 120);
-    };
-
-    window.addEventListener('blur', onBlur);
-    return () => window.removeEventListener('blur', onBlur);
-  }, [postId]);
   // Pinterest-style smooth reveal (presentational only — the overlay below
   // stays at z-index 2 and keeps owning the first-tap video_play).
   const threadsRevealed = useSmoothReveal(hasLoaded);
