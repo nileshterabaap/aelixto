@@ -1194,6 +1194,7 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      delete_post_with_score: { Args: { p_post_id: string }; Returns: Json }
       email_queue_dispatch: { Args: never; Returns: undefined }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
@@ -1414,6 +1415,7 @@ export type Database = {
         }
         Returns: number
       }
+      post_delete_score_preview: { Args: { p_post_id: string }; Returns: Json }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
