@@ -304,6 +304,14 @@ body.at-scroll-top iframe[src*="youtu.be"] {
   pointer-events: auto !important;
 }
 
+/* Spotify only: same tradeoff — the player iframe must stay tappable at
+   scroll-top so the first tap on the native play button isn't swallowed by
+   the Pull-to-Refresh iframe lock above. */
+body.at-scroll-top iframe[src*="open.spotify.com"],
+body.at-scroll-top iframe[src*="spotify.com/embed"] {
+  pointer-events: auto !important;
+}
+
 /* Threads iframes stay interactive (tap-to-play), so a transparent catcher
    layer above them lets Pull-to-Refresh see the touch while the page is at
    scroll-top. It hands the tap straight back to the iframe on touchstart. */
