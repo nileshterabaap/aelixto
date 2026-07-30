@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
+import { OgCardFallback } from '@/components/OgCardFallback';
 import { ThreadsEmbed, isThreadsUrl, buildThreadsEmbedSrc } from '@/components/embeds/ThreadsEmbed';
 import {
   isThreadsShareUrl,
@@ -20,6 +21,7 @@ const ThreadsShareResolver = (props: {
     getCachedThreadsShareUrl(props.url)
   );
   const [pending, setPending] = useState(!resolved);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (resolved) return;
@@ -37,7 +39,16 @@ const ThreadsShareResolver = (props: {
     return () => {
       cancelled = true;
     };
-  }, [props.url, resolved]);
+  }, [props.url, resolved, attempt]);
+
+  // Fix 3 — a failed resolution is transient (cold start / timeout / network),
+  // so retry once shortly after instead of falling through to a cached
+  // fallback. Nothing is persisted, so the URL stays eligible on every mount.
+  useEffect(() => {
+    if (resolved || pending || attempt >= 1) return;
+    const timer = window.setTimeout(() => setAttempt((n) => n + 1), 2500);
+    return () => window.clearTimeout(timer);
+  }, [resolved, pending, attempt]);
 
   if (resolved && buildThreadsEmbedSrc(resolved)) {
     return <ThreadsEmbed {...props} url={resolved} />;
@@ -47,7 +58,10 @@ const ThreadsShareResolver = (props: {
     return <div data-embed-status="loading" className="w-full" style={{ minHeight: 220 }} />;
   }
 
-  return <UniversalMetaEmbed {...(props as any)} />;
+  // Never hand an unresolved /share/... URL to UniversalMetaEmbed: it would
+  // write a permanent `showFallback` entry into its module-level embedCache.
+  // Render the link card directly instead — no cache write, fully retryable.
+  return <OgCardFallback url={props.url} platform="Threads" />;
 };
 
 /**
