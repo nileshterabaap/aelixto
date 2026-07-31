@@ -11,7 +11,7 @@ import redditIcon from "@/assets/platforms/reddit.svg";
 import tiktokIcon from "@/assets/platforms/tiktok.svg";
 import pinterestIcon from "@/assets/platforms/pinterest.svg";
 import quoraIcon from "@/assets/platforms/quora.svg";
-import blogIcon from "@/assets/platforms/blog.svg";
+import blogIcon from "@/assets/platforms/articles.svg";
 import externalIcon from "@/assets/platforms/external.svg";
 
 const ICONS: Record<string, string> = {
