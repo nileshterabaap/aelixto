@@ -219,6 +219,20 @@ export function maybeProxy(url?: string | null, w = 480) {
     return null;
   }
   
+  // Some CDNs (Quora's qph.*.quoracdn.net, LinkedIn's licdn.com) hotlink-block
+  // direct <img> requests from third-party origins, so grid tiles render blank
+  // even though the same image works inside the embed (which proxies it).
+  // Route those hosts through our img-proxy edge function.
+  try {
+    const host = new URL(url).hostname;
+    if (/(^|\.)quoracdn\.net$|^qph\.|(^|\.)licdn\.com$/i.test(host)) {
+      const base = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      if (base) return `${base}/functions/v1/img-proxy?u=${encodeURIComponent(url)}`;
+    }
+  } catch {
+    // fall through
+  }
+
   // Return ALL URLs directly - no proxying needed
   // Supabase storage URLs are permanent and public
   // YouTube thumbnails are stable
