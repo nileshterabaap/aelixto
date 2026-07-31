@@ -34,12 +34,17 @@ export function useOriginalVisitTracker(
   const recentPointerRef = useRef(0);
   const lastIframeInteractionRef = useRef(0);
   const originalDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks whether the most recent pointerdown landed on an outbound anchor
+  // (article/link-card CTA). Used to stop non-playable posts from inferring a
+  // "visited the original" event from an unrelated body tap + app background.
+  const recentAnchorPointerRef = useRef(0);
 
   useEffect(() => {
     firedRef.current = false;
     playFiredRef.current = false;
     recentPointerRef.current = 0;
     lastIframeInteractionRef.current = 0;
+    recentAnchorPointerRef.current = 0;
     if (originalDwellTimerRef.current) {
       clearTimeout(originalDwellTimerRef.current);
       originalDwellTimerRef.current = null;
