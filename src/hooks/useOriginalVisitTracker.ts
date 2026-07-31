@@ -271,8 +271,15 @@ export function useOriginalVisitTracker(
       // never infer visit from an app-background here on playable posts.
       if (trackPlayableInteraction) return;
       const now = Date.now();
+      // Only credit a Visit when the backgrounding plausibly followed an
+      // outbound tap: an anchor/CTA pointerdown, or an iframe interaction.
+      // A bare body tap (scrolling, tapping the card, opening the app
+      // switcher) must NOT award a visit — that used to give article/quora
+      // posts a phantom +1 on top of the impression, and then the real
+      // "Continue Reading" tap scored nothing because the event was already
+      // consumed for that viewer.
       if (
-        now - recentPointerRef.current < 3000 ||
+        now - recentAnchorPointerRef.current < 3000 ||
         now - lastIframeInteractionRef.current < 10000
       ) {
         fireOriginal();
