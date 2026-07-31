@@ -10,11 +10,10 @@
              MERGED manifest. Declaring it in the plugin's library manifest
              guarantees it merges into the host app manifest, so no manual
              edit of android/app/src/main/AndroidManifest.xml is required.
-             tools:replace lets the app manifest override it if it also
-             declares the same key. -->
+             If the app manifest also declares this key, it must use the
+             SAME value (or add tools:replace="android:value" there). -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-4944388830758437~6705238632"
-            tools:replace="android:value" />
+            android:value="ca-app-pub-4944388830758437~6705238632" />
     </application>
 </manifest>
