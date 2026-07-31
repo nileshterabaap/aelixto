@@ -687,6 +687,7 @@ serve(async (req) => {
       ];
 
       let okResp: Response | null = null;
+      let usedProxy = false;
       for (const ua of uaChain) {
         try {
           const r = await fetch(targetUrl, { headers: buildHeaders(ua), redirect: 'follow' });
@@ -705,6 +706,7 @@ serve(async (req) => {
             redirect: 'follow',
           });
           if (jina.ok) { okResp = jina; resolvedUrl = targetUrl; console.log('[unfurl-article] Jina proxy succeeded'); }
+          if (jina.ok) usedProxy = true;
         } catch (e) {
           console.log('[unfurl-article] Jina proxy failed:', e instanceof Error ? e.message : String(e));
         }
@@ -771,11 +773,31 @@ serve(async (req) => {
       }
 
       html = await okResp.text();
-      resolvedUrl = okResp.url || resolvedUrl;
+      // Never let a proxy origin (r.jina.ai) become the resolved article URL —
+      // it would poison the site name, domain and favicon shown on the card.
+      if (!usedProxy) {
+        const candidate = okResp.url || resolvedUrl;
+        try {
+          if (!/(^|\.)r\.jina\.ai$/i.test(new URL(candidate).hostname)) resolvedUrl = candidate;
+        } catch { /* keep existing resolvedUrl */ }
+      }
     }
 
     // Extract metadata
-    const title = extractTitle(html);
+    let title = extractTitle(html);
+    // Proxy/reader output has no <title>; it prefixes a "Title: ..." line.
+    if (!title) {
+      const m = html.match(/^\s*Title:\s*(.+)$/m);
+      if (m) title = m[1].trim();
+    }
+    // Last resort: humanise the URL slug so the card never renders title-less.
+    if (!title) {
+      try {
+        const seg = new URL(resolvedUrl).pathname.split('/').filter(Boolean).pop() || '';
+        const words = decodeURIComponent(seg).replace(/\.(html?|php|aspx)$/i, '').replace(/[-_]+/g, ' ').trim();
+        if (words) title = words.replace(/\b\w/g, (c) => c.toUpperCase());
+      } catch { /* ignore */ }
+    }
     console.log('[unfurl-article] Extracted title:', title);
     
     // Description with fallback to content excerpt
