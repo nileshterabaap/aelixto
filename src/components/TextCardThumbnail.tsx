@@ -31,6 +31,10 @@ const ICONS: Record<string, string> = {
   article: blogIcon,
 };
 
+// Link-type posts (Quora / articles / external links) with no image should
+// always fall back to their platform logo tile — never a text card.
+const LOGO_ONLY = new Set(["quora", "article", "articles", "external", "link"]);
+
 // Brand-tinted gradient tokens tuned for legibility and independent of Tailwind's generated class scan.
 const GRADIENTS: Record<string, string> = {
   instagram: "var(--thumb-gradient-instagram)",
