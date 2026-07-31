@@ -794,6 +794,10 @@ serve(async (req) => {
       const m = html.match(/^\s*Title:\s*(.+)$/m);
       if (m) title = m[1].trim();
     }
+    // Bot-wall pages ("Access Denied", "Just a moment...", 403s) leak their
+    // block page title into the card — treat those as no title at all.
+    const BLOCK_TITLE_RE = /^(access denied|forbidden|403[\s\S]*forbidden|attention required|just a moment|are you a robot|error|page not found|404[^\d]*)/i;
+    if (title && BLOCK_TITLE_RE.test(title.trim())) title = '';
     // Last resort: humanise the URL slug so the card never renders title-less.
     if (!title) {
       try {
