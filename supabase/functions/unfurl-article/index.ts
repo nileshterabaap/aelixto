@@ -705,8 +705,12 @@ serve(async (req) => {
             headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,*/*' },
             redirect: 'follow',
           });
-          if (jina.ok) { okResp = jina; resolvedUrl = targetUrl; console.log('[unfurl-article] Jina proxy succeeded'); }
-          if (jina.ok) usedProxy = true;
+          if (jina.ok) {
+            okResp = jina;
+            usedProxy = true;
+            resolvedUrl = targetUrl;
+            console.log('[unfurl-article] Jina proxy succeeded');
+          }
         } catch (e) {
           console.log('[unfurl-article] Jina proxy failed:', e instanceof Error ? e.message : String(e));
         }
