@@ -99,6 +99,9 @@ const PLATFORM_LABEL: Record<string, string> = {
   quora: "Quora",
   article: "Article",
 };
+PLATFORM_LABEL.articles = "Article";
+PLATFORM_LABEL.external = "Link";
+PLATFORM_LABEL.link = "Link";
 
 /**
  * Typographic fallback thumbnail for text-only posts (Threads, X text,
@@ -120,9 +123,10 @@ export function TextCardThumbnail({
   const key = (platform || "").toLowerCase();
   const icon = ICONS[key];
   const gradient = GRADIENTS[key] || GRADIENTS.external;
-  const display = trimText(text, maxChars);
+  const logoOnly = LOGO_ONLY.has(key);
+  const display = logoOnly ? "" : trimText(text, maxChars);
   const label = PLATFORM_LABEL[key] || "Post";
-  const canShowProfile = preferProfile && (!!profileAvatarUrl || !!displayName || !!username);
+  const canShowProfile = !logoOnly && preferProfile && (!!profileAvatarUrl || !!displayName || !!username);
   const avatarSrc = profileAvatarUrl && !avatarError ? profileAvatarUrl : null;
 
   if (canShowProfile) {
