@@ -132,6 +132,10 @@ export function useOriginalVisitTracker(
       const now = Date.now();
       recentPointerRef.current = now;
       const t = e.target as Element | null;
+      const anchorAtPointer = t?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (anchorAtPointer && !anchorAtPointer.href.startsWith('javascript:')) {
+        recentAnchorPointerRef.current = now;
+      }
       const path: string[] = [];
       let cur: Element | null = t;
       for (let i = 0; cur && i < 6; i++) {
