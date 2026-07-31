@@ -1,4 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     package="com.aelixto.gamnative">
+
+    <application>
+        <!-- Google Ad Manager (AdX) APPLICATION ID.
+             MobileAdsInitProvider crashes at process start with
+             "Missing application ID" if this meta-data is absent from the
+             MERGED manifest. Declaring it in the plugin's library manifest
+             guarantees it merges into the host app manifest, so no manual
+             edit of android/app/src/main/AndroidManifest.xml is required.
+             If the app manifest also declares this key, it must use the
+             SAME value (or add tools:replace="android:value" there). -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-4944388830758437~6705238632" />
+    </application>
 </manifest>
