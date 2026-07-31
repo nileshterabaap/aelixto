@@ -29,6 +29,9 @@ const ICONS: Record<string, string> = {
   pinterest: pinterestIcon,
   quora: quoraIcon,
   article: blogIcon,
+  articles: blogIcon,
+  external: externalIcon,
+  link: externalIcon,
 };
 
 // Link-type posts (Quora / articles / external links) with no image should
