@@ -209,7 +209,7 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
   // No image on the source page → branded platform logo tile so the card
   // never renders imageless. Purely presentational; no tracking involved.
   const fallbackKind =
-    platform === 'quora' || data.kind === 'quora-post'
+    platform === 'quora' || data.site?.domain?.includes('quora.com')
       ? 'quora'
       : platform === 'external'
         ? 'external'
