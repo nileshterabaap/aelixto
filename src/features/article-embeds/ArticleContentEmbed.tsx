@@ -1,7 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import quoraIcon from "@/assets/platforms/quora.svg";
-import blogIcon from "@/assets/platforms/blog.svg";
+import blogIcon from "@/assets/platforms/articles.svg";
 import externalIcon from "@/assets/platforms/external.svg";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
