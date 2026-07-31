@@ -1,0 +1,1 @@
+delete from public.link_previews where lower(coalesce(data->'meta'->>'title','')) ~ '^(access denied|forbidden|attention required|just a moment|error|page not found)';
