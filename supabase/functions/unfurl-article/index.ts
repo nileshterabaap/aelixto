@@ -502,8 +502,46 @@ serve(async (req) => {
               meta['twitter:image'] ||
               meta.image ||
               '';
+            // Quora frequently sets og:image to the *answer author's profile
+            // photo*, which is hosted on the same qph/quoracdn hosts as real
+            // content images, so URL shape alone cannot tell them apart.
+            // Collect the avatars declared in the scraped body (alt text
+            // "Profile photo for X", or tiny <img> dimensions) and treat any
+            // matching candidate as an avatar, never as the post thumbnail.
+            const avatarUrls = new Set<string>();
+            const rememberAvatar = (src: string | null | undefined) => {
+              if (!src) return;
+              const normalized = normalizeImageCandidate(src, targetUrl);
+              if (normalized) avatarUrls.add(normalized.split('?')[0]);
+            };
+            if (fcHtml) {
+              const imgTagRegex = /<img\b[^>]*>/gi;
+              let am: RegExpExecArray | null;
+              while ((am = imgTagRegex.exec(fcHtml)) !== null) {
+                const tag = am[0];
+                const alt = tag.match(/\salt=["']([^"']*)["']/i)?.[1] || '';
+                const w = parseInt(tag.match(/\swidth=["']?(\d+)/i)?.[1] || '0', 10);
+                const h = parseInt(tag.match(/\sheight=["']?(\d+)/i)?.[1] || '0', 10);
+                const looksAvatar =
+                  /profile photo|profile picture|avatar/i.test(alt) ||
+                  (w > 0 && w <= 120) ||
+                  (h > 0 && h <= 120);
+                if (looksAvatar) rememberAvatar(extractImageFromImgTag(tag, targetUrl));
+              }
+            }
+            if (md) {
+              const mdAvatar = /!\[([^\]]*(?:profile photo|profile picture|avatar)[^\]]*)\]\((https?:\/\/[^\s)]+)\)/gi;
+              let am: RegExpExecArray | null;
+              while ((am = mdAvatar.exec(md)) !== null) rememberAvatar(am[2]);
+            }
+            const isKnownAvatar = (src: string | null | undefined) =>
+              !!src && avatarUrls.has(src.split('?')[0]);
+
             const normalizedOgImage = normalizeImageCandidate(ogImage, targetUrl);
             if (normalizedOgImage && /^https?:\/\//i.test(normalizedOgImage) && !isLikelyRealContentImage(normalizedOgImage)) {
+              fcImage = null;
+            } else if (normalizedOgImage && isKnownAvatar(normalizedOgImage)) {
+              // og:image is the author's avatar — fall through to the body scans.
               fcImage = null;
             } else if (normalizedOgImage && /^https?:\/\//i.test(normalizedOgImage)) {
               fcImage = normalizedOgImage;
@@ -512,7 +550,8 @@ serve(async (req) => {
             const isQuoraContentImg = (src: string) =>
               /(?:^|\.)quoracdn\.net\//i.test(src) || /\/\/qph\./i.test(src) || /main-qimg/i.test(src);
             const isJunkImg = (src: string) =>
-              /\/-?\d-images\.|\bavatar\b|\bprofile\b|\bspacer\b|\b1x1\b|tracking|favicon|logo|sprite|emoji|default_user/i.test(src);
+              /\/-?\d-images\.|\bavatar\b|\bprofile\b|\bspacer\b|\b1x1\b|tracking|favicon|logo|sprite|emoji|default_user/i.test(src) ||
+              isKnownAvatar(src);
 
             if (!fcImage && fcHtml) {
               const imgRegex = /<img\b[^>]*>/gi;
