@@ -18,13 +18,17 @@
  * preview URL). `npm run build` — which is what every release APK/IPA is
  * built from — sets it to false, guaranteeing live Ad Manager IDs.
  */
-export const AD_TEST_MODE = import.meta.env.DEV === true;
+const ADS_TEST_FLAG =
+  String(import.meta.env.VITE_ADS_TEST ?? '').trim() === '1' ||
+  String(import.meta.env.VITE_ADS_TEST ?? '').trim().toLowerCase() === 'true';
+
+export const AD_TEST_MODE = import.meta.env.DEV === true || ADS_TEST_FLAG;
 
 /**
  * Developer-only bypass for the 48h install-age gate. Same DEV guard as
  * above, so release builds always enforce the 48h gate.
  */
-export const AD_DEV_BYPASS_INSTALL_AGE = import.meta.env.DEV === true;
+export const AD_DEV_BYPASS_INSTALL_AGE = import.meta.env.DEV === true || ADS_TEST_FLAG;
 
 // Official Google test IDs — safe to hit unlimited times in dev.
 // See https://developers.google.com/admob/android/test-ads
