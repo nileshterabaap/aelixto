@@ -99,7 +99,7 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     const res = (await SocialLogin.login({
       provider,
       options: options as never,
-    })) as { result?: Record<string, unknown> };
+    })) as unknown as { result?: Record<string, unknown> };
 
     const result = (res?.result ?? {}) as Record<string, unknown>;
     const idToken =
