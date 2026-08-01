@@ -67,7 +67,7 @@ export const canUseNativeSocialAuth = (provider: "google" | "apple") => {
   return true;
 };
 
-type NativeResult = { ok: true } | { ok: false; cancelled: boolean; message: string };
+type NativeResult = { ok: boolean; cancelled?: boolean; message?: string };
 
 const isCancellation = (message: string) => {
   const m = message.toLowerCase();
@@ -118,7 +118,7 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     });
 
     if (error) return { ok: false, cancelled: false, message: error.message };
-    return { ok: true };
+    return { ok: true, cancelled: false, message: "" };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     return { ok: false, cancelled: isCancellation(message), message };
