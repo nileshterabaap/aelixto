@@ -4,6 +4,7 @@ import { createLovableAuth } from "@lovable.dev/cloud-auth-js";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
+import { canUseNativeSocialAuth, nativeSocialSignIn } from "@/lib/nativeSocialAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -296,7 +297,7 @@ const Auth = () => {
    * back to the app via the com.aelixto.app10:// deep link, where
    * capacitor-init's appUrlOpen listener closes the tab and sets the session.
    */
-  const nativeSocialSignIn = async (provider: "google" | "apple") => {
+  const browserSocialSignIn = async (provider: "google" | "apple") => {
     const label = provider === "google" ? "Google" : "Apple";
     const result = await nativeLovableAuth.signInWithOAuth(provider, {
       redirect_uri: "https://aelixto.com/~auth-bridge",
@@ -347,7 +348,19 @@ const Auth = () => {
     setOauthPending(provider);
     try {
       if (Capacitor.isNativePlatform()) {
-        await nativeSocialSignIn(provider);
+        // Preferred: fully native, no browser surface at all.
+        //   Android → Credential Manager bottom sheet (Google)
+        //   iOS     → GoogleSignIn sheet / ASAuthorizationController (Apple)
+        // The ID token is exchanged in-process, so the user is signed in
+        // without ever leaving Aelixto.
+        if (canUseNativeSocialAuth(provider)) {
+          const res = await nativeSocialSignIn(provider);
+          if (res.ok) return;
+          if (res.cancelled) return;
+          console.warn(`Native ${label} sign-in unavailable, falling back to browser flow:`, res.message);
+        }
+        // Fallback: system-browser OAuth (Custom Tab / SFSafariViewController).
+        await browserSocialSignIn(provider);
         return;
       }
       // Web: the managed helper opens the provider popup and sets the session
