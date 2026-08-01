@@ -34,10 +34,14 @@ const AppleIcon = () => (
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  // Apple permits Sign in with Apple on every platform (native sheet on Apple
-  // devices, web flow elsewhere) and *requires* it on iOS when other social
-  // logins are offered — so it is always shown.
-  const showApple = true;
+  // Sign in with Apple is shown only where Apple's own native flow exists:
+  // iOS/iPadOS (ASAuthorizationController), plus Apple/desktop browsers on the
+  // web build. It is never offered on Android — there is no Apple SDK there,
+  // and Apple only *requires* the button on Apple platforms.
+  const showApple = (() => {
+    if (Capacitor.isNativePlatform()) return Capacitor.getPlatform() === "ios";
+    return !/android/i.test(navigator.userAgent);
+  })();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
