@@ -518,10 +518,10 @@ const Auth = () => {
                 variant="outline"
                 className="w-full h-12 rounded-full text-base font-medium gap-2"
                 onClick={handleGoogleSignIn}
-                disabled={loading}
+                disabled={loading || !!oauthPending}
               >
                 <GoogleIcon />
-                Continue with Google
+                {oauthPending === "google" ? "Connecting…" : "Continue with Google"}
               </Button>
 
               {showApple && (
@@ -530,10 +530,10 @@ const Auth = () => {
                   variant="outline"
                   className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
                   onClick={handleAppleSignIn}
-                  disabled={loading}
+                  disabled={loading || !!oauthPending}
                 >
                   <AppleIcon />
-                  Continue with Apple
+                  {oauthPending === "apple" ? "Connecting…" : "Continue with Apple"}
                 </Button>
               )}
             </form>
@@ -598,10 +598,10 @@ const Auth = () => {
                 variant="outline"
                 className="w-full h-12 rounded-full text-base font-medium gap-2"
                 onClick={handleGoogleSignIn}
-                disabled={loading}
+                disabled={loading || !!oauthPending}
               >
                 <GoogleIcon />
-                Continue with Google
+                {oauthPending === "google" ? "Connecting…" : "Continue with Google"}
               </Button>
 
               {showApple && (
@@ -610,10 +610,10 @@ const Auth = () => {
                   variant="outline"
                   className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
                   onClick={handleAppleSignIn}
-                  disabled={loading}
+                  disabled={loading || !!oauthPending}
                 >
                   <AppleIcon />
-                  Continue with Apple
+                  {oauthPending === "apple" ? "Connecting…" : "Continue with Apple"}
                 </Button>
               )}
             </form>
