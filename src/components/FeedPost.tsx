@@ -431,6 +431,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             postAuthorId={(post as any).user_id}
           />
         )}
+        <LikesSheet open={likesOpen} onOpenChange={setLikesOpen} postId={post.id} />
         {(
           <SharePostSheet 
             open={shareOpen} 
@@ -862,6 +863,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           postAuthorId={(post as any).user_id}
         />
       )}
+      <LikesSheet open={likesOpen} onOpenChange={setLikesOpen} postId={post.id} />
       {(
         <SharePostSheet 
           open={shareOpen} 
