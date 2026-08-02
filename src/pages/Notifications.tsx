@@ -62,9 +62,9 @@ const NotificationItem = ({
   const message = getNotificationMessage(notification.type);
   const isReportOutcome = notification.type === 'report_outcome';
   const isFollowRequest = notification.type === 'follow_request';
-  const actorName = isFollowRequest && notification.actor?.username
+  const actorName = notification.actor?.username
     ? `@${notification.actor.username}`
-    : notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
+    : 'Someone';
   const outcome = notification.metadata?.action as 'removed' | 'kept' | undefined;
   const reportKind = notification.metadata?.kind as
     | 'report_outcome'
@@ -305,7 +305,11 @@ const Notifications = () => {
   const handleNotificationClick = (notification: Notification) => {
     if (notification.type === 'report_outcome') return; // no navigation for moderation outcomes
     if (notification.post_id) {
-      navigate(`/post/${notification.post_id}`);
+      const commentParam =
+        notification.type === 'comment' && notification.comment_id
+          ? `?comment=${notification.comment_id}`
+          : '';
+      navigate(`/post/${notification.post_id}${commentParam}`);
     } else if (notification.actor?.username) {
       navigate(`/u/${notification.actor.username}`);
     }
