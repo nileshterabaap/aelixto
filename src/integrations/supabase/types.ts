@@ -1415,6 +1415,14 @@ export type Database = {
         }
         Returns: number
       }
+      notif_flag_allowed: {
+        Args: { _key: string; _recipient: string }
+        Returns: boolean
+      }
+      notif_scope_allowed: {
+        Args: { _actor: string; _key: string; _recipient: string }
+        Returns: boolean
+      }
       post_delete_score_preview: { Args: { p_post_id: string }; Returns: Json }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
