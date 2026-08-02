@@ -2,7 +2,7 @@ import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { Heart, MessageCircle, Repeat2, Bell, Shield, UserPlus } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Bell, Shield, UserPlus, UserCheck, MessageSquare } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,6 +22,10 @@ const getNotificationIcon = (type: string) => {
       return { icon: Repeat2, bgColor: 'bg-green-100', iconColor: 'text-green-500' };
     case 'follow_request':
       return { icon: UserPlus, bgColor: 'bg-violet-100', iconColor: 'text-violet-500' };
+    case 'follow_accepted':
+      return { icon: UserCheck, bgColor: 'bg-violet-100', iconColor: 'text-violet-500' };
+    case 'message':
+      return { icon: MessageSquare, bgColor: 'bg-sky-100', iconColor: 'text-sky-500' };
     case 'report_outcome':
       return { icon: Shield, bgColor: 'bg-amber-100', iconColor: 'text-amber-600' };
     default:
@@ -41,6 +45,10 @@ const getNotificationMessage = (type: string) => {
       return 'started following you';
     case 'follow_request':
       return 'asked to Follow';
+    case 'follow_accepted':
+      return 'agreed your follow ask';
+    case 'message':
+      return 'sent you a message';
     default:
       return 'interacted with you';
   }
