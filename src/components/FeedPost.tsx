@@ -363,6 +363,11 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <div className="flex items-center justify-around px-2 py-4 mt-1">
             <button
               onClick={handleLikeClick}
+              onPointerDown={startLikeLongPress}
+              onPointerUp={cancelLikeLongPress}
+              onPointerLeave={cancelLikeLongPress}
+              onPointerCancel={cancelLikeLongPress}
+              onContextMenu={(e) => e.preventDefault()}
               className="action-btn p-2 active:scale-90 transition-transform flex items-center gap-1"
             >
               <Heart 
@@ -374,10 +379,15 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                   color: isLiked ? '#ef4444' : 'currentColor'
                 }}
               />
-              {!(post as any).hide_likes && (post as any).likes_count > 0 && (
-                <span className="text-xs text-muted-foreground">{(post as any).likes_count}</span>
-              )}
             </button>
+            {!(post as any).hide_likes && (post as any).likes_count > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setLikesOpen(true); }}
+                className="text-xs text-muted-foreground -ml-2 pr-1"
+              >
+                {(post as any).likes_count}
+              </button>
+            )}
             <button 
               onClick={() => setCommentsOpen(true)}
               className="action-btn p-2 active:scale-90 transition-transform flex items-center gap-1"
