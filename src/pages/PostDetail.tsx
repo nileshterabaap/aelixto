@@ -153,6 +153,19 @@ const PostDetail = () => {
         <HydratedFeedPost post={post} userId={userId} startHydrated />
       </main>
       {!userId && <AuthCTABar />}
+      <CommentsDialog
+        open={commentsOpen}
+        onOpenChange={(o) => {
+          setCommentsOpen(o);
+          if (!o && focusCommentId) {
+            searchParams.delete("comment");
+            setSearchParams(searchParams, { replace: true });
+          }
+        }}
+        postId={post.id}
+        postAuthorId={(post as any).user_id}
+        highlightCommentId={focusCommentId}
+      />
     </div>
   );
 };
