@@ -13,6 +13,7 @@ import { useState, useRef, memo, useCallback } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
+import { LikesSheet } from "@/components/LikesSheet";
 import { LazyEmbed } from "@/components/LazyEmbed";
 import { CollapsibleCaption } from "@/components/CollapsibleCaption";
 import { UsernameLink } from "@/components/UsernameLink";
@@ -110,6 +111,7 @@ const detectPlatformFromUrl = (url?: string) => {
 
 export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [likesOpen, setLikesOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [blogFavicon, setBlogFavicon] = useState<string | null>(null);
@@ -249,10 +251,30 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   // Animated action handlers
   const handleLikeClick = useCallback(() => {
     if (!canUseActions) return;
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false;
+      return;
+    }
     setLikeAnimating(true);
     toggleLike();
     setTimeout(() => setLikeAnimating(false), 400);
   }, [canUseActions, toggleLike]);
+
+  // Long-press (2s) on the like button opens the list of users who liked.
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
+  const startLikeLongPress = useCallback(() => {
+    longPressFiredRef.current = false;
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      setLikesOpen(true);
+    }, 2000);
+  }, []);
+  const cancelLikeLongPress = useCallback(() => {
+    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
+    longPressTimerRef.current = null;
+  }, []);
 
   const handleRepostClick = useCallback(() => {
     if (!canUseActions) return;
