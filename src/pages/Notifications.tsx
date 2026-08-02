@@ -62,9 +62,7 @@ const NotificationItem = ({
   const message = getNotificationMessage(notification.type);
   const isReportOutcome = notification.type === 'report_outcome';
   const isFollowRequest = notification.type === 'follow_request';
-  const actorName = notification.actor?.username
-    ? `@${notification.actor.username}`
-    : 'Someone';
+  const actorName = notification.actor?.username || 'Someone';
   const outcome = notification.metadata?.action as 'removed' | 'kept' | undefined;
   const reportKind = notification.metadata?.kind as
     | 'report_outcome'
