@@ -226,7 +226,7 @@ className="h-14 w-14"
             }}
           >
             <h1
-              className="absolute inset-0 flex items-center justify-center text-3xl font-bold tracking-tight"
+              className="absolute inset-0 flex items-center justify-center text-3xl font-bold tracking-tight text-brand-red"
               style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
             >
               Aelixto
