@@ -1,23 +1,36 @@
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { AD_MIN_REQUEST_INTERVAL_MS, getNativeFeedAdUnitId } from '@/config/ads';
+import { AD_DEV_BYPASS_INSTALL_AGE, AD_MIN_REQUEST_INTERVAL_MS, AD_TEST_MODE, getNativeFeedAdUnitId } from '@/config/ads';
 import { adsReady } from '@/lib/adConsent';
 import { GamNative, type NativeAdCreative } from 'aelixto-gam-native';
 
 let lastRequestAt = 0;
 
 async function requestNativeAd(): Promise<NativeAdCreative | null> {
-  if (!Capacitor.isNativePlatform()) return null;
+  if (!Capacitor.isNativePlatform()) {
+    console.log('[ads] requestNativeAd skipped: not native');
+    return null;
+  }
   const now = Date.now();
-  if (now - lastRequestAt < AD_MIN_REQUEST_INTERVAL_MS) return null;
+  if (now - lastRequestAt < AD_MIN_REQUEST_INTERVAL_MS) {
+    console.log('[ads] requestNativeAd throttled: msSinceLast =', now - lastRequestAt,
+      'min =', AD_MIN_REQUEST_INTERVAL_MS);
+    return null;
+  }
   lastRequestAt = now;
 
   const platform = Capacitor.getPlatform() as 'android' | 'ios' | 'web';
   const adUnitId = getNativeFeedAdUnitId(platform);
-  if (!adUnitId) return null;
+  console.log('[ads] requestNativeAd: platform =', platform, 'testMode =', AD_TEST_MODE,
+    'installAgeBypass =', AD_DEV_BYPASS_INSTALL_AGE, 'adUnitId =', adUnitId);
+  if (!adUnitId) {
+    console.log('[ads] requestNativeAd aborted: empty adUnitId');
+    return null;
+  }
 
   try {
     const result = await GamNative.loadNativeAd({ adUnitId });
+    console.log('[ads] loadNativeAd returned:', result ? JSON.stringify(result) : 'null (no-fill/error)');
     return result ?? null;
   } catch (e) {
     console.warn('[ads] loadNativeAd failed', e);
@@ -46,10 +59,15 @@ export function NativeFeedAd() {
   useEffect(() => {
     mountedRef.current = true;
     (async () => {
+      console.log('[ads] NativeFeedAd slot mounted — awaiting adsReady');
       const ok = await adsReady();
-      if (!ok || !mountedRef.current) return;
+      if (!ok || !mountedRef.current) {
+        console.log('[ads] NativeFeedAd aborted: adsReady =', ok, 'mounted =', mountedRef.current);
+        return;
+      }
       const creative = await requestNativeAd();
       if (!mountedRef.current) return;
+      console.log('[ads] NativeFeedAd render decision: creative =', creative ? 'present' : 'null');
       setAd(creative);
       setReady(true);
     })();
@@ -80,6 +98,7 @@ export function NativeFeedAd() {
       };
       if (!presentedRef.current) {
         presentedRef.current = true;
+        console.log('[ads] presentNativeAd overlay for adId =', adId, 'frame =', JSON.stringify(payload));
         void GamNative.presentNativeAd(payload).catch(() => {});
       } else {
         void GamNative.updateNativeAdFrame(payload).catch(() => {});
