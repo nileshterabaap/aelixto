@@ -77,6 +77,11 @@ public class GamNativePlugin extends Plugin {
                 settings.setBlockNetworkImage(false);
                 settings.setMixedContentMode(
                     android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+                Log.i(TAG, "[webview] media settings relaxed: gesture=false imagesAuto="
+                        + settings.getLoadsImagesAutomatically()
+                        + " blockNetworkImage=" + settings.getBlockNetworkImage()
+                        + " mixedContent=" + settings.getMixedContentMode()
+                        + " ua=" + settings.getUserAgentString());
             }
         } catch (Throwable t) {
             Log.w(TAG, "Unable to relax WebView media settings", t);
