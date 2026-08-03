@@ -451,7 +451,11 @@ const EditProfile = () => {
             </Button>
           </div>
 
-          <Button type="submit" className="w-full">
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={usernameStatus === 'taken' || usernameStatus === 'invalid' || usernameStatus === 'checking'}
+          >
             Save Changes
           </Button>
         </form>
