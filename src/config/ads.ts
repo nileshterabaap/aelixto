@@ -61,3 +61,8 @@ export const AD_MIN_INSTALL_AGE_MS = 2 * 24 * 60 * 60 * 1000;
 
 /** Minimum spacing between successive ad requests (rate limit). */
 export const AD_MIN_REQUEST_INTERVAL_MS = 20_000;
+
+// One-time boot log so the APK's Logcat shows exactly which mode is compiled in.
+console.log('[ads] config: DEV =', import.meta.env.DEV, 'VITE_ADS_TEST =',
+  String(import.meta.env.VITE_ADS_TEST ?? ''), 'AD_TEST_MODE =', AD_TEST_MODE,
+  'installAgeBypass =', AD_DEV_BYPASS_INSTALL_AGE, 'adInterval =', AD_INTERVAL);
