@@ -131,12 +131,19 @@ public class GamNativePlugin extends Plugin {
     public void showPrivacyOptionsForm(final PluginCall call) {
         Activity activity = getActivity();
         if (activity == null) { call.reject("No activity"); return; }
-        UserMessagingPlatform.showPrivacyOptionsForm(activity, formError -> {
-            if (formError != null) {
-                call.reject("UMP showPrivacyOptionsForm failed: " + formError.getMessage());
-                return;
+        // UMP requires this call on the Android UI thread.
+        activity.runOnUiThread(() -> {
+            try {
+                UserMessagingPlatform.showPrivacyOptionsForm(activity, formError -> {
+                    if (formError != null) {
+                        call.reject("UMP showPrivacyOptionsForm failed: " + formError.getMessage());
+                        return;
+                    }
+                    call.resolve();
+                });
+            } catch (Throwable t) {
+                call.reject("UMP showPrivacyOptionsForm crashed: " + t.getMessage());
             }
-            call.resolve();
         });
     }
 
