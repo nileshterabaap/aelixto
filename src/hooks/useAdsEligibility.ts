@@ -35,13 +35,18 @@ export function useAdsEligibility(): boolean {
     let cancelled = false;
     (async () => {
       if (!Capacitor.isNativePlatform()) return;
+      console.log('[ads] eligibility: native platform detected, waiting for SDK…');
       const sdkOk = await adsReady();
-      if (!sdkOk || cancelled) return;
+      if (!sdkOk || cancelled) {
+        console.log('[ads] eligibility BLOCKED: sdkReady =', sdkOk, 'cancelled =', cancelled);
+        return;
+      }
 
       // Developer-only: skip the 48h gate in DEV builds so on-device QA
       // sees ads immediately. Release builds always fall through to the
       // real age check below.
       if (AD_DEV_BYPASS_INSTALL_AGE) {
+        console.log('[ads] eligibility: install-age gate BYPASSED (test mode)');
         if (!cancelled) setEligible(true);
         return;
       }
@@ -76,7 +81,10 @@ export function useAdsEligibility(): boolean {
       }
 
       if (!cancelled && ageMs >= AD_MIN_INSTALL_AGE_MS) {
+        console.log('[ads] eligibility GRANTED: installAgeMs =', ageMs, '>=', AD_MIN_INSTALL_AGE_MS);
         setEligible(true);
+      } else {
+        console.log('[ads] eligibility BLOCKED by install age: ageMs =', ageMs, 'required =', AD_MIN_INSTALL_AGE_MS);
       }
     })();
     return () => {
