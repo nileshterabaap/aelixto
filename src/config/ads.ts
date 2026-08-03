@@ -22,13 +22,31 @@ const ADS_TEST_FLAG =
   String(import.meta.env.VITE_ADS_TEST ?? '').trim() === '1' ||
   String(import.meta.env.VITE_ADS_TEST ?? '').trim().toLowerCase() === 'true';
 
-export const AD_TEST_MODE = import.meta.env.DEV === true || ADS_TEST_FLAG;
+/**
+ * Runtime override so a *release* APK can be flipped into test mode from
+ * Settings without a rebuild (Settings -> "Ad test mode (debug)"). Persisted
+ * in localStorage; defaults to off.
+ */
+export const AD_TEST_LS_KEY = 'aelixto_ads_test';
+
+function readRuntimeTestFlag(): boolean {
+  try {
+    return localStorage.getItem(AD_TEST_LS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+const RUNTIME_TEST_FLAG = readRuntimeTestFlag();
+
+export const AD_TEST_MODE = import.meta.env.DEV === true || ADS_TEST_FLAG || RUNTIME_TEST_FLAG;
 
 /**
  * Developer-only bypass for the 48h install-age gate. Same DEV guard as
  * above, so release builds always enforce the 48h gate.
  */
-export const AD_DEV_BYPASS_INSTALL_AGE = import.meta.env.DEV === true || ADS_TEST_FLAG;
+export const AD_DEV_BYPASS_INSTALL_AGE =
+  import.meta.env.DEV === true || ADS_TEST_FLAG || RUNTIME_TEST_FLAG;
 
 // Official Google test IDs — safe to hit unlimited times in dev.
 // See https://developers.google.com/admob/android/test-ads
@@ -64,5 +82,6 @@ export const AD_MIN_REQUEST_INTERVAL_MS = 20_000;
 
 // One-time boot log so the APK's Logcat shows exactly which mode is compiled in.
 console.log('[ads] config: DEV =', import.meta.env.DEV, 'VITE_ADS_TEST =',
-  String(import.meta.env.VITE_ADS_TEST ?? ''), 'AD_TEST_MODE =', AD_TEST_MODE,
+  String(import.meta.env.VITE_ADS_TEST ?? ''), 'runtimeTestFlag =', RUNTIME_TEST_FLAG,
+  'AD_TEST_MODE =', AD_TEST_MODE,
   'installAgeBypass =', AD_DEV_BYPASS_INSTALL_AGE, 'adInterval =', AD_INTERVAL);

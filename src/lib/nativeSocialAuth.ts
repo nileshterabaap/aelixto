@@ -60,10 +60,20 @@ const sha256 = async (value: string) => {
 };
 
 export const canUseNativeSocialAuth = (provider: "google" | "apple") => {
-  if (!Capacitor.isNativePlatform()) return false;
-  if (!isNativeAuthConfigured(provider)) return false;
+  if (!Capacitor.isNativePlatform()) {
+    console.log("[auth] native social disabled: not a native platform");
+    return false;
+  }
+  if (!isNativeAuthConfigured(provider)) {
+    console.log(
+      `[auth] native ${provider} sign-in NOT configured — missing client id ` +
+        "(VITE_GOOGLE_WEB_CLIENT_ID). Falling back to browser OAuth.",
+    );
+    return false;
+  }
   // Sign in with Apple has no native surface on Android; it must use the web flow.
   if (provider === "apple" && Capacitor.getPlatform() !== "ios") return false;
+  console.log(`[auth] native ${provider} sign-in available`);
   return true;
 };
 

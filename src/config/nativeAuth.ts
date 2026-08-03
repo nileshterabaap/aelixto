@@ -33,3 +33,12 @@ export const isNativeAuthConfigured = (provider: "google" | "apple") => {
   // "Sign in with Apple" capability are enough.
   return true;
 };
+
+// Boot-time diagnostic: shows in Logcat whether the release bundle actually
+// contains the OAuth client IDs (empty string = env var missing at build time).
+console.log(
+  "[auth] nativeAuth config: googleWebClientId =",
+  NATIVE_AUTH_CONFIG.googleWebClientId ? "set" : "MISSING",
+  "googleIosClientId =",
+  NATIVE_AUTH_CONFIG.googleIosClientId ? "set" : "MISSING",
+);
