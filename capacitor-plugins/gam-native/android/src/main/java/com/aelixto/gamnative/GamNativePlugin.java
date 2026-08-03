@@ -57,6 +57,32 @@ public class GamNativePlugin extends Plugin {
     private final Map<String, NativeAdView> adViews = new HashMap<>();
     private ConsentInformation consentInformation;
 
+    /**
+     * Android WebView defaults to `mediaPlaybackRequiresUserGesture = true`, which
+     * stops embedded <video> elements (Threads/Meta embeds) from preloading their
+     * first frame. The WebView then paints its oversized built-in play placeholder
+     * instead of the poster — the exact "giant grey play button" artifact seen in
+     * the APK but never in the mobile browser. Chrome/Safari load the poster, so
+     * matching that behaviour here makes the APK render identically to the web.
+     */
+    @Override
+    public void load() {
+        super.load();
+        try {
+            android.webkit.WebView webView = getBridge().getWebView();
+            if (webView != null) {
+                android.webkit.WebSettings settings = webView.getSettings();
+                settings.setMediaPlaybackRequiresUserGesture(false);
+                settings.setLoadsImagesAutomatically(true);
+                settings.setBlockNetworkImage(false);
+                settings.setMixedContentMode(
+                    android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Unable to relax WebView media settings", t);
+        }
+    }
+
     @PluginMethod
     public void initialize(PluginCall call) {
         MobileAds.initialize(getContext(), status -> {
