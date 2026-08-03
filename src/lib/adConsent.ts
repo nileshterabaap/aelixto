@@ -24,12 +24,28 @@ export function adsReady(): Promise<boolean> {
   });
 }
 
-export async function showPrivacyOptionsForm(): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
+export async function showPrivacyOptionsForm(): Promise<{ ok: boolean; message: string }> {
+  if (!Capacitor.isNativePlatform()) {
+    console.log('[ads] showPrivacyOptionsForm skipped: not native');
+    return { ok: false, message: 'Ad preferences are only available in the app.' };
+  }
   try {
+    // Log the current consent state first — the privacy options form only
+    // exists when the UMP/Funding Choices privacy message is published AND
+    // the user is in a region where it applies.
+    try {
+      const info = await GamNative.requestConsentInfo();
+      console.log('[ads] privacy options: consent info =', JSON.stringify(info));
+    } catch (e) {
+      console.warn('[ads] privacy options: consent info failed', e);
+    }
     await GamNative.showPrivacyOptionsForm();
+    console.log('[ads] showPrivacyOptionsForm resolved');
+    return { ok: true, message: '' };
   } catch (e) {
-    console.warn('[ads] showPrivacyOptionsForm failed', e);
+    const message = e instanceof Error ? e.message : String(e);
+    console.warn('[ads] showPrivacyOptionsForm failed:', message);
+    return { ok: false, message };
   }
 }
 
