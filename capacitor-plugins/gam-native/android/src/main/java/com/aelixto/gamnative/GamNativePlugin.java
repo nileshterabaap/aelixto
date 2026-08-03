@@ -85,7 +85,13 @@ public class GamNativePlugin extends Plugin {
 
     @PluginMethod
     public void initialize(PluginCall call) {
+        Log.i(TAG, "[ads] MobileAds.initialize() called");
         MobileAds.initialize(getContext(), status -> {
+            try {
+                Log.i(TAG, "[ads] MobileAds init complete: " + status.getAdapterStatusMap().toString());
+            } catch (Throwable t) {
+                Log.i(TAG, "[ads] MobileAds init complete (no adapter status)");
+            }
             JSObject ret = new JSObject();
             ret.put("status", "ready");
             call.resolve(ret);
@@ -104,12 +110,19 @@ public class GamNativePlugin extends Plugin {
         consentInformation = UserMessagingPlatform.getConsentInformation(getContext());
         consentInformation.requestConsentInfoUpdate(activity, params,
                 () -> {
+                    Log.i(TAG, "[ads] consent info updated: status=" + mapStatus(consentInformation.getConsentStatus())
+                            + " formAvailable=" + consentInformation.isConsentFormAvailable()
+                            + " canRequestAds=" + consentInformation.canRequestAds());
                     JSObject ret = new JSObject();
                     ret.put("status", mapStatus(consentInformation.getConsentStatus()));
                     ret.put("isConsentFormAvailable", consentInformation.isConsentFormAvailable());
                     call.resolve(ret);
                 },
-                formError -> call.reject("UMP requestConsentInfoUpdate failed: " + formError.getMessage()));
+                formError -> {
+                    Log.w(TAG, "[ads] consent info update FAILED: code=" + formError.getErrorCode()
+                            + " msg=" + formError.getMessage());
+                    call.reject("UMP requestConsentInfoUpdate failed: " + formError.getMessage());
+                });
     }
 
     @PluginMethod
@@ -118,9 +131,12 @@ public class GamNativePlugin extends Plugin {
         if (activity == null) { call.reject("No activity"); return; }
         UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity, formError -> {
             if (formError != null) {
+                Log.w(TAG, "[ads] consent form FAILED: code=" + formError.getErrorCode()
+                        + " msg=" + formError.getMessage());
                 call.reject("UMP loadAndShowConsentFormIfRequired failed: " + formError.getMessage());
                 return;
             }
+            Log.i(TAG, "[ads] consent form flow completed (shown or not required)");
             JSObject ret = new JSObject();
             ret.put("shown", true);
             call.resolve(ret);
@@ -176,9 +192,14 @@ public class GamNativePlugin extends Plugin {
         }
         final String adId = UUID.randomUUID().toString();
 
+        Log.i(TAG, "[ads] loadNativeAd requested adUnitId=" + adUnitId + " adId=" + adId);
+
         getActivity().runOnUiThread(() -> {
             AdLoader loader = new AdLoader.Builder(getContext(), adUnitId)
                     .forNativeAd(nativeAd -> {
+                        Log.i(TAG, "[ads] native ad LOADED adId=" + adId
+                                + " headline=" + nativeAd.getHeadline()
+                                + " advertiser=" + nativeAd.getAdvertiser());
                         ads.put(adId, nativeAd);
                         JSObject payload = new JSObject();
                         payload.put("adId", adId);
@@ -204,7 +225,12 @@ public class GamNativePlugin extends Plugin {
                     .withAdListener(new AdListener() {
                         @Override
                         public void onAdFailedToLoad(@NonNull LoadAdError error) {
-                            Log.w(TAG, "Native ad failed: " + error.getMessage());
+                            Log.w(TAG, "[ads] native ad FAILED adUnitId=" + adUnitId
+                                    + " code=" + error.getCode()
+                                    + " domain=" + error.getDomain()
+                                    + " msg=" + error.getMessage()
+                                    + " cause=" + error.getCause()
+                                    + " responseInfo=" + error.getResponseInfo());
                             // No-fill / error -> resolve null so JS silently unmounts the slot.
                             call.resolve();
                         }
@@ -212,6 +238,7 @@ public class GamNativePlugin extends Plugin {
                     .build();
 
             AdManagerAdRequest request = new AdManagerAdRequest.Builder().build();
+            Log.i(TAG, "[ads] sending AdManagerAdRequest for " + adUnitId);
             loader.loadAd(request);
         });
     }

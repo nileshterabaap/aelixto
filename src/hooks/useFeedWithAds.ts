@@ -23,6 +23,8 @@ export function useFeedWithAds<T extends { id: string }>(posts: T[]): Array<Feed
         out.push({ kind: 'ad', slotIndex: adCount });
       }
     });
+    console.log('[ads] feed interleave: posts =', posts.length, 'eligible =', eligible,
+      'interval =', AD_INTERVAL, 'adSlotsInserted =', adCount);
     return out;
   }, [posts, eligible]);
 }

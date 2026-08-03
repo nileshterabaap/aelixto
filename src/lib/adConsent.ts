@@ -14,7 +14,14 @@ let ready = false;
 let readyPromise: Promise<boolean> | null = null;
 
 export function adsReady(): Promise<boolean> {
-  return readyPromise ?? Promise.resolve(ready);
+  if (!readyPromise) {
+    console.log('[ads] adsReady() called before init — returning', ready);
+    return Promise.resolve(ready);
+  }
+  return readyPromise.then((v) => {
+    console.log('[ads] adsReady() resolved =', v);
+    return v;
+  });
 }
 
 export async function showPrivacyOptionsForm(): Promise<void> {
@@ -27,29 +34,42 @@ export async function showPrivacyOptionsForm(): Promise<void> {
 }
 
 export function initAdsAndConsent(): Promise<boolean> {
-  if (readyPromise) return readyPromise;
+  if (readyPromise) {
+    console.log('[ads] initAdsAndConsent() already started');
+    return readyPromise;
+  }
+  console.log('[ads] initAdsAndConsent() start; native =', Capacitor.isNativePlatform(), 'platform =', Capacitor.getPlatform());
   readyPromise = (async () => {
-    if (!Capacitor.isNativePlatform()) return false;
+    if (!Capacitor.isNativePlatform()) {
+      console.log('[ads] not a native platform — ads disabled');
+      return false;
+    }
     try {
       // 1. UMP consent (Google-certified CMP via Funding Choices).
       try {
-        await GamNative.requestConsentInfo();
-        await GamNative.showConsentFormIfRequired();
+        const info = await GamNative.requestConsentInfo();
+        console.log('[ads] consent info:', JSON.stringify(info));
+        const formResult = await GamNative.showConsentFormIfRequired();
+        console.log('[ads] consent form result:', JSON.stringify(formResult));
       } catch (e) {
         console.warn('[ads] consent flow failed', e);
       }
       // 2. iOS ATT prompt (Android returns "unavailable").
       try {
-        await GamNative.requestTrackingAuthorization();
+        const att = await GamNative.requestTrackingAuthorization();
+        console.log('[ads] ATT status:', JSON.stringify(att));
       } catch {
         /* non-fatal */
       }
       // 3. Initialize Google Mobile Ads SDK (Ad Manager APIs use the same SDK).
-      await GamNative.initialize();
+      const init = await GamNative.initialize();
+      console.log('[ads] SDK initialize result:', JSON.stringify(init));
       ready = true;
+      console.log('[ads] adsReady state -> true');
       return true;
     } catch (e) {
       console.warn('[ads] init failed', e);
+      console.log('[ads] adsReady state -> false (init failed)');
       return false;
     }
   })();
