@@ -109,13 +109,12 @@ const EditProfile = () => {
         .from('profiles')
         .select('user_id')
         .ilike('username', uname)
-        .limit(1);
+        .maybeSingle();
       if (error) {
         setUsernameStatus('idle');
         return;
       }
-      const match = data?.[0];
-      if (!match || match.user_id === profile.user_id) {
+      if (!data || data.user_id === profile.user_id) {
         setUsernameStatus('available');
       } else {
         setUsernameStatus('taken');
@@ -170,7 +169,6 @@ const EditProfile = () => {
     }
     await upsertProfile({
       ...formData,
-      username: formData.username.trim(),
       settings: {
         ...((profile?.settings as any) || {}),
         aelix_score_enabled: aelixScoreEnabled,
@@ -451,11 +449,7 @@ const EditProfile = () => {
             </Button>
           </div>
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={usernameStatus === 'taken' || usernameStatus === 'invalid' || usernameStatus === 'checking'}
-          >
+          <Button type="submit" className="w-full">
             Save Changes
           </Button>
         </form>
