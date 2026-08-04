@@ -62,10 +62,14 @@ export const AD_TEST_MODE = import.meta.env.DEV === true || ADS_TEST_FLAG || RUN
 export const AD_DEV_BYPASS_INSTALL_AGE =
   import.meta.env.DEV === true || ADS_TEST_FLAG || RUNTIME_TEST_FLAG;
 
-// Official Google test IDs — safe to hit unlimited times in dev.
-// See https://developers.google.com/admob/android/test-ads
-const TEST_NATIVE_ANDROID = 'ca-app-pub-3940256099942544/2247696110';
-const TEST_NATIVE_IOS     = 'ca-app-pub-3940256099942544/3986624511';
+// Google **Ad Manager** sample native ad unit.
+// IMPORTANT: the plugin requests ads with `AdManagerAdRequest` + an Ad Manager
+// ad-unit path. The AdMob test units (ca-app-pub-3940256099942544/...) are NOT
+// valid on that request path and return invalid-request / no-fill, which is why
+// no test ad ever appeared. The GAM sample unit below always fills.
+// See https://developers.google.com/ad-manager/mobile-ads-sdk/android/test-ads
+const TEST_NATIVE_ANDROID = '/6499/example/native';
+const TEST_NATIVE_IOS     = '/6499/example/native';
 
 // Live Google Ad Manager (AdX) native ad units.
 // Network code 23362049225.

@@ -13,14 +13,25 @@
  */
 const env = import.meta.env as Record<string, string | undefined>;
 
+/**
+ * Hardcoded fallbacks. These are PUBLIC OAuth client IDs (they ship inside the
+ * APK/IPA anyway), so keeping them in the repo is safe and removes the need for
+ * a build-time env var — which is exactly why the native flow never ran: with
+ * VITE_GOOGLE_WEB_CLIENT_ID unset at build time, `isNativeAuthConfigured()`
+ * returned false and Auth.tsx silently fell back to browser OAuth (Chrome).
+ * Paste the Google Cloud **Web application** client ID below.
+ */
+const FALLBACK_GOOGLE_WEB_CLIENT_ID = "";
+const FALLBACK_GOOGLE_IOS_CLIENT_ID = "";
+
 export const NATIVE_AUTH_CONFIG = {
   /** Google Cloud → Credentials → OAuth client ID of type **Web application**.
    *  Android Credential Manager requires the *web* client ID, not the Android one.
    *  The Android client (with your release + debug SHA-1) must still exist in the
    *  same project, but is never referenced here. */
-  googleWebClientId: env.VITE_GOOGLE_WEB_CLIENT_ID ?? "",
+  googleWebClientId: env.VITE_GOOGLE_WEB_CLIENT_ID || FALLBACK_GOOGLE_WEB_CLIENT_ID,
   /** Google Cloud → OAuth client ID of type **iOS** (bundle id com.aelixto.app10). */
-  googleIosClientId: env.VITE_GOOGLE_IOS_CLIENT_ID ?? "",
+  googleIosClientId: env.VITE_GOOGLE_IOS_CLIENT_ID || FALLBACK_GOOGLE_IOS_CLIENT_ID,
   /** Apple Developer → Identifiers → Services ID. Only needed for non-iOS Apple flows. */
   appleServiceId: env.VITE_APPLE_SERVICE_ID ?? "",
   /** Apple return URL configured on the Services ID. Only needed for non-iOS Apple flows. */

@@ -25,8 +25,10 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.google.android.gms.ads.AdError;
 import com.google.android.gms.ads.AdListener;
 import com.google.android.gms.ads.AdLoader;
+import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.LoadAdError;
 import com.google.android.gms.ads.MobileAds;
+import com.google.android.gms.ads.RequestConfiguration;
 import com.google.android.gms.ads.admanager.AdManagerAdRequest;
 import com.google.android.gms.ads.nativead.NativeAd;
 import com.google.android.gms.ads.nativead.NativeAdView;
@@ -91,6 +93,19 @@ public class GamNativePlugin extends Plugin {
     @PluginMethod
     public void initialize(PluginCall call) {
         Log.i(TAG, "[ads] MobileAds.initialize() called");
+        // Register the emulator (and any device the developer adds) as a test
+        // device so LIVE Ad Manager units also return test creatives instead of
+        // no-fill during QA. Real device hashes are printed by the SDK itself:
+        // look for "Use RequestConfiguration.Builder.setTestDeviceIds(...)".
+        try {
+            MobileAds.setRequestConfiguration(
+                    new RequestConfiguration.Builder()
+                            .setTestDeviceIds(java.util.Arrays.asList(AdRequest.DEVICE_ID_EMULATOR))
+                            .build());
+            Log.i(TAG, "[ads] test device configuration applied (emulator)");
+        } catch (Throwable t) {
+            Log.w(TAG, "[ads] unable to set test device configuration", t);
+        }
         MobileAds.initialize(getContext(), status -> {
             try {
                 Log.i(TAG, "[ads] MobileAds init complete: " + status.getAdapterStatusMap().toString());
