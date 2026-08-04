@@ -8,6 +8,14 @@ const config: CapacitorConfig = {
     cleartext: true,
   },
   plugins: {
+    // The app always boots from the web bundle packaged inside the APK.
+    // Keep this explicit so adding an updater dependency cannot silently
+    // replace the built-in bundle with a previously published remote bundle.
+    CapacitorUpdater: {
+      autoUpdate: false,
+      directUpdate: false,
+      resetWhenUpdate: true,
+    },
     SplashScreen: {
       launchShowDuration: 2000,
       launchAutoHide: true,
