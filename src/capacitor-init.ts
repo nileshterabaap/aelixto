@@ -5,6 +5,35 @@ import { initAdsAndConsent } from "@/lib/adConsent";
 export async function initCapacitorPlugins() {
   if (!Capacitor.isNativePlatform()) return;
 
+  // Runtime proof of exactly what Android is executing. A bundled Capacitor
+  // app uses the local Capacitor origin (normally http://localhost); an https
+  // URL here proves that a remote server is being loaded instead. The marker
+  // also proves that this specific JS bundle reached the device.
+  const bundleMarker = "aelixto-bundle-2026-08-04-1";
+  const entryScript = Array.from(document.scripts)
+    .map((script) => script.src)
+    .find((src) => src.includes("/assets/")) ?? "not-found";
+  try {
+    const { App } = await import("@capacitor/app");
+    const appInfo = await App.getInfo();
+    console.log("[bundle] runtime", {
+      marker: bundleMarker,
+      href: window.location.href,
+      origin: window.location.origin,
+      entryScript,
+      appVersion: appInfo.version,
+      appBuild: appInfo.build,
+    });
+  } catch (error) {
+    console.warn("[bundle] runtime diagnostic failed", {
+      marker: bundleMarker,
+      href: window.location.href,
+      origin: window.location.origin,
+      entryScript,
+      error,
+    });
+  }
+
   const openNativeExternal = async (url: string) => {
     try {
       const { AppLauncher } = await import("@capacitor/app-launcher");
