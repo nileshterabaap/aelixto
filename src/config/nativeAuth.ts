@@ -21,7 +21,8 @@ const env = import.meta.env as Record<string, string | undefined>;
  * returned false and Auth.tsx silently fell back to browser OAuth (Chrome).
  * Paste the Google Cloud **Web application** client ID below.
  */
-const FALLBACK_GOOGLE_WEB_CLIENT_ID = "";
+const FALLBACK_GOOGLE_WEB_CLIENT_ID =
+  "7514336584-arjbr39ma6f15i891bb7v5ag5h1htjvn.apps.googleusercontent.com";
 const FALLBACK_GOOGLE_IOS_CLIENT_ID = "";
 
 export const NATIVE_AUTH_CONFIG = {
