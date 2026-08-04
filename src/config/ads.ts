@@ -39,6 +39,20 @@ function readRuntimeTestFlag(): boolean {
 
 const RUNTIME_TEST_FLAG = readRuntimeTestFlag();
 
+/**
+ * LIVE test-mode read. The Settings toggle writes localStorage at runtime, so
+ * anything that captured a module-load constant would keep using live ad units
+ * until the app was fully restarted. Always call this at request time.
+ */
+export function isAdTestMode(): boolean {
+  return import.meta.env.DEV === true || ADS_TEST_FLAG || readRuntimeTestFlag();
+}
+
+/** Live read of the install-age bypass (same sources as test mode). */
+export function isInstallAgeBypassed(): boolean {
+  return isAdTestMode();
+}
+
 export const AD_TEST_MODE = import.meta.env.DEV === true || ADS_TEST_FLAG || RUNTIME_TEST_FLAG;
 
 /**
@@ -65,7 +79,7 @@ export const GAM_APP_ID_IOS     = 'ca-app-pub-4944388830758437~4837623196';
 
 export function getNativeFeedAdUnitId(platform: 'android' | 'ios' | 'web'): string {
   if (platform === 'web') return '';
-  if (AD_TEST_MODE) {
+  if (isAdTestMode()) {
     return platform === 'android' ? TEST_NATIVE_ANDROID : TEST_NATIVE_IOS;
   }
   return platform === 'android' ? LIVE_NATIVE_ANDROID : LIVE_NATIVE_IOS;
