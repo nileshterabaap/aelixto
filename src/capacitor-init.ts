@@ -16,14 +16,9 @@ export async function initCapacitorPlugins() {
   try {
     const { App } = await import("@capacitor/app");
     const appInfo = await App.getInfo();
-    console.log("[bundle] runtime", {
-      marker: bundleMarker,
-      href: window.location.href,
-      origin: window.location.origin,
-      entryScript,
-      appVersion: appInfo.version,
-      appBuild: appInfo.build,
-    });
+    console.log(
+      `[bundle] runtime marker=${bundleMarker} origin=${window.location.origin} entry=${entryScript} appVersion=${appInfo.version} appBuild=${appInfo.build}`,
+    );
   } catch (error) {
     console.warn("[bundle] runtime diagnostic failed", {
       marker: bundleMarker,
