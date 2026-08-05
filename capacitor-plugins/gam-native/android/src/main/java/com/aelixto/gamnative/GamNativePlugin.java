@@ -77,11 +77,17 @@ public class GamNativePlugin extends Plugin {
                 settings.setMediaPlaybackRequiresUserGesture(false);
                 settings.setLoadsImagesAutomatically(true);
                 settings.setBlockNetworkImage(false);
+                settings.setDomStorageEnabled(true);
                 settings.setMixedContentMode(
                     android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+                android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
+                cookieManager.setAcceptCookie(true);
+                cookieManager.setAcceptThirdPartyCookies(webView, true);
                 Log.i(TAG, "[webview] media settings relaxed: gesture=false imagesAuto="
                         + settings.getLoadsImagesAutomatically()
                         + " blockNetworkImage=" + settings.getBlockNetworkImage()
+                        + " domStorage=" + settings.getDomStorageEnabled()
+                        + " thirdPartyCookies=true"
                         + " mixedContent=" + settings.getMixedContentMode()
                         + " ua=" + settings.getUserAgentString());
             }
