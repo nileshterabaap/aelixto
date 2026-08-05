@@ -122,7 +122,7 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
         ? { scopes: ["email", "name"], nonce: await sha256(rawNonce) }
         : Capacitor.getPlatform() === "android"
           ? { nonce: rawNonce, style: "bottom" as const, forcePrompt: true }
-          : { scopes: ["email", "profile"], nonce: rawNonce };
+          : { nonce: rawNonce, style: "bottom" };
 
     const res = (await SocialLogin.login({
       provider,
