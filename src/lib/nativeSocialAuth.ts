@@ -64,6 +64,13 @@ export const canUseNativeSocialAuth = (provider: "google" | "apple") => {
     console.log("[auth] native social disabled: not a native platform");
     return false;
   }
+  if (!Capacitor.isPluginAvailable("SocialLogin")) {
+    console.warn(
+      "[auth] native social disabled: SocialLogin plugin is NOT registered in this build. " +
+        "Run `npm install && npx cap sync android` before assembling the APK.",
+    );
+    return false;
+  }
   if (!isNativeAuthConfigured(provider)) {
     console.log(
       `[auth] native ${provider} sign-in NOT configured — missing client id ` +
@@ -131,6 +138,7 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     return { ok: true, cancelled: false, message: "" };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    console.warn(`[auth] native ${provider} sign-in threw:`, message, e);
     return { ok: false, cancelled: isCancellation(message), message };
   }
 };

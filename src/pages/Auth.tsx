@@ -362,6 +362,15 @@ const Auth = () => {
           if (res.ok) return;
           if (res.cancelled) return;
           console.warn(`Native ${label} sign-in unavailable, falling back to browser flow:`, res.message);
+          toast({
+            title: "Native sign-in unavailable",
+            description: (res.message || "Unknown reason").slice(0, 180),
+          });
+        } else {
+          toast({
+            title: "Native sign-in not compiled in",
+            description: "SocialLogin plugin missing — run npx cap sync android and rebuild.",
+          });
         }
         // Fallback: system-browser OAuth (Custom Tab / SFSafariViewController).
         await browserSocialSignIn(provider);
