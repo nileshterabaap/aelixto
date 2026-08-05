@@ -64,6 +64,13 @@ export const canUseNativeSocialAuth = (provider: "google" | "apple") => {
     console.log("[auth] native social disabled: not a native platform");
     return false;
   }
+  if (!Capacitor.isPluginAvailable("SocialLogin")) {
+    console.warn(
+      "[auth] native social disabled: SocialLogin plugin is NOT registered in this build. " +
+        "Run `npm install && npx cap sync android` before assembling the APK.",
+    );
+    return false;
+  }
   if (!isNativeAuthConfigured(provider)) {
     console.log(
       `[auth] native ${provider} sign-in NOT configured — missing client id ` +
