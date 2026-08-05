@@ -35,7 +35,6 @@ const ensureInitialized = async () => {
       google: {
         webClientId: NATIVE_AUTH_CONFIG.googleWebClientId,
         iOSClientId: NATIVE_AUTH_CONFIG.googleIosClientId || undefined,
-        mode: "offline",
       },
     };
     if (Capacitor.getPlatform() === "ios") {
