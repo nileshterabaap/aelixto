@@ -15,8 +15,11 @@ let readyPromise: Promise<boolean> | null = null;
 
 export function adsReady(): Promise<boolean> {
   if (!readyPromise) {
-    console.log('[ads] adsReady() called before init — returning', ready);
-    return Promise.resolve(ready);
+    // Race fix: eligibility/slots can call adsReady() before
+    // initCapacitorPlugins() has kicked off consent+SDK init. Previously that
+    // returned `false` forever (the hook never re-ran), so no ad ever loaded.
+    console.log('[ads] adsReady() called before init — starting init now');
+    return initAdsAndConsent();
   }
   return readyPromise.then((v) => {
     console.log('[ads] adsReady() resolved =', v);

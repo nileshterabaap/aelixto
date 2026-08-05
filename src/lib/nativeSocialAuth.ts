@@ -35,7 +35,6 @@ const ensureInitialized = async () => {
       google: {
         webClientId: NATIVE_AUTH_CONFIG.googleWebClientId,
         iOSClientId: NATIVE_AUTH_CONFIG.googleIosClientId || undefined,
-        mode: "offline",
       },
     };
     if (Capacitor.getPlatform() === "ios") {
@@ -117,7 +116,7 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     const options =
       provider === "apple"
         ? { scopes: ["email", "name"], nonce: await sha256(rawNonce) }
-        : { scopes: ["email", "profile"], nonce: rawNonce, forceRefreshToken: true };
+        : { scopes: ["email", "profile"], nonce: rawNonce };
 
     const res = (await SocialLogin.login({
       provider,
