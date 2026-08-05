@@ -34,6 +34,21 @@ export async function initCapacitorPlugins() {
     });
   }
 
+  // Which native plugins the running APK actually has compiled in. If a plugin
+  // shows `false` here, the JS bundle is fine but `npx cap sync android` was
+  // never run (or the Gradle module was not picked up) — that single fact
+  // explains native Google sign-in falling back to Chrome AND no native ads.
+  try {
+    console.log("[plugins] available", {
+      SocialLogin: Capacitor.isPluginAvailable("SocialLogin"),
+      GamNative: Capacitor.isPluginAvailable("GamNative"),
+      PushNotifications: Capacitor.isPluginAvailable("PushNotifications"),
+      userAgent: navigator.userAgent,
+    });
+  } catch (error) {
+    console.warn("[plugins] availability probe failed", error);
+  }
+
   const openNativeExternal = async (url: string) => {
     try {
       const { AppLauncher } = await import("@capacitor/app-launcher");
