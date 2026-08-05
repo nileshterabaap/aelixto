@@ -8,6 +8,18 @@ import { adsReady } from '@/lib/adConsent';
 
 const LS_INSTALL_KEY = 'aelixto_install_first_seen_at';
 
+/**
+ * Sticky, module-level reason for the current eligibility verdict. The
+ * eligibility effect runs once at cold start, so its logs are usually gone by
+ * the time a logcat capture starts. This value is re-printed on every feed
+ * interleave so the reason is always visible in a capture.
+ */
+export let adsEligibilityReason = 'pending (effect not run yet)';
+function setReason(r: string) {
+  adsEligibilityReason = r;
+  console.log('[ads] eligibility reason ->', r);
+}
+
 function getLocalInstallAgeMs(): number {
   try {
     let v = localStorage.getItem(LS_INSTALL_KEY);
@@ -34,10 +46,14 @@ export function useAdsEligibility(): boolean {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!Capacitor.isNativePlatform()) return;
+      if (!Capacitor.isNativePlatform()) {
+        setReason('not a native platform');
+        return;
+      }
       console.log('[ads] eligibility: native platform detected, waiting for SDK…');
       const sdkOk = await adsReady();
       if (!sdkOk || cancelled) {
+        setReason(`SDK/consent not ready (adsReady=${sdkOk}, cancelled=${cancelled})`);
         console.log('[ads] eligibility BLOCKED: sdkReady =', sdkOk, 'cancelled =', cancelled);
         return;
       }
@@ -46,6 +62,7 @@ export function useAdsEligibility(): boolean {
       // sees ads immediately. Release builds always fall through to the
       // real age check below.
       if (isInstallAgeBypassed()) {
+        setReason('ELIGIBLE (install-age gate bypassed via test mode)');
         console.log('[ads] eligibility: install-age gate BYPASSED (test mode)');
         if (!cancelled) setEligible(true);
         return;
@@ -81,9 +98,11 @@ export function useAdsEligibility(): boolean {
       }
 
       if (!cancelled && ageMs >= AD_MIN_INSTALL_AGE_MS) {
+        setReason(`ELIGIBLE (installAgeMs=${ageMs})`);
         console.log('[ads] eligibility GRANTED: installAgeMs =', ageMs, '>=', AD_MIN_INSTALL_AGE_MS);
         setEligible(true);
       } else {
+        setReason(`blocked by install age (ageMs=${ageMs}, required=${AD_MIN_INSTALL_AGE_MS}, cancelled=${cancelled})`);
         console.log('[ads] eligibility BLOCKED by install age: ageMs =', ageMs, 'required =', AD_MIN_INSTALL_AGE_MS);
       }
     })();
