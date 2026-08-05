@@ -28,17 +28,23 @@ const ensureInitialized = async () => {
   if (initPromise) return initPromise;
   initPromise = (async () => {
     const SocialLogin = await getPlugin();
-    await SocialLogin.initialize({
+    // IMPORTANT: never pass an `apple` key on Android. The plugin validates it
+    // eagerly and throws "apple.android.redirectUrl is null or empty", which
+    // aborts the whole initialize() call — including Google.
+    const config: Record<string, unknown> = {
       google: {
         webClientId: NATIVE_AUTH_CONFIG.googleWebClientId,
         iOSClientId: NATIVE_AUTH_CONFIG.googleIosClientId || undefined,
         mode: "offline",
       },
-      apple: {
+    };
+    if (Capacitor.getPlatform() === "ios") {
+      config.apple = {
         clientId: NATIVE_AUTH_CONFIG.appleServiceId || undefined,
         redirectUrl: NATIVE_AUTH_CONFIG.appleRedirectUrl || undefined,
-      },
-    });
+      };
+    }
+    await SocialLogin.initialize(config as never);
   })().catch((e) => {
     initPromise = null;
     throw e;

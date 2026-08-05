@@ -25,14 +25,22 @@ const FALLBACK_GOOGLE_WEB_CLIENT_ID =
   "7514336584-arjbr39ma6f15i891bb7v5ag5h1htjvn.apps.googleusercontent.com";
 const FALLBACK_GOOGLE_IOS_CLIENT_ID = "";
 
+/** Only accept a real Google client id; a mistyped/placeholder env value
+ *  (e.g. "@secret:GOOGLE_OAUTH_CLIENT_ID git pull") must never reach the
+ *  native plugin — it silently breaks the ID-token exchange. */
+const validGoogleId = (value: string | undefined) =>
+  value && /^[\w-]+\.apps\.googleusercontent\.com$/.test(value.trim()) ? value.trim() : "";
+
 export const NATIVE_AUTH_CONFIG = {
   /** Google Cloud → Credentials → OAuth client ID of type **Web application**.
    *  Android Credential Manager requires the *web* client ID, not the Android one.
    *  The Android client (with your release + debug SHA-1) must still exist in the
    *  same project, but is never referenced here. */
-  googleWebClientId: env.VITE_GOOGLE_WEB_CLIENT_ID || FALLBACK_GOOGLE_WEB_CLIENT_ID,
+  googleWebClientId:
+    validGoogleId(env.VITE_GOOGLE_WEB_CLIENT_ID) || FALLBACK_GOOGLE_WEB_CLIENT_ID,
   /** Google Cloud → OAuth client ID of type **iOS** (bundle id com.aelixto.app10). */
-  googleIosClientId: env.VITE_GOOGLE_IOS_CLIENT_ID || FALLBACK_GOOGLE_IOS_CLIENT_ID,
+  googleIosClientId:
+    validGoogleId(env.VITE_GOOGLE_IOS_CLIENT_ID) || FALLBACK_GOOGLE_IOS_CLIENT_ID,
   /** Apple Developer → Identifiers → Services ID. Only needed for non-iOS Apple flows. */
   appleServiceId: env.VITE_APPLE_SERVICE_ID ?? "",
   /** Apple return URL configured on the Services ID. Only needed for non-iOS Apple flows. */
