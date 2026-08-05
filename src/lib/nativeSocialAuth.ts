@@ -138,6 +138,7 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     return { ok: true, cancelled: false, message: "" };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    console.warn(`[auth] native ${provider} sign-in threw:`, message, e);
     return { ok: false, cancelled: isCancellation(message), message };
   }
 };
