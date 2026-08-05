@@ -361,10 +361,11 @@ const Auth = () => {
           const res = await nativeSocialSignIn(provider);
           if (res.ok) return;
           if (res.cancelled) return;
-          console.warn(`Native ${label} sign-in unavailable, falling back to browser flow:`, res.message);
+          console.warn(`Native ${label} sign-in failed:`, res.message);
           toast({
-            title: "Native sign-in unavailable",
+            title: "Native sign-in failed",
             description: (res.message || "Unknown reason").slice(0, 180),
+            variant: "destructive",
           });
         } else {
           toast({
@@ -372,8 +373,8 @@ const Auth = () => {
             description: "SocialLogin plugin missing — run npx cap sync android and rebuild.",
           });
         }
-        // Fallback: system-browser OAuth (Custom Tab / SFSafariViewController).
-        await browserSocialSignIn(provider);
+        // Native builds never fall back to browser OAuth. A native error stays
+        // visible so configuration problems cannot silently open Chrome.
         return;
       }
       // Web: the managed helper opens the provider popup and sets the session

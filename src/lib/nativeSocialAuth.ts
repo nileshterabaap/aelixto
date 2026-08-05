@@ -113,10 +113,16 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     const SocialLogin = await getPlugin();
 
     const rawNonce = randomNonce();
+    // Android's Credential Manager already requests the base OIDC email/profile
+    // claims. Passing `scopes` invokes the plugin's separate Google
+    // Authorization API, which requires a custom MainActivity and rejects before
+    // the account picker opens. Keep Android on the pure ID-token path.
     const options =
       provider === "apple"
         ? { scopes: ["email", "name"], nonce: await sha256(rawNonce) }
-        : { scopes: ["email", "profile"], nonce: rawNonce };
+        : Capacitor.getPlatform() === "android"
+          ? { nonce: rawNonce, style: "bottom" as const, forcePrompt: true }
+          : { scopes: ["email", "profile"], nonce: rawNonce };
 
     const res = (await SocialLogin.login({
       provider,

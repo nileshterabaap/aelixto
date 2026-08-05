@@ -68,8 +68,8 @@ export const AD_DEV_BYPASS_INSTALL_AGE =
 // valid on that request path and return invalid-request / no-fill, which is why
 // no test ad ever appeared. The GAM sample unit below always fills.
 // See https://developers.google.com/ad-manager/mobile-ads-sdk/android/test-ads
-const TEST_NATIVE_ANDROID = '/6499/example/native';
-const TEST_NATIVE_IOS     = '/6499/example/native';
+const TEST_NATIVE_ANDROID = '/21775744923/example/native';
+const TEST_NATIVE_IOS     = '/21775744923/example/native';
 
 // Live Google Ad Manager (AdX) native ad units.
 // Network code 23362049225.
