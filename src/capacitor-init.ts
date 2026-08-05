@@ -16,14 +16,9 @@ export async function initCapacitorPlugins() {
   try {
     const { App } = await import("@capacitor/app");
     const appInfo = await App.getInfo();
-    console.log("[bundle] runtime", {
-      marker: bundleMarker,
-      href: window.location.href,
-      origin: window.location.origin,
-      entryScript,
-      appVersion: appInfo.version,
-      appBuild: appInfo.build,
-    });
+    console.log(
+      `[bundle] runtime marker=${bundleMarker} origin=${window.location.origin} entry=${entryScript} appVersion=${appInfo.version} appBuild=${appInfo.build}`,
+    );
   } catch (error) {
     console.warn("[bundle] runtime diagnostic failed", {
       marker: bundleMarker,
@@ -39,12 +34,16 @@ export async function initCapacitorPlugins() {
   // never run (or the Gradle module was not picked up) — that single fact
   // explains native Google sign-in falling back to Chrome AND no native ads.
   try {
-    console.log("[plugins] available", {
-      SocialLogin: Capacitor.isPluginAvailable("SocialLogin"),
-      GamNative: Capacitor.isPluginAvailable("GamNative"),
-      PushNotifications: Capacitor.isPluginAvailable("PushNotifications"),
-      userAgent: navigator.userAgent,
-    });
+    // Logcat flattens objects to "[object Object]", so log flat strings only.
+    const socialLogin = Capacitor.isPluginAvailable("SocialLogin");
+    const gamNative = Capacitor.isPluginAvailable("GamNative");
+    const push = Capacitor.isPluginAvailable("PushNotifications");
+    console.log(
+      `[plugins] available SocialLogin=${socialLogin} GamNative=${gamNative} PushNotifications=${push}`,
+    );
+    console.log(`[plugins] isWebView=${/;\s*wv/i.test(navigator.userAgent)}`);
+    console.log(`[plugins] userAgent=${navigator.userAgent}`);
+    console.log(`[plugins] allPlugins=${Object.keys((window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } }).Capacitor?.Plugins ?? {}).join(",")}`);
   } catch (error) {
     console.warn("[plugins] availability probe failed", error);
   }
