@@ -34,14 +34,11 @@ const AppleIcon = () => (
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  // Sign in with Apple is shown only where Apple's own native flow exists:
-  // iOS/iPadOS (ASAuthorizationController), plus Apple/desktop browsers on the
-  // web build. It is never offered on Android — there is no Apple SDK there,
-  // and Apple only *requires* the button on Apple platforms.
-  const showApple = (() => {
-    if (Capacitor.isNativePlatform()) return Capacitor.getPlatform() === "ios";
-    return !/android/i.test(navigator.userAgent);
-  })();
+  // Sign in with Apple is offered everywhere:
+  //   • iOS/iPadOS → native ASAuthorizationController sheet
+  //   • Android / web → Apple's web OAuth flow in a Chrome Custom Tab / popup
+  //     (there is no Apple SDK on Android, so the web flow is the supported path)
+  const showApple = true;
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
@@ -367,6 +364,11 @@ const Auth = () => {
             description: (res.message || "Unknown reason").slice(0, 180),
             variant: "destructive",
           });
+        } else if (provider === "apple") {
+          // Android has no native Apple SDK — use Apple's web OAuth flow in a
+          // Chrome Custom Tab. Tokens return via the /~auth-bridge deep link.
+          await browserSocialSignIn("apple");
+          return;
         } else {
           toast({
             title: "Native sign-in not compiled in",
