@@ -173,4 +173,12 @@ export const nativeSocialSignOut = async () => {
   } catch {
     /* provider was never initialized — nothing to do */
   }
+  if (Capacitor.getPlatform() === "ios") {
+    try {
+      const SocialLogin = await getPlugin();
+      await SocialLogin.logout({ provider: "apple" } as never);
+    } catch {
+      /* Apple was never used on this device — nothing to do */
+    }
+  }
 };
