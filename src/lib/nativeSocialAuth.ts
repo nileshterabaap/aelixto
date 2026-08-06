@@ -117,12 +117,22 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     // claims. Passing `scopes` invokes the plugin's separate Google
     // Authorization API, which requires a custom MainActivity and rejects before
     // the account picker opens. Keep Android on the pure ID-token path.
+    //
+    // Google: no nonce at all. The plugin puts the raw nonce in the ID token and
+    // the backend re-hashes it before comparing, which produces "Nonces
+    // mismatch". Omitting it entirely keeps the exchange valid.
+    // `style: "standard"` opens the full "Sign in with Google" account picker
+    // (all accounts on the device) instead of the One Tap "sign back in" sheet,
+    // which only ever suggests a single, previously used account.
     const options =
       provider === "apple"
         ? { scopes: ["email", "name"], nonce: await sha256(rawNonce) }
-        : Capacitor.getPlatform() === "android"
-          ? { nonce: rawNonce, style: "bottom" as const, forcePrompt: true }
-          : { nonce: rawNonce, style: "bottom" };
+        : {
+            style: "standard" as const,
+            filterByAuthorizedAccounts: false,
+            autoSelectEnabled: false,
+            forcePrompt: true,
+          };
 
     const res = (await SocialLogin.login({
       provider,
@@ -142,7 +152,7 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     const { error } = await supabase.auth.signInWithIdToken({
       provider,
       token: idToken,
-      nonce: rawNonce,
+      ...(provider === "apple" ? { nonce: rawNonce } : {}),
     });
 
     if (error) return { ok: false, cancelled: false, message: error.message };
