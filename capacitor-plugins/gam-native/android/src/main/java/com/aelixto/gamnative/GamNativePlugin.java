@@ -2,11 +2,14 @@ package com.aelixto.gamnative;
 
 import android.app.Activity;
 import android.graphics.Color;
+import android.graphics.Outline;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewOutlineProvider;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
@@ -336,47 +339,88 @@ public class GamNativePlugin extends Plugin {
      */
     private NativeAdView buildNativeAdView(Activity activity, NativeAd ad) {
         NativeAdView adView = new NativeAdView(activity);
-        adView.setBackgroundColor(Color.WHITE);
+        adView.setBackgroundColor(Color.TRANSPARENT);
+
+        final int RADIUS = dp(32);           // matches rounded-[2rem]
+        final int PAD_H = dp(20);            // matches px-5
+        final int TEXT_MUTED = Color.parseColor("#6B7280");
+        final int BORDER = Color.parseColor("#E4E7EB");   // hsl(220 13% 91%)
+        final int BRAND_BLUE = Color.parseColor("#0080FF"); // hsl(213 100% 50%)
 
         LinearLayout container = new LinearLayout(activity);
         container.setOrientation(LinearLayout.VERTICAL);
         container.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        GradientDrawable cardBg = new GradientDrawable();
+        cardBg.setColor(Color.WHITE);
+        cardBg.setCornerRadius(RADIUS);
+        cardBg.setStroke(dp(1), BORDER);
+        container.setBackground(cardBg);
+        container.setClipToOutline(true);
+        container.setOutlineProvider(new ViewOutlineProvider() {
+            @Override public void getOutline(View view, Outline outline) {
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), RADIUS);
+            }
+        });
 
         // Header row
         LinearLayout header = new LinearLayout(activity);
         header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setPadding(dp(12), dp(10), dp(12), dp(10));
+        header.setPadding(PAD_H, dp(16), PAD_H, dp(12));
         header.setGravity(Gravity.CENTER_VERTICAL);
 
         ImageView icon = new ImageView(activity);
-        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(32), dp(32));
-        iconLp.rightMargin = dp(8);
+        icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        icon.setClipToOutline(true);
+        icon.setOutlineProvider(new ViewOutlineProvider() {
+            @Override public void getOutline(View view, Outline outline) {
+                outline.setOval(0, 0, view.getWidth(), view.getHeight());
+            }
+        });
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(48), dp(48));
+        iconLp.rightMargin = dp(12);
         header.addView(icon, iconLp);
         if (ad.getIcon() != null && ad.getIcon().getUri() != null) {
             try { Picasso.get().load(ad.getIcon().getUri()).into(icon); } catch (Exception ignored) {}
         }
 
+        LinearLayout nameCol = new LinearLayout(activity);
+        nameCol.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams nameColLp = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        header.addView(nameCol, nameColLp);
+
         TextView advertiser = new TextView(activity);
         advertiser.setTypeface(Typeface.DEFAULT_BOLD);
         advertiser.setTextColor(Color.BLACK);
-        advertiser.setTextSize(14);
+        advertiser.setTextSize(16);
+        advertiser.setMaxLines(1);
         advertiser.setText(ad.getAdvertiser() != null ? ad.getAdvertiser() : "Sponsored");
-        LinearLayout.LayoutParams advLp = new LinearLayout.LayoutParams(0,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        header.addView(advertiser, advLp);
+        nameCol.addView(advertiser);
 
+        TextView sponsored = new TextView(activity);
+        sponsored.setText("Sponsored");
+        sponsored.setTextColor(TEXT_MUTED);
+        sponsored.setTextSize(12);
+        nameCol.addView(sponsored);
+
+        // Mandatory "Ad" attribution chip (Google native policy).
         TextView chip = new TextView(activity);
         chip.setText("Ad");
         chip.setTextColor(Color.WHITE);
-        chip.setBackgroundColor(Color.BLACK);
-        chip.setPadding(dp(6), dp(2), dp(6), dp(2));
         chip.setTextSize(10);
+        chip.setTypeface(Typeface.DEFAULT_BOLD);
+        chip.setPadding(dp(8), dp(3), dp(8), dp(3));
+        GradientDrawable chipBg = new GradientDrawable();
+        chipBg.setColor(Color.parseColor("#111827"));
+        chipBg.setCornerRadius(dp(999));
+        chip.setBackground(chipBg);
         header.addView(chip);
         container.addView(header);
 
-        // Media
+        // Media — edge-to-edge like the feed embeds
         MediaView mediaView = new MediaView(activity);
+        mediaView.setBackgroundColor(Color.parseColor("#F3F4F6"));
         LinearLayout.LayoutParams mediaLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
         container.addView(mediaView, mediaLp);
@@ -384,18 +428,20 @@ public class GamNativePlugin extends Plugin {
         // Text block
         LinearLayout textBlock = new LinearLayout(activity);
         textBlock.setOrientation(LinearLayout.VERTICAL);
-        textBlock.setPadding(dp(12), dp(10), dp(12), dp(12));
+        textBlock.setPadding(PAD_H, dp(12), PAD_H, dp(16));
 
         TextView headline = new TextView(activity);
         headline.setTypeface(Typeface.DEFAULT_BOLD);
         headline.setTextColor(Color.BLACK);
         headline.setTextSize(15);
+        headline.setMaxLines(2);
         if (ad.getHeadline() != null) headline.setText(ad.getHeadline());
         textBlock.addView(headline);
 
         TextView body = new TextView(activity);
-        body.setTextColor(Color.DKGRAY);
+        body.setTextColor(TEXT_MUTED);
         body.setTextSize(13);
+        body.setMaxLines(2);
         if (ad.getBody() != null) body.setText(ad.getBody());
         LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -404,12 +450,19 @@ public class GamNativePlugin extends Plugin {
 
         Button cta = new Button(activity);
         cta.setAllCaps(false);
+        cta.setTypeface(Typeface.DEFAULT_BOLD);
+        cta.setTextSize(14);
         cta.setTextColor(Color.WHITE);
-        cta.setBackgroundColor(Color.BLACK);
+        cta.setStateListAnimator(null);
+        cta.setPadding(dp(16), 0, dp(16), 0);
+        GradientDrawable ctaBg = new GradientDrawable();
+        ctaBg.setColor(BRAND_BLUE);
+        ctaBg.setCornerRadius(dp(999));
+        cta.setBackground(ctaBg);
         if (ad.getCallToAction() != null) cta.setText(ad.getCallToAction());
         LinearLayout.LayoutParams ctaLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        ctaLp.topMargin = dp(8);
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
+        ctaLp.topMargin = dp(12);
         textBlock.addView(cta, ctaLp);
         container.addView(textBlock);
 
