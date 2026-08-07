@@ -415,32 +415,20 @@ public class GamNativePlugin extends Plugin {
         sponsoredLp.topMargin = dp(2);              // mt-0.5
         nameCol.addView(sponsored, sponsoredLp);
 
-        // Mandatory "Ad" attribution chip (Google native policy). Sits in the
-        // same top-right slot the feed post uses for its platform icon.
-        TextView chip = new TextView(activity);
-        chip.setText("Ad");
-        chip.setTextColor(Color.WHITE);
-        chip.setTextSize(10);
-        chip.setTypeface(Typeface.DEFAULT_BOLD);
-        chip.setPadding(dp(8), dp(3), dp(8), dp(3));
-        GradientDrawable chipBg = new GradientDrawable();
-        chipBg.setColor(Color.parseColor("#111827"));
-        chipBg.setCornerRadius(dp(999));
-        chip.setBackground(chipBg);
-        header.addView(chip);
+        // Attribution: the "Sponsored" line under the advertiser name carries
+        // the disclosure; the SDK's AdChoices badge is rendered by Google and
+        // cannot be removed.
         container.addView(header);
 
-        // Caption — same slot/typography as the feed post caption
-        // (px-5 pb-3, text-sm foreground), rendered ABOVE the media exactly
-        // like HydratedFeedPost.
-        TextView body = new TextView(activity);
-        body.setTextColor(FOREGROUND);
-        body.setTextSize(14);                       // text-sm
-        body.setLineSpacing(0f, 1.43f);             // leading-5
-        body.setMaxLines(3);
-        if (ad.getBody() != null) body.setText(ad.getBody());
-        body.setPadding(PAD_H, 0, PAD_H, dp(12));   // px-5 pb-3
-        container.addView(body);
+        // Headline ABOVE the media (px-5 pb-3, text-xl font-bold)
+        TextView headline = new TextView(activity);
+        headline.setTypeface(Typeface.DEFAULT_BOLD);
+        headline.setTextColor(FOREGROUND);
+        headline.setTextSize(20);
+        headline.setMaxLines(2);
+        headline.setPadding(PAD_H, 0, PAD_H, dp(14));
+        if (ad.getHeadline() != null) headline.setText(ad.getHeadline());
+        container.addView(headline);
 
         // Media — edge-to-edge like the feed embeds
         MediaView mediaView = new MediaView(activity);
@@ -449,42 +437,51 @@ public class GamNativePlugin extends Plugin {
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
         container.addView(mediaView, mediaLp);
 
-        // Title under the media — matches the feed post's media title slot
-        // (px-5 pt-3, text-lg font-bold).
-        TextView headline = new TextView(activity);
-        headline.setTypeface(Typeface.DEFAULT_BOLD);
-        headline.setTextColor(FOREGROUND);
-        headline.setTextSize(18);                   // text-lg
-        headline.setMaxLines(2);
-        headline.setPadding(PAD_H, dp(12), PAD_H, 0);
-        if (ad.getHeadline() != null) headline.setText(ad.getHeadline());
-        container.addView(headline);
+        // Body caption BELOW the media (px-5 py-4, text-sm)
+        TextView body = new TextView(activity);
+        body.setTextColor(FOREGROUND);
+        body.setTextSize(15);
+        body.setLineSpacing(0f, 1.4f);
+        body.setMaxLines(3);
+        if (ad.getBody() != null) body.setText(ad.getBody());
+        body.setPadding(PAD_H, dp(14), PAD_H, dp(14));
+        container.addView(body);
 
-        // Bottom bar — occupies the same strip as the post interaction bar
-        // (px-3 py-3, ~54dp tall) so card heights and rhythm line up. It holds
-        // the CTA instead of like/comment icons: mimicking non-functional
-        // social actions on an ad is a Google native-ads policy violation.
-        LinearLayout ctaRow = new LinearLayout(activity);
-        ctaRow.setOrientation(LinearLayout.HORIZONTAL);
-        ctaRow.setGravity(Gravity.CENTER_VERTICAL);
-        ctaRow.setPadding(PAD_H, dp(12), PAD_H, dp(12));
+        // Full-bleed CTA bar flush with the bottom of the card, with a chevron
+        // on the right — mirrors the reference design.
+        FrameLayout ctaRow = new FrameLayout(activity);
+        GradientDrawable ctaBg = new GradientDrawable();
+        ctaBg.setColor(BRAND_BLUE);
+        ctaBg.setCornerRadii(new float[]{0, 0, 0, 0, RADIUS, RADIUS, RADIUS, RADIUS});
+        ctaRow.setBackground(ctaBg);
 
         Button cta = new Button(activity);
         cta.setAllCaps(false);
         cta.setTypeface(Typeface.DEFAULT_BOLD);
-        cta.setTextSize(14);
+        cta.setTextSize(16);
         cta.setTextColor(Color.WHITE);
         cta.setStateListAnimator(null);
-        cta.setPadding(dp(16), 0, dp(16), 0);
-        GradientDrawable ctaBg = new GradientDrawable();
-        ctaBg.setColor(BRAND_BLUE);
-        ctaBg.setCornerRadius(dp(999));
-        cta.setBackground(ctaBg);
+        cta.setBackgroundColor(Color.TRANSPARENT);
+        cta.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
+        cta.setPadding(PAD_H, 0, dp(48), 0);
         if (ad.getCallToAction() != null) cta.setText(ad.getCallToAction());
-        LinearLayout.LayoutParams ctaLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
-        ctaRow.addView(cta, ctaLp);
-        container.addView(ctaRow);
+        ctaRow.addView(cta, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
+
+        TextView chevron = new TextView(activity);
+        chevron.setText("\u203A");
+        chevron.setTextColor(Color.WHITE);
+        chevron.setTextSize(24);
+        chevron.setTypeface(Typeface.DEFAULT_BOLD);
+        FrameLayout.LayoutParams chevLp = new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, dp(56));
+        chevLp.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
+        chevLp.rightMargin = PAD_H;
+        chevron.setGravity(Gravity.CENTER);
+        ctaRow.addView(chevron, chevLp);
+
+        container.addView(ctaRow, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(56)));
 
         adView.addView(container);
 
