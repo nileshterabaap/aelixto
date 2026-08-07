@@ -8,6 +8,8 @@ import android.graphics.drawable.GradientDrawable;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.MotionEvent;
+import android.view.ViewConfiguration;
 import android.view.View;
 import android.view.ViewOutlineProvider;
 import android.view.ViewGroup;
