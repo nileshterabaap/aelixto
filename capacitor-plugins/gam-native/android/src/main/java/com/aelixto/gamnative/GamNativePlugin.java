@@ -335,6 +335,75 @@ public class GamNativePlugin extends Plugin {
     }
 
     /**
+     * The native ad overlay sits on top of the WebView, so by default it swallows
+     * every touch and the feed cannot be scrolled while the thumb is on an ad.
+     *
+     * This subclass keeps taps/clicks on the ad (so Google still tracks billable
+     * clicks) but, as soon as a vertical drag passes the touch slop, cancels the
+     * ad gesture and forwards the rest of the gesture to the WebView so the feed
+     * scrolls normally.
+     */
+    private static class ScrollForwardingNativeAdView extends NativeAdView {
+        private final android.webkit.WebView webView;
+        private final int slop;
+        private float downX, downY;
+        private boolean forwarding;
+
+        ScrollForwardingNativeAdView(Activity activity, android.webkit.WebView webView) {
+            super(activity);
+            this.webView = webView;
+            this.slop = ViewConfiguration.get(activity).getScaledTouchSlop();
+        }
+
+        private void forward(MotionEvent ev, int action) {
+            if (webView == null) return;
+            int[] mine = new int[2];
+            int[] web = new int[2];
+            getLocationOnScreen(mine);
+            webView.getLocationOnScreen(web);
+            MotionEvent copy = MotionEvent.obtain(ev);
+            copy.setAction(action);
+            copy.setLocation(ev.getX() + mine[0] - web[0], ev.getY() + mine[1] - web[1]);
+            webView.dispatchTouchEvent(copy);
+            copy.recycle();
+        }
+
+        @Override
+        public boolean dispatchTouchEvent(MotionEvent ev) {
+            final int action = ev.getActionMasked();
+            if (action == MotionEvent.ACTION_DOWN) {
+                downX = ev.getX();
+                downY = ev.getY();
+                forwarding = false;
+            } else if (!forwarding && action == MotionEvent.ACTION_MOVE && webView != null) {
+                float dy = ev.getY() - downY;
+                float dx = ev.getX() - downX;
+                if (Math.abs(dy) > slop && Math.abs(dy) > Math.abs(dx)) {
+                    forwarding = true;
+                    MotionEvent cancel = MotionEvent.obtain(ev);
+                    cancel.setAction(MotionEvent.ACTION_CANCEL);
+                    super.dispatchTouchEvent(cancel);
+                    cancel.recycle();
+                    // Give the WebView a DOWN at the original touch point first.
+                    MotionEvent down = MotionEvent.obtain(ev);
+                    down.setLocation(downX, downY);
+                    forward(down, MotionEvent.ACTION_DOWN);
+                    down.recycle();
+                }
+            }
+
+            if (forwarding) {
+                forward(ev, action);
+                if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                    forwarding = false;
+                }
+                return true;
+            }
+            return super.dispatchTouchEvent(ev);
+        }
+    }
+
+    /**
      * Build a fully-registered NativeAdView programmatically so Google's SDK
      * can auto-fire impressions + billable clicks. Layout mirrors the JS
      * placeholder card (header row, media, headline/body, CTA).
