@@ -341,10 +341,12 @@ public class GamNativePlugin extends Plugin {
         NativeAdView adView = new NativeAdView(activity);
         adView.setBackgroundColor(Color.TRANSPARENT);
 
-        final int RADIUS = dp(32);           // matches rounded-[2rem]
-        final int PAD_H = dp(20);            // matches px-5
-        final int TEXT_MUTED = Color.parseColor("#6B7280");
-        final int BORDER = Color.parseColor("#E4E7EB");   // hsl(220 13% 91%)
+        // Values mirror HydratedFeedPost.tsx / index.css exactly.
+        final int RADIUS = dp(32);            // rounded-[2rem]
+        final int PAD_H = dp(20);             // px-5
+        final int TEXT_MUTED = Color.parseColor("#737373"); // --muted-foreground 0 0% 45%
+        final int FOREGROUND = Color.parseColor("#000000"); // --foreground 0 0% 0%
+        final int BORDER = Color.parseColor("#E4E7EB");     // hsl(220 13% 91%)
         final int BRAND_BLUE = Color.parseColor("#0080FF"); // hsl(213 100% 50%)
 
         LinearLayout container = new LinearLayout(activity);
@@ -362,6 +364,8 @@ public class GamNativePlugin extends Plugin {
                 outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), RADIUS);
             }
         });
+        // .glass-post-card elevation (0 4px 16px -8px rgba(...)) approximation.
+        container.setElevation(dp(2));
 
         // Header row
         LinearLayout header = new LinearLayout(activity);
@@ -377,8 +381,9 @@ public class GamNativePlugin extends Plugin {
                 outline.setOval(0, 0, view.getWidth(), view.getHeight());
             }
         });
-        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(48), dp(48));
+        LinearLayout.LayoutParams iconLp = new LinearLayout.LayoutParams(dp(48), dp(48)); // h-12 w-12
         iconLp.rightMargin = dp(12);
+        icon.setBackgroundColor(Color.parseColor("#F5F5F5")); // AvatarFallback bg-muted
         header.addView(icon, iconLp);
         if (ad.getIcon() != null && ad.getIcon().getUri() != null) {
             try { Picasso.get().load(ad.getIcon().getUri()).into(icon); } catch (Exception ignored) {}
@@ -392,8 +397,10 @@ public class GamNativePlugin extends Plugin {
 
         TextView advertiser = new TextView(activity);
         advertiser.setTypeface(Typeface.DEFAULT_BOLD);
-        advertiser.setTextColor(Color.BLACK);
-        advertiser.setTextSize(16);
+        advertiser.setTextColor(FOREGROUND);
+        advertiser.setTextSize(16);                 // text-base font-bold
+        advertiser.setLineSpacing(0f, 1.0f);        // leading-tight
+        advertiser.setIncludeFontPadding(false);
         advertiser.setMaxLines(1);
         advertiser.setText(ad.getAdvertiser() != null ? ad.getAdvertiser() : "Sponsored");
         nameCol.addView(advertiser);
@@ -401,10 +408,15 @@ public class GamNativePlugin extends Plugin {
         TextView sponsored = new TextView(activity);
         sponsored.setText("Sponsored");
         sponsored.setTextColor(TEXT_MUTED);
-        sponsored.setTextSize(12);
-        nameCol.addView(sponsored);
+        sponsored.setTextSize(12);                  // text-xs muted, same slot as the timestamp
+        sponsored.setIncludeFontPadding(false);
+        LinearLayout.LayoutParams sponsoredLp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        sponsoredLp.topMargin = dp(2);              // mt-0.5
+        nameCol.addView(sponsored, sponsoredLp);
 
-        // Mandatory "Ad" attribution chip (Google native policy).
+        // Mandatory "Ad" attribution chip (Google native policy). Sits in the
+        // same top-right slot the feed post uses for its platform icon.
         TextView chip = new TextView(activity);
         chip.setText("Ad");
         chip.setTextColor(Color.WHITE);
@@ -418,35 +430,44 @@ public class GamNativePlugin extends Plugin {
         header.addView(chip);
         container.addView(header);
 
+        // Caption — same slot/typography as the feed post caption
+        // (px-5 pb-3, text-sm foreground), rendered ABOVE the media exactly
+        // like HydratedFeedPost.
+        TextView body = new TextView(activity);
+        body.setTextColor(FOREGROUND);
+        body.setTextSize(14);                       // text-sm
+        body.setLineSpacing(0f, 1.43f);             // leading-5
+        body.setMaxLines(3);
+        if (ad.getBody() != null) body.setText(ad.getBody());
+        body.setPadding(PAD_H, 0, PAD_H, dp(12));   // px-5 pb-3
+        container.addView(body);
+
         // Media — edge-to-edge like the feed embeds
         MediaView mediaView = new MediaView(activity);
-        mediaView.setBackgroundColor(Color.parseColor("#F3F4F6"));
+        mediaView.setBackgroundColor(Color.parseColor("#F5F5F5")); // --muted
         LinearLayout.LayoutParams mediaLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
         container.addView(mediaView, mediaLp);
 
-        // Text block
-        LinearLayout textBlock = new LinearLayout(activity);
-        textBlock.setOrientation(LinearLayout.VERTICAL);
-        textBlock.setPadding(PAD_H, dp(12), PAD_H, dp(16));
-
+        // Title under the media — matches the feed post's media title slot
+        // (px-5 pt-3, text-lg font-bold).
         TextView headline = new TextView(activity);
         headline.setTypeface(Typeface.DEFAULT_BOLD);
-        headline.setTextColor(Color.BLACK);
-        headline.setTextSize(15);
+        headline.setTextColor(FOREGROUND);
+        headline.setTextSize(18);                   // text-lg
         headline.setMaxLines(2);
+        headline.setPadding(PAD_H, dp(12), PAD_H, 0);
         if (ad.getHeadline() != null) headline.setText(ad.getHeadline());
-        textBlock.addView(headline);
+        container.addView(headline);
 
-        TextView body = new TextView(activity);
-        body.setTextColor(TEXT_MUTED);
-        body.setTextSize(13);
-        body.setMaxLines(2);
-        if (ad.getBody() != null) body.setText(ad.getBody());
-        LinearLayout.LayoutParams bodyLp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        bodyLp.topMargin = dp(4);
-        textBlock.addView(body, bodyLp);
+        // Bottom bar — occupies the same strip as the post interaction bar
+        // (px-3 py-3, ~54dp tall) so card heights and rhythm line up. It holds
+        // the CTA instead of like/comment icons: mimicking non-functional
+        // social actions on an ad is a Google native-ads policy violation.
+        LinearLayout ctaRow = new LinearLayout(activity);
+        ctaRow.setOrientation(LinearLayout.HORIZONTAL);
+        ctaRow.setGravity(Gravity.CENTER_VERTICAL);
+        ctaRow.setPadding(PAD_H, dp(12), PAD_H, dp(12));
 
         Button cta = new Button(activity);
         cta.setAllCaps(false);
@@ -462,9 +483,8 @@ public class GamNativePlugin extends Plugin {
         if (ad.getCallToAction() != null) cta.setText(ad.getCallToAction());
         LinearLayout.LayoutParams ctaLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(44));
-        ctaLp.topMargin = dp(12);
-        textBlock.addView(cta, ctaLp);
-        container.addView(textBlock);
+        ctaRow.addView(cta, ctaLp);
+        container.addView(ctaRow);
 
         adView.addView(container);
 
