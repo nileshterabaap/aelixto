@@ -340,7 +340,7 @@ public class GamNativePlugin extends Plugin {
      * placeholder card (header row, media, headline/body, CTA).
      */
     private NativeAdView buildNativeAdView(Activity activity, NativeAd ad) {
-        NativeAdView adView = new NativeAdView(activity);
+        NativeAdView adView = new ScrollForwardingNativeAdView(activity, getBridge() != null ? getBridge().getWebView() : null);
         adView.setBackgroundColor(Color.TRANSPARENT);
 
         // Values mirror HydratedFeedPost.tsx / index.css exactly.
