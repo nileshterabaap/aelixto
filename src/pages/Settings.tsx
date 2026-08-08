@@ -36,6 +36,25 @@ const Settings = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [adTestMode, setAdTestMode] = useState(AD_TEST_MODE);
+  // "Manage ad preferences" is only shown when the UMP privacy message
+  // actually applies to the user's region (GDPR/CPRA). Elsewhere (and in
+  // release builds outside those regions) the row stays hidden.
+  const [adPrefsAvailable, setAdPrefsAvailable] = useState(false);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { GamNative } = await import('aelixto-gam-native');
+        const info = await GamNative.requestConsentInfo();
+        if (!cancelled) setAdPrefsAvailable(!!info?.privacyOptionsRequired);
+      } catch {
+        if (!cancelled) setAdPrefsAvailable(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleAdPreferences = async () => {
     const res = await showPrivacyOptionsForm();
@@ -182,10 +201,10 @@ const Settings = () => {
           <Row label="Change password" onClick={() => setChangePasswordOpen(true)} />
           <Row label="Notifications" onClick={() => navigate('/settings/notifications')} />
           <Row label="Privacy settings" onClick={() => navigate('/settings/privacy')} />
-          {Capacitor.isNativePlatform() && (
+          {Capacitor.isNativePlatform() && adPrefsAvailable && (
             <Row label="Manage ad preferences" onClick={() => { void handleAdPreferences(); }} />
           )}
-          {Capacitor.isNativePlatform() && (
+          {Capacitor.isNativePlatform() && (import.meta.env.DEV || adTestMode) && (
             <button
               type="button"
               onClick={toggleAdTestMode}
