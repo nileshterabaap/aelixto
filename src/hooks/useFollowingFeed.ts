@@ -170,8 +170,10 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
 
   return {
     items,
-    empty: authReady && !feedLoading && !isFetching && items.length === 0,
-    loading: !authReady || feedLoading || (isFetching && items.length === 0),
+    empty:
+      (!sessionLoading && !user?.id) ||
+      (authReady && !feedLoading && !isFetching && items.length === 0),
+    loading: sessionLoading || (authReady && (feedLoading || (isFetching && items.length === 0))),
     error: feedError?.message ?? null,
     loadMore,
     hasMore: hasNextPage ?? false,
