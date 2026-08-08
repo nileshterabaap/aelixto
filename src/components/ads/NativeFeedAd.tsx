@@ -109,12 +109,16 @@ export function NativeFeedAd() {
 
 function measureClip() {
   // Fixed bottom nav height (incl. safe-area) — the overlay must never paint
-  // over it. Falls back to 0 when the nav is not mounted on this route.
+  // over it. The floating "create post" FAB overhangs the nav's top edge, so
+  // the clip must start at the highest of the two. Falls back to 0 when the
+  // nav is not mounted on this route.
   let clipBottom = 0;
   const nav = document.querySelector('nav.fixed.bottom-0') as HTMLElement | null;
   if (nav) {
-    const r = nav.getBoundingClientRect();
-    clipBottom = Math.max(0, Math.round(window.innerHeight - r.top));
+    let top = nav.getBoundingClientRect().top;
+    const fab = nav.querySelector('[aria-label="Create post"]') as HTMLElement | null;
+    if (fab) top = Math.min(top, fab.getBoundingClientRect().top);
+    clipBottom = Math.max(0, Math.round(window.innerHeight - top));
   }
   return { clipTop: 0, clipBottom };
 }

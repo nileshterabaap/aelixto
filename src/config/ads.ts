@@ -89,8 +89,8 @@ export function getNativeFeedAdUnitId(platform: 'android' | 'ios' | 'web'): stri
   return platform === 'android' ? LIVE_NATIVE_ANDROID : LIVE_NATIVE_IOS;
 }
 
-/** Show 1 ad after every N real posts. */
-export const AD_INTERVAL = 5;
+/** Show 1 ad after every N real posts (test + live, Android + iOS). */
+export const AD_INTERVAL = 7;
 
 /** Minimum install age before any ad is requested. */
 export const AD_MIN_INSTALL_AGE_MS = 2 * 24 * 60 * 60 * 1000;
