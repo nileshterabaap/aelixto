@@ -8,6 +8,12 @@ export interface GamNativePlugin {
   requestConsentInfo(): Promise<{
     status: 'REQUIRED' | 'NOT_REQUIRED' | 'OBTAINED' | 'UNKNOWN';
     isConsentFormAvailable: boolean;
+    /**
+     * True only when the UMP privacy message applies to this user's region
+     * (GDPR/CPRA etc). Used to decide whether the Settings row that reopens
+     * the privacy options form should be shown at all.
+     */
+    privacyOptionsRequired?: boolean;
   }>;
   /** Load and show the consent form if required. Resolves after user chooses. */
   showConsentFormIfRequired(): Promise<{ shown: boolean }>;
