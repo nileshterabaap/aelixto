@@ -159,6 +159,9 @@ public class GamNativePlugin extends Plugin {
                     JSObject ret = new JSObject();
                     ret.put("status", mapStatus(consentInformation.getConsentStatus()));
                     ret.put("isConsentFormAvailable", consentInformation.isConsentFormAvailable());
+                    ret.put("privacyOptionsRequired",
+                            consentInformation.getPrivacyOptionsRequirementStatus()
+                                    == ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED);
                     call.resolve(ret);
                 },
                 formError -> {
