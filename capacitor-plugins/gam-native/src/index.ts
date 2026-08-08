@@ -35,11 +35,14 @@ export interface GamNativePlugin {
   presentNativeAd(options: {
     adId: string;
     x: number; y: number; width: number; height: number;
+    /** CSS px of chrome at the top/bottom the overlay must be clipped by. */
+    clipTop?: number; clipBottom?: number;
   }): Promise<void>;
   /** Reposition the overlay after scroll/resize. */
   updateNativeAdFrame(options: {
     adId: string;
     x: number; y: number; width: number; height: number;
+    clipTop?: number; clipBottom?: number;
   }): Promise<void>;
   /** Free the underlying native ad object when the card unmounts. */
   destroyAd(options: { adId: string }): Promise<void>;

@@ -65,6 +65,18 @@ public class GamNativePlugin extends Plugin {
     private ConsentInformation consentInformation;
 
     /**
+     * All ad overlays live inside this clipping host instead of directly in the
+     * activity content root. Its top/bottom margins are driven by the JS layer
+     * (sticky header / fixed bottom nav), so an ad can never paint over the
+     * bottom navigation bar — it is clipped at the feed boundary exactly like a
+     * WebView-rendered post.
+     */
+    private FrameLayout adHost;
+    private int clipTopPx = 0;
+    private int clipBottomPx = 0;
+    private boolean scrollHooked = false;
+
+    /**
      * Android WebView defaults to `mediaPlaybackRequiresUserGesture = true`, which
      * stops embedded <video> elements (Threads/Meta embeds) from preloading their
      * first frame. The WebView then paints its oversized built-in play placeholder
@@ -284,6 +296,8 @@ public class GamNativePlugin extends Plugin {
         final int y = call.getInt("y", 0);
         final int w = call.getInt("width", 0);
         final int h = call.getInt("height", 0);
+        final int clipTop = call.getInt("clipTop", 0);
+        final int clipBottom = call.getInt("clipBottom", 0);
         final Activity activity = getActivity();
         if (activity == null) { call.reject("no activity"); return; }
 
@@ -295,12 +309,13 @@ public class GamNativePlugin extends Plugin {
             NativeAdView adView = buildNativeAdView(activity, ad);
             adViews.put(adId, adView);
 
-            ViewGroup root = (ViewGroup) activity.findViewById(android.R.id.content);
+            clipTopPx = dp(clipTop);
+            clipBottomPx = dp(clipBottom);
+            FrameLayout host = ensureAdHost(activity);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(dp(w), dp(h));
-            lp.leftMargin = dp(x);
-            lp.topMargin = dp(y);
             lp.gravity = Gravity.TOP | Gravity.START;
-            root.addView(adView, lp);
+            host.addView(adView, lp);
+            placeAdView(adView, x, y);
             call.resolve();
         });
     }
@@ -313,20 +328,82 @@ public class GamNativePlugin extends Plugin {
         final int y = call.getInt("y", 0);
         final int w = call.getInt("width", 0);
         final int h = call.getInt("height", 0);
+        final int clipTop = call.getInt("clipTop", -1);
+        final int clipBottom = call.getInt("clipBottom", -1);
         final Activity activity = getActivity();
         if (activity == null) { call.resolve(); return; }
         activity.runOnUiThread(() -> {
             NativeAdView v = adViews.get(adId);
             if (v != null) {
-                FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(dp(w), dp(h));
-                lp.leftMargin = dp(x);
-                lp.topMargin = dp(y);
-                lp.gravity = Gravity.TOP | Gravity.START;
-                v.setLayoutParams(lp);
-                v.requestLayout();
+                if (clipTop >= 0) clipTopPx = dp(clipTop);
+                if (clipBottom >= 0) clipBottomPx = dp(clipBottom);
+                if (adHost != null) ensureAdHost(activity);
+                ViewGroup.LayoutParams lp = v.getLayoutParams();
+                if (lp != null && (lp.width != dp(w) || lp.height != dp(h))) {
+                    lp.width = dp(w);
+                    lp.height = dp(h);
+                    v.setLayoutParams(lp);
+                }
+                placeAdView(v, x, y);
             }
             call.resolve();
         });
+    }
+
+    /**
+     * Position an overlay using translation only (no relayout) and in host-local
+     * coordinates, so scroll updates are a single cheap property change.
+     */
+    private void placeAdView(View v, int cssX, int cssY) {
+        v.setTranslationX(dp(cssX));
+        v.setTranslationY(dp(cssY) - clipTopPx);
+    }
+
+    private FrameLayout ensureAdHost(Activity activity) {
+        if (adHost == null || adHost.getParent() == null) {
+            adHost = new FrameLayout(activity);
+            adHost.setClipChildren(true);
+            adHost.setClipToPadding(true);
+            ViewGroup root = (ViewGroup) activity.findViewById(android.R.id.content);
+            root.addView(adHost, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }
+        ViewGroup.LayoutParams raw = adHost.getLayoutParams();
+        if (raw instanceof FrameLayout.LayoutParams) {
+            FrameLayout.LayoutParams hlp = (FrameLayout.LayoutParams) raw;
+            if (hlp.topMargin != clipTopPx || hlp.bottomMargin != clipBottomPx) {
+                hlp.topMargin = clipTopPx;
+                hlp.bottomMargin = clipBottomPx;
+                adHost.setLayoutParams(hlp);
+            }
+        }
+        hookWebViewScroll();
+        return adHost;
+    }
+
+    /**
+     * Drive overlay movement from the WebView's own scroll callback instead of a
+     * JS scroll event + bridge round-trip. The translation is applied in the
+     * same frame the WebView scrolls, which removes the visible lag/float during
+     * fast scrolling and flings. The JS `updateNativeAdFrame` calls remain as a
+     * correction pass for layout changes.
+     */
+    private void hookWebViewScroll() {
+        if (scrollHooked) return;
+        android.webkit.WebView wv = getBridge() != null ? getBridge().getWebView() : null;
+        if (wv == null) return;
+        wv.setOnScrollChangeListener((v, sx, sy, oldSx, oldSy) -> {
+            if (adHost == null) return;
+            final int dy = sy - oldSy;
+            final int dx = sx - oldSx;
+            if (dx == 0 && dy == 0) return;
+            for (int i = 0; i < adHost.getChildCount(); i++) {
+                View c = adHost.getChildAt(i);
+                c.setTranslationY(c.getTranslationY() - dy);
+                c.setTranslationX(c.getTranslationX() - dx);
+            }
+        });
+        scrollHooked = true;
     }
 
     private int dp(int px) {
