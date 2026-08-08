@@ -61,7 +61,7 @@ public class GamNativePlugin extends Plugin {
 
     private static final String TAG = "GamNative";
     private final Map<String, NativeAd> ads = new HashMap<>();
-    private final Map<String, NativeAdView> adViews = new HashMap<>();
+    private final Map<String, ScrollForwardingAdFrame> adViews = new HashMap<>();
     private ConsentInformation consentInformation;
 
     /**
@@ -302,11 +302,11 @@ public class GamNativePlugin extends Plugin {
         if (activity == null) { call.reject("no activity"); return; }
 
         activity.runOnUiThread(() -> {
-            NativeAdView existing = adViews.remove(adId);
+            ScrollForwardingAdFrame existing = adViews.remove(adId);
             if (existing != null && existing.getParent() instanceof ViewGroup) {
                 ((ViewGroup) existing.getParent()).removeView(existing);
             }
-            NativeAdView adView = buildNativeAdView(activity, ad);
+            ScrollForwardingAdFrame adView = buildNativeAdView(activity, ad);
             adViews.put(adId, adView);
 
             clipTopPx = dp(clipTop);
@@ -333,7 +333,7 @@ public class GamNativePlugin extends Plugin {
         final Activity activity = getActivity();
         if (activity == null) { call.resolve(); return; }
         activity.runOnUiThread(() -> {
-            NativeAdView v = adViews.get(adId);
+            ScrollForwardingAdFrame v = adViews.get(adId);
             if (v != null) {
                 if (clipTop >= 0) clipTopPx = dp(clipTop);
                 if (clipBottom >= 0) clipBottomPx = dp(clipBottom);
@@ -420,16 +420,24 @@ public class GamNativePlugin extends Plugin {
      * ad gesture and forwards the rest of the gesture to the WebView so the feed
      * scrolls normally.
      */
-    private static class ScrollForwardingNativeAdView extends NativeAdView {
+    private static class ScrollForwardingAdFrame extends FrameLayout {
         private final android.webkit.WebView webView;
         private final int slop;
         private float downX, downY;
         private boolean forwarding;
+        final NativeAdView adView;
 
-        ScrollForwardingNativeAdView(Activity activity, android.webkit.WebView webView) {
+        ScrollForwardingAdFrame(Activity activity, android.webkit.WebView webView) {
             super(activity);
             this.webView = webView;
             this.slop = ViewConfiguration.get(activity).getScaledTouchSlop();
+            this.adView = new NativeAdView(activity);
+            addView(adView, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }
+
+        void destroy() {
+            adView.destroy();
         }
 
         private void forward(MotionEvent ev, int action) {
@@ -485,8 +493,11 @@ public class GamNativePlugin extends Plugin {
      * can auto-fire impressions + billable clicks. Layout mirrors the JS
      * placeholder card (header row, media, headline/body, CTA).
      */
-    private NativeAdView buildNativeAdView(Activity activity, NativeAd ad) {
-        NativeAdView adView = new ScrollForwardingNativeAdView(activity, getBridge() != null ? getBridge().getWebView() : null);
+    private ScrollForwardingAdFrame buildNativeAdView(Activity activity, NativeAd ad) {
+        ScrollForwardingAdFrame frame = new ScrollForwardingAdFrame(
+                activity, getBridge() != null ? getBridge().getWebView() : null);
+        NativeAdView adView = frame.adView;
+        frame.setBackgroundColor(Color.TRANSPARENT);
         adView.setBackgroundColor(Color.TRANSPARENT);
 
         // Values mirror HydratedFeedPost.tsx / index.css exactly.
@@ -641,14 +652,14 @@ public class GamNativePlugin extends Plugin {
         adView.setIconView(icon);
         adView.setAdvertiserView(advertiser);
         adView.setNativeAd(ad);
-        return adView;
+        return frame;
     }
 
     @PluginMethod
     public void destroyAd(PluginCall call) {
         String adId = call.getString("adId");
         if (adId != null) {
-            final NativeAdView v = adViews.remove(adId);
+            final ScrollForwardingAdFrame v = adViews.remove(adId);
             if (v != null) {
                 Activity activity = getActivity();
                 if (activity != null) {
