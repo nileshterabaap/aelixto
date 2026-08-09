@@ -100,11 +100,32 @@ public class GamNativePlugin extends Plugin {
                 android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
                 cookieManager.setAcceptCookie(true);
                 cookieManager.setAcceptThirdPartyCookies(webView, true);
+
+                // A <video> without a poster makes Android's WebView paint its own
+                // oversized grey play placeholder (getDefaultVideoPoster() == null).
+                // Chrome never does this, which is why the same Threads post looks
+                // fine on the website and shows a giant grey/black play cover in the
+                // APK. Returning a transparent 1x1 bitmap suppresses the placeholder
+                // so the embed's own first frame / player chrome is what's visible.
+                webView.setWebChromeClient(new com.getcapacitor.BridgeWebChromeClient(getBridge()) {
+                    @Override
+                    public android.graphics.Bitmap getDefaultVideoPoster() {
+                        return android.graphics.Bitmap.createBitmap(
+                                1, 1, android.graphics.Bitmap.Config.ARGB_8888);
+                    }
+                });
+
+                // HTML5 video composites to black when the WebView is stuck on a
+                // software layer. Force the hardware layer so the video surface is
+                // actually drawn.
+                webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
+
                 Log.i(TAG, "[webview] media settings relaxed: gesture=false imagesAuto="
                         + settings.getLoadsImagesAutomatically()
                         + " blockNetworkImage=" + settings.getBlockNetworkImage()
                         + " domStorage=" + settings.getDomStorageEnabled()
                         + " thirdPartyCookies=true"
+                        + " videoPosterSuppressed=true hwLayer=true"
                         + " mixedContent=" + settings.getMixedContentMode()
                         + " ua=" + settings.getUserAgentString());
             }
