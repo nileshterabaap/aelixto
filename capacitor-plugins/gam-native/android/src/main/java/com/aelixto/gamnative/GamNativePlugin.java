@@ -107,11 +107,20 @@ public class GamNativePlugin extends Plugin {
                 // fine on the website and shows a giant grey/black play cover in the
                 // APK. Returning a transparent 1x1 bitmap suppresses the placeholder
                 // so the embed's own first frame / player chrome is what's visible.
-                webView.setWebChromeClient(new com.getcapacitor.BridgeWebChromeClient(getBridge()) {
-                    @Override
-                    public android.graphics.Bitmap getDefaultVideoPoster() {
-                        return android.graphics.Bitmap.createBitmap(
-                                1, 1, android.graphics.Bitmap.Config.ARGB_8888);
+                // Posted so it runs after the Bridge has installed its own chrome
+                // client during startup — otherwise Capacitor would overwrite ours.
+                webView.post(() -> {
+                    try {
+                        webView.setWebChromeClient(new com.getcapacitor.BridgeWebChromeClient(getBridge()) {
+                            @Override
+                            public android.graphics.Bitmap getDefaultVideoPoster() {
+                                return android.graphics.Bitmap.createBitmap(
+                                        1, 1, android.graphics.Bitmap.Config.ARGB_8888);
+                            }
+                        });
+                        Log.i(TAG, "[webview] default video poster suppressed");
+                    } catch (Throwable t) {
+                        Log.w(TAG, "[webview] unable to override chrome client", t);
                     }
                 });
 
