@@ -212,7 +212,7 @@ const ThreadsIframeEmbed = ({
         src={src}
         scrolling="no"
         allowFullScreen
-        allow="accelerometer; gyroscope; magnetometer; autoplay; clipboard-write; encrypted-media; picture-in-picture; fullscreen; web-share"
+        allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
         loading="lazy"
         sandbox="allow-scripts allow-same-origin allow-presentation"
         data-nav-lock-applied="1"
