@@ -76,6 +76,43 @@ public class GamNativePlugin extends Plugin {
     private int clipBottomPx = 0;
     private boolean scrollHooked = false;
 
+    /**
+     * Android WebView defaults to `mediaPlaybackRequiresUserGesture = true`, which
+     * stops embedded <video> elements (Threads/Meta embeds) from preloading their
+     * first frame. The WebView then paints its oversized built-in play placeholder
+     * instead of the poster — the exact "giant grey play button" artifact seen in
+     * the APK but never in the mobile browser. Chrome/Safari load the poster, so
+     * matching that behaviour here makes the APK render identically to the web.
+     */
+    @Override
+    public void load() {
+        super.load();
+        try {
+            android.webkit.WebView webView = getBridge().getWebView();
+            if (webView != null) {
+                android.webkit.WebSettings settings = webView.getSettings();
+                settings.setMediaPlaybackRequiresUserGesture(false);
+                settings.setLoadsImagesAutomatically(true);
+                settings.setBlockNetworkImage(false);
+                settings.setDomStorageEnabled(true);
+                settings.setMixedContentMode(
+                    android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+                android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
+                cookieManager.setAcceptCookie(true);
+                cookieManager.setAcceptThirdPartyCookies(webView, true);
+                Log.i(TAG, "[webview] media settings relaxed: gesture=false imagesAuto="
+                        + settings.getLoadsImagesAutomatically()
+                        + " blockNetworkImage=" + settings.getBlockNetworkImage()
+                        + " domStorage=" + settings.getDomStorageEnabled()
+                        + " thirdPartyCookies=true"
+                        + " mixedContent=" + settings.getMixedContentMode()
+                        + " ua=" + settings.getUserAgentString());
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "Unable to relax WebView media settings", t);
+        }
+    }
+
     @PluginMethod
     public void initialize(PluginCall call) {
         Log.i(TAG, "[ads] MobileAds.initialize() called");
