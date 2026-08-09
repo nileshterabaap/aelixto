@@ -200,13 +200,10 @@ const ThreadsIframeEmbed = ({
       style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
     >
       <EmbedFadeSkeleton visible={!threadsRevealed} />
-      <div
-        ref={catcherRef}
-        data-threads-ptr-catcher="1"
-        data-threads-play-capture="1"
-        className="threads-ptr-catcher"
-        aria-hidden="true"
-      />
+      {/* DIAGNOSTIC: catcher layer removed from the Threads tree so nothing at
+          all can sit above the iframe and absorb the first tap. Tracking is
+          unchanged — the window-blur one-shot below still records video_play. */}
+      <div ref={catcherRef} style={{ display: 'none' }} aria-hidden="true" />
       <iframe
         ref={iframeRef}
         src={src}

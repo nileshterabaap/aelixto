@@ -275,7 +275,7 @@ a:active:not(:disabled) {
 
 /* Global iframe freeze during scroll — prevents iframes from intercepting
    touch events which causes 1-2s scroll input delay on mobile */
-.scroll-freezing-iframes iframe {
+.scroll-freezing-iframes iframe:not([src*="threads."]) {
   pointer-events: none !important;
 }
 
