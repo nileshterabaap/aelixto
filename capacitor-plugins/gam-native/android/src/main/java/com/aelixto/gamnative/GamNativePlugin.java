@@ -76,6 +76,25 @@ public class GamNativePlugin extends Plugin {
     private int clipBottomPx = 0;
     private boolean scrollHooked = false;
 
+    /**
+     * DIAGNOSTIC (Threads A/B test): allow media inside the WebView to start
+     * without a user gesture. This only touches WebView media-start
+     * authorization — no ad, tracking, or navigation behaviour changes.
+     */
+    @Override
+    public void load() {
+        super.load();
+        try {
+            android.webkit.WebView wv = getBridge() != null ? getBridge().getWebView() : null;
+            if (wv != null) {
+                wv.getSettings().setMediaPlaybackRequiresUserGesture(false);
+                Log.i(TAG, "[webview] mediaPlaybackRequiresUserGesture=false (diagnostic)");
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "[webview] could not relax media gesture requirement", t);
+        }
+    }
+
     @PluginMethod
     public void initialize(PluginCall call) {
         Log.i(TAG, "[ads] MobileAds.initialize() called");
