@@ -60,6 +60,7 @@ import java.util.UUID;
 public class GamNativePlugin extends Plugin {
 
     private static final String TAG = "GamNative";
+    private static final String DIAGNOSTIC_SOURCE = "aelixto-gam-native-java-2026-08-10-2";
     private final Map<String, NativeAd> ads = new HashMap<>();
     private final Map<String, ScrollForwardingAdFrame> adViews = new HashMap<>();
     private ConsentInformation consentInformation;
@@ -86,34 +87,41 @@ public class GamNativePlugin extends Plugin {
      * lifecycle log that can be lost before Logcat attaches. The value is read
      * back before the required proof line is emitted.
      */
-    private void applyMediaPlaybackDiagnostic() {
+    private boolean applyMediaPlaybackDiagnostic() {
         try {
             android.webkit.WebView webView = getBridge() != null ? getBridge().getWebView() : null;
             if (webView == null) {
-                Log.w(TAG, "[webview] diagnostic skipped: bridge WebView unavailable");
-                Log.w("Capacitor/Console", "[webview] diagnostic skipped: bridge WebView unavailable");
-                return;
+                String skipped = "[webview] diagnostic skipped: bridge WebView unavailable source=" + DIAGNOSTIC_SOURCE;
+                Log.e(TAG, skipped);
+                Log.e("Capacitor/Console", skipped);
+                return false;
             }
 
             webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
             boolean requiresGesture = webView.getSettings().getMediaPlaybackRequiresUserGesture();
             if (!requiresGesture) {
-                String proof = "[webview] mediaPlaybackRequiresUserGesture=false (diagnostic)";
-                Log.i(TAG, proof);
-                Log.i("Capacitor/Console", proof);
+                String proof = "[webview] mediaPlaybackRequiresUserGesture=false (diagnostic) source=" + DIAGNOSTIC_SOURCE;
+                // Error priority is intentional for this diagnostic build so the
+                // proof survives restrictive Logcat filters used for release APKs.
+                Log.e(TAG, proof);
+                Log.e("Capacitor/Console", proof);
+                return true;
             } else {
-                Log.w(TAG, "[webview] diagnostic setting did not persist");
-                Log.w("Capacitor/Console", "[webview] diagnostic setting did not persist");
+                String failed = "[webview] diagnostic setting did not persist source=" + DIAGNOSTIC_SOURCE;
+                Log.e(TAG, failed);
+                Log.e("Capacitor/Console", failed);
+                return false;
             }
         } catch (Throwable t) {
-            Log.w(TAG, "[webview] could not relax media gesture requirement", t);
-            Log.w("Capacitor/Console", "[webview] could not relax media gesture requirement: " + t);
+            Log.e(TAG, "[webview] could not relax media gesture requirement source=" + DIAGNOSTIC_SOURCE, t);
+            Log.e("Capacitor/Console", "[webview] could not relax media gesture requirement source=" + DIAGNOSTIC_SOURCE + ": " + t);
+            return false;
         }
     }
 
     @PluginMethod
     public void initialize(PluginCall call) {
-        applyMediaPlaybackDiagnostic();
+        final boolean diagnosticApplied = applyMediaPlaybackDiagnostic();
         Log.i(TAG, "[ads] MobileAds.initialize() called");
         // Register the emulator (and any device the developer adds) as a test
         // device so LIVE Ad Manager units also return test creatives instead of
@@ -136,6 +144,8 @@ public class GamNativePlugin extends Plugin {
             }
             JSObject ret = new JSObject();
             ret.put("status", "ready");
+            ret.put("mediaPlaybackRequiresUserGesture", !diagnosticApplied);
+            ret.put("diagnosticSource", DIAGNOSTIC_SOURCE);
             call.resolve(ret);
         });
     }
