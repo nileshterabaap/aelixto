@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { trackView } from '@/hooks/useViewTracking';
-import { EMBED_FADE_MS, EmbedFadeSkeleton, useSmoothReveal } from '@/components/embeds/SmoothEmbedFrame';
+import { EMBED_FADE_MS, useSmoothReveal } from '@/components/embeds/SmoothEmbedFrame';
 
 // One-shot guard so a Threads post never records more than one video_play per
 // session from this path (the guarded tracker may also fire; the server's
@@ -196,10 +196,28 @@ const ThreadsIframeEmbed = ({
   return (
     <div
       ref={wrapperRef}
-      className="relative w-full overflow-hidden"
+      className="relative w-full"
       style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
     >
-      <EmbedFadeSkeleton visible={!threadsRevealed} />
+      {/* Root-cause fix (WebView tile-memory / video-overlay promotion):
+          the iframe itself must carry NO compositing property (opacity /
+          transition / z-index) and no clipping ancestor, otherwise Chromium
+          cannot promote the Threads video to an overlay surface and has to
+          raster it into parent tiles — which fails in Android WebView's small
+          tile budget and shows as a grey/black cover. The fade now lives on
+          the skeleton above the iframe instead. */}
+      <div
+        aria-hidden
+        className="absolute inset-0 animate-pulse rounded-lg bg-muted"
+        style={{
+          zIndex: 1,
+          pointerEvents: 'none',
+          opacity: threadsRevealed ? 0 : 1,
+          transition: `opacity ${EMBED_FADE_MS}ms ease`,
+          visibility: threadsRevealed ? 'hidden' : 'visible',
+          transitionProperty: 'opacity, visibility',
+        }}
+      />
       {/* DIAGNOSTIC: catcher layer removed from the Threads tree so nothing at
           all can sit above the iframe and absorb the first tap. Tracking is
           unchanged — the window-blur one-shot below still records video_play. */}
@@ -224,10 +242,6 @@ const ThreadsIframeEmbed = ({
           margin: 0,
           padding: 0,
           background: 'transparent',
-          position: 'relative',
-          zIndex: 1,
-          opacity: threadsRevealed ? 1 : 0,
-          transition: `opacity ${EMBED_FADE_MS}ms ease`,
         }}
       />
     </div>
