@@ -60,7 +60,7 @@ import java.util.UUID;
 public class GamNativePlugin extends Plugin {
 
     private static final String TAG = "GamNative";
-    private static final String DIAGNOSTIC_SOURCE = "aelixto-gam-native-java-2026-08-10-2";
+    private static final String DIAGNOSTIC_SOURCE = "AELIXTO_GAM_INITIALIZE_2026_08_10_1123";
     private final Map<String, NativeAd> ads = new HashMap<>();
     private final Map<String, ScrollForwardingAdFrame> adViews = new HashMap<>();
     private ConsentInformation consentInformation;
@@ -121,6 +121,14 @@ public class GamNativePlugin extends Plugin {
 
     @PluginMethod
     public void initialize(PluginCall call) {
+        // Deliberately emitted before every dependency call. Log.wtf, stderr,
+        // and Capacitor/Console make this observable independently of ordinary
+        // tag/priority filters. The same literal is validated by Gradle before
+        // this Java source is compiled.
+        String startupMarker = "AELIXTO_GAM_INITIALIZE_ENTERED marker=" + DIAGNOSTIC_SOURCE;
+        Log.wtf(TAG, startupMarker);
+        Log.wtf("Capacitor/Console", startupMarker);
+        System.err.println(startupMarker);
         final boolean diagnosticApplied = applyMediaPlaybackDiagnostic();
         Log.i(TAG, "[ads] MobileAds.initialize() called");
         // Register the emulator (and any device the developer adds) as a test
