@@ -83,6 +83,16 @@ export function initAdsAndConsent(): Promise<boolean> {
       // 3. Initialize Google Mobile Ads SDK (Ad Manager APIs use the same SDK).
       const init = await GamNative.initialize();
       console.log('[ads] SDK initialize result:', JSON.stringify(init));
+      if (
+        init.mediaPlaybackRequiresUserGesture === false &&
+        init.diagnosticSource === 'aelixto-gam-native-java-2026-08-10-2'
+      ) {
+        console.error(
+          `[webview] mediaPlaybackRequiresUserGesture=false (diagnostic) source=${init.diagnosticSource} nativeInitializeReturn=true`,
+        );
+      } else {
+        console.error('[webview] native diagnostic proof FAILED:', JSON.stringify(init));
+      }
       ready = true;
       console.log('[ads] adsReady state -> true');
       return true;
