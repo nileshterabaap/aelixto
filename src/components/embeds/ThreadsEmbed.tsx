@@ -229,7 +229,6 @@ const ThreadsIframeEmbed = ({
         allowFullScreen
         allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
         loading="lazy"
-        sandbox="allow-scripts allow-same-origin allow-presentation"
         data-nav-lock-applied="1"
         onLoad={() => {
           setHasLoaded(true);
