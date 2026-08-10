@@ -88,6 +88,33 @@ public class GamNativePlugin extends Plugin {
      * back before the required proof line is emitted.
      */
     private boolean applyMediaPlaybackDiagnostic() {
+        // WebView methods must run on the thread that created the WebView (the
+        // Android main/UI thread). initialize() arrives on the CapacitorPlugins
+        // thread, so hop to the UI thread and wait for the read-back.
+        final java.util.concurrent.atomic.AtomicBoolean result =
+                new java.util.concurrent.atomic.AtomicBoolean(false);
+        final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        Runnable work = () -> {
+            try {
+                result.set(applyMediaPlaybackDiagnosticOnUiThread());
+            } finally {
+                latch.countDown();
+            }
+        };
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+            work.run();
+        } else {
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(work);
+            try {
+                latch.await(3, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return result.get();
+    }
+
+    private boolean applyMediaPlaybackDiagnosticOnUiThread() {
         try {
             android.webkit.WebView webView = getBridge() != null ? getBridge().getWebView() : null;
             if (webView == null) {
