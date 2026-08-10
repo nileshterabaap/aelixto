@@ -80,23 +80,40 @@ public class GamNativePlugin extends Plugin {
      * DIAGNOSTIC (Threads A/B test): allow media inside the WebView to start
      * without a user gesture. This only touches WebView media-start
      * authorization — no ad, tracking, or navigation behaviour changes.
+     *
+     * This is deliberately invoked from initialize(), a JS-driven plugin path
+     * already proven by the ads logs, rather than relying on a startup-only
+     * lifecycle log that can be lost before Logcat attaches. The value is read
+     * back before the required proof line is emitted.
      */
-    @Override
-    public void load() {
-        super.load();
+    private void applyMediaPlaybackDiagnostic() {
         try {
-            android.webkit.WebView wv = getBridge() != null ? getBridge().getWebView() : null;
-            if (wv != null) {
-                wv.getSettings().setMediaPlaybackRequiresUserGesture(false);
-                Log.i(TAG, "[webview] mediaPlaybackRequiresUserGesture=false (diagnostic)");
+            android.webkit.WebView webView = getBridge() != null ? getBridge().getWebView() : null;
+            if (webView == null) {
+                Log.w(TAG, "[webview] diagnostic skipped: bridge WebView unavailable");
+                Log.w("Capacitor/Console", "[webview] diagnostic skipped: bridge WebView unavailable");
+                return;
+            }
+
+            webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
+            boolean requiresGesture = webView.getSettings().getMediaPlaybackRequiresUserGesture();
+            if (!requiresGesture) {
+                String proof = "[webview] mediaPlaybackRequiresUserGesture=false (diagnostic)";
+                Log.i(TAG, proof);
+                Log.i("Capacitor/Console", proof);
+            } else {
+                Log.w(TAG, "[webview] diagnostic setting did not persist");
+                Log.w("Capacitor/Console", "[webview] diagnostic setting did not persist");
             }
         } catch (Throwable t) {
             Log.w(TAG, "[webview] could not relax media gesture requirement", t);
+            Log.w("Capacitor/Console", "[webview] could not relax media gesture requirement: " + t);
         }
     }
 
     @PluginMethod
     public void initialize(PluginCall call) {
+        applyMediaPlaybackDiagnostic();
         Log.i(TAG, "[ads] MobileAds.initialize() called");
         // Register the emulator (and any device the developer adds) as a test
         // device so LIVE Ad Manager units also return test creatives instead of
