@@ -46,3 +46,28 @@ dependencies {
     // Android apps; declared explicitly so the plugin is self-contained).
     implementation 'com.squareup.picasso:picasso:2.8'
 }
+
+// Diagnostic source-chain proof. This runs against the Java source collection
+// Gradle is actually about to compile after `npx cap sync android`, not merely
+// against the plugin source in the repository. It fails the build if an old or
+// different GamNativePlugin.java has been wired into the Android project.
+tasks.withType(JavaCompile).configureEach { compileTask ->
+    compileTask.doFirst {
+        def marker = 'AELIXTO_GAM_INITIALIZE_2026_08_10_1123'
+        def pluginSources = compileTask.source.files.findAll {
+            it.name == 'GamNativePlugin.java' && it.path.contains('com/aelixto/gamnative')
+        }
+        if (pluginSources.size() != 1) {
+            throw new GradleException("AELIXTO_GAM_COMPILE_PROOF failed: expected one GamNativePlugin.java, found ${pluginSources.size()}")
+        }
+        def sourceFile = pluginSources.first()
+        if (!sourceFile.getText('UTF-8').contains(marker)) {
+            throw new GradleException("AELIXTO_GAM_COMPILE_PROOF failed: marker missing from ${sourceFile.canonicalPath}")
+        }
+        def digest = java.security.MessageDigest.getInstance('SHA-256')
+                .digest(sourceFile.bytes)
+                .encodeHex()
+                .toString()
+        println "AELIXTO_GAM_COMPILE_PROOF marker=${marker} source=${sourceFile.canonicalPath} sha256=${digest}"
+    }
+}
