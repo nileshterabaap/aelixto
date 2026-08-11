@@ -1,6 +1,8 @@
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { trackArticleOpen, trackExternalVisit } from "@/hooks/useViewTracking";
+import quoraIcon from "@/assets/platforms/quora.svg";
+import blogIcon from "@/assets/platforms/articles.svg";
+import externalIcon from "@/assets/platforms/external.svg";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 
@@ -141,15 +143,12 @@ interface ArticleContentEmbedProps {
 export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEmbedProps) => {
   const isExternal = platform === 'external';
   const ctaLabel = isExternal ? 'Visit' : 'Continue Reading';
-
-  const handleCtaClick = () => {
-    if (!postId) return;
-    if (isExternal) {
-      void trackExternalVisit(postId);
-    } else {
-      void trackArticleOpen(postId);
-    }
-  };
+  // Note: the CTA anchor click bubbles up to useOriginalVisitTracker's
+  // container-level click listener, which fires exactly one `original_visit`
+  // event for non-playable posts (articles/external/quora). We intentionally
+  // do NOT also fire `article_open` / `external_visit` here — that would
+  // record two separate events for a single Continue Reading / Visit tap and
+  // award the author +2 score instead of +1.
   const formatDate = (dateString: string | null) => {
     if (!dateString) return null;
     try {
@@ -207,6 +206,19 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
   const { excerpt, heroImage } = parseContent();
   const displayImage = proxiedImage(heroImage);
   const isCompact = !excerpt;
+  // No image on the source page → branded platform logo tile so the card
+  // never renders imageless. Purely presentational; no tracking involved.
+  const fallbackKind =
+    platform === 'quora' || data.site?.domain?.includes('quora.com')
+      ? 'quora'
+      : platform === 'external'
+        ? 'external'
+        : 'article';
+  const fallbackIcon =
+    fallbackKind === 'quora' ? quoraIcon : fallbackKind === 'external' ? externalIcon : blogIcon;
+  const fallbackLabel =
+    fallbackKind === 'quora' ? 'Quora' : fallbackKind === 'external' ? 'Link' : 'Article';
+  const fallbackGradient = `var(--thumb-gradient-${fallbackKind})`;
 
   return (
     <article className="rounded-2xl overflow-hidden border border-border bg-card hover:shadow-lg transition-all">
@@ -218,7 +230,7 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
         </h3>
 
         {/* Thumbnail */}
-        {displayImage && (
+        {displayImage ? (
           <div className={`relative w-full ${isCompact ? "h-40" : "h-48"} rounded-xl overflow-hidden bg-muted mx-auto`}>
             <img
               src={displayImage}
@@ -237,6 +249,16 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
                 }
               }}
             />
+          </div>
+        ) : (
+          <div
+            className={`relative w-full ${isCompact ? "h-40" : "h-48"} rounded-xl overflow-hidden mx-auto flex flex-col items-center justify-center gap-2`}
+            style={{ background: fallbackGradient }}
+          >
+            <img src={fallbackIcon} alt="" className="w-10 h-10 opacity-95 invert" />
+            <span className="text-[13px] font-semibold tracking-wide text-background">
+              {fallbackLabel}
+            </span>
           </div>
         )}
 
@@ -286,7 +308,6 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
               href={data.resolvedUrl}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={handleCtaClick}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
               {ctaLabel}

@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Post } from "@/data/demoData";
 import type { PlatformPost } from "@/hooks/useUserPlatformPosts";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
+import { getEmbedStatus, subscribeEmbedReadiness } from "@/lib/embedReadiness";
 
 interface PlatformPostViewerProps {
   userId: string;
@@ -30,6 +31,33 @@ interface ProfileData {
   display_name: string | null;
   avatar_url: string | null;
 }
+
+// Platforms whose embeds hydrate late and resize a lot. For these we render a
+// tight window around the tapped post first (radius 0) and widen it in the
+// background with scroll anchoring — this is what removed the "treadmill"
+// feel on X, and it applies identically to the other heavy embed platforms.
+const X_PLATFORMS = new Set([
+  "x",
+  "twitter",
+  "instagram",
+  "pinterest",
+  "facebook",
+  "youtube",
+  "tiktok",
+]);
+const INITIAL_X_WINDOW_RADIUS = 0;
+const BACKGROUND_X_WINDOW_RADIUS = 2;
+const X_WINDOW_EXPAND_STEP = 4;
+const X_WINDOW_EDGE_PX = 900;
+
+const getXViewerRange = (length: number, index: number, radius: number) => {
+  if (length === 0) return { start: 0, end: -1 };
+  const safeIndex = index >= 0 ? index : 0;
+  return {
+    start: Math.max(0, safeIndex - radius),
+    end: Math.min(length - 1, safeIndex + radius),
+  };
+};
 
 // Render all posts so users can scroll UP to see posts above the tapped one
 // and DOWN to see posts below. We anchor the scroll position to the tapped
@@ -56,6 +84,9 @@ function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { 
     preview_text: post.preview_text,
     preview_title: post.preview_title,
     preview_image_url: post.preview_image_url,
+    media_kind: post.media_kind,
+    aspect_ratio: post.aspect_ratio,
+    suggested_height: post.suggested_height,
     platform: post.platform as any,
     embed_html: post.embed_html,
     timestamp: new Date(post.created_at),
@@ -64,6 +95,9 @@ function transformPost(post: PlatformPost, profileData?: ProfileData): Post & { 
     comments_count: 0,
     isRepost: !!post.is_repost,
     isRealPost: true,
+    pinned_at: (post as any).pinned_at ?? null,
+    hide_counts: !!(post as any).hide_counts,
+    comments_disabled: !!(post as any).comments_disabled,
   } as any;
 }
 
@@ -98,13 +132,34 @@ export const PlatformPostViewer = ({
     },
   });
   const [portalReady, setPortalReady] = useState(false);
-  // Gate the inner content for one paint so the modal's enter animation
-  // (opacity/scale) always plays visibly — otherwise, when profile + posts
-  // are cached, content commits on the same frame as the modal mounts and
-  // the user perceives an instant jump with no transition.
-  const [contentReady, setContentReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const pendingPrependAnchor = useRef<{ postId: string; top: number } | null>(null);
+  // Fires exactly once when the tapped target post is first attached to
+  // the DOM — used to synchronously scroll the container to that post
+  // BEFORE the browser paints, so post #0 never flashes.
+  const initialAnchorDoneRef = useRef(false);
+  // Hide the tapped target post until its first iframe/image has fully
+  // rendered AND its height has stabilised so users don't see the
+  // Instagram "tall footer → trimmed" flash. Falls back after 1400ms so
+  // slow embeds never leave the post invisible.
+  const [targetReady, setTargetReady] = useState(false);
+  useEffect(() => {
+    setTargetReady(false);
+    // Let the post shell appear almost instantly; the embed renders its own
+    // skeleton while third-party SDKs finish inside the card.
+    const check = () => {
+      if (getEmbedStatus(initialPostId) === "ready") {
+        setTargetReady(true);
+        return true;
+      }
+      return false;
+    };
+    if (check()) return;
+    const unsub = subscribeEmbedReadiness(() => { check(); });
+    const cap = window.setTimeout(() => setTargetReady(true), 180);
+    return () => { unsub(); window.clearTimeout(cap); };
+  }, [initialPostId]);
   // Persist scroll-locked state across effect re-runs. Without this, if
   // `posts`/`profileData`/etc change after the user has already started
   // scrolling, the anchoring effect re-runs with userScrolled=false and
@@ -115,6 +170,7 @@ export const PlatformPostViewer = ({
   // (e.g. user tapped a different grid item).
   useEffect(() => {
     userScrolledRef.current = false;
+    initialAnchorDoneRef.current = false;
   }, [initialPostId]);
   const initialIdx = useMemo(
     () => {
@@ -126,6 +182,97 @@ export const PlatformPostViewer = ({
     [posts, initialPostId, initialPostIndex]
   );
   const targetPostId = initialIdx >= 0 ? posts[initialIdx]?.id : undefined;
+  const isXViewer = useMemo(() => {
+    const tab = (activeTab || "").toLowerCase();
+    const targetPlatform = String(posts[initialIdx]?.platform || "").toLowerCase();
+    return X_PLATFORMS.has(tab) || X_PLATFORMS.has(targetPlatform);
+  }, [activeTab, posts, initialIdx]);
+  const [renderRange, setRenderRange] = useState(() =>
+    getXViewerRange(posts.length, initialIdx, INITIAL_X_WINDOW_RADIUS)
+  );
+  const renderedPosts = useMemo(
+    () => isXViewer ? posts.slice(renderRange.start, renderRange.end + 1) : posts,
+    [isXViewer, posts, renderRange.start, renderRange.end]
+  );
+  const renderedPostsRef = useRef(renderedPosts);
+  renderedPostsRef.current = renderedPosts;
+
+  useEffect(() => {
+    postRefs.current.clear();
+    pendingPrependAnchor.current = null;
+    if (isXViewer) {
+      setRenderRange(getXViewerRange(posts.length, initialIdx, INITIAL_X_WINDOW_RADIUS));
+    } else {
+      setRenderRange({ start: 0, end: posts.length - 1 });
+    }
+  }, [isXViewer, posts.length, initialIdx, initialPostId, activeTab]);
+
+  useEffect(() => {
+    if (!isXViewer || initialIdx < 0) return;
+    const t = window.setTimeout(() => {
+      // Record a scroll anchor BEFORE widening the window backwards.
+      // Without this, prepending posts above pushes the content down and the
+      // viewer ends up showing a different post than the one that was tapped.
+      const container = scrollContainerRef.current;
+      const firstId = renderedPostsRef.current[0]?.id;
+      if (container && firstId) {
+        const el = postRefs.current.get(firstId);
+        if (el) {
+          pendingPrependAnchor.current = { postId: firstId, top: el.getBoundingClientRect().top };
+        }
+      }
+      setRenderRange(getXViewerRange(posts.length, initialIdx, BACKGROUND_X_WINDOW_RADIUS));
+    }, 900);
+    return () => window.clearTimeout(t);
+  }, [isXViewer, posts.length, initialIdx, initialPostId]);
+
+  useLayoutEffect(() => {
+    if (!isXViewer) return;
+    const anchor = pendingPrependAnchor.current;
+    const container = scrollContainerRef.current;
+    if (!anchor || !container) return;
+    const el = postRefs.current.get(anchor.postId);
+    if (el) {
+      container.scrollTop += el.getBoundingClientRect().top - anchor.top;
+    }
+    pendingPrependAnchor.current = null;
+  }, [isXViewer, renderRange.start]);
+
+  const expandXWindowIfNeeded = useCallback(() => {
+    if (!isXViewer) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    if (container.scrollTop < X_WINDOW_EDGE_PX && renderRange.start > 0 && renderedPosts.length > 0) {
+      const firstPost = renderedPosts[0];
+      const firstEl = postRefs.current.get(firstPost.id);
+      if (firstEl) {
+        pendingPrependAnchor.current = { postId: firstPost.id, top: firstEl.getBoundingClientRect().top };
+      }
+      setRenderRange((current) => ({
+        ...current,
+        start: Math.max(0, current.start - X_WINDOW_EXPAND_STEP),
+      }));
+    }
+
+    const distanceFromBottom = container.scrollHeight - container.clientHeight - container.scrollTop;
+    if (distanceFromBottom < X_WINDOW_EDGE_PX && renderRange.end < posts.length - 1) {
+      setRenderRange((current) => ({
+        ...current,
+        end: Math.min(posts.length - 1, current.end + X_WINDOW_EXPAND_STEP),
+      }));
+    }
+  }, [isXViewer, posts.length, renderRange.end, renderRange.start, renderedPosts]);
+
+  useEffect(() => {
+    if (!isXViewer) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const onScroll = () => expandXWindowIfNeeded();
+    container.addEventListener("scroll", onScroll, { passive: true });
+    requestAnimationFrame(onScroll);
+    return () => container.removeEventListener("scroll", onScroll);
+  }, [isXViewer, expandXWindowIfNeeded]);
   
   // Touch handling for swipe
   const touchStartX = useRef<number>(0);
@@ -140,21 +287,19 @@ export const PlatformPostViewer = ({
     };
   }, []);
 
-  // Reveal content shortly after mount so the entry animation always plays.
-  useEffect(() => {
-    const t = window.setTimeout(() => setContentReady(true), 180);
-    return () => window.clearTimeout(t);
-  }, []);
-
   // Anchor scroll to the tapped post and keep it anchored while posts above
   // hydrate. Stops anchoring once the user scrolls.
   useLayoutEffect(() => {
-    if (!portalReady || !contentReady || !targetPostId || !profileData) return;
+    if (!portalReady || !targetPostId) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
     let cancelled = false;
     let lastScrollTop = container.scrollTop;
+    // Timestamp of the last genuine pointer/touch contact inside the viewer.
+    // Scroll deltas that happen without recent contact are layout-driven
+    // (embed hydration, browser scroll anchoring) — never user intent.
+    let lastPointerAt = 0;
 
     const anchor = () => {
       if (cancelled || userScrolledRef.current) return;
@@ -215,8 +360,6 @@ export const PlatformPostViewer = ({
     };
     container.addEventListener("wheel", markScrolled, { passive: true });
     container.addEventListener("touchmove", markScrolled, { passive: true });
-    container.addEventListener("pointerdown", markScrolled, { passive: true });
-    container.addEventListener("touchstart", markScrolled, { passive: true });
     container.addEventListener("keydown", markScrolled, { passive: true });
     // Last-resort: any genuine scroll delta the observers didn't catch
     // (momentum, scrollbar drag, programmatic-but-user-initiated) trips
@@ -224,13 +367,17 @@ export const PlatformPostViewer = ({
     const onScroll = () => {
       if (userScrolledRef.current) return;
       const delta = Math.abs(container.scrollTop - lastScrollTop);
-      // Ignore tiny sub-pixel adjustments from our own anchor() writes.
-      if (delta > 8) {
+      // Ignore adjustments that aren't backed by a recent finger/pointer
+      // contact — those come from embeds resizing above the target.
+      if (delta > 8 && performance.now() - lastPointerAt < 700) {
         markScrolled();
       }
       lastScrollTop = container.scrollTop;
     };
     container.addEventListener("scroll", onScroll, { passive: true });
+    const onPointerContact = () => { lastPointerAt = performance.now(); };
+    container.addEventListener("pointerdown", onPointerContact, { passive: true, capture: true });
+    container.addEventListener("touchstart", onPointerContact, { passive: true, capture: true });
 
     // Safety: stop anchoring after 12s — long enough for slow embeds to
     // finish hydrating, short enough to never feel sticky.
@@ -238,7 +385,7 @@ export const PlatformPostViewer = ({
       cancelled = true;
       ro.disconnect();
       mo.disconnect();
-    }, 4000);
+    }, 12000);
 
     return () => {
       cancelled = true;
@@ -247,13 +394,13 @@ export const PlatformPostViewer = ({
       window.clearTimeout(safetyTimeout);
       container.removeEventListener("wheel", markScrolled);
       container.removeEventListener("touchmove", markScrolled);
-      container.removeEventListener("pointerdown", markScrolled);
-      container.removeEventListener("touchstart", markScrolled);
       container.removeEventListener("keydown", markScrolled);
       container.removeEventListener("scroll", onScroll);
+      container.removeEventListener("pointerdown", onPointerContact, true);
+      container.removeEventListener("touchstart", onPointerContact, true);
       container.removeEventListener("load", onAnyLoad, true);
     };
-  }, [portalReady, contentReady, targetPostId, posts, initialIdx, activeTab, profileData]);
+  }, [portalReady, targetPostId, posts, initialIdx, activeTab]);
 
   // Mark all visible posts as seen when viewing profile posts
   useEffect(() => {
@@ -290,10 +437,10 @@ export const PlatformPostViewer = ({
 
   const currentTab = tabs.find(t => t.key === activeTab);
 
-  // Gate post rendering until profile is loaded so the author header never
-  // flashes "Unknown". Also wait for one paint after mount so the modal's
-  // enter animation has a chance to play (otherwise cached opens look instant).
-  const profileReady = !!profileData && contentReady;
+  // Render immediately — the profile header hydrates async without gating
+  // the tapped post. Waiting on `profileData` used to delay first paint by
+  // hundreds of ms and caused the "wrong post opens" bug on cold taps.
+  const profileReady = true;
 
   const viewer = (
     <motion.div
@@ -376,29 +523,67 @@ export const PlatformPostViewer = ({
               <p className="text-muted-foreground">No posts in this section</p>
             </div>
           ) : (
-            posts.map((post, idx) => (
+            renderedPosts.map((post, idx) => {
+              const absoluteIdx = isXViewer ? renderRange.start + idx : idx;
+              return (
               <motion.div
                 key={post.id}
                 ref={(el) => {
                   if (el) postRefs.current.set(post.id, el);
                   else postRefs.current.delete(post.id);
+                  // Synchronously scroll to the tapped post the moment its
+                  // node mounts — before paint, before profile hydrates.
+                  // This eliminates the "wrong post opens for 5-7s" bug.
+                  if (
+                    el &&
+                    post.id === targetPostId &&
+                    !initialAnchorDoneRef.current &&
+                    !userScrolledRef.current
+                  ) {
+                    const container = scrollContainerRef.current;
+                    if (container) {
+                      const targetRect = el.getBoundingClientRect();
+                      const containerRect = container.getBoundingClientRect();
+                      container.scrollTop =
+                        container.scrollTop + (targetRect.top - containerRect.top);
+                      initialAnchorDoneRef.current = true;
+                    }
+                  }
                 }}
-                initial={{ opacity: 0, y: 6 }}
+                initial={post.id === targetPostId ? false : { opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
+                style={
+                  post.id === targetPostId && !targetReady
+                    ? { opacity: 0 }
+                    : undefined
+                }
                 transition={{
                   duration: 0.28,
-                  delay: Math.min(Math.abs(idx - initialIdx), 4) * 0.04,
+                  delay: Math.min(Math.abs(absoluteIdx - initialIdx), 4) * 0.04,
                   ease: [0.22, 1, 0.36, 1],
                 }}
               >
-                <HydratedFeedPost
-                  post={transformPost(post, profileData)}
-                  userId={user?.id}
-                  startHydrated={true}
-                  onDeleted={onClose}
-                />
+                <div className="relative">
+                  {post.id === targetPostId && !targetReady && (
+                    <div className="absolute inset-0 z-10">
+                      <PostSkeleton />
+                    </div>
+                  )}
+                  <HydratedFeedPost
+                    post={transformPost(post, profileData)}
+                    onDeleted={() => {
+                      // Stay inside the viewer after deleting. Only close it
+                      // when this was the last post in the grid.
+                      if (posts.length <= 1) onClose();
+                    }}
+                    userId={user?.id}
+                    startHydrated={true}
+                    fastReveal={isXViewer && post.id === targetPostId}
+                  />
+                </div>
               </motion.div>
-            ))
+              );
+            })
           )}
         </div>
       </div>

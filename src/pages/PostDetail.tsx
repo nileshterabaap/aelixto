@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { markPostSeenImmediate } from "@/hooks/useMarkPostSeen";
@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { HydratedFeedPost } from "@/components/HydratedFeedPost";
 import type { Post } from "@/data/demoData";
 import { AuthCTABar } from "@/components/AuthCTABar";
+import { CommentsDialog } from "@/components/CommentsDialog";
 
 interface SupabasePost {
   id: string;
@@ -32,6 +33,9 @@ interface SupabasePost {
 const PostDetail = () => {
   const { postId } = useParams<{ postId: string }>();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusCommentId = searchParams.get("comment");
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | undefined>();
@@ -51,6 +55,10 @@ const PostDetail = () => {
       fetchPost();
     }
   }, [postId]);
+
+  useEffect(() => {
+    if (focusCommentId && post) setCommentsOpen(true);
+  }, [focusCommentId, post]);
 
   const fetchPost = async () => {
     try {
@@ -145,6 +153,19 @@ const PostDetail = () => {
         <HydratedFeedPost post={post} userId={userId} startHydrated />
       </main>
       {!userId && <AuthCTABar />}
+      <CommentsDialog
+        open={commentsOpen}
+        onOpenChange={(o) => {
+          setCommentsOpen(o);
+          if (!o && focusCommentId) {
+            searchParams.delete("comment");
+            setSearchParams(searchParams, { replace: true });
+          }
+        }}
+        postId={post.id}
+        postAuthorId={(post as any).user_id}
+        highlightCommentId={focusCommentId}
+      />
     </div>
   );
 };
