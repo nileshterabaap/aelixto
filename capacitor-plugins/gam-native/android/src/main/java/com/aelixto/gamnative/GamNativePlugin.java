@@ -60,7 +60,6 @@ import java.util.UUID;
 public class GamNativePlugin extends Plugin {
 
     private static final String TAG = "GamNative";
-    private static final String DIAGNOSTIC_SOURCE = "AELIXTO_GAM_INITIALIZE_2026_08_10_1123";
     private final Map<String, NativeAd> ads = new HashMap<>();
     private final Map<String, ScrollForwardingAdFrame> adViews = new HashMap<>();
     private ConsentInformation consentInformation;
@@ -77,86 +76,8 @@ public class GamNativePlugin extends Plugin {
     private int clipBottomPx = 0;
     private boolean scrollHooked = false;
 
-    /**
-     * DIAGNOSTIC (Threads A/B test): allow media inside the WebView to start
-     * without a user gesture. This only touches WebView media-start
-     * authorization — no ad, tracking, or navigation behaviour changes.
-     *
-     * This is deliberately invoked from initialize(), a JS-driven plugin path
-     * already proven by the ads logs, rather than relying on a startup-only
-     * lifecycle log that can be lost before Logcat attaches. The value is read
-     * back before the required proof line is emitted.
-     */
-    private boolean applyMediaPlaybackDiagnostic() {
-        // WebView methods must run on the thread that created the WebView (the
-        // Android main/UI thread). initialize() arrives on the CapacitorPlugins
-        // thread, so hop to the UI thread and wait for the read-back.
-        final java.util.concurrent.atomic.AtomicBoolean result =
-                new java.util.concurrent.atomic.AtomicBoolean(false);
-        final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
-        Runnable work = () -> {
-            try {
-                result.set(applyMediaPlaybackDiagnosticOnUiThread());
-            } finally {
-                latch.countDown();
-            }
-        };
-        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
-            work.run();
-        } else {
-            new android.os.Handler(android.os.Looper.getMainLooper()).post(work);
-            try {
-                latch.await(3, java.util.concurrent.TimeUnit.SECONDS);
-            } catch (InterruptedException ie) {
-                Thread.currentThread().interrupt();
-            }
-        }
-        return result.get();
-    }
-
-    private boolean applyMediaPlaybackDiagnosticOnUiThread() {
-        try {
-            android.webkit.WebView webView = getBridge() != null ? getBridge().getWebView() : null;
-            if (webView == null) {
-                String skipped = "[webview] diagnostic skipped: bridge WebView unavailable source=" + DIAGNOSTIC_SOURCE;
-                Log.e(TAG, skipped);
-                Log.e("Capacitor/Console", skipped);
-                return false;
-            }
-
-            webView.getSettings().setMediaPlaybackRequiresUserGesture(false);
-            boolean requiresGesture = webView.getSettings().getMediaPlaybackRequiresUserGesture();
-            if (!requiresGesture) {
-                String proof = "[webview] mediaPlaybackRequiresUserGesture=false (diagnostic) source=" + DIAGNOSTIC_SOURCE;
-                // Error priority is intentional for this diagnostic build so the
-                // proof survives restrictive Logcat filters used for release APKs.
-                Log.e(TAG, proof);
-                Log.e("Capacitor/Console", proof);
-                return true;
-            } else {
-                String failed = "[webview] diagnostic setting did not persist source=" + DIAGNOSTIC_SOURCE;
-                Log.e(TAG, failed);
-                Log.e("Capacitor/Console", failed);
-                return false;
-            }
-        } catch (Throwable t) {
-            Log.e(TAG, "[webview] could not relax media gesture requirement source=" + DIAGNOSTIC_SOURCE, t);
-            Log.e("Capacitor/Console", "[webview] could not relax media gesture requirement source=" + DIAGNOSTIC_SOURCE + ": " + t);
-            return false;
-        }
-    }
-
     @PluginMethod
     public void initialize(PluginCall call) {
-        // Deliberately emitted before every dependency call. Log.wtf, stderr,
-        // and Capacitor/Console make this observable independently of ordinary
-        // tag/priority filters. The same literal is validated by Gradle before
-        // this Java source is compiled.
-        String startupMarker = "AELIXTO_GAM_INITIALIZE_ENTERED marker=" + DIAGNOSTIC_SOURCE;
-        Log.wtf(TAG, startupMarker);
-        Log.wtf("Capacitor/Console", startupMarker);
-        System.err.println(startupMarker);
-        final boolean diagnosticApplied = applyMediaPlaybackDiagnostic();
         Log.i(TAG, "[ads] MobileAds.initialize() called");
         // Register the emulator (and any device the developer adds) as a test
         // device so LIVE Ad Manager units also return test creatives instead of
@@ -179,8 +100,6 @@ public class GamNativePlugin extends Plugin {
             }
             JSObject ret = new JSObject();
             ret.put("status", "ready");
-            ret.put("mediaPlaybackRequiresUserGesture", !diagnosticApplied);
-            ret.put("diagnosticSource", DIAGNOSTIC_SOURCE);
             call.resolve(ret);
         });
     }
