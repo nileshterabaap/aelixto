@@ -205,6 +205,7 @@ export type Database = {
           conversation_id: string
           id: string
           joined_at: string
+          last_delivered_at: string | null
           last_read_at: string | null
           user_id: string
         }
@@ -212,6 +213,7 @@ export type Database = {
           conversation_id: string
           id?: string
           joined_at?: string
+          last_delivered_at?: string | null
           last_read_at?: string | null
           user_id: string
         }
@@ -219,6 +221,7 @@ export type Database = {
           conversation_id?: string
           id?: string
           joined_at?: string
+          last_delivered_at?: string | null
           last_read_at?: string | null
           user_id?: string
         }
@@ -498,6 +501,27 @@ export type Database = {
         }
         Relationships: []
       }
+      install_metadata: {
+        Row: {
+          device_id: string
+          first_seen_at: string
+          platform: string | null
+          user_id: string
+        }
+        Insert: {
+          device_id: string
+          first_seen_at?: string
+          platform?: string | null
+          user_id: string
+        }
+        Update: {
+          device_id?: string
+          first_seen_at?: string
+          platform?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       likes: {
         Row: {
           created_at: string
@@ -771,9 +795,11 @@ export type Database = {
           broken_check_count: number
           broken_first_seen_at: string | null
           comments_count: number | null
+          comments_disabled: boolean
           content: string
           created_at: string
           embed_html: string | null
+          hide_counts: boolean
           id: string
           is_public: boolean
           last_validated_at: string | null
@@ -781,6 +807,7 @@ export type Database = {
           media_kind: string | null
           media_type: string | null
           media_url: string | null
+          pinned_at: string | null
           platform: string | null
           preview_image_url: string | null
           preview_text: string | null
@@ -798,9 +825,11 @@ export type Database = {
           broken_check_count?: number
           broken_first_seen_at?: string | null
           comments_count?: number | null
+          comments_disabled?: boolean
           content: string
           created_at?: string
           embed_html?: string | null
+          hide_counts?: boolean
           id?: string
           is_public?: boolean
           last_validated_at?: string | null
@@ -808,6 +837,7 @@ export type Database = {
           media_kind?: string | null
           media_type?: string | null
           media_url?: string | null
+          pinned_at?: string | null
           platform?: string | null
           preview_image_url?: string | null
           preview_text?: string | null
@@ -825,9 +855,11 @@ export type Database = {
           broken_check_count?: number
           broken_first_seen_at?: string | null
           comments_count?: number | null
+          comments_disabled?: boolean
           content?: string
           created_at?: string
           embed_html?: string | null
+          hide_counts?: boolean
           id?: string
           is_public?: boolean
           last_validated_at?: string | null
@@ -835,6 +867,7 @@ export type Database = {
           media_kind?: string | null
           media_type?: string | null
           media_url?: string | null
+          pinned_at?: string | null
           platform?: string | null
           preview_image_url?: string | null
           preview_text?: string | null
@@ -1141,15 +1174,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      am_i_blocked_by: { Args: { _target: string }; Returns: boolean }
+      are_blocked: { Args: { _a: string; _b: string }; Returns: boolean }
+      can_view_follow_list: {
+        Args: { _kind: string; _target: string; _viewer: string }
+        Returns: boolean
+      }
+      can_view_profile_posts: { Args: { _target: string }; Returns: boolean }
       cancel_follow_or_request: {
         Args: { _target: string }
         Returns: undefined
       }
       create_short_link: { Args: { p_target_path: string }; Returns: string }
+      delete_conversation: {
+        Args: { _conversation_id: string }
+        Returns: boolean
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
+      delete_post_with_score: { Args: { p_post_id: string }; Returns: Json }
+      email_queue_dispatch: { Args: never; Returns: undefined }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
         Returns: number
@@ -1328,9 +1374,11 @@ export type Database = {
           target_user: string
         }
         Returns: {
+          comments_disabled: boolean
           content: string
           created_at: string
           embed_html: string
+          hide_counts: boolean
           id: string
           is_public: boolean
           is_repost: boolean
@@ -1338,6 +1386,7 @@ export type Database = {
           media_type: string
           media_url: string
           original_user_id: string
+          pinned_at: string
           platform: string
           saves_count: number
           thumbnail_url: string
@@ -1366,6 +1415,15 @@ export type Database = {
         }
         Returns: number
       }
+      notif_flag_allowed: {
+        Args: { _key: string; _recipient: string }
+        Returns: boolean
+      }
+      notif_scope_allowed: {
+        Args: { _actor: string; _key: string; _recipient: string }
+        Returns: boolean
+      }
+      post_delete_score_preview: { Args: { p_post_id: string }; Returns: Json }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
@@ -1540,6 +1598,7 @@ export type Database = {
           username: string
         }[]
       }
+      start_conversation: { Args: { _other_user_id: string }; Returns: string }
       update_post_dimensions: {
         Args: { _aspect?: number; _height: number; _post_id: string }
         Returns: undefined
