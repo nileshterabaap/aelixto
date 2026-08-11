@@ -227,11 +227,7 @@ className="h-14 w-14"
           >
             <h1
               className="absolute inset-0 flex items-center justify-center text-3xl font-bold tracking-tight"
-              style={{
-                backfaceVisibility: "hidden",
-                WebkitBackfaceVisibility: "hidden",
-                color: "hsl(var(--brand-blue))",
-              }}
+              style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
             >
               Aelixto
             </h1>

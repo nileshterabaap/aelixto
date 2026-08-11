@@ -50,7 +50,7 @@ const fetchOrCreateProfile = async (userId: string, email?: string, userMetadata
     bio: null,
     cover_url: null,
     aelix_score: 0,
-    settings: { aelix_score_enabled: false },
+    settings: {},
   };
 
   const { data: created, error: createError } = await supabase
@@ -71,14 +71,10 @@ export const useCurrentProfile = () => {
     queryKey: ['profile', user?.id],
     queryFn: () => fetchOrCreateProfile(user!.id, user!.email, user!.user_metadata),
     enabled: !!user && !sessionLoading,
-    // Score changes should surface quickly. Keep the cache warm for instant
-    // paint, but always trigger a background refetch on mount/focus so the
-    // displayed Aelix Score reflects the latest server value without needing
-    // a manual pull-to-refresh.
-    staleTime: 30 * 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
-    refetchOnWindowFocus: true,
-    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const updateMutation = useMutation({

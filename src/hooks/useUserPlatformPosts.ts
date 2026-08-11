@@ -19,18 +19,12 @@ export interface PlatformPost {
   preview_text?: string | null;
   preview_title?: string | null;
   preview_image_url?: string | null;
-  media_kind?: string | null;
-  aspect_ratio?: number | null;
-  suggested_height?: number | null;
   is_public: boolean;
   is_repost: boolean;
   original_user_id: string | null;
   profile_username?: string | null;
   profile_display_name?: string | null;
   profile_avatar_url?: string | null;
-  pinned_at?: string | null;
-  hide_counts?: boolean;
-  comments_disabled?: boolean;
 }
 
 const THUMB_BACKFILL_PLATFORMS = new Set(["instagram", "facebook", "reddit", "threads", "linkedin", "tiktok", "article", "medium"]);
@@ -50,25 +44,10 @@ const isLikelyExpiringMetaCdnUrl = (url?: string | null) => {
   );
 };
 
-const isMetaAvatarUrl = (url?: string | null) => {
-  if (!url) return false;
-  const lower = url.toLowerCase();
-  if (lower.includes("profile_pic")) return true;
-  if (/\/t\d+\.[\d-]*-19\//.test(lower)) return true;
-  if (/[?&]stp=[^&]*_19/.test(lower)) return true;
-  return false;
-};
-
 const isGenericPlaceholderThumbnail = (url?: string | null) => {
   if (!url) return false;
   const lower = url.toLowerCase();
-  return (
-    lower.includes("images.unsplash.com") ||
-    lower.includes("source.unsplash.com") ||
-    // Reddit's branded fallback/logo thumbnails — never a real post preview.
-    lower.includes("redditstatic.com") ||
-    lower.includes("share.redd.it/preview/post")
-  );
+  return lower.includes("images.unsplash.com") || lower.includes("source.unsplash.com");
 };
 
 const hasUsableTextThumbnail = (post: PlatformPost) => {
@@ -92,8 +71,7 @@ async function backfillThumbnail(post: PlatformPost, force = false) {
   // article) we can skip backfill when text is already usable.
   const imageFirstPlatform =
     platform === "reddit" || platform === "instagram" ||
-    platform === "facebook" || platform === "linkedin" || platform === "tiktok" ||
-    platform === "pinterest" || platform === "threads";
+    platform === "facebook" || platform === "linkedin" || platform === "tiktok" || platform === "pinterest";
   if (!post.thumbnail_url && !imageFirstPlatform && hasUsableTextThumbnail(post)) return;
 
   const key = `${post.id}:${platform}`;
@@ -119,10 +97,6 @@ async function persistExistingThumbnail(post: PlatformPost) {
   if (!post.thumbnail_url) return;
   const platform = (post.platform || "").toLowerCase();
   if (!THUMB_BACKFILL_PLATFORMS.has(platform)) return;
-  // Never re-host a Threads author avatar into our storage — once copied it
-  // loses the Meta "-19" bucket marker and starts rendering as the post's
-  // thumbnail instead of the typographic text card.
-  if (platform === "threads" && isMetaAvatarUrl(post.thumbnail_url)) return;
   if (!isLikelyExpiringMetaCdnUrl(post.thumbnail_url)) return;
 
   const key = `${post.id}:persist:${platform}`;
@@ -182,23 +156,11 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
         if (!cursor) break;
       }
 
-      // Pinned posts are returned first by the RPC, which breaks the
-      // created_at cursor ordering and can re-emit the same post on a later
-      // page. Keep only the first occurrence of each post id.
-      const seenIds = new Set<string>();
-      const deduped = all.filter((post) => {
-        if (!post.id || seenIds.has(post.id)) return false;
-        seenIds.add(post.id);
-        return true;
-      });
-      all.length = 0;
-      all.push(...deduped);
-
       const postIds = all.map((post) => post.id).filter(Boolean);
       const { data: postDetails } = postIds.length
         ? await supabase
             .from("posts")
-            .select("id, title, content, thumbnail_url, preview_text, preview_title, preview_image_url, media_kind, aspect_ratio, suggested_height, pinned_at, hide_counts, comments_disabled")
+            .select("id, title, content, thumbnail_url, preview_text, preview_title, preview_image_url")
             .in("id", postIds)
         : { data: [] };
 
@@ -247,8 +209,7 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
 
     const imageFirstPlatform =
       platformLower === "reddit" || platformLower === "instagram" ||
-      platformLower === "facebook" || platformLower === "linkedin" || platformLower === "tiktok" ||
-      platformLower === "pinterest" || platformLower === "threads";
+      platformLower === "facebook" || platformLower === "linkedin" || platformLower === "tiktok" || platformLower === "pinterest";
     const missing = items.filter((p) => {
       if (!p.media_url) return false;
       const noThumb = !p.thumbnail_url || isGenericPlaceholderThumbnail(p.thumbnail_url);

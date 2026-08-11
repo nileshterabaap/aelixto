@@ -1,1 +1,0 @@
-UPDATE public.posts SET media_kind = NULL WHERE lower(platform) = 'threads' AND media_kind = 'text';

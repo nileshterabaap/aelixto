@@ -27,34 +27,12 @@ function isDirectImageUrl(url?: string | null): boolean {
   }
 }
 
-function isRedditMediaHost(url?: string | null): boolean {
-  if (!url) return false;
-  try {
-    const host = new URL(url).hostname.toLowerCase();
-    return (
-      host === "i.redd.it" ||
-      host === "preview.redd.it" ||
-      host === "external-preview.redd.it" ||
-      host.endsWith("redditmedia.com")
-    );
-  } catch {
-    return false;
-  }
-}
-
 function isTextOnlySocialAvatar(platform: string, url: string): boolean {
   const lower = url.toLowerCase();
   if ((platform === "twitter" || platform === "x") && lower.includes("pbs.twimg.com/profile_images/")) {
     return true;
   }
   if ((platform === "twitter" || platform === "x") && lower.includes("abs.twimg.com/")) {
-    return true;
-  }
-  // Twitter's generic OG/summary card art (not the tweet's own media).
-  if ((platform === "twitter" || platform === "x") && lower.includes("pbs.twimg.com/card_img/")) {
-    return true;
-  }
-  if ((platform === "twitter" || platform === "x") && lower.includes("pbs.twimg.com/semantic_core_img/")) {
     return true;
   }
   if (platform === "threads" && isThreadsProfilePictureUrl(lower)) {
@@ -66,13 +44,6 @@ function isTextOnlySocialAvatar(platform: string, url: string): boolean {
 function isThreadsProfilePictureUrl(lowerUrl: string): boolean {
   if (lowerUrl.includes("profile_pic")) return true;
   if (lowerUrl.includes("/t51.82787-19/")) return true;
-  // Meta CDN profile-picture buckets all end in "-19" (t51.2885-19,
-  // t51.82787-19, t51.30982-19, ...). Any Threads/IG CDN asset served from
-  // one of those buckets is an avatar, never the post's own media.
-  if (/\/t\d+\.[\d-]*-19\//.test(lowerUrl)) return true;
-  if (/[?&]stp=[^&]*_19/.test(lowerUrl)) return true;
-  if (lowerUrl.includes("cdninstagram.com") && lowerUrl.includes("-19/")) return true;
-  if (lowerUrl.includes("fbcdn.net") && lowerUrl.includes("-19/")) return true;
   return false;
 }
 
@@ -96,6 +67,7 @@ export function getPostThumb(p: {
   const piu = p.preview_image_url || p.previewImageUrl;
   const mu = p.media_url || p.mediaUrl;
   const authorAvatar = p.author_avatar_url || p.profile_avatar_url || null;
+  const previewIsThreadsAvatar = platform === "threads" && piu ? isThreadsProfilePictureUrl(decodeHtmlEntities(piu).toLowerCase()) : false;
 
   // 1) server-derived thumbnail wins (decode HTML entities first),
   //    BUT filter out misleading generic OG placeholders (e.g. Unsplash
@@ -111,7 +83,7 @@ export function getPostThumb(p: {
     // typographic TextCardThumbnail can render the actual text instead
     // of a misleading avatar tile.
     const matchesOwnAvatar = !!authorAvatar && sameUrl(decoded, authorAvatar);
-    if (matchesOwnAvatar || isMisleadingThumbnail(platform, decoded) || isTextOnlySocialAvatar(platform, decoded)) {
+    if (matchesOwnAvatar || previewIsThreadsAvatar || isMisleadingThumbnail(platform, decoded) || isTextOnlySocialAvatar(platform, decoded)) {
       // Fall through to platform/media derivations or placeholder.
     } else {
       return decoded;
@@ -122,9 +94,8 @@ export function getPostThumb(p: {
   // Use them consistently anywhere a grid/share card asks for a post thumb.
   if (piu) {
     const decoded = decodeHtmlEntities(piu);
-    const isThreadsAvatar = platform === "threads" && isThreadsProfilePictureUrl(decoded.toLowerCase());
     const matchesOwnAvatar = !!authorAvatar && sameUrl(decoded, authorAvatar);
-    if (!matchesOwnAvatar && !isThreadsAvatar && !isMisleadingThumbnail(platform, decoded) && !isTextOnlySocialAvatar(platform, decoded)) {
+    if (!matchesOwnAvatar && !isMisleadingThumbnail(platform, decoded) && !isTextOnlySocialAvatar(platform, decoded)) {
       return decoded;
     }
   }
@@ -140,21 +111,6 @@ export function getPostThumb(p: {
   //     Never return a reddit post page URL as an <img> src, and never fall
   //     back to the Aelixto user's avatar.
   if (platform === "reddit") {
-    // Prefer real Reddit media hosts stored on either thumbnail_url or
-    // preview_image_url — these are the actual post images/gifs and should
-    // beat the platform-branded text card.
-    if (tu) {
-      const decoded = decodeHtmlEntities(tu);
-      if (isRedditMediaHost(decoded) || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(decoded)) {
-        return decoded;
-      }
-    }
-    if (piu) {
-      const decoded = decodeHtmlEntities(piu);
-      if (isRedditMediaHost(decoded) || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(decoded)) {
-        return decoded;
-      }
-    }
     if (isDirectImageUrl(mu)) return mu!;
     return null;
   }
@@ -219,20 +175,6 @@ export function maybeProxy(url?: string | null, w = 480) {
     return null;
   }
   
-  // Some CDNs (Quora's qph.*.quoracdn.net, LinkedIn's licdn.com) hotlink-block
-  // direct <img> requests from third-party origins, so grid tiles render blank
-  // even though the same image works inside the embed (which proxies it).
-  // Route those hosts through our img-proxy edge function.
-  try {
-    const host = new URL(url).hostname;
-    if (/(^|\.)quoracdn\.net$|^qph\.|(^|\.)licdn\.com$/i.test(host)) {
-      const base = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-      if (base) return `${base}/functions/v1/img-proxy?u=${encodeURIComponent(url)}`;
-    }
-  } catch {
-    // fall through
-  }
-
   // Return ALL URLs directly - no proxying needed
   // Supabase storage URLs are permanent and public
   // YouTube thumbnails are stable

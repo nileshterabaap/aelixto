@@ -17,9 +17,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 import { SwipeableView } from "@/components/SwipeableView";
-import { markScrolledPast, reorderBySlowness, subscribeEmbedReadiness } from "@/lib/embedReadiness";
-import { useFeedWithAds } from "@/hooks/useFeedWithAds";
-import { NativeFeedAd } from "@/components/ads/NativeFeedAd";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -32,25 +29,16 @@ const Index = () => {
 
   // How many people does this user follow? Used to differentiate the
   // "Nothing here yet" (no follows) vs "No posts yet" (follows have no posts) states.
-  const seenFeedStorageKey = user?.id ? `aelixto-has-had-feed:${user.id}` : null;
-  const [hasHadFeedPosts, setHasHadFeedPosts] = useState(false);
-
-  useEffect(() => {
-    if (!seenFeedStorageKey) {
-      setHasHadFeedPosts(false);
-      return;
-    }
-    setHasHadFeedPosts(window.localStorage.getItem(seenFeedStorageKey) === "1");
-  }, [seenFeedStorageKey]);
-
-  const { data: followingCount, isLoading: followingCountLoading, isError: followingCountError } = useQuery({
+  const { data: followingCount } = useQuery({
     queryKey: ["my-following-count", user?.id],
     enabled: !!user?.id,
     staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_following_count" as any);
-      if (error) throw error;
-      return Number(data ?? 0);
+      const { count } = await supabase
+        .from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("follower_id", user!.id);
+      return count ?? 0;
     },
   });
 
@@ -59,8 +47,7 @@ const Index = () => {
   const { data: hasSeenAnyPosts } = useQuery({
     queryKey: ["has-seen-any-posts", user?.id],
     enabled: !!user?.id,
-    staleTime: 0,
-    refetchOnMount: "always",
+    staleTime: 30_000,
     queryFn: async () => {
       const { count } = await (supabase as any)
         .from("post_seen")
@@ -72,10 +59,8 @@ const Index = () => {
   });
   
   
-  // Demo feed for signed-out users — only fetched when actually shown
-  const isDemoModeEnv = import.meta.env.VITE_DEMO_MODE === "true";
-  const enableDemoFetch = !user && isDemoModeEnv;
-  const { data: demoPostsData, isLoading: demoLoading } = usePosts({ enabled: enableDemoFetch });
+  // Demo feed for signed-out users
+  const { data: demoPostsData, isLoading: demoLoading } = usePosts();
 
   // Following feed for signed-in users
   const {
@@ -86,7 +71,7 @@ const Index = () => {
     hasMore,
   } = useFollowingFeed();
 
-  const isDemoMode = isDemoModeEnv;
+  const isDemoMode = import.meta.env.VITE_DEMO_MODE === "true";
   const isSignedOut = !user;
   const showDemoFeed = isSignedOut && isDemoMode;
 
@@ -113,9 +98,6 @@ const Index = () => {
         preview_text: post.preview_text,
         preview_title: post.preview_title,
         preview_image_url: post.preview_image_url,
-        aspect_ratio: (post as any).aspect_ratio,
-        media_kind: (post as any).media_kind,
-        suggested_height: (post as any).suggested_height,
         platform: post.platform as
           | "youtube"
           | "instagram"
@@ -157,8 +139,6 @@ const Index = () => {
       preview_title: post.preview_title,
       preview_image_url: post.preview_image_url,
       suggested_height: post.suggested_height,
-      aspect_ratio: post.aspect_ratio,
-      media_kind: post.media_kind,
       platform: post.platform as
         | "youtube"
         | "instagram"
@@ -179,53 +159,12 @@ const Index = () => {
   }, [followingPosts, showDemoFeed]);
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
-
-  // Subscribe to embed readiness so the feed reflows when slow posts time out
-  // or when previously-slow posts finish loading.
-  const [readinessTick, setReadinessTick] = useState(0);
-  useEffect(() => subscribeEmbedReadiness(() => setReadinessTick((t) => t + 1)), []);
-
-  // Reordered feed: posts whose embeds are still loading past the slow threshold
-  // sink below faster ones, but only for posts the user hasn't already committed
-  // to (rendered successfully or scrolled past).
-  const displayPosts = useMemo(
-    () => reorderBySlowness(allPosts as Array<{ id: string } & Record<string, any>>),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allPosts, readinessTick]
-  ) as typeof allPosts;
-
-  // Mark posts as "scrolled past" so they lock in place and never reshuffle
-  // under the user's eyes once they've moved beyond them.
-  const pastObserverRef = useRef<IntersectionObserver | null>(null);
-  useEffect(() => {
-    pastObserverRef.current = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const id = entry.target.getAttribute("data-feed-item-id");
-          if (!id) continue;
-          // boundingClientRect.bottom < 0 means the whole item is above the viewport top.
-          if (!entry.isIntersecting && entry.boundingClientRect.bottom < 0) {
-            markScrolledPast(id);
-          }
-        }
-      },
-      { rootMargin: "0px", threshold: 0 }
-    );
-    return () => pastObserverRef.current?.disconnect();
-  }, []);
-  const observeForPast = useCallback((el: HTMLElement | null) => {
-    const obs = pastObserverRef.current;
-    if (!obs || !el) return;
-    obs.observe(el);
-  }, []);
+  
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
-    useMemo(() => displayPosts.map((p) => p.id), [displayPosts])
+    useMemo(() => allPosts.map((p) => p.id), [allPosts])
   );
-
-  // Interleave native ads after every N posts (only for eligible native users).
-  const feedWithAds = useFeedWithAds(displayPosts as Array<{ id: string } & Record<string, any>>);
 
   useEffect(() => {
     if (!sessionLoading && !user && !isDemoMode) {
@@ -237,43 +176,19 @@ const Index = () => {
   useEffect(() => {
     if (allPosts.length > 0) {
       hasRenderedOnce.current = true;
-      if (seenFeedStorageKey) {
-        window.localStorage.setItem(seenFeedStorageKey, "1");
-        setHasHadFeedPosts(true);
-        queryClient.setQueryData(["has-seen-any-posts", user?.id], true);
-      }
     }
-  }, [allPosts.length, queryClient, seenFeedStorageKey, user?.id]);
+  }, [allPosts.length]);
 
   const handleRefresh = useCallback(async () => {
-    // Collapse the infinite feed back to a single page first. Otherwise every
-    // loaded page is refetched sequentially on refresh, which is what makes the
-    // spinner feel "stuck" after the user has scrolled a while.
-    if (!showDemoFeed) {
-      queryClient.setQueryData(["following-feed"], (old: any) =>
-        old?.pages?.length > 1
-          ? { pages: old.pages.slice(0, 1), pageParams: old.pageParams.slice(0, 1) }
-          : old,
-      );
-    }
-
-    // Only await the primary list; secondary counters refresh in the background
-    // so the indicator never waits on them.
-    queryClient.invalidateQueries({ queryKey: ["my-following-count", user?.id] });
-    queryClient.invalidateQueries({ queryKey: ["has-seen-any-posts", user?.id] });
-
-    await queryClient.refetchQueries({
-      queryKey: showDemoFeed ? ["posts"] : ["following-feed"],
-      type: "active",
-    });
-  }, [queryClient, showDemoFeed, user?.id]);
+    await queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] });
+  }, [queryClient, showDemoFeed]);
 
   // Data-friendly invisible pagination: load the next page only when the
   // user reaches a post ~7 items before the end. Uses an IntersectionObserver
   // attached to that specific post so nothing fetches until it's actually
   // needed — and no loader is ever shown.
   const PREFETCH_OFFSET = 7;
-  const prefetchTriggerIndex = Math.max(0, displayPosts.length - PREFETCH_OFFSET);
+  const prefetchTriggerIndex = Math.max(0, allPosts.length - PREFETCH_OFFSET);
   const prefetchSentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     if (!hasMore || showDemoFeed) return;
@@ -287,20 +202,13 @@ const Index = () => {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, loadMore, showDemoFeed, displayPosts.length, prefetchTriggerIndex]);
+  }, [hasMore, loadMore, showDemoFeed, allPosts.length, prefetchTriggerIndex]);
 
   // Only show skeleton on truly empty first load - prevent flicker
   const loading = showDemoFeed ? demoLoading : followingLoading;
   const shouldShowSkeleton = !hasRenderedOnce.current && (sessionLoading || loading) && allPosts.length === 0;
-  const hasKnownSeenPosts = Boolean(hasSeenAnyPosts || hasHadFeedPosts);
-  const shouldWaitForEmptyState =
-    !showDemoFeed &&
-    followingEmpty &&
-    !hasKnownSeenPosts &&
-    (followingCountLoading || followingCount === undefined) &&
-    !followingCountError;
 
-  if (shouldShowSkeleton || shouldWaitForEmptyState) {
+  if (shouldShowSkeleton) {
     return (
       <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
         <div className="min-h-screen bg-background pb-20">
@@ -325,7 +233,7 @@ const Index = () => {
       <PullToRefresh onRefresh={handleRefresh}>
         <main className="mx-auto max-w-2xl px-4 py-6">
           {!showDemoFeed && followingEmpty ? (
-            followingCount === 0 && !hasKnownSeenPosts && !followingCountError ? (
+            (followingCount ?? 0) === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <h2 className="text-xl font-semibold">Nothing here yet 👀</h2>
                 <p className="text-sm text-muted-foreground mt-2">
@@ -341,7 +249,7 @@ const Index = () => {
                   Discover people to follow
                 </Link>
               </div>
-            ) : hasKnownSeenPosts ? (
+            ) : hasSeenAnyPosts ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <CheckCircle2 className="h-10 w-10 text-primary mb-3" strokeWidth={1.5} />
                 <h2 className="text-xl font-semibold">You're all caught up</h2>
@@ -359,33 +267,25 @@ const Index = () => {
             )
           ) : (
             <div className="space-y-6">
-              {feedWithAds.map((item) => {
-                if (item.kind === 'ad') {
-                  return <NativeFeedAd key={`ad-${item.slotIndex}`} />;
-                }
-                const post = item.post as any;
-                const index = item.slotIndex;
-                return (
-                  <div
-                    key={post.id}
-                    ref={(el) => {
-                      registerItem(post.id)(el);
-                      if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
-                      if (el) observeForPast(el);
-                      if (index === prefetchTriggerIndex) {
-                        prefetchSentinelRef.current = el;
-                      }
-                    }}
-                    data-feed-item-id={post.id}
-                  >
-                    <FeedPost
-                      post={post}
-                      userId={user?.id}
-                      startHydrated={index < 4}
-                    />
-                  </div>
-                );
-              })}
+              {allPosts.map((post, index) => (
+                <div 
+                  key={post.id} 
+                  ref={(el) => {
+                    registerItem(post.id)(el);
+                    if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
+                    if (index === prefetchTriggerIndex) {
+                      prefetchSentinelRef.current = el;
+                    }
+                  }}
+                  data-feed-item-id={post.id}
+                >
+                  <FeedPost 
+                    post={post} 
+                    userId={user?.id} 
+                    startHydrated={index < 4}
+                  />
+                </div>
+              ))}
               {/* No visible loader — pagination happens silently far before
                   the user reaches the end. */}
               {/* All caught up message */}

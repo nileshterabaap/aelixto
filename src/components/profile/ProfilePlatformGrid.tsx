@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pin } from "lucide-react";
 import { getPostThumb, maybeProxy } from "@/lib/getPostThumb";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 import { getThumbnailText } from "@/lib/getThumbnailText";
@@ -12,7 +11,7 @@ import FacebookIcon from "@/assets/platforms/facebook.svg";
 import YoutubeIcon from "@/assets/platforms/youtube.svg";
 import TiktokIcon from "@/assets/platforms/tiktok.svg";
 import XIcon from "@/assets/platforms/x.svg";
-import BlogIcon from "@/assets/platforms/articles.svg";
+import BlogIcon from "@/assets/platforms/blog.svg";
 import ThreadsIcon from "@/assets/platforms/threads.svg";
 import RedditIcon from "@/assets/platforms/reddit.svg";
 import PinterestIcon from "@/assets/platforms/pinterest.svg";
@@ -22,62 +21,14 @@ import QuoraIcon from "@/assets/platforms/quora.svg";
 import ExternalIcon from "@/assets/platforms/external.svg";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 import { PlatformPostViewer } from "./PlatformPostViewer";
-import { PostOwnerActionsSheet } from "./PostOwnerActionsSheet";
 
-function PostCard({ post, onClick, onLongPress }: { 
+function PostCard({ post, onClick }: { 
   post: PlatformPost; 
   onClick: () => void;
-  onLongPress?: () => void;
   eager?: boolean;
 }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
-  const isPinned = !!post.pinned_at;
-
-  // Long-press detection (touch + mouse) — opens the owner actions sheet.
-  const longPressTimer = useRef<number | null>(null);
-  const suppressClickRef = useRef(false);
-  const startLongPress = () => {
-    if (!onLongPress) return;
-    suppressClickRef.current = false;
-    if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
-    longPressTimer.current = window.setTimeout(() => {
-      suppressClickRef.current = true;
-      onLongPress();
-    }, 450);
-  };
-  const cancelLongPress = () => {
-    if (longPressTimer.current) {
-      window.clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  };
-  const handleClick = () => {
-    if (suppressClickRef.current) {
-      suppressClickRef.current = false;
-      return;
-    }
-    onClick();
-  };
-  const pressProps = onLongPress
-    ? {
-        onTouchStart: startLongPress,
-        onTouchEnd: cancelLongPress,
-        onTouchMove: cancelLongPress,
-        onTouchCancel: cancelLongPress,
-        onMouseDown: startLongPress,
-        onMouseUp: cancelLongPress,
-        onMouseLeave: cancelLongPress,
-        onContextMenu: (e: React.MouseEvent) => { e.preventDefault(); },
-      }
-    : {};
-
-  const PinBadge = () =>
-    isPinned ? (
-      <div className="absolute top-2 left-2 z-10 grid place-items-center h-7 w-7 rounded-full bg-black/40 backdrop-blur-sm">
-        <Pin className="h-3.5 w-3.5 text-neutral-300 fill-neutral-300" style={{ transform: 'rotate(45deg)' }} />
-      </div>
-    ) : null;
   
   // YouTube uses 16:9, all others use 3:4 portrait
   const getAspectRatio = () => post.platform === "youtube" ? "aspect-video" : "aspect-[3/4]";
@@ -155,17 +106,14 @@ function PostCard({ post, onClick, onLongPress }: {
   // Show platform-branded fallback when no thumbnail or image error
   if (!src || src === "/placeholder.svg") {
     const textSource = getThumbnailText(post);
-    // Threads (like X and Reddit) should always render a branded text card
-    // instead of falling back to the author's profile picture.
-    const useProfileFallback = false;
+    const useProfileFallback =
+      !textSource && ["threads", "x", "twitter"].includes(platform);
     const aspect = getAspectRatio();
     return (
       <button
-        onClick={handleClick}
-        {...pressProps}
-        className={`press-in relative overflow-hidden rounded-2xl ${aspect} block w-full bg-muted/70`}
+        onClick={onClick}
+        className={`relative overflow-hidden rounded-2xl ${aspect} block w-full bg-muted/70`}
       >
-        <PinBadge />
         <TextCardThumbnail
           platform={post.platform}
           text={textSource}
@@ -181,11 +129,9 @@ function PostCard({ post, onClick, onLongPress }: {
 
   return (
     <button
-      onClick={handleClick}
-      {...pressProps}
-      className={`press-in relative overflow-hidden rounded-2xl ${getAspectRatio()} block w-full bg-muted/70 group`}
+      onClick={onClick}
+      className={`relative overflow-hidden rounded-2xl ${getAspectRatio()} block w-full bg-muted/70 group`}
     >
-      <PinBadge />
       {!imageLoaded && (
         <div
           className="absolute inset-0 bg-muted/70 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/40 before:to-transparent before:animate-shimmer"
@@ -219,8 +165,6 @@ interface ProfilePlatformGridProps {
   activeTab: string;
   tabs: PlatformTab[];
   onTabChange: (tab: string) => void;
-  isOwner?: boolean;
-  currentUserId?: string;
 }
 
 export const ProfilePlatformGrid = ({
@@ -228,8 +172,6 @@ export const ProfilePlatformGrid = ({
   activeTab,
   tabs,
   onTabChange,
-  isOwner = false,
-  currentUserId,
 }: ProfilePlatformGridProps) => {
   const { items, loading, hasMore, loadMore } = useUserPlatformPosts(
     userId,
@@ -238,7 +180,6 @@ export const ProfilePlatformGrid = ({
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedPostIndex, setSelectedPostIndex] = useState<number>(-1);
-  const [actionsPost, setActionsPost] = useState<PlatformPost | null>(null);
   const location = useLocation();
 
   // Close the viewer when the route/location changes (e.g. user taps a nav button)
@@ -342,11 +283,6 @@ export const ProfilePlatformGrid = ({
                     <PostCard
                       post={post}
                       onClick={() => handlePostClick(post.id, idx)}
-                      onLongPress={
-                        isOwner && currentUserId && !post.is_repost
-                          ? () => setActionsPost(post)
-                          : undefined
-                      }
                     />
                   </div>
                 ))}
@@ -382,21 +318,6 @@ export const ProfilePlatformGrid = ({
           onTabChange={(tab) => {
             onTabChange(tab);
           }}
-        />
-      )}
-
-      {actionsPost && currentUserId && (
-        <PostOwnerActionsSheet
-          open={!!actionsPost}
-          onOpenChange={(v) => { if (!v) setActionsPost(null); }}
-          postId={actionsPost.id}
-          userId={currentUserId}
-          platform={actionsPost.platform}
-          isPinned={!!actionsPost.pinned_at}
-          hideCounts={!!actionsPost.hide_counts}
-          commentsDisabled={!!actionsPost.comments_disabled}
-          isRepost={!!actionsPost.is_repost}
-          currentCaption={actionsPost.content || ""}
         />
       )}
     </>

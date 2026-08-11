@@ -1,1 +1,0 @@
-DELETE FROM public.link_previews WHERE url ILIKE '%quora.com%';

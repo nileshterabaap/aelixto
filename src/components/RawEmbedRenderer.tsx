@@ -102,22 +102,6 @@ const normalizeFacebookIframeEmbed = (html: string): string => {
   }
 };
 
-// Sandbox Spotify iframes so taps inside the embed can't navigate the top window.
-// Mirrors the Pinterest fix: allow scripts/media/presentation, block top navigation.
-const normalizeSpotifyIframeEmbed = (html: string): string => {
-  try {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const iframes = doc.querySelectorAll('iframe[src*="open.spotify.com"], iframe[src*="spotify.com/embed"]');
-    if (!iframes.length) return html;
-    iframes.forEach((iframe) => {
-      iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-presentation allow-popups');
-    });
-    return doc.body.innerHTML;
-  } catch {
-    return html;
-  }
-};
-
 /**
  * Decode HTML entities inside blockquote text nodes so raw codes like &#064;
  * don't flash before the Threads SDK replaces them with an iframe.
@@ -156,7 +140,7 @@ const sanitizeEmbedHtml = (html: string): string => {
   
   return DOMPurify.sanitize(processedHtml, {
     ALLOWED_TAGS: ['blockquote', 'div', 'iframe', 'a', 'p', 'br', 'span', 'img', 'svg', 'path', 'title', 'section'],
-    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling', 'data-text-post-permalink', 'data-text-post-version', 'id', 'viewBox', 'xmlns', 'role', 'fill', 'd', 'aria-label', 'cite', 'data-video-id', 'rel', 'sandbox'],
+    ALLOWED_ATTR: ['class', 'data-href', 'data-width', 'data-show-text', 'data-instgrm-permalink', 'data-instgrm-version', 'href', 'src', 'style', 'target', 'width', 'height', 'frameborder', 'allowfullscreen', 'allow', 'loading', 'alt', 'allowtransparency', 'scrolling', 'data-text-post-permalink', 'data-text-post-version', 'id', 'viewBox', 'xmlns', 'role', 'fill', 'd', 'aria-label', 'cite', 'data-video-id', 'rel'],
     ALLOW_DATA_ATTR: true
   });
 };
@@ -250,11 +234,6 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit }: RawEmb
   // Transform Facebook embeds to SDK-compatible format
   if (platform === 'facebook') {
     sanitizedHtml = transformFacebookEmbed(sanitizedHtml);
-  }
-
-  // Sandbox Spotify iframes so taps can't navigate the top window (matches Pinterest).
-  if (/open\.spotify\.com|spotify\.com\/embed/i.test(embedHtml)) {
-    sanitizedHtml = normalizeSpotifyIframeEmbed(sanitizedHtml);
   }
 
 

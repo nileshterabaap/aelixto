@@ -159,13 +159,6 @@ function stageAResume(root: HTMLElement) {
   restoreHardSuspended(root);
   root.dataset.aelixHasBeenActive = 'true';
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.dataset[MUTE_FLAG] === '1') {
-      // Undo the mute side-effects, otherwise the iframe stays
-      // pointer-events:none forever and taps (e.g. Threads play) never land.
-      iframe.style.pointerEvents = '';
-      iframe.removeAttribute('aria-hidden');
-      iframe.removeAttribute('tabindex');
-    }
     delete iframe.dataset[MUTE_FLAG];
   });
   unfreezeIframes(root);
@@ -408,17 +401,6 @@ export function useGlobalMediaPauseOnNavigate() {
           iframe.contentWindow?.postMessage({ command: 'pause' }, '*');
         } catch { /* cross-origin */ }
       });
-
-      // Cross-origin embeds with no pause API (Threads/Meta) keep playing when
-      // the user switches tabs, because keep-alive only hides them. Resetting
-      // the src is the only way to stop their audio/video.
-      document
-        .querySelectorAll<HTMLIFrameElement>('iframe[src*="threads.net"], iframe[src*="threads.com"]')
-        .forEach((iframe) => {
-          const src = iframe.getAttribute('src');
-          if (!src || src === 'about:blank') return;
-          iframe.setAttribute('src', src);
-        });
 
       prevPathRef.current = location.pathname;
     }

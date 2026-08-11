@@ -11,7 +11,7 @@ import tiktokIcon from "@/assets/platforms/tiktok.svg";
 import facebookIcon from "@/assets/platforms/facebook.svg";
 import quoraIcon from "@/assets/platforms/quora.svg";
 import mediumIcon from "@/assets/platforms/medium.svg";
-import blogIcon from "@/assets/platforms/articles.svg";
+import blogIcon from "@/assets/platforms/blog.svg";
 import spotifyIcon from "@/assets/platforms/spotify.svg";
 import threadsIcon from "@/assets/platforms/threads.svg";
 import linkedinIcon from "@/assets/platforms/linkedin.svg";
