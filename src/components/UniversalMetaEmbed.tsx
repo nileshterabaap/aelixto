@@ -108,6 +108,7 @@ const ThreadsIframeEmbed = ({
       : THREADS_DEFAULT_HEIGHT
   );
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [tapped, setTapped] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
 
@@ -154,6 +155,8 @@ const ThreadsIframeEmbed = ({
     );
   }
 
+  const showPoster = fallbackData?.image && !tapped;
+
   return (
     <div
       className="relative w-full overflow-hidden"
@@ -178,6 +181,31 @@ const ThreadsIframeEmbed = ({
           background: 'transparent',
         }}
       />
+      {showPoster && (
+        <button
+          type="button"
+          onClick={() => setTapped(true)}
+          className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 active:bg-black/30 transition-colors"
+          aria-label="Play video"
+        >
+          <img
+            src={fallbackData.image}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <span className="relative z-10 flex items-center justify-center w-14 h-14 rounded-full bg-black/55 text-white shadow-lg backdrop-blur-sm">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-6 h-6 ml-0.5"
+              aria-hidden="true"
+            >
+              <path d="M8 5v14l11-7z" />
+            </svg>
+          </span>
+        </button>
+      )}
     </div>
   );
 };
