@@ -941,10 +941,17 @@ serve(async (req) => {
     const description = meta.description;
     const ogType = extractMeta('og:type');
 
-    console.log('[fetch-og] Extracted OG data:', { title, image, description, ogType, finalUrl });
+    const ogVideo =
+      extractMeta('og:video') ||
+      extractMeta('og:video:url') ||
+      extractMeta('og:video:secure_url') ||
+      extractMeta('twitter:player:stream');
+    const hasVideo = !!ogVideo || /video/i.test(ogType || '');
+
+    console.log('[fetch-og] Extracted OG data:', { title, image, description, ogType, hasVideo, finalUrl });
 
     return new Response(
-      JSON.stringify({ title, image, description, finalUrl, og_type: ogType }),
+      JSON.stringify({ title, image, description, finalUrl, og_type: ogType, has_video: hasVideo }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
