@@ -939,7 +939,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
   const cached = embedCache.get(url);
 
   const [embedHtml, setEmbedHtml] = useState<string | null>(cached?.embedHtml ?? null);
-  const [fallbackData, setFallbackData] = useState<{ title?: string; image?: string; description?: string } | null>(
+  const [fallbackData, setFallbackData] = useState<{ title?: string; image?: string; description?: string; hasVideo?: boolean } | null>(
     cached?.fallbackData ?? null
   );
   const [expandedUrl, setExpandedUrl] = useState(cached?.expandedUrl ?? url);
@@ -1077,6 +1077,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
                 title: ogTitle,
                 image: ogData.meta?.image || ogData.image,
                 description: ogData.meta?.description || ogData.description,
+                hasVideo: !!(ogData.has_video ?? ogData.meta?.has_video),
               });
             }
           })
