@@ -43,6 +43,12 @@ export async function initCapacitorPlugins() {
     );
     console.log(`[plugins] isWebView=${/;\s*wv/i.test(navigator.userAgent)}`);
     console.log(`[plugins] userAgent=${navigator.userAgent}`);
+    // DIAGNOSTIC: proves whether the capacitor.config overrideUserAgent is
+    // actually active in this APK (look for uaOverrideActive=true in logcat).
+    const uaOverrideActive =
+      navigator.userAgent.includes('Windows NT 10.0') &&
+      !/;\s*wv/i.test(navigator.userAgent);
+    console.log(`[ua-diagnostic] uaOverrideActive=${uaOverrideActive} ua=${navigator.userAgent}`);
     console.log(`[plugins] allPlugins=${Object.keys((window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } }).Capacitor?.Plugins ?? {}).join(",")}`);
   } catch (error) {
     console.warn("[plugins] availability probe failed", error);
