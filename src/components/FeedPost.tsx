@@ -770,6 +770,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <div className="rounded-2xl overflow-hidden">
                 <video 
                   src={r.url} 
+                  poster={thumbnailUrl || undefined}
                   className="w-full h-auto" 
                   controls 
                   playsInline
