@@ -324,6 +324,7 @@ export const HydratedEmbed = memo(({
           <ImageViewTracker postId={post.id}>
             <video 
               src={r.url} 
+              poster={effectiveThumbnail || undefined}
               className="w-full h-auto" 
               controls 
               playsInline
