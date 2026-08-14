@@ -213,10 +213,17 @@ export const HydratedEmbed = memo(({
   
   const isYouTubePost = platformHint === 'youtube' || (!!r.url && /youtube\.com|youtu\.be/i.test(r.url));
 
+  const postThumbnailFallback =
+    (post as any).thumbnailUrl ||
+    (post as any).thumbnail_url ||
+    (post as any).previewImageUrl ||
+    (post as any).preview_image_url ||
+    null;
+
   // For YouTube, prefer their thumbnail
   const effectiveThumbnail = isYouTubePost && r.url 
-    ? getYouTubeThumbnail(r.url) || thumbnailUrl 
-    : thumbnailUrl;
+    ? getYouTubeThumbnail(r.url) || thumbnailUrl || postThumbnailFallback
+    : thumbnailUrl || postThumbnailFallback;
   
   const aspectClass = isYouTubePost && r.url && isYouTubeShort(
     r.url,
