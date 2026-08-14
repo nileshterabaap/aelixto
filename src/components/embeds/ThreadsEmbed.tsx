@@ -3,13 +3,6 @@ import { OgCardFallback } from '@/components/OgCardFallback';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { trackView } from '@/hooks/useViewTracking';
 import { EMBED_FADE_MS, useSmoothReveal } from '@/components/embeds/SmoothEmbedFrame';
-import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
-import { openExternalUrl } from '@/lib/openExternalUrl';
-import {
-  fetchThreadsVideoMeta,
-  getCachedThreadsVideoMeta,
-  type ThreadsVideoMeta,
-} from '@/lib/threadsVideoMeta';
 
 // One-shot guard so a Threads post never records more than one video_play per
 // session from this path (the guarded tracker may also fire; the server's
@@ -280,81 +273,13 @@ export const ThreadsEmbed = ({
   url,
   postId,
   suggestedHeight,
-  thumbnailUrl,
 }: {
   url: string;
   postId?: string | null;
   suggestedHeight?: number | null;
-  thumbnailUrl?: string | null;
 }) => {
   const src = buildThreadsEmbedSrc(url);
-  const [meta, setMeta] = useState<ThreadsVideoMeta | null>(() => getCachedThreadsVideoMeta(url));
-
-  useEffect(() => {
-    if (meta) return;
-    let cancelled = false;
-    fetchThreadsVideoMeta(url).then((next) => {
-      if (!cancelled) setMeta(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [url, meta]);
-
   if (!src) return <OgCardFallback url={url} platform="Threads" />;
-
-  const posterImage = thumbnailUrl || meta?.image || null;
-
-  // Threads VIDEO posts only: Android WebView cannot render the Threads
-  // player (black cover). Present an Aelixto-owned poster card instead and
-  // open the original post on tap. Image/text Threads posts keep the iframe.
-  if (meta?.hasVideo && posterImage) {
-    const height =
-      suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
-        ? Math.min(THREADS_MAX_HEIGHT, suggestedHeight)
-        : 420;
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (postId) markOriginalVisit(postId);
-          void openExternalUrl(url);
-        }}
-        aria-label="Open video on Threads"
-        className="relative block w-full overflow-hidden rounded-lg"
-        style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
-      >
-        <img
-          src={posterImage}
-          alt="Threads video"
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <span className="absolute inset-0 bg-black/20 active:bg-black/30 transition-colors" />
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span className="flex items-center justify-center w-14 h-14 rounded-full bg-black/55 text-white shadow-lg backdrop-blur-sm">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 ml-0.5" aria-hidden="true">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </span>
-        </span>
-      </button>
-    );
-  }
-
-  // Metadata still unknown: hold a neutral placeholder so a Threads video
-  // never flashes its black player before the poster card takes over.
-  if (!meta) {
-    return (
-      <div
-        aria-hidden
-        className="w-full animate-pulse rounded-lg bg-muted"
-        style={{ minHeight: THREADS_MIN_HEIGHT }}
-      />
-    );
-  }
-
   return (
     <ThreadsIframeEmbed
       src={src}
