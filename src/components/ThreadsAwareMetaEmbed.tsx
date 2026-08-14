@@ -16,6 +16,7 @@ const ThreadsShareResolver = (props: {
   url: string;
   postId?: string | null;
   suggestedHeight?: number | null;
+  thumbnailUrl?: string | null;
 }) => {
   const [resolved, setResolved] = useState<string | null>(() =>
     getCachedThreadsShareUrl(props.url)
@@ -73,6 +74,7 @@ export const ThreadsAwareMetaEmbed = (props: {
   url: string;
   postId?: string | null;
   suggestedHeight?: number | null;
+  thumbnailUrl?: string | null;
 }) => {
   if (isThreadsShareUrl(props.url)) {
     return <ThreadsShareResolver {...props} />;
@@ -80,5 +82,6 @@ export const ThreadsAwareMetaEmbed = (props: {
   if (isThreadsUrl(props.url) && buildThreadsEmbedSrc(props.url)) {
     return <ThreadsEmbed {...props} />;
   }
-  return <UniversalMetaEmbed {...(props as any)} />;
+  const { thumbnailUrl: _ignored, ...rest } = props;
+  return <UniversalMetaEmbed {...(rest as any)} />;
 };
