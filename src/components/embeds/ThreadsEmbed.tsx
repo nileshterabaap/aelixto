@@ -5,6 +5,7 @@ import { trackView } from '@/hooks/useViewTracking';
 import { EMBED_FADE_MS, useSmoothReveal } from '@/components/embeds/SmoothEmbedFrame';
 import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
 import { openExternalUrl } from '@/lib/openExternalUrl';
+import { Capacitor } from '@capacitor/core';
 import {
   fetchThreadsVideoMeta,
   getCachedThreadsVideoMeta,
@@ -281,14 +282,17 @@ export const ThreadsEmbed = ({
   postId,
   suggestedHeight,
   thumbnailUrl,
+  isVideo,
 }: {
   url: string;
   postId?: string | null;
   suggestedHeight?: number | null;
   thumbnailUrl?: string | null;
+  isVideo?: boolean;
 }) => {
   const src = buildThreadsEmbedSrc(url);
   const [meta, setMeta] = useState<ThreadsVideoMeta | null>(() => getCachedThreadsVideoMeta(url));
+  const isNative = Capacitor.isNativePlatform();
 
   useEffect(() => {
     if (meta) return;
@@ -304,11 +308,16 @@ export const ThreadsEmbed = ({
   if (!src) return <OgCardFallback url={url} platform="Threads" />;
 
   const posterImage = thumbnailUrl || meta?.image || null;
+  // The APK (Android WebView) cannot paint the paused Threads player, so any
+  // Threads post we know to be a video gets the Aelixto-owned poster card —
+  // even when fetch-og could not confirm `has_video` (login walls / share
+  // links). On the web the iframe renders fine, so nothing changes there.
+  const treatAsVideo = !!meta?.hasVideo || (isNative && !!isVideo);
 
   // Threads VIDEO posts only: Android WebView cannot render the Threads
   // player (black cover). Present an Aelixto-owned poster card instead and
   // open the original post on tap. Image/text Threads posts keep the iframe.
-  if (meta?.hasVideo && posterImage) {
+  if (treatAsVideo && posterImage) {
     const height =
       suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
         ? Math.min(THREADS_MAX_HEIGHT, suggestedHeight)
@@ -345,7 +354,7 @@ export const ThreadsEmbed = ({
 
   // Metadata still unknown: hold a neutral placeholder so a Threads video
   // never flashes its black player before the poster card takes over.
-  if (!meta) {
+  if (!meta && !(isNative && isVideo && posterImage)) {
     return (
       <div
         aria-hidden
