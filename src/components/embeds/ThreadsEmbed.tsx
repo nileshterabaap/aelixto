@@ -292,6 +292,7 @@ export const ThreadsEmbed = ({
 }) => {
   const src = buildThreadsEmbedSrc(url);
   const [meta, setMeta] = useState<ThreadsVideoMeta | null>(() => getCachedThreadsVideoMeta(url));
+  const [playing, setPlaying] = useState(false);
   const isNative = Capacitor.isNativePlatform();
 
   useEffect(() => {
@@ -308,6 +309,7 @@ export const ThreadsEmbed = ({
   if (!src) return <OgCardFallback url={url} platform="Threads" />;
 
   const posterImage = thumbnailUrl || meta?.image || null;
+  const videoUrl = meta?.videoUrl || null;
   // The APK (Android WebView) cannot paint the paused Threads player, so any
   // Threads post we know to be a video gets the Aelixto-owned poster card —
   // even when fetch-og could not confirm `has_video` (login walls / share
@@ -322,15 +324,48 @@ export const ThreadsEmbed = ({
       suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
         ? Math.min(THREADS_MAX_HEIGHT, suggestedHeight)
         : 420;
+
+    // Inline playback: when we know the post's own MP4, play it in an
+    // Aelixto-owned <video> (with the existing thumbnail as poster) instead
+    // of sending the user to Threads.
+    if (playing && videoUrl) {
+      return (
+        <div
+          className="relative w-full overflow-hidden rounded-lg bg-black"
+          style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
+        >
+          <video
+            src={videoUrl}
+            poster={posterImage || undefined}
+            controls
+            autoPlay
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 w-full h-full object-contain"
+          />
+        </div>
+      );
+    }
+
     return (
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
+          if (videoUrl) {
+            setPlaying(true);
+            if (postId && !threadsPlayFired.has(postId)) {
+              threadsPlayFired.add(postId);
+              trackView({ postId, eventType: 'video_play' }).catch(() => {
+                threadsPlayFired.delete(postId);
+              });
+            }
+            return;
+          }
           if (postId) markOriginalVisit(postId);
           void openExternalUrl(url);
         }}
-        aria-label="Open video on Threads"
+        aria-label={videoUrl ? 'Play video' : 'Open video on Threads'}
         className="relative block w-full overflow-hidden rounded-lg"
         style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
       >

@@ -199,33 +199,45 @@ function extractArticleMetadata(
  * record following the exact requested shortcode so unrelated recommended
  * posts elsewhere in the document cannot classify this post as video.
  */
-function threadsPostHasVideo(html: string, targetUrl: string): boolean {
+function threadsPostVideo(html: string, targetUrl: string): { hasVideo: boolean; videoUrl: string | null } {
+  const none = { hasVideo: false, videoUrl: null as string | null };
   try {
     const parsed = new URL(targetUrl);
-    if (!/(^|\.)threads\.(com|net)$/i.test(parsed.hostname)) return false;
+    if (!/(^|\.)threads\.(com|net)$/i.test(parsed.hostname)) return none;
 
     const shortcode = parsed.pathname.match(/\/post\/([A-Za-z0-9_-]+)/i)?.[1];
-    if (!shortcode) return false;
+    if (!shortcode) return none;
 
     const escapedShortcode = shortcode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const codeMatch = html.match(new RegExp(`"code"\\s*:\\s*"${escapedShortcode}"`, 'i'));
-    if (!codeMatch || codeMatch.index === undefined) return false;
+    if (!codeMatch || codeMatch.index === undefined) return none;
 
     // The requested media's media_type follows its code and media payload.
     // Stop at that first media_type instead of scanning the rest of the page.
     const exactPostTail = html.slice(codeMatch.index, codeMatch.index + 30_000);
     const mediaTypeMatch = exactPostTail.match(/"media_type"\s*:\s*(\d+)/i);
-    if (!mediaTypeMatch || mediaTypeMatch.index === undefined) return false;
+    if (!mediaTypeMatch || mediaTypeMatch.index === undefined) return none;
 
     const exactMediaPayload = exactPostTail.slice(0, mediaTypeMatch.index);
     const mediaType = Number(mediaTypeMatch[1]);
-    return (
+    const hasVideo =
       mediaType === 2 ||
       /"video_versions"\s*:\s*\[\s*\{/i.test(exactMediaPayload) ||
-      /"video_dash_manifest"\s*:\s*"(?!null)/i.test(exactMediaPayload)
-    );
+      /"video_dash_manifest"\s*:\s*"(?!null)/i.test(exactMediaPayload);
+    if (!hasVideo) return none;
+
+    // Pull the progressive MP4 for this exact post so the client can play it
+    // inline instead of only showing a poster.
+    const versionsBlock =
+      exactMediaPayload.match(/"video_versions"\s*:\s*\[([\s\S]*?)\]/i)?.[1] ??
+      exactPostTail.slice(0, 30_000).match(/"video_versions"\s*:\s*\[([\s\S]*?)\]/i)?.[1] ??
+      '';
+    const rawUrl = versionsBlock.match(/"url"\s*:\s*"([^"]+\.mp4[^"]*)"/i)?.[1] ?? null;
+    const videoUrl = rawUrl ? decodeHtmlEntities(rawUrl.replace(/\\\//g, '/').replace(/\\u0026/g, '&')) : null;
+
+    return { hasVideo: true, videoUrl };
   } catch {
-    return false;
+    return none;
   }
 }
 
@@ -982,15 +994,14 @@ serve(async (req) => {
       extractMeta('og:video:url') ||
       extractMeta('og:video:secure_url') ||
       extractMeta('twitter:player:stream');
-    const hasVideo =
-      !!ogVideo ||
-      /video/i.test(ogType || '') ||
-      threadsPostHasVideo(html, finalUrl || targetUrl);
+    const threadsVideo = threadsPostVideo(html, finalUrl || targetUrl);
+    const hasVideo = !!ogVideo || /video/i.test(ogType || '') || threadsVideo.hasVideo;
+    const videoUrl = threadsVideo.videoUrl || ogVideo || null;
 
-    console.log('[fetch-og] Extracted OG data:', { title, image, description, ogType, hasVideo, finalUrl });
+    console.log('[fetch-og] Extracted OG data:', { title, image, description, ogType, hasVideo, videoUrl, finalUrl });
 
     return new Response(
-      JSON.stringify({ title, image, description, finalUrl, og_type: ogType, has_video: hasVideo }),
+      JSON.stringify({ title, image, description, finalUrl, og_type: ogType, has_video: hasVideo, video_url: videoUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
-export type ThreadsVideoMeta = { hasVideo: boolean; image?: string | null };
+export type ThreadsVideoMeta = { hasVideo: boolean; image?: string | null; videoUrl?: string | null };
 
 const cache = new Map<string, ThreadsVideoMeta>();
 const inflight = new Map<string, Promise<ThreadsVideoMeta>>();
@@ -25,12 +25,13 @@ export const fetchThreadsVideoMeta = (url: string): Promise<ThreadsVideoMeta> =>
       const meta: ThreadsVideoMeta = {
         hasVideo: !!((data as any).has_video ?? (data as any).meta?.has_video),
         image: (data as any).meta?.image || (data as any).image || null,
+        videoUrl: (data as any).video_url || (data as any).meta?.video_url || null,
       };
       cache.set(url, meta);
       return meta;
     })
     .catch(() => {
-      const meta: ThreadsVideoMeta = { hasVideo: false, image: null };
+      const meta: ThreadsVideoMeta = { hasVideo: false, image: null, videoUrl: null };
       return meta;
     })
     .finally(() => {
