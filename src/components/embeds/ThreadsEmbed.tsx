@@ -3,14 +3,6 @@ import { OgCardFallback } from '@/components/OgCardFallback';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { trackView } from '@/hooks/useViewTracking';
 import { EMBED_FADE_MS, useSmoothReveal } from '@/components/embeds/SmoothEmbedFrame';
-import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
-import { openExternalUrl } from '@/lib/openExternalUrl';
-import { Capacitor } from '@capacitor/core';
-import {
-  fetchThreadsVideoMeta,
-  getCachedThreadsVideoMeta,
-  type ThreadsVideoMeta,
-} from '@/lib/threadsVideoMeta';
 
 // One-shot guard so a Threads post never records more than one video_play per
 // session from this path (the guarded tracker may also fire; the server's
@@ -84,10 +76,12 @@ const ThreadsIframeEmbed = ({
   src,
   postId,
   suggestedHeight,
+  posterUrl,
 }: {
   src: string;
   postId?: string | null;
   suggestedHeight?: number | null;
+  posterUrl?: string | null;
 }) => {
   const [height, setHeight] = useState(() =>
     suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
@@ -225,7 +219,15 @@ const ThreadsIframeEmbed = ({
           visibility: threadsRevealed ? 'hidden' : 'visible',
           transitionProperty: 'opacity, visibility',
         }}
-      />
+      >
+        {posterUrl ? (
+          <img
+            src={posterUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover rounded-lg"
+          />
+        ) : null}
+      </div>
       {/* DIAGNOSTIC: catcher layer removed from the Threads tree so nothing at
           all can sit above the iframe and absorb the first tap. Tracking is
           unchanged — the window-blur one-shot below still records video_play. */}
@@ -291,119 +293,18 @@ export const ThreadsEmbed = ({
   isVideo?: boolean;
 }) => {
   const src = buildThreadsEmbedSrc(url);
-  const [meta, setMeta] = useState<ThreadsVideoMeta | null>(() => getCachedThreadsVideoMeta(url));
-  const [playing, setPlaying] = useState(false);
-  const isNative = Capacitor.isNativePlatform();
-
-  useEffect(() => {
-    if (meta) return;
-    let cancelled = false;
-    fetchThreadsVideoMeta(url).then((next) => {
-      if (!cancelled) setMeta(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [url, meta]);
-
   if (!src) return <OgCardFallback url={url} platform="Threads" />;
 
-  const posterImage = thumbnailUrl || meta?.image || null;
-  const videoUrl = meta?.videoUrl || null;
-  // The APK (Android WebView) cannot paint the paused Threads player, so any
-  // Threads post we know to be a video gets the Aelixto-owned poster card —
-  // even when fetch-og could not confirm `has_video` (login walls / share
-  // links). On the web the iframe renders fine, so nothing changes there.
-  const treatAsVideo = !!meta?.hasVideo || (isNative && !!isVideo);
-
-  // Threads VIDEO posts only: Android WebView cannot render the Threads
-  // player (black cover). Present an Aelixto-owned poster card instead and
-  // open the original post on tap. Image/text Threads posts keep the iframe.
-  if (treatAsVideo && posterImage) {
-    const height =
-      suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
-        ? Math.min(THREADS_MAX_HEIGHT, suggestedHeight)
-        : 420;
-
-    // Inline playback: when we know the post's own MP4, play it in an
-    // Aelixto-owned <video> (with the existing thumbnail as poster) instead
-    // of sending the user to Threads.
-    if (playing && videoUrl) {
-      return (
-        <div
-          className="relative w-full overflow-hidden rounded-lg bg-black"
-          style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
-        >
-          <video
-            src={videoUrl}
-            poster={posterImage || undefined}
-            controls
-            autoPlay
-            playsInline
-            preload="metadata"
-            className="absolute inset-0 w-full h-full object-contain"
-          />
-        </div>
-      );
-    }
-
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (videoUrl) {
-            setPlaying(true);
-            if (postId && !threadsPlayFired.has(postId)) {
-              threadsPlayFired.add(postId);
-              trackView({ postId, eventType: 'video_play' }).catch(() => {
-                threadsPlayFired.delete(postId);
-              });
-            }
-            return;
-          }
-          if (postId) markOriginalVisit(postId);
-          void openExternalUrl(url);
-        }}
-        aria-label={videoUrl ? 'Play video' : 'Open video on Threads'}
-        className="relative block w-full overflow-hidden rounded-lg"
-        style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
-      >
-        <img
-          src={posterImage}
-          alt="Threads video"
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <span className="absolute inset-0 bg-black/20 active:bg-black/30 transition-colors" />
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span className="flex items-center justify-center w-14 h-14 rounded-full bg-black/55 text-white shadow-lg backdrop-blur-sm">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 ml-0.5" aria-hidden="true">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </span>
-        </span>
-      </button>
-    );
-  }
-
-  // Metadata still unknown: hold a neutral placeholder so a Threads video
-  // never flashes its black player before the poster card takes over.
-  if (!meta && !(isNative && isVideo && posterImage)) {
-    return (
-      <div
-        aria-hidden
-        className="w-full animate-pulse rounded-lg bg-muted"
-        style={{ minHeight: THREADS_MIN_HEIGHT }}
-      />
-    );
-  }
-
+  // Original embed system restored: the real Threads iframe (author, username,
+  // caption, native player) is always what renders. The APK black-cover
+  // mitigation now lives inside ThreadsIframeEmbed as a poster layer that sits
+  // behind/over the iframe until it paints, instead of replacing the embed.
   return (
     <ThreadsIframeEmbed
       src={src}
       postId={postId}
       suggestedHeight={suggestedHeight}
+      posterUrl={thumbnailUrl || null}
     />
   );
 };
