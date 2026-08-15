@@ -193,6 +193,42 @@ function extractArticleMetadata(
   return { image: image || null, title: title || null, description: description || null };
 }
 
+/**
+ * Threads does not expose og:video for public post pages, but it does serialize
+ * the requested post's media object into the page. Read only the first media
+ * record following the exact requested shortcode so unrelated recommended
+ * posts elsewhere in the document cannot classify this post as video.
+ */
+function threadsPostHasVideo(html: string, targetUrl: string): boolean {
+  try {
+    const parsed = new URL(targetUrl);
+    if (!/(^|\.)threads\.(com|net)$/i.test(parsed.hostname)) return false;
+
+    const shortcode = parsed.pathname.match(/\/post\/([A-Za-z0-9_-]+)/i)?.[1];
+    if (!shortcode) return false;
+
+    const escapedShortcode = shortcode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const codeMatch = html.match(new RegExp(`"code"\\s*:\\s*"${escapedShortcode}"`, 'i'));
+    if (!codeMatch || codeMatch.index === undefined) return false;
+
+    // The requested media's media_type follows its code and media payload.
+    // Stop at that first media_type instead of scanning the rest of the page.
+    const exactPostTail = html.slice(codeMatch.index, codeMatch.index + 30_000);
+    const mediaTypeMatch = exactPostTail.match(/"media_type"\s*:\s*(\d+)/i);
+    if (!mediaTypeMatch || mediaTypeMatch.index === undefined) return false;
+
+    const exactMediaPayload = exactPostTail.slice(0, mediaTypeMatch.index);
+    const mediaType = Number(mediaTypeMatch[1]);
+    return (
+      mediaType === 2 ||
+      /"video_versions"\s*:\s*\[\s*\{/i.test(exactMediaPayload) ||
+      /"video_dash_manifest"\s*:\s*"(?!null)/i.test(exactMediaPayload)
+    );
+  } catch {
+    return false;
+  }
+}
+
 const stripHtml = (text: string): string =>
   decodeHtmlEntities(text.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
 
@@ -946,7 +982,10 @@ serve(async (req) => {
       extractMeta('og:video:url') ||
       extractMeta('og:video:secure_url') ||
       extractMeta('twitter:player:stream');
-    const hasVideo = !!ogVideo || /video/i.test(ogType || '');
+    const hasVideo =
+      !!ogVideo ||
+      /video/i.test(ogType || '') ||
+      threadsPostHasVideo(html, finalUrl || targetUrl);
 
     console.log('[fetch-og] Extracted OG data:', { title, image, description, ogType, hasVideo, finalUrl });
 
