@@ -84,10 +84,12 @@ const ThreadsIframeEmbed = ({
   src,
   postId,
   suggestedHeight,
+  posterUrl,
 }: {
   src: string;
   postId?: string | null;
   suggestedHeight?: number | null;
+  posterUrl?: string | null;
 }) => {
   const [height, setHeight] = useState(() =>
     suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
@@ -225,7 +227,15 @@ const ThreadsIframeEmbed = ({
           visibility: threadsRevealed ? 'hidden' : 'visible',
           transitionProperty: 'opacity, visibility',
         }}
-      />
+      >
+        {posterUrl ? (
+          <img
+            src={posterUrl}
+            alt=""
+            className="absolute inset-0 w-full h-full object-cover rounded-lg"
+          />
+        ) : null}
+      </div>
       {/* DIAGNOSTIC: catcher layer removed from the Threads tree so nothing at
           all can sit above the iframe and absorb the first tap. Tracking is
           unchanged — the window-blur one-shot below still records video_play. */}
