@@ -946,7 +946,42 @@ serve(async (req) => {
       extractMeta('og:video:url') ||
       extractMeta('og:video:secure_url') ||
       extractMeta('twitter:player:stream');
-    const hasVideo = !!ogVideo || /video/i.test(ogType || '');
+    let hasVideo = !!ogVideo || /video/i.test(ogType || '');
+
+    // Threads never emits og:video, so the only reliable server-side signal is
+    // the embed page itself: with browser-like headers it is server-rendered
+    // and contains a real <video> tag for video posts (and none for
+    // image/text posts). Hostname is pinned to www.threads.net (no SSRF).
+    if (!hasVideo) {
+      try {
+        const canonical = new URL(finalUrl);
+        if (/(^|\.)threads\.(net|com)$/.test(canonical.hostname)) {
+          const postMatch = canonical.pathname.match(/\/@([^/]+)\/post\/([A-Za-z0-9_-]+)/);
+          if (postMatch) {
+            const embedUrl = `https://www.threads.net/@${postMatch[1]}/post/${postMatch[2]}/embed`;
+            const embedRes = await fetch(embedUrl, {
+              headers: {
+                'User-Agent':
+                  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Sec-Fetch-Dest': 'iframe',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'cross-site',
+              },
+              redirect: 'follow',
+            });
+            if (embedRes.ok) {
+              const embedHtml = await embedRes.text();
+              hasVideo = /<video[\s>]/i.test(embedHtml);
+              console.log('[fetch-og] Threads embed video probe:', embedUrl, hasVideo);
+            }
+          }
+        }
+      } catch (e) {
+        console.log('[fetch-og] Threads embed probe failed:', e instanceof Error ? e.message : String(e));
+      }
+    }
 
     console.log('[fetch-og] Extracted OG data:', { title, image, description, ogType, hasVideo, finalUrl });
 
