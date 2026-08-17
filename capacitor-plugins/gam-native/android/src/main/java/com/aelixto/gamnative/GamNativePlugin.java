@@ -76,36 +76,6 @@ public class GamNativePlugin extends Plugin {
     private int clipBottomPx = 0;
     private boolean scrollHooked = false;
 
-    /**
-     * DIAGNOSTIC: force the bridge WebView into software rendering.
-     * This disables hardware-overlay promotion for the whole WebView, which is
-     * the suspected cause of the black cover on Threads videos. Expect reduced
-     * scroll smoothness and stuttery CSS animations app-wide — this is a
-     * diagnostic build setting, not a shippable one.
-     */
-    @Override
-    public void load() {
-        super.load();
-        try {
-            final Activity activity = getActivity();
-            final android.webkit.WebView wv = getBridge() != null ? getBridge().getWebView() : null;
-            if (activity == null || wv == null) {
-                Log.w(TAG, "[webview] LAYER_TYPE_SOFTWARE skipped (no activity/webview)");
-                return;
-            }
-            activity.runOnUiThread(() -> {
-                try {
-                    wv.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-                    Log.i(TAG, "[webview] layerType=SOFTWARE applied (diagnostic) readBack=" + wv.getLayerType());
-                } catch (Throwable t) {
-                    Log.w(TAG, "[webview] LAYER_TYPE_SOFTWARE failed", t);
-                }
-            });
-        } catch (Throwable t) {
-            Log.w(TAG, "[webview] LAYER_TYPE_SOFTWARE wrapper failed", t);
-        }
-    }
-
     @PluginMethod
     public void initialize(PluginCall call) {
         Log.i(TAG, "[ads] MobileAds.initialize() called");
