@@ -946,35 +946,7 @@ serve(async (req) => {
       extractMeta('og:video:url') ||
       extractMeta('og:video:secure_url') ||
       extractMeta('twitter:player:stream');
-    let hasVideo = !!ogVideo || /video/i.test(ogType || '');
-
-    // Threads-only fallback: Threads never emits og:video, so when the fast
-    // path above finds nothing we probe the server-rendered /embed page
-    // (crawler UA) and look for its <video> markup. Runs only for Threads
-    // post URLs, so every other request keeps its original cost.
-    if (!hasVideo) {
-      try {
-        const canonical = extractMeta('og:url') || finalUrl;
-        const cu = new URL(canonical);
-        const postMatch = cu.pathname.match(/\/@([^/]+)\/post\/([A-Za-z0-9_-]+)/);
-        if (/(^|\.)threads\.(net|com)$/.test(cu.hostname) && postMatch) {
-          const embedUrl = `https://${cu.hostname}/@${postMatch[1]}/post/${postMatch[2]}/embed`;
-          const embedRes = await fetch(embedUrl, {
-            headers: { 'User-Agent': 'facebookexternalhit/1.1', 'Accept': 'text/html' },
-            signal: AbortSignal.timeout(8000),
-          });
-          if (embedRes.ok) {
-            const embedHtml = await embedRes.text();
-            hasVideo =
-              /SingleInnerMediaContainerVideo/i.test(embedHtml) ||
-              /<video[\s>]/i.test(embedHtml);
-            console.log('[fetch-og] Threads embed probe:', { embedUrl, hasVideo });
-          }
-        }
-      } catch (probeError) {
-        console.log('[fetch-og] Threads embed probe failed:', String(probeError));
-      }
-    }
+    const hasVideo = !!ogVideo || /video/i.test(ogType || '');
 
     console.log('[fetch-og] Extracted OG data:', { title, image, description, ogType, hasVideo, finalUrl });
 
