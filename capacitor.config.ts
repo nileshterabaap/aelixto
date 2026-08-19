@@ -5,6 +5,8 @@ const config: CapacitorConfig = {
   appName: 'Aelixto',
   webDir: 'dist',
   server: {
+    hostname: "aelixto.com",
+    androidScheme: "https",
     cleartext: true,
   },
   plugins: {
