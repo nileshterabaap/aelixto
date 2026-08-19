@@ -946,30 +946,7 @@ serve(async (req) => {
       extractMeta('og:video:url') ||
       extractMeta('og:video:secure_url') ||
       extractMeta('twitter:player:stream');
-    let hasVideo = !!ogVideo || /video/i.test(ogType || '');
-
-    // Threads never exposes og:video on post pages (og:type is "article"),
-    // so probe the canonical /embed page for a real <video> tag instead.
-    if (!hasVideo) {
-      try {
-        const tu = new URL(finalUrl || targetUrl);
-        if (/(^|\.)threads\.(net|com)$/.test(tu.hostname)) {
-          const postMatch = tu.pathname.match(/\/@([^/]+)\/post\/([A-Za-z0-9_-]+)/);
-          if (postMatch) {
-            const embedUrl = `https://www.threads.net/@${postMatch[1]}/post/${postMatch[2]}/embed`;
-            const embedRes = await fetch(embedUrl, {
-              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AelixtoBot/1.0)' },
-            });
-            if (embedRes.ok) {
-              const embedHtml = await embedRes.text();
-              hasVideo = /<video[\s>]/i.test(embedHtml) || /\.mp4/i.test(embedHtml);
-            }
-          }
-        }
-      } catch (_e) {
-        // non-fatal: fall back to the OG-only result
-      }
-    }
+    const hasVideo = !!ogVideo || /video/i.test(ogType || '');
 
     console.log('[fetch-og] Extracted OG data:', { title, image, description, ogType, hasVideo, finalUrl });
 
