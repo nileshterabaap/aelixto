@@ -36,6 +36,7 @@ import ChildSafety from "./pages/ChildSafety";
 import AuthBridge from "./pages/AuthBridge";
 import Unsubscribe from "./pages/Unsubscribe";
 import ShortLinkRedirect from "./pages/ShortLinkRedirect";
+import ThreadsProbe from "./pages/ThreadsProbe";
 
 // Configure QueryClient with aggressive caching for instant navigation
 const queryClient = new QueryClient({
