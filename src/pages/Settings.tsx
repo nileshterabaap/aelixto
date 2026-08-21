@@ -201,6 +201,7 @@ const Settings = () => {
           <Row label="Change password" onClick={() => setChangePasswordOpen(true)} />
           <Row label="Notifications" onClick={() => navigate('/settings/notifications')} />
           <Row label="Privacy settings" onClick={() => navigate('/settings/privacy')} />
+          <Row label="Threads Video Diagnostic" onClick={() => navigate('/settings/threads-diagnostic')} />
           {Capacitor.isNativePlatform() && adPrefsAvailable && (
             <Row label="Manage ad preferences" onClick={() => { void handleAdPreferences(); }} />
           )}

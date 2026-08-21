@@ -30,6 +30,7 @@ import SavedPosts from "./pages/SavedPosts";
 import InteractionSettings from "./pages/InteractionSettings";
 import PrivacySettings from "./pages/PrivacySettings";
 import NotificationSettings from "./pages/NotificationSettings";
+import ThreadsVideoDiagnostic from "./pages/ThreadsVideoDiagnostic";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import ChildSafety from "./pages/ChildSafety";
@@ -102,6 +103,7 @@ const AnimatedRoutes = () => {
             <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
             <Route path="/settings/interactions" element={<PageTransition><InteractionSettings /></PageTransition>} />
             <Route path="/settings/privacy" element={<PageTransition><PrivacySettings /></PageTransition>} />
+            <Route path="/settings/threads-diagnostic" element={<PageTransition><ThreadsVideoDiagnostic /></PageTransition>} />
             <Route path="/settings/notifications" element={<PageTransition><NotificationSettings /></PageTransition>} />
             <Route path="/edit-profile" element={<PageTransition><EditProfile /></PageTransition>} />
             <Route path="/saved" element={<PageTransition><SavedPosts /></PageTransition>} />
