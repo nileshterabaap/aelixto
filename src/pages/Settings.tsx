@@ -241,12 +241,6 @@ const Settings = () => {
           <Row label="Child Safety Standards" onClick={() => navigate('/child-safety')} />
         </div>
 
-        {/* Dev / Debug */}
-        <SectionHeader title="Developer" />
-        <div className="divide-y divide-border">
-          <Row label="Threads Probe" onClick={() => navigate('/~threads-probe')} />
-        </div>
-
         {/* Log out at bottom */}
         <SectionHeader title="" />
         <div className="divide-y divide-border">

@@ -45,5 +45,3 @@ project_id = "hhotresssetunubidrth"
     verify_jwt = true
   [functions.moderate-report]
     verify_jwt = false
-  [functions.threads-oembed-probe]
-    verify_jwt = false
