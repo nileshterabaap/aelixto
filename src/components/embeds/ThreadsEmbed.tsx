@@ -235,13 +235,13 @@ const ThreadsIframeEmbed = ({
         scrolling="no"
         allowFullScreen
         allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-        loading="lazy"
+        loading="eager"
         data-nav-lock-applied="1"
         onLoad={() => {
           setHasLoaded(true);
         }}
         style={{
-          border: 'none',
+          border: 0,
           width: '100%',
           height: '100%',
           display: 'block',
