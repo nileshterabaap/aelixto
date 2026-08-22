@@ -19,12 +19,11 @@ const threadsPlayFired = new Set<string>();
 /**
  * Threads-only embed. Extracted out of UniversalMetaEmbed so Threads fixes
  * never touch the Facebook/Instagram guarded baseline.
+ *
+ * Threads VIDEO posts ALWAYS render the Aelixto-owned poster card (never the
+ * /embed iframe) because the Threads player shows a black cover in Android
+ * WebView. Image/text Threads posts keep the iframe.
  */
-// TEMPORARY DIAGNOSTIC FLAG (Android APK black-cover investigation).
-// When true, Threads VIDEO posts render the real Threads /embed iframe instead
-// of the Aelixto-owned poster card. The poster-card code below is left fully
-// intact — set this back to false to restore production behavior.
-const FORCE_THREADS_VIDEO_IFRAME = true;
 
 const THREADS_MIN_HEIGHT = 220;
 const THREADS_MAX_HEIGHT = 1400;
