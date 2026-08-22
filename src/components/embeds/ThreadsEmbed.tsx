@@ -20,6 +20,12 @@ const threadsPlayFired = new Set<string>();
  * Threads-only embed. Extracted out of UniversalMetaEmbed so Threads fixes
  * never touch the Facebook/Instagram guarded baseline.
  */
+// TEMPORARY DIAGNOSTIC FLAG (Android APK black-cover investigation).
+// When true, Threads VIDEO posts render the real Threads /embed iframe instead
+// of the Aelixto-owned poster card. The poster-card code below is left fully
+// intact — set this back to false to restore production behavior.
+const FORCE_THREADS_VIDEO_IFRAME = true;
+
 const THREADS_MIN_HEIGHT = 220;
 const THREADS_MAX_HEIGHT = 1400;
 const THREADS_DEFAULT_HEIGHT = 280;
@@ -308,7 +314,7 @@ export const ThreadsEmbed = ({
   // Threads VIDEO posts only: Android WebView cannot render the Threads
   // player (black cover). Present an Aelixto-owned poster card instead and
   // open the original post on tap. Image/text Threads posts keep the iframe.
-  if (meta?.hasVideo && posterImage) {
+  if (!FORCE_THREADS_VIDEO_IFRAME && meta?.hasVideo && posterImage) {
     const height =
       suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
         ? Math.min(THREADS_MAX_HEIGHT, suggestedHeight)
