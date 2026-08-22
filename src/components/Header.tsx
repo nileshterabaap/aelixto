@@ -230,7 +230,7 @@ className="h-14 w-14"
               style={{
                 backfaceVisibility: "hidden",
                 WebkitBackfaceVisibility: "hidden",
-                color: "hsl(var(--brand-purple))",
+                color: "hsl(var(--primary-foreground))",
               }}
             >
               Aelixto
