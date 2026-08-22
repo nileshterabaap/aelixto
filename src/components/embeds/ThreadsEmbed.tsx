@@ -351,7 +351,7 @@ export const ThreadsEmbed = ({
 
   // Metadata still unknown: hold a neutral placeholder so a Threads video
   // never flashes its black player before the poster card takes over.
-  if (!meta) {
+  if (!FORCE_THREADS_VIDEO_IFRAME && !meta) {
     return (
       <div
         aria-hidden
