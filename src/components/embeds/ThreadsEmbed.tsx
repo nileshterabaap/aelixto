@@ -19,12 +19,11 @@ const threadsPlayFired = new Set<string>();
 /**
  * Threads-only embed. Extracted out of UniversalMetaEmbed so Threads fixes
  * never touch the Facebook/Instagram guarded baseline.
+ *
+ * Threads VIDEO posts ALWAYS render the Aelixto-owned poster card (never the
+ * /embed iframe) because the Threads player shows a black cover in Android
+ * WebView. Image/text Threads posts keep the iframe.
  */
-// TEMPORARY DIAGNOSTIC FLAG (Android APK black-cover investigation).
-// When true, Threads VIDEO posts render the real Threads /embed iframe instead
-// of the Aelixto-owned poster card. The poster-card code below is left fully
-// intact — set this back to false to restore production behavior.
-const FORCE_THREADS_VIDEO_IFRAME = true;
 
 const THREADS_MIN_HEIGHT = 220;
 const THREADS_MAX_HEIGHT = 1400;
@@ -311,10 +310,20 @@ export const ThreadsEmbed = ({
 
   const posterImage = thumbnailUrl || meta?.image || null;
 
-  // Threads VIDEO posts only: Android WebView cannot render the Threads
-  // player (black cover). Present an Aelixto-owned poster card instead and
-  // open the original post on tap. Image/text Threads posts keep the iframe.
-  if (!FORCE_THREADS_VIDEO_IFRAME && meta?.hasVideo && posterImage) {
+  // Threads VIDEO posts: ALWAYS render the Aelixto-owned poster card and NEVER
+  // the /embed iframe (the Threads player shows a black cover in Android
+  // WebView). If the video is detected but the cover image is not yet
+  // available, hold a placeholder so the iframe player never flashes.
+  if (meta?.hasVideo) {
+    if (!posterImage) {
+      return (
+        <div
+          aria-hidden
+          className="w-full animate-pulse rounded-lg bg-muted"
+          style={{ minHeight: THREADS_MIN_HEIGHT }}
+        />
+      );
+    }
     const height =
       suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
         ? Math.min(THREADS_MAX_HEIGHT, suggestedHeight)
@@ -351,7 +360,7 @@ export const ThreadsEmbed = ({
 
   // Metadata still unknown: hold a neutral placeholder so a Threads video
   // never flashes its black player before the poster card takes over.
-  if (!FORCE_THREADS_VIDEO_IFRAME && !meta) {
+  if (!meta) {
     return (
       <div
         aria-hidden
@@ -361,6 +370,7 @@ export const ThreadsEmbed = ({
     );
   }
 
+  // Image/text Threads posts: render the /embed iframe.
   return (
     <ThreadsIframeEmbed
       src={src}
