@@ -684,7 +684,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 mediaUrl={mediaUrl}
               >
                 <ImageViewTracker postId={post.id}>
-                  <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} thumbnailUrl={thumbnailUrl || previewImageUrl || null} />
+                  <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
                 </ImageViewTracker>
               </LazyEmbed>
             )}
@@ -695,7 +695,7 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 platform={post.platform || undefined}
                 mediaUrl={mediaUrl}
               >
-                <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} thumbnailUrl={thumbnailUrl || previewImageUrl || null} />
+                <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
               </LazyEmbed>
             )}
             {r.kind === 'universal' && isFacebookUnavailable && (
@@ -770,7 +770,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
               <div className="rounded-2xl overflow-hidden">
                 <video 
                   src={r.url} 
-                  poster={thumbnailUrl || previewImageUrl || deriveThumbnailFromUrl(mediaUrl, post.platform) || undefined}
                   className="w-full h-auto" 
                   controls 
                   playsInline

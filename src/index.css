@@ -44,7 +44,6 @@ All colors MUST be HSL.
     
     --brand-orange: 22 100% 51%;
     --brand-blue: 213 100% 50%;
-    --brand-purple: 270 80% 55%;
     --shadow-soft: 0 0% 0% / 0.15;
 
     --thumb-gradient-instagram: linear-gradient(135deg, hsl(262 83% 45%), hsl(330 81% 52%), hsl(25 95% 53%));
@@ -276,7 +275,7 @@ a:active:not(:disabled) {
 
 /* Global iframe freeze during scroll — prevents iframes from intercepting
    touch events which causes 1-2s scroll input delay on mobile */
-.scroll-freezing-iframes iframe:not([src*="threads."]) {
+.scroll-freezing-iframes iframe {
   pointer-events: none !important;
 }
 

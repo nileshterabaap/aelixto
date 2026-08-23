@@ -2,14 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { OgCardFallback } from '@/components/OgCardFallback';
 import { usePersistEmbedHeight } from '@/hooks/usePersistEmbedHeight';
 import { trackView } from '@/hooks/useViewTracking';
-import { EMBED_FADE_MS, useSmoothReveal } from '@/components/embeds/SmoothEmbedFrame';
-import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
-import { openExternalUrl } from '@/lib/openExternalUrl';
-import {
-  fetchThreadsVideoMeta,
-  getCachedThreadsVideoMeta,
-  type ThreadsVideoMeta,
-} from '@/lib/threadsVideoMeta';
+import { EMBED_FADE_MS, EmbedFadeSkeleton, useSmoothReveal } from '@/components/embeds/SmoothEmbedFrame';
 
 // One-shot guard so a Threads post never records more than one video_play per
 // session from this path (the guarded tracker may also fire; the server's
@@ -19,12 +12,7 @@ const threadsPlayFired = new Set<string>();
 /**
  * Threads-only embed. Extracted out of UniversalMetaEmbed so Threads fixes
  * never touch the Facebook/Instagram guarded baseline.
- *
- * Threads VIDEO posts ALWAYS render the Aelixto-owned poster card (never the
- * /embed iframe) because the Threads player shows a black cover in Android
- * WebView. Image/text Threads posts keep the iframe.
  */
-
 const THREADS_MIN_HEIGHT = 220;
 const THREADS_MAX_HEIGHT = 1400;
 const THREADS_DEFAULT_HEIGHT = 280;
@@ -208,51 +196,41 @@ const ThreadsIframeEmbed = ({
   return (
     <div
       ref={wrapperRef}
-      className="relative w-full"
+      className="relative w-full overflow-hidden"
       style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
     >
-      {/* Root-cause fix (WebView tile-memory / video-overlay promotion):
-          the iframe itself must carry NO compositing property (opacity /
-          transition / z-index) and no clipping ancestor, otherwise Chromium
-          cannot promote the Threads video to an overlay surface and has to
-          raster it into parent tiles — which fails in Android WebView's small
-          tile budget and shows as a grey/black cover. The fade now lives on
-          the skeleton above the iframe instead. */}
+      <EmbedFadeSkeleton visible={!threadsRevealed} />
       <div
-        aria-hidden
-        className="absolute inset-0 animate-pulse rounded-lg bg-muted"
-        style={{
-          zIndex: 1,
-          pointerEvents: 'none',
-          opacity: threadsRevealed ? 0 : 1,
-          transition: `opacity ${EMBED_FADE_MS}ms ease`,
-          visibility: threadsRevealed ? 'hidden' : 'visible',
-          transitionProperty: 'opacity, visibility',
-        }}
+        ref={catcherRef}
+        data-threads-ptr-catcher="1"
+        data-threads-play-capture="1"
+        className="threads-ptr-catcher"
+        aria-hidden="true"
       />
-      {/* DIAGNOSTIC: catcher layer removed from the Threads tree so nothing at
-          all can sit above the iframe and absorb the first tap. Tracking is
-          unchanged — the window-blur one-shot below still records video_play. */}
-      <div ref={catcherRef} style={{ display: 'none' }} aria-hidden="true" />
       <iframe
         ref={iframeRef}
         src={src}
         scrolling="no"
         allowFullScreen
-        allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
-        loading="eager"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen; web-share"
+        loading="lazy"
+        sandbox="allow-scripts allow-same-origin allow-presentation"
         data-nav-lock-applied="1"
         onLoad={() => {
           setHasLoaded(true);
         }}
         style={{
-          border: 0,
+          border: 'none',
           width: '100%',
           height: '100%',
           display: 'block',
           margin: 0,
           padding: 0,
           background: 'transparent',
+          position: 'relative',
+          zIndex: 1,
+          opacity: threadsRevealed ? 1 : 0,
+          transition: `opacity ${EMBED_FADE_MS}ms ease`,
         }}
       />
     </div>
@@ -285,92 +263,13 @@ export const ThreadsEmbed = ({
   url,
   postId,
   suggestedHeight,
-  thumbnailUrl,
 }: {
   url: string;
   postId?: string | null;
   suggestedHeight?: number | null;
-  thumbnailUrl?: string | null;
 }) => {
   const src = buildThreadsEmbedSrc(url);
-  const [meta, setMeta] = useState<ThreadsVideoMeta | null>(() => getCachedThreadsVideoMeta(url));
-
-  useEffect(() => {
-    if (meta) return;
-    let cancelled = false;
-    fetchThreadsVideoMeta(url).then((next) => {
-      if (!cancelled) setMeta(next);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [url, meta]);
-
   if (!src) return <OgCardFallback url={url} platform="Threads" />;
-
-  const posterImage = thumbnailUrl || meta?.image || null;
-
-  // Threads VIDEO posts: ALWAYS render the Aelixto-owned poster card and NEVER
-  // the /embed iframe (the Threads player shows a black cover in Android
-  // WebView). If the video is detected but the cover image is not yet
-  // available, hold a placeholder so the iframe player never flashes.
-  if (meta?.hasVideo) {
-    if (!posterImage) {
-      return (
-        <div
-          aria-hidden
-          className="w-full animate-pulse rounded-lg bg-muted"
-          style={{ minHeight: THREADS_MIN_HEIGHT }}
-        />
-      );
-    }
-    const height =
-      suggestedHeight && suggestedHeight >= THREADS_MIN_HEIGHT
-        ? Math.min(THREADS_MAX_HEIGHT, suggestedHeight)
-        : 420;
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          if (postId) markOriginalVisit(postId);
-          void openExternalUrl(url);
-        }}
-        aria-label="Open video on Threads"
-        className="relative block w-full overflow-hidden rounded-lg"
-        style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
-      >
-        <img
-          src={posterImage}
-          alt="Threads video"
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <span className="absolute inset-0 bg-black/20 active:bg-black/30 transition-colors" />
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span className="flex items-center justify-center w-14 h-14 rounded-full bg-black/55 text-white shadow-lg backdrop-blur-sm">
-            <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6 ml-0.5" aria-hidden="true">
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </span>
-        </span>
-      </button>
-    );
-  }
-
-  // Metadata still unknown: hold a neutral placeholder so a Threads video
-  // never flashes its black player before the poster card takes over.
-  if (!meta) {
-    return (
-      <div
-        aria-hidden
-        className="w-full animate-pulse rounded-lg bg-muted"
-        style={{ minHeight: THREADS_MIN_HEIGHT }}
-      />
-    );
-  }
-
-  // Image/text Threads posts: render the /embed iframe.
   return (
     <ThreadsIframeEmbed
       src={src}

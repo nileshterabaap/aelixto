@@ -11,7 +11,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.9.1'
+        classpath 'com.android.tools.build:gradle:8.2.1'
     }
 }
 
@@ -19,10 +19,10 @@ apply plugin: 'com.android.library'
 
 android {
     namespace "com.aelixto.gamnative"
-    compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 36
+    compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 34
     defaultConfig {
         minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 23
-        targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 36
+        targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 34
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
@@ -45,38 +45,4 @@ dependencies {
     // Image loading for the native ad icon (already used transitively by many
     // Android apps; declared explicitly so the plugin is self-contained).
     implementation 'com.squareup.picasso:picasso:2.8'
-}
-
-// Diagnostic source-chain proof. Reports (never fails) which
-// GamNativePlugin.java sources exist for this module, so a stale or duplicate
-// copy is visible in the build log. Path matching is separator-agnostic so it
-// works on Windows as well as Unix.
-tasks.withType(JavaCompile).configureEach { compileTask ->
-    compileTask.doFirst {
-        def marker = 'AELIXTO_GAM_INITIALIZE_2026_08_10_1123'
-        def candidates = []
-        try {
-            candidates += compileTask.source.files.findAll { it.name == 'GamNativePlugin.java' }
-        } catch (Throwable ignored) {
-            // source collection unavailable for this task — fall back to disk scan
-        }
-        if (candidates.isEmpty()) {
-            def srcDir = new File(projectDir, 'src/main/java/com/aelixto/gamnative')
-            if (srcDir.isDirectory()) {
-                candidates += srcDir.listFiles().findAll { it.name == 'GamNativePlugin.java' }
-            }
-        }
-        if (candidates.isEmpty()) {
-            println "AELIXTO_GAM_COMPILE_PROOF: no GamNativePlugin.java found for task ${compileTask.path}"
-            return
-        }
-        candidates.unique { it.canonicalPath }.each { sourceFile ->
-            def digest = java.security.MessageDigest.getInstance('SHA-256')
-                    .digest(sourceFile.bytes)
-                    .encodeHex()
-                    .toString()
-            def hasMarker = sourceFile.getText('UTF-8').contains(marker)
-            println "AELIXTO_GAM_COMPILE_PROOF task=${compileTask.path} source=${sourceFile.canonicalPath} markerPresent=${hasMarker} sha256=${digest}"
-        }
-    }
 }

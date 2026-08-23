@@ -97,7 +97,7 @@ const ThreadsIframeEmbed = ({
 }: {
   src: string;
   expandedUrl: string;
-  fallbackData: { title?: string; image?: string; description?: string; hasVideo?: boolean } | null;
+  fallbackData: { title?: string; image?: string; description?: string } | null;
   postId?: string | null;
   suggestedHeight?: number | null;
 }) => {
@@ -108,7 +108,6 @@ const ThreadsIframeEmbed = ({
       : THREADS_DEFAULT_HEIGHT
   );
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [tapped, setTapped] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
 
@@ -143,48 +142,6 @@ const ThreadsIframeEmbed = ({
     return () => clearTimeout(timeout);
   }, [hasLoaded]);
 
-  // Threads VIDEO posts only: Android WebView cannot render Threads' internal
-  // video player (grey/black cover). Present an Aelixto-owned poster card with
-  // the same dimensions/radius and open the original post on tap. Photo posts
-  // and every other platform keep their existing behavior.
-  const isThreadsVideo = !!fallbackData?.hasVideo && !!fallbackData?.image;
-
-  if (isThreadsVideo) {
-    return (
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          void openExternalUrl(expandedUrl);
-        }}
-        aria-label="Open video on Threads"
-        className="relative block w-full overflow-hidden rounded-lg"
-        style={{ width: '100%', height: `${height}px`, minHeight: `${THREADS_MIN_HEIGHT}px` }}
-      >
-        <img
-          src={fallbackData!.image}
-          alt={fallbackData?.title || 'Threads video'}
-          loading="lazy"
-          className="absolute inset-0 w-full h-full object-cover"
-        />
-        <span className="absolute inset-0 bg-black/20 active:bg-black/30 transition-colors" />
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span className="flex items-center justify-center w-14 h-14 rounded-full bg-black/55 text-white shadow-lg backdrop-blur-sm">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-6 h-6 ml-0.5"
-              aria-hidden="true"
-            >
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </span>
-        </span>
-      </button>
-    );
-  }
-
   if (failed) {
     return (
       <OgCardFallback
@@ -196,8 +153,6 @@ const ThreadsIframeEmbed = ({
       />
     );
   }
-
-  const showPoster = fallbackData?.image && !tapped;
 
   return (
     <div
@@ -223,31 +178,6 @@ const ThreadsIframeEmbed = ({
           background: 'transparent',
         }}
       />
-      {showPoster && (
-        <button
-          type="button"
-          onClick={() => setTapped(true)}
-          className="absolute inset-0 z-10 flex items-center justify-center bg-black/20 active:bg-black/30 transition-colors"
-          aria-label="Play video"
-        >
-          <img
-            src={fallbackData.image}
-            alt=""
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <span className="relative z-10 flex items-center justify-center w-14 h-14 rounded-full bg-black/55 text-white shadow-lg backdrop-blur-sm">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-6 h-6 ml-0.5"
-              aria-hidden="true"
-            >
-              <path d="M8 5v14l11-7z" />
-            </svg>
-          </span>
-        </button>
-      )}
     </div>
   );
 };
@@ -939,7 +869,7 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
   const cached = embedCache.get(url);
 
   const [embedHtml, setEmbedHtml] = useState<string | null>(cached?.embedHtml ?? null);
-  const [fallbackData, setFallbackData] = useState<{ title?: string; image?: string; description?: string; hasVideo?: boolean } | null>(
+  const [fallbackData, setFallbackData] = useState<{ title?: string; image?: string; description?: string } | null>(
     cached?.fallbackData ?? null
   );
   const [expandedUrl, setExpandedUrl] = useState(cached?.expandedUrl ?? url);
@@ -1077,7 +1007,6 @@ export const UniversalMetaEmbed = ({ url, postId, suggestedHeight }: UniversalMe
                 title: ogTitle,
                 image: ogData.meta?.image || ogData.image,
                 description: ogData.meta?.description || ogData.description,
-                hasVideo: !!(ogData.has_video ?? ogData.meta?.has_video),
               });
             }
           })

@@ -213,17 +213,10 @@ export const HydratedEmbed = memo(({
   
   const isYouTubePost = platformHint === 'youtube' || (!!r.url && /youtube\.com|youtu\.be/i.test(r.url));
 
-  const postThumbnailFallback =
-    (post as any).thumbnailUrl ||
-    (post as any).thumbnail_url ||
-    (post as any).previewImageUrl ||
-    (post as any).preview_image_url ||
-    null;
-
   // For YouTube, prefer their thumbnail
   const effectiveThumbnail = isYouTubePost && r.url 
-    ? getYouTubeThumbnail(r.url) || thumbnailUrl || postThumbnailFallback
-    : thumbnailUrl || postThumbnailFallback;
+    ? getYouTubeThumbnail(r.url) || thumbnailUrl 
+    : thumbnailUrl;
   
   const aspectClass = isYouTubePost && r.url && isYouTubeShort(
     r.url,
@@ -331,7 +324,6 @@ export const HydratedEmbed = memo(({
           <ImageViewTracker postId={post.id}>
             <video 
               src={r.url} 
-              poster={effectiveThumbnail || undefined}
               className="w-full h-auto" 
               controls 
               playsInline
@@ -365,7 +357,7 @@ export const HydratedEmbed = memo(({
 
         {forceUniversalRenderer && mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={mediaUrl} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} thumbnailUrl={effectiveThumbnail || null} />
+            <UniversalMetaEmbed url={mediaUrl} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
           </ImageViewTracker>
         )}
         
@@ -379,7 +371,7 @@ export const HydratedEmbed = memo(({
         {/* Fallback when raw embed fails — show UniversalMetaEmbed to rebuild */}
         {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && rawEmbedFailed && post.mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={post.mediaUrl} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} thumbnailUrl={effectiveThumbnail || null} />
+            <UniversalMetaEmbed url={post.mediaUrl} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
           </ImageViewTracker>
         )}
         
@@ -428,7 +420,7 @@ export const HydratedEmbed = memo(({
         {/* Universal Meta embed (Instagram, Facebook, etc) */}
         {r.kind === 'universal' && r.url && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} thumbnailUrl={effectiveThumbnail || null} />
+            <UniversalMetaEmbed url={r.url} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
           </ImageViewTracker>
         )}
       </div>

@@ -2,11 +2,7 @@ import { registerPlugin } from '@capacitor/core';
 
 export interface GamNativePlugin {
   /** Initialize the Google Mobile Ads SDK. Safe to call multiple times. */
-  initialize(options?: { testDeviceIds?: string[] }): Promise<{
-    status: string;
-    mediaPlaybackRequiresUserGesture?: boolean;
-    diagnosticSource?: string;
-  }>;
+  initialize(options?: { testDeviceIds?: string[] }): Promise<{ status: string }>;
 
   /** UMP consent status (Google-certified CMP via Funding Choices). */
   requestConsentInfo(): Promise<{
