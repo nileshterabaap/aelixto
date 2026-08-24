@@ -23,7 +23,7 @@ import { useLocation } from 'react-router-dom';
 const YOUTUBE_SELECTOR = 'iframe[src*="youtube.com"], iframe[src*="youtube-nocookie.com"]';
 const SPOTIFY_SELECTOR = 'iframe[src*="open.spotify.com"]';
 const SUSPENDED_IFRAME_SELECTOR = 'iframe[data-aelix-suspended="1"]';
-const HARD_SUSPEND_MIN_DISTANCE_PX = 2800;
+
 
 const SUSPENDED_FLAG = 'aelixSuspended';
 const SUSPENDED_SRC = 'aelixSuspendedSrc';
