@@ -77,13 +77,22 @@ function hasLifecycleTargets(root: HTMLElement): boolean {
  * before the post can actually be seen.
  */
 function getHardSuspendDistancePx(_hardSuspendDistanceVh: number): number {
+  // Distance ABOVE the viewport at which a post is considered "far" and its
+  // iframes get hard-suspended. Kept tiny (no 300px floor) so audio from
+  // Post A dies as soon as it clears the screen — i.e. at Post B, not Post C.
   const vh = window.innerHeight || document.documentElement.clientHeight;
-  // Suspended zone starts ~0.4 viewports away so audio from Post A stops
-  // almost immediately as the next post enters view. The near zone (pre-warm)
-  // is intentionally tight; pre-warming still fires before the post is
-  // visible on most scroll speeds.
-  return Math.min(Math.max(Math.round(vh * 0.4), 300), 600);
+  return Math.min(Math.round(vh * 0.08), 80);
 }
+
+/**
+ * Distance BELOW the viewport at which a suspended post starts pre-warming
+ * (hidden reload). Must stay generous so the embed is live before it is seen.
+ */
+function getPrewarmDistancePx(): number {
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  return Math.min(Math.max(Math.round(vh * 1.5), 700), 1200);
+}
+
 
 
 function getActiveDistancePx(): number {
@@ -324,6 +333,7 @@ function ensureSharedObservers() {
   if (sharedNearObserver) return;
 
   const hardDist = getHardSuspendDistancePx(6);
+  const prewarmDist = getPrewarmDistancePx();
   const activeDist = getActiveDistancePx();
 
   sharedNearObserver = new IntersectionObserver((entries) => {
@@ -334,7 +344,10 @@ function ensureSharedObservers() {
       reconcileElement(entry.target as HTMLElement, reg);
     }
   }, {
-    rootMargin: `${hardDist}px 0px ${hardDist}px 0px`,
+    // Asymmetric: tiny margin above (suspend fast, kills Post A audio at Post B),
+    // large margin below (pre-warm upcoming posts long before they're visible).
+    rootMargin: `${hardDist}px 0px ${prewarmDist}px 0px`,
+
     threshold: 0,
   });
 
@@ -353,14 +366,16 @@ function ensureSharedObservers() {
   sharedResizeHandler = () => {
     const vh = window.innerHeight || document.documentElement.clientHeight;
     const hd = getHardSuspendDistancePx(6);
+    const pw = getPrewarmDistancePx();
     const ad = getActiveDistancePx();
     elementStates.forEach((reg, el) => {
       const rect = el.getBoundingClientRect();
-      reg.near = rect.bottom > -hd && rect.top < vh + hd;
+      reg.near = rect.bottom > -hd && rect.top < vh + pw;
       reg.active = rect.bottom > ad && rect.top < vh - ad;
       reconcileElement(el, reg);
     });
   };
+
 
   window.addEventListener('resize', sharedResizeHandler);
 }
@@ -386,11 +401,13 @@ function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
   // Sync initial state from layout
   const vh = window.innerHeight || document.documentElement.clientHeight;
   const hardDist = getHardSuspendDistancePx(6);
+  const prewarmDist = getPrewarmDistancePx();
   const activeDist = getActiveDistancePx();
   const rect = el.getBoundingClientRect();
-  reg.near = rect.bottom > -hardDist && rect.top < vh + hardDist;
+  reg.near = rect.bottom > -hardDist && rect.top < vh + prewarmDist;
   reg.active = rect.bottom > activeDist && rect.top < vh - activeDist;
   reconcileElement(el, reg);
+
 }
 
 function unregisterElement(el: HTMLElement) {
