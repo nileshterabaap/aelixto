@@ -333,6 +333,7 @@ function ensureSharedObservers() {
   if (sharedNearObserver) return;
 
   const hardDist = getHardSuspendDistancePx(6);
+  const prewarmDist = getPrewarmDistancePx();
   const activeDist = getActiveDistancePx();
 
   sharedNearObserver = new IntersectionObserver((entries) => {
@@ -343,7 +344,10 @@ function ensureSharedObservers() {
       reconcileElement(entry.target as HTMLElement, reg);
     }
   }, {
-    rootMargin: `${hardDist}px 0px ${hardDist}px 0px`,
+    // Asymmetric: tiny margin above (suspend fast, kills Post A audio at Post B),
+    // large margin below (pre-warm upcoming posts long before they're visible).
+    rootMargin: `${hardDist}px 0px ${prewarmDist}px 0px`,
+
     threshold: 0,
   });
 
