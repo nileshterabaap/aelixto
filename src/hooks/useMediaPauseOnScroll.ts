@@ -77,13 +77,22 @@ function hasLifecycleTargets(root: HTMLElement): boolean {
  * before the post can actually be seen.
  */
 function getHardSuspendDistancePx(_hardSuspendDistanceVh: number): number {
+  // Distance ABOVE the viewport at which a post is considered "far" and its
+  // iframes get hard-suspended. Kept tiny (no 300px floor) so audio from
+  // Post A dies as soon as it clears the screen — i.e. at Post B, not Post C.
   const vh = window.innerHeight || document.documentElement.clientHeight;
-  // Suspended zone starts ~0.4 viewports away so audio from Post A stops
-  // almost immediately as the next post enters view. The near zone (pre-warm)
-  // is intentionally tight; pre-warming still fires before the post is
-  // visible on most scroll speeds.
-  return Math.min(Math.max(Math.round(vh * 0.4), 300), 600);
+  return Math.min(Math.round(vh * 0.08), 80);
 }
+
+/**
+ * Distance BELOW the viewport at which a suspended post starts pre-warming
+ * (hidden reload). Must stay generous so the embed is live before it is seen.
+ */
+function getPrewarmDistancePx(): number {
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  return Math.min(Math.max(Math.round(vh * 1.5), 700), 1200);
+}
+
 
 
 function getActiveDistancePx(): number {
