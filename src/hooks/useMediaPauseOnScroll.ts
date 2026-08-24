@@ -71,10 +71,16 @@ function hasLifecycleTargets(root: HTMLElement): boolean {
   return hasPlayableMedia(root) || root.querySelector(SUSPENDED_IFRAME_SELECTOR) !== null;
 }
 
-function getHardSuspendDistancePx(hardSuspendDistanceVh: number): number {
+/**
+ * Boundary between "suspended" (src killed, audio stopped) and "pre-warming"
+ * (hidden reload in flight). ~1.5 viewports gives the embed time to load
+ * before the post can actually be seen.
+ */
+function getHardSuspendDistancePx(_hardSuspendDistanceVh: number): number {
   const vh = window.innerHeight || document.documentElement.clientHeight;
-  return Math.max(Math.round(hardSuspendDistanceVh * vh), HARD_SUSPEND_MIN_DISTANCE_PX);
+  return Math.min(Math.max(Math.round(vh * 1.5), 800), 1400);
 }
+
 
 function getActiveDistancePx(): number {
   const vh = window.innerHeight || document.documentElement.clientHeight;
