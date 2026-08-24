@@ -140,7 +140,7 @@ export const HydratedEmbed = memo(({
   useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
-    { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: true }
+    { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: false }
   );
 
   // Track click-throughs to the original platform (iframe focus or anchor clicks).
