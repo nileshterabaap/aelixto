@@ -78,11 +78,11 @@ function hasLifecycleTargets(root: HTMLElement): boolean {
  */
 function getHardSuspendDistancePx(_hardSuspendDistanceVh: number): number {
   const vh = window.innerHeight || document.documentElement.clientHeight;
-  // Suspended zone starts ~0.7 viewports away so audio from Post A stops
-  // around Post B rather than persisting to Post D. The near zone (pre-warm)
+  // Suspended zone starts ~0.4 viewports away so audio from Post A stops
+  // almost immediately as the next post enters view. The near zone (pre-warm)
   // is intentionally tight; pre-warming still fires before the post is
   // visible on most scroll speeds.
-  return Math.min(Math.max(Math.round(vh * 0.7), 350), 700);
+  return Math.min(Math.max(Math.round(vh * 0.4), 300), 600);
 }
 
 
