@@ -366,14 +366,16 @@ function ensureSharedObservers() {
   sharedResizeHandler = () => {
     const vh = window.innerHeight || document.documentElement.clientHeight;
     const hd = getHardSuspendDistancePx(6);
+    const pw = getPrewarmDistancePx();
     const ad = getActiveDistancePx();
     elementStates.forEach((reg, el) => {
       const rect = el.getBoundingClientRect();
-      reg.near = rect.bottom > -hd && rect.top < vh + hd;
+      reg.near = rect.bottom > -hd && rect.top < vh + pw;
       reg.active = rect.bottom > ad && rect.top < vh - ad;
       reconcileElement(el, reg);
     });
   };
+
 
   window.addEventListener('resize', sharedResizeHandler);
 }
