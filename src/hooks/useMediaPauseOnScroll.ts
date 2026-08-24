@@ -401,11 +401,13 @@ function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
   // Sync initial state from layout
   const vh = window.innerHeight || document.documentElement.clientHeight;
   const hardDist = getHardSuspendDistancePx(6);
+  const prewarmDist = getPrewarmDistancePx();
   const activeDist = getActiveDistancePx();
   const rect = el.getBoundingClientRect();
-  reg.near = rect.bottom > -hardDist && rect.top < vh + hardDist;
+  reg.near = rect.bottom > -hardDist && rect.top < vh + prewarmDist;
   reg.active = rect.bottom > activeDist && rect.top < vh - activeDist;
   reconcileElement(el, reg);
+
 }
 
 function unregisterElement(el: HTMLElement) {
