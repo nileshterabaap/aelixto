@@ -171,31 +171,96 @@ function stageAResume(root: HTMLElement) {
   unfreezeIframes(root);
 }
 
-// ── Stage B helpers ───────────────────────────────────────────────────
+// ── Stage B helpers (hard-suspend + pre-warmed restore) ───────────────
+
+const WARMING_FLAG = 'aelixWarming';
+const OVERLAY_CLASS = 'aelix-warm-overlay';
+const WARM_REVEAL_TIMEOUT_MS = 5000;
+
+/** API-pausable frames (YouTube/Spotify) are never hard-suspended — postMessage handles them. */
+function shouldHardSuspend(iframe: HTMLIFrameElement): boolean {
+  if (!isPlayableIframe(iframe)) return false;
+  return !iframe.matches(API_PAUSABLE_SELECTOR);
+}
+
+function ensureWarmOverlay(iframe: HTMLIFrameElement) {
+  const parent = iframe.parentElement;
+  if (!parent) return;
+  if (parent.querySelector(`:scope > .${OVERLAY_CLASS}`)) return;
+  if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
+  const overlay = document.createElement('div');
+  overlay.className = OVERLAY_CLASS;
+  overlay.style.cssText =
+    'position:absolute;inset:0;z-index:2;pointer-events:none;background:hsl(var(--muted));opacity:1;transition:opacity 220ms ease-out;';
+  parent.appendChild(overlay);
+}
+
+function clearWarmOverlay(iframe: HTMLIFrameElement) {
+  const parent = iframe.parentElement;
+  const overlay = parent?.querySelector<HTMLElement>(`:scope > .${OVERLAY_CLASS}`);
+  if (!overlay) return;
+  overlay.style.opacity = '0';
+  setTimeout(() => overlay.remove(), 260);
+}
+
+function revealWarmedIframe(iframe: HTMLIFrameElement) {
+  if (iframe.dataset[WARMING_FLAG] !== '1') return;
+  delete iframe.dataset[WARMING_FLAG];
+  iframe.style.visibility = '';
+  clearWarmOverlay(iframe);
+}
 
 function hardSuspendIframes(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (!isPlayableIframe(iframe)) return;
+    if (!shouldHardSuspend(iframe)) return;
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
     const src = iframe.getAttribute('src');
     if (!src || src === 'about:blank') return;
     iframe.dataset[SUSPENDED_SRC] = src;
     iframe.dataset[SUSPENDED_FLAG] = '1';
+    delete iframe.dataset[WARMING_FLAG];
     iframe.setAttribute('src', 'about:blank');
     iframe.style.visibility = 'hidden';
+    // Keep the slot visually filled so the user never sees a blank frame.
+    ensureWarmOverlay(iframe);
   });
 }
 
+/**
+ * Pre-warm: bring the real src back while the post is still off-screen, but
+ * keep the frame hidden behind the placeholder overlay until it finishes
+ * loading. By the time the post scrolls into view the embed is already live.
+ */
 function restoreHardSuspended(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (iframe.dataset[SUSPENDED_FLAG] !== '1') return;
     const storedSrc = iframe.dataset[SUSPENDED_SRC];
-    if (storedSrc) iframe.setAttribute('src', storedSrc);
     delete iframe.dataset[SUSPENDED_FLAG];
     delete iframe.dataset[SUSPENDED_SRC];
-    iframe.style.visibility = '';
+
+    if (!storedSrc) {
+      iframe.style.visibility = '';
+      clearWarmOverlay(iframe);
+      return;
+    }
+
+    iframe.dataset[WARMING_FLAG] = '1';
+    iframe.style.visibility = 'hidden';
+    ensureWarmOverlay(iframe);
+
+    const onLoad = () => {
+      iframe.removeEventListener('load', onLoad);
+      // Give the embed SDK a frame to paint before revealing.
+      requestAnimationFrame(() => revealWarmedIframe(iframe));
+    };
+    iframe.addEventListener('load', onLoad);
+    // Cross-origin frames don't always fire load — reveal anyway.
+    setTimeout(() => revealWarmedIframe(iframe), WARM_REVEAL_TIMEOUT_MS);
+
+    iframe.setAttribute('src', storedSrc);
   });
 }
+
 
 // ── Shared observer registry ──────────────────────────────────────────
 // Instead of 2 IntersectionObservers + 1 resize listener PER POST,
