@@ -138,15 +138,33 @@ export const HydratedEmbed = memo(({
       r.kind === 'universal' ||
       r.kind === 'pinterest');
 
-  // Hard-suspend + pre-warm only matters for posts the user actually played.
-  // Never-played embeds just load normally and stay put (no reload traffic).
+  // Hard-suspend + pre-warm only matters for VIDEO posts the user actually played.
+  // Images/text/never-played embeds just load normally and stay put (no reload traffic).
+  const isVideoPost =
+    mediaTypeHint === 'video' ||
+    r.kind === 'video' ||
+    lowerUrl.includes('/reel/') ||
+    lowerUrl.includes('/reels/') ||
+    lowerUrl.includes('/shorts/') ||
+    lowerUrl.includes('/video/') ||
+    lowerUrl.includes('/clips/') ||
+    lowerUrl.includes('youtube.com/') ||
+    lowerUrl.includes('youtu.be/') ||
+    lowerUrl.includes('tiktok.com/') ||
+    lowerUrl.includes('fb.watch/');
+
   const hasBeenPlayed = useHasPostBeenPlayed(post.id);
 
   useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
-    { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: !hasBeenPlayed }
+    {
+      enabled: mediaLifecycleEnabled,
+      hardSuspendDistanceVh: 6,
+      disableHardSuspend: !(hasBeenPlayed && isVideoPost),
+    }
   );
+
 
   // Track click-throughs to the original platform (iframe focus or anchor clicks).
   // Awards +1 engagement score to the author on top of the impression score.
