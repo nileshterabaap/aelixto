@@ -317,9 +317,15 @@ function getDirectionalNearState(
   hardDist: number,
   prewarmDist: number,
   direction: ScrollDirection,
+  currentState: LifecycleState,
 ): boolean {
   const withinStopBuffer = rect.bottom > -hardDist && rect.top < vh + hardDist;
   if (withinStopBuffer) return true;
+
+  // A post that is currently live/paused must be suspended as soon as it
+  // leaves the tight stop buffer, regardless of scroll direction. The large
+  // directional zone is only for restoring frames that are already suspended.
+  if (currentState !== 'suspended') return false;
 
   const aboveViewport = rect.bottom <= -hardDist;
   const belowViewport = rect.top >= vh + hardDist;
@@ -342,7 +348,7 @@ function syncElementFromLayout(el: HTMLElement, reg: RegisteredElement, directio
   const activeDist = getActiveDistancePx();
   const rect = el.getBoundingClientRect();
 
-  reg.near = getDirectionalNearState(rect, vh, hardDist, prewarmDist, direction);
+  reg.near = getDirectionalNearState(rect, vh, hardDist, prewarmDist, direction, reg.state);
   reg.active = rect.bottom > activeDist && rect.top < vh - activeDist;
   reconcileElement(el, reg);
 }
@@ -400,6 +406,7 @@ function ensureSharedObservers() {
         hardDist,
         prewarmDist,
         lastScrollDirection,
+        reg.state,
       );
       reconcileElement(el, reg);
     }
