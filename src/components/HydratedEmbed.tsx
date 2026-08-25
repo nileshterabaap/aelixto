@@ -140,18 +140,30 @@ export const HydratedEmbed = memo(({
 
   // Hard-suspend + pre-warm only matters for VIDEO posts the user actually played.
   // Images/text/never-played embeds just load normally and stay put (no reload traffic).
+  const isNonVideoPost =
+    mediaTypeHint === 'image' ||
+    mediaTypeHint === 'photo' ||
+    mediaTypeHint === 'text' ||
+    mediaTypeHint === 'article' ||
+    mediaTypeHint === 'link';
+
   const isVideoPost =
-    mediaTypeHint === 'video' ||
-    r.kind === 'video' ||
-    lowerUrl.includes('/reel/') ||
-    lowerUrl.includes('/reels/') ||
-    lowerUrl.includes('/shorts/') ||
-    lowerUrl.includes('/video/') ||
-    lowerUrl.includes('/clips/') ||
-    lowerUrl.includes('youtube.com/') ||
-    lowerUrl.includes('youtu.be/') ||
-    lowerUrl.includes('tiktok.com/') ||
-    lowerUrl.includes('fb.watch/');
+    !isNonVideoPost &&
+    (mediaTypeHint === 'video' ||
+      r.kind === 'video' ||
+      lowerUrl.includes('/reel/') ||
+      lowerUrl.includes('/reels/') ||
+      lowerUrl.includes('/shorts/') ||
+      lowerUrl.includes('/video/') ||
+      lowerUrl.includes('/clips/') ||
+      lowerUrl.includes('youtube.com/') ||
+      lowerUrl.includes('youtu.be/') ||
+      lowerUrl.includes('tiktok.com/') ||
+      lowerUrl.includes('fb.watch/') ||
+      // Threads/IG/FB permalinks don't reveal the media type in the URL —
+      // a recorded play is itself proof the post contains video.
+      mediaTypeHint === '');
+
 
   const hasBeenPlayed = useHasPostBeenPlayed(post.id);
 
