@@ -348,7 +348,7 @@ function syncElementFromLayout(el: HTMLElement, reg: RegisteredElement, directio
   const activeDist = getActiveDistancePx();
   const rect = el.getBoundingClientRect();
 
-  reg.near = getDirectionalNearState(rect, vh, hardDist, prewarmDist, direction);
+  reg.near = getDirectionalNearState(rect, vh, hardDist, prewarmDist, direction, reg.state);
   reg.active = rect.bottom > activeDist && rect.top < vh - activeDist;
   reconcileElement(el, reg);
 }
