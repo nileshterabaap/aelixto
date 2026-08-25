@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
-import { markPostPlayed } from '@/lib/playedPosts';
 
 // no-op stub kept to minimize diff after removing temporary diagnostic logger
 const traceLog = (..._args: unknown[]) => {};
@@ -61,8 +60,6 @@ export function useOriginalVisitTracker(
       traceLog('firePlay', 'called', { postId, detail: { alreadyFired: playFiredRef.current, trackPlayableInteraction } });
       if (trackPlayableInteraction && !playFiredRef.current) {
         playFiredRef.current = true;
-        // Only played posts get the hard-suspend + pre-warm lifecycle.
-        markPostPlayed(postId);
         traceLog('firePlay', 'dispatch:trackView(video_play)', { postId });
         trackView({ postId, eventType: 'video_play' }).then((ok) => {
           traceLog('firePlay', 'trackView:result', { postId, detail: { ok } });

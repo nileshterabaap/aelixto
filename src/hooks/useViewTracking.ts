@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getDeviceId, sha256 } from '@/lib/deviceId';
 import { useCallback } from 'react';
+import { markPostPlayed } from '@/lib/playedPosts';
 
 type EventType = 'video_play' | 'image_view' | 'article_open' | 'external_visit' | 'original_visit';
 
@@ -15,6 +16,8 @@ interface TrackViewParams {
  * Sends to edge function which handles deduplication and scoring
  */
 export async function trackView({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
+  // Only played posts get the hard-suspend + pre-warm lifecycle.
+  if (eventType === 'video_play' && postId) markPostPlayed(postId);
   try {
     // Get current user (may be null for anonymous)
     const { data: { user } } = await supabase.auth.getUser();
