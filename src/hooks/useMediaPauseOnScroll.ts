@@ -10,9 +10,10 @@ import { useLocation } from 'react-router-dom';
  *   - Pause Spotify via postMessage { command: 'pause' }
  *   - Preserve non-API iframe visuals (do NOT hide or destroy them)
  *
- * Stage B (far from viewport):
+ * Stage B (leaving viewport):
  *   - Hard-suspend playable iframes by swapping src → about:blank
- *   - Restore them early when they come back near the viewport
+ *   - Restore them early only when scroll direction shows they are approaching
+ *     the viewport again, so upward scrolls stop audio just like downward scrolls
  *
  * Performance: uses TWO shared IntersectionObservers + ONE resize listener
  * for ALL registered posts, instead of per-post observers.
@@ -286,6 +287,7 @@ function restoreHardSuspended(root: HTMLElement) {
 // we maintain 2 shared observers + 1 resize listener for ALL posts.
 
 type LifecycleState = 'active' | 'paused' | 'suspended';
+type ScrollDirection = 'up' | 'down' | 'none';
 
 interface RegisteredElement {
   near: boolean;
@@ -299,7 +301,55 @@ const elementStates = new Map<HTMLElement, RegisteredElement>();
 let sharedNearObserver: IntersectionObserver | null = null;
 let sharedActiveObserver: IntersectionObserver | null = null;
 let sharedResizeHandler: (() => void) | null = null;
+let sharedScrollHandler: (() => void) | null = null;
+let scrollRaf: number | null = null;
+let lastScrollY = 0;
+let lastScrollDirection: ScrollDirection = 'none';
 let observerRefCount = 0;
+
+function getScrollTop(): number {
+  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+}
+
+function getDirectionalNearState(
+  rect: DOMRect,
+  vh: number,
+  hardDist: number,
+  prewarmDist: number,
+  direction: ScrollDirection,
+): boolean {
+  const withinStopBuffer = rect.bottom > -hardDist && rect.top < vh + hardDist;
+  if (withinStopBuffer) return true;
+
+  const aboveViewport = rect.bottom <= -hardDist;
+  const belowViewport = rect.top >= vh + hardDist;
+
+  if (aboveViewport) {
+    return direction === 'up' && rect.bottom > -prewarmDist;
+  }
+
+  if (belowViewport) {
+    return direction === 'down' && rect.top < vh + prewarmDist;
+  }
+
+  return false;
+}
+
+function syncElementFromLayout(el: HTMLElement, reg: RegisteredElement, direction: ScrollDirection) {
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  const hardDist = getHardSuspendDistancePx(6);
+  const prewarmDist = getPrewarmDistancePx();
+  const activeDist = getActiveDistancePx();
+  const rect = el.getBoundingClientRect();
+
+  reg.near = getDirectionalNearState(rect, vh, hardDist, prewarmDist, direction);
+  reg.active = rect.bottom > activeDist && rect.top < vh - activeDist;
+  reconcileElement(el, reg);
+}
+
+function syncAllElementsFromLayout(direction: ScrollDirection) {
+  elementStates.forEach((reg, el) => syncElementFromLayout(el, reg, direction));
+}
 
 function transitionElement(el: HTMLElement, reg: RegisteredElement, target: LifecycleState) {
   const current = reg.state;
@@ -335,18 +385,28 @@ function ensureSharedObservers() {
   const hardDist = getHardSuspendDistancePx(6);
   const prewarmDist = getPrewarmDistancePx();
   const activeDist = getActiveDistancePx();
+  lastScrollY = getScrollTop();
+  lastScrollDirection = 'none';
 
   sharedNearObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
-      const reg = elementStates.get(entry.target as HTMLElement);
+      const el = entry.target as HTMLElement;
+      const reg = elementStates.get(el);
       if (!reg) continue;
-      reg.near = entry.isIntersecting;
-      reconcileElement(entry.target as HTMLElement, reg);
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      reg.near = entry.isIntersecting && getDirectionalNearState(
+        el.getBoundingClientRect(),
+        vh,
+        hardDist,
+        prewarmDist,
+        lastScrollDirection,
+      );
+      reconcileElement(el, reg);
     }
   }, {
-    // Asymmetric: tiny margin above (suspend fast, kills Post A audio at Post B),
-    // large margin below (pre-warm upcoming posts long before they're visible).
-    rootMargin: `${hardDist}px 0px ${prewarmDist}px 0px`,
+    // Symmetric pre-warm envelope. Direction-aware layout sync below decides
+    // whether an offscreen post is approaching (restore) or leaving (suspend).
+    rootMargin: `${prewarmDist}px 0px ${prewarmDist}px 0px`,
 
     threshold: 0,
   });
@@ -364,29 +424,39 @@ function ensureSharedObservers() {
   });
 
   sharedResizeHandler = () => {
-    const vh = window.innerHeight || document.documentElement.clientHeight;
-    const hd = getHardSuspendDistancePx(6);
-    const pw = getPrewarmDistancePx();
-    const ad = getActiveDistancePx();
-    elementStates.forEach((reg, el) => {
-      const rect = el.getBoundingClientRect();
-      reg.near = rect.bottom > -hd && rect.top < vh + pw;
-      reg.active = rect.bottom > ad && rect.top < vh - ad;
-      reconcileElement(el, reg);
+    syncAllElementsFromLayout(lastScrollDirection);
+  };
+
+  sharedScrollHandler = () => {
+    const y = getScrollTop();
+    if (y > lastScrollY + 1) lastScrollDirection = 'down';
+    else if (y < lastScrollY - 1) lastScrollDirection = 'up';
+    lastScrollY = y;
+
+    if (scrollRaf !== null) return;
+    scrollRaf = window.requestAnimationFrame(() => {
+      scrollRaf = null;
+      syncAllElementsFromLayout(lastScrollDirection);
     });
   };
 
 
   window.addEventListener('resize', sharedResizeHandler);
+  window.addEventListener('scroll', sharedScrollHandler, { passive: true });
 }
 
 function destroySharedObservers() {
   sharedNearObserver?.disconnect();
   sharedActiveObserver?.disconnect();
   if (sharedResizeHandler) window.removeEventListener('resize', sharedResizeHandler);
+  if (sharedScrollHandler) window.removeEventListener('scroll', sharedScrollHandler);
+  if (scrollRaf !== null) window.cancelAnimationFrame(scrollRaf);
   sharedNearObserver = null;
   sharedActiveObserver = null;
   sharedResizeHandler = null;
+  sharedScrollHandler = null;
+  scrollRaf = null;
+  lastScrollDirection = 'none';
 }
 
 function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
@@ -398,15 +468,8 @@ function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
   sharedNearObserver!.observe(el);
   sharedActiveObserver!.observe(el);
 
-  // Sync initial state from layout
-  const vh = window.innerHeight || document.documentElement.clientHeight;
-  const hardDist = getHardSuspendDistancePx(6);
-  const prewarmDist = getPrewarmDistancePx();
-  const activeDist = getActiveDistancePx();
-  const rect = el.getBoundingClientRect();
-  reg.near = rect.bottom > -hardDist && rect.top < vh + prewarmDist;
-  reg.active = rect.bottom > activeDist && rect.top < vh - activeDist;
-  reconcileElement(el, reg);
+  // Sync initial state from layout.
+  syncElementFromLayout(el, reg, 'none');
 
 }
 
