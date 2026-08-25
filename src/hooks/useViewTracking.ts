@@ -15,6 +15,8 @@ interface TrackViewParams {
  * Sends to edge function which handles deduplication and scoring
  */
 export async function trackView({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
+  // Only played posts get the hard-suspend + pre-warm lifecycle.
+  if (eventType === 'video_play' && postId) markPostPlayed(postId);
   try {
     // Get current user (may be null for anonymous)
     const { data: { user } } = await supabase.auth.getUser();
