@@ -12,6 +12,7 @@ import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
 import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
 import { openExternalUrl } from '@/lib/openExternalUrl';
+import { useHasPostBeenPlayed } from '@/lib/playedPosts';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -137,10 +138,14 @@ export const HydratedEmbed = memo(({
       r.kind === 'universal' ||
       r.kind === 'pinterest');
 
+  // Hard-suspend + pre-warm only matters for posts the user actually played.
+  // Never-played embeds just load normally and stay put (no reload traffic).
+  const hasBeenPlayed = useHasPostBeenPlayed(post.id);
+
   useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
-    { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: false }
+    { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: !hasBeenPlayed }
   );
 
   // Track click-throughs to the original platform (iframe focus or anchor clicks).
