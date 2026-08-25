@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getDeviceId, sha256 } from '@/lib/deviceId';
 import { useCallback } from 'react';
+import { markPostPlayed } from '@/lib/playedPosts';
 
 type EventType = 'video_play' | 'image_view' | 'article_open' | 'external_visit' | 'original_visit';
 
