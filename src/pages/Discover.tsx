@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useUserSearch, SearchResult } from "@/hooks/useUserSearch";
 import { SearchResultItem } from "@/components/SearchResultItem";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useSession } from "@/hooks/useSession";
 
 const HISTORY_KEY_BASE = "aelixto:visited-profiles";
 const MAX_HISTORY = 10;
