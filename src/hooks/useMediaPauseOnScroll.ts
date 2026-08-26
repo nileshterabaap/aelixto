@@ -457,14 +457,31 @@ function destroySharedObservers() {
   sharedResizeHandler = null;
 }
 
+const replayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
+
 function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
   ensureSharedObservers();
   observerRefCount++;
 
-  const reg: RegisteredElement = { visible: false, prewarm: false, state: 'active', disableHardSuspend };
+  const reg: RegisteredElement = {
+    visible: false,
+    prewarm: false,
+    state: 'active',
+    disableHardSuspend,
+    cycleUsed: false,
+  };
   elementStates.set(el, reg);
   sharedNearObserver!.observe(el);
   sharedActiveObserver!.observe(el);
+
+  // A fresh tap inside the post means the user (re)started playback, so the
+  // post earns another suspend + pre-warm cycle.
+  const onReplayIntent = () => {
+    reg.cycleUsed = false;
+  };
+  el.addEventListener('pointerdown', onReplayIntent, true);
+  el.addEventListener('touchstart', onReplayIntent, { capture: true, passive: true });
+  replayListeners.set(el, onReplayIntent);
 
   // Sync initial state from layout.
   syncElementFromLayout(el, reg);
@@ -475,6 +492,12 @@ function unregisterElement(el: HTMLElement) {
   elementStates.delete(el);
   sharedNearObserver?.unobserve(el);
   sharedActiveObserver?.unobserve(el);
+  const onReplayIntent = replayListeners.get(el);
+  if (onReplayIntent) {
+    el.removeEventListener('pointerdown', onReplayIntent, true);
+    el.removeEventListener('touchstart', onReplayIntent, true);
+    replayListeners.delete(el);
+  }
   observerRefCount--;
 
   if (observerRefCount <= 0) {
@@ -482,6 +505,7 @@ function unregisterElement(el: HTMLElement) {
     destroySharedObservers();
   }
 }
+
 
 // ── Hook options ──────────────────────────────────────────────────────
 
