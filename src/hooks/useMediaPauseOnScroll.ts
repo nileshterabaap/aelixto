@@ -321,7 +321,14 @@ interface RegisteredElement {
   prewarm: boolean;
   state: LifecycleState;
   disableHardSuspend: boolean;
+  /**
+   * One-shot guard: a played video is suspended + pre-warmed exactly ONCE after
+   * it leaves the viewport. Until the user taps play again, it then stays
+   * loaded and is never reloaded on subsequent scroll passes.
+   */
+  cycleUsed: boolean;
 }
+
 
 const elementStates = new Map<HTMLElement, RegisteredElement>();
 
@@ -358,10 +365,14 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
   if (target === 'active') {
     stageAResume(el);
   } else if (target === 'paused') {
-    if (current === 'suspended') restoreHardSuspended(el);
+    if (current === 'suspended') {
+      restoreHardSuspended(el);
+      // The single allowed refresh has now been spent.
+      reg.cycleUsed = true;
+    }
     stageAPause(el);
   } else if (target === 'suspended') {
-    if (reg.disableHardSuspend) {
+    if (reg.disableHardSuspend || reg.cycleUsed) {
       stageAPause(el);
       reg.state = 'paused';
       return;
@@ -379,9 +390,10 @@ function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
     return;
   }
 
-  // Never-played posts still receive cheap API/native pause commands, but
-  // their iframe is not destroyed or reloaded.
-  if (reg.disableHardSuspend) {
+  // Never-played posts (and played posts that already spent their one refresh)
+  // still receive cheap API/native pause commands, but their iframe is not
+  // destroyed or reloaded again.
+  if (reg.disableHardSuspend || reg.cycleUsed) {
     transitionElement(el, reg, 'suspended');
     return;
   }
@@ -395,6 +407,7 @@ function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
     transitionElement(el, reg, 'paused');
   }
 }
+
 
 function ensureSharedObservers() {
   if (sharedNearObserver) return;
@@ -444,14 +457,31 @@ function destroySharedObservers() {
   sharedResizeHandler = null;
 }
 
+const replayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
+
 function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
   ensureSharedObservers();
   observerRefCount++;
 
-  const reg: RegisteredElement = { visible: false, prewarm: false, state: 'active', disableHardSuspend };
+  const reg: RegisteredElement = {
+    visible: false,
+    prewarm: false,
+    state: 'active',
+    disableHardSuspend,
+    cycleUsed: false,
+  };
   elementStates.set(el, reg);
   sharedNearObserver!.observe(el);
   sharedActiveObserver!.observe(el);
+
+  // A fresh tap inside the post means the user (re)started playback, so the
+  // post earns another suspend + pre-warm cycle.
+  const onReplayIntent = () => {
+    reg.cycleUsed = false;
+  };
+  el.addEventListener('pointerdown', onReplayIntent, true);
+  el.addEventListener('touchstart', onReplayIntent, { capture: true, passive: true });
+  replayListeners.set(el, onReplayIntent);
 
   // Sync initial state from layout.
   syncElementFromLayout(el, reg);
@@ -462,6 +492,12 @@ function unregisterElement(el: HTMLElement) {
   elementStates.delete(el);
   sharedNearObserver?.unobserve(el);
   sharedActiveObserver?.unobserve(el);
+  const onReplayIntent = replayListeners.get(el);
+  if (onReplayIntent) {
+    el.removeEventListener('pointerdown', onReplayIntent, true);
+    el.removeEventListener('touchstart', onReplayIntent, true);
+    replayListeners.delete(el);
+  }
   observerRefCount--;
 
   if (observerRefCount <= 0) {
@@ -469,6 +505,7 @@ function unregisterElement(el: HTMLElement) {
     destroySharedObservers();
   }
 }
+
 
 // ── Hook options ──────────────────────────────────────────────────────
 
