@@ -23,6 +23,7 @@ import { useLocation } from 'react-router-dom';
 
 const YOUTUBE_SELECTOR = 'iframe[src*="youtube.com"], iframe[src*="youtube-nocookie.com"]';
 const SPOTIFY_SELECTOR = 'iframe[src*="open.spotify.com"]';
+const VIMEO_SELECTOR = 'iframe[src*="player.vimeo.com"]';
 const SUSPENDED_IFRAME_SELECTOR = 'iframe[data-aelix-suspended="1"]';
 
 
@@ -138,6 +139,14 @@ function pauseSpotifyIframes(root: HTMLElement) {
   });
 }
 
+function pauseVimeoIframes(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>(VIMEO_SELECTOR).forEach((iframe) => {
+    try {
+      iframe.contentWindow?.postMessage({ method: 'pause' }, '*');
+    } catch { /* cross-origin */ }
+  });
+}
+
 // ── Mute/unmute helpers ───────────────────────────────────────────────
 
 const MUTE_FLAG = 'aelixMuted';
@@ -179,6 +188,7 @@ function stageAPause(root: HTMLElement) {
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
+  pauseVimeoIframes(root);
   if (root.dataset.aelixHasBeenActive) {
     muteNonApiIframes(root);
   }
@@ -207,10 +217,13 @@ const WARMING_FLAG = 'aelixWarming';
 const OVERLAY_CLASS = 'aelix-warm-overlay';
 const WARM_REVEAL_TIMEOUT_MS = 5000;
 
-/** API-pausable frames (YouTube/Spotify) are never hard-suspended — postMessage handles them. */
+/** API-pausable frames are never hard-suspended — postMessage handles them. */
 function shouldHardSuspend(iframe: HTMLIFrameElement): boolean {
-  if (!isPlayableIframe(iframe)) return false;
-  return !iframe.matches(API_PAUSABLE_SELECTOR);
+  // This function is only reached for a post that has emitted a confirmed
+  // video_play event. Third-party SDKs frequently generate opaque iframe URLs
+  // that cannot be identified reliably, so every non-API iframe in that
+  // confirmed video post must be treated as the player.
+  return !iframe.matches(`${API_PAUSABLE_SELECTOR}, ${VIMEO_SELECTOR}`);
 }
 
 function ensureWarmOverlay(iframe: HTMLIFrameElement) {
@@ -297,11 +310,10 @@ function restoreHardSuspended(root: HTMLElement) {
 // we maintain 2 shared observers + 1 resize listener for ALL posts.
 
 type LifecycleState = 'active' | 'paused' | 'suspended';
-type ScrollDirection = 'up' | 'down' | 'none';
 
 interface RegisteredElement {
-  near: boolean;
-  active: boolean;
+  visible: boolean;
+  prewarm: boolean;
   state: LifecycleState;
   disableHardSuspend: boolean;
 }
@@ -311,58 +323,27 @@ const elementStates = new Map<HTMLElement, RegisteredElement>();
 let sharedNearObserver: IntersectionObserver | null = null;
 let sharedActiveObserver: IntersectionObserver | null = null;
 let sharedResizeHandler: (() => void) | null = null;
-let sharedScrollHandler: (() => void) | null = null;
-let scrollRaf: number | null = null;
-let lastScrollY = 0;
-let lastScrollDirection: ScrollDirection = 'none';
 let observerRefCount = 0;
 
-function getScrollTop(): number {
-  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
-}
-
-function getDirectionalNearState(
-  rect: DOMRect,
-  prewarmDist: number,
-  direction: ScrollDirection,
-  currentState: LifecycleState,
-): boolean {
+function isInsideUsableViewport(rect: DOMRect): boolean {
   const viewport = getUsableViewportBounds();
-  const withinStopBuffer = rect.bottom > viewport.top && rect.top < viewport.bottom;
-  if (withinStopBuffer) return true;
-
-  // A post that is currently live/paused must be suspended as soon as it
-  // leaves the tight stop buffer, regardless of scroll direction. The large
-  // directional zone is only for restoring frames that are already suspended.
-  if (currentState !== 'suspended') return false;
-
-  const aboveViewport = rect.bottom <= viewport.top;
-  const belowViewport = rect.top >= viewport.bottom;
-
-  if (aboveViewport) {
-    return direction === 'up' && rect.bottom > viewport.top - prewarmDist;
-  }
-
-  if (belowViewport) {
-    return direction === 'down' && rect.top < viewport.bottom + prewarmDist;
-  }
-
-  return false;
+  return rect.bottom > viewport.top && rect.top < viewport.bottom;
 }
 
-function syncElementFromLayout(el: HTMLElement, reg: RegisteredElement, direction: ScrollDirection) {
-  const vh = window.innerHeight || document.documentElement.clientHeight;
+function syncElementFromLayout(el: HTMLElement, reg: RegisteredElement) {
   const prewarmDist = getPrewarmDistancePx();
-  const activeDist = getActiveDistancePx();
   const rect = el.getBoundingClientRect();
+  const viewport = getUsableViewportBounds();
 
-  reg.near = getDirectionalNearState(rect, prewarmDist, direction, reg.state);
-  reg.active = rect.bottom > activeDist && rect.top < vh - activeDist;
+  reg.visible = isInsideUsableViewport(rect);
+  reg.prewarm = rect.bottom > viewport.top - prewarmDist && rect.top < viewport.bottom + prewarmDist;
   reconcileElement(el, reg);
 }
 
-function syncAllElementsFromLayout(direction: ScrollDirection) {
-  elementStates.forEach((reg, el) => syncElementFromLayout(el, reg, direction));
+function syncAllElementsFromLayout() {
+  // Resize is rare; doing a full layout sync here is safe. Scroll itself is
+  // handled entirely by IntersectionObserver and performs no O(posts) reads.
+  elementStates.forEach((reg, el) => syncElementFromLayout(el, reg));
 }
 
 function transitionElement(el: HTMLElement, reg: RegisteredElement, target: LifecycleState) {
@@ -388,30 +369,39 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
 }
 
 function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
-  if (reg.active) transitionElement(el, reg, 'active');
-  else if (reg.near) transitionElement(el, reg, 'paused');
-  else transitionElement(el, reg, 'suspended');
+  if (reg.visible) {
+    transitionElement(el, reg, 'active');
+    return;
+  }
+
+  // Never-played posts still receive cheap API/native pause commands, but
+  // their iframe is not destroyed or reloaded.
+  if (reg.disableHardSuspend) {
+    transitionElement(el, reg, 'suspended');
+    return;
+  }
+
+  // A played iframe is killed immediately after leaving the visible feed.
+  // Once it has travelled outside the prewarm envelope, the observer restores
+  // it on re-entry while it is still well off-screen.
+  if (reg.state !== 'suspended') {
+    transitionElement(el, reg, 'suspended');
+  } else if (reg.prewarm) {
+    transitionElement(el, reg, 'paused');
+  }
 }
 
 function ensureSharedObservers() {
   if (sharedNearObserver) return;
 
   const prewarmDist = getPrewarmDistancePx();
-  const activeDist = getActiveDistancePx();
-  lastScrollY = getScrollTop();
-  lastScrollDirection = 'none';
 
   sharedNearObserver = new IntersectionObserver((entries) => {
     for (const entry of entries) {
       const el = entry.target as HTMLElement;
       const reg = elementStates.get(el);
       if (!reg) continue;
-      reg.near = entry.isIntersecting && getDirectionalNearState(
-        el.getBoundingClientRect(),
-        prewarmDist,
-        lastScrollDirection,
-        reg.state,
-      );
+      reg.prewarm = entry.isIntersecting;
       reconcileElement(el, reg);
     }
   }, {
@@ -426,61 +416,40 @@ function ensureSharedObservers() {
     for (const entry of entries) {
       const reg = elementStates.get(entry.target as HTMLElement);
       if (!reg) continue;
-      reg.active = entry.isIntersecting;
+      reg.visible = entry.isIntersecting && isInsideUsableViewport(entry.boundingClientRect);
       reconcileElement(entry.target as HTMLElement, reg);
     }
   }, {
-    rootMargin: `-${activeDist}px 0px -${activeDist}px 0px`,
     threshold: 0,
   });
 
   sharedResizeHandler = () => {
-    syncAllElementsFromLayout(lastScrollDirection);
+    syncAllElementsFromLayout();
   };
-
-  sharedScrollHandler = () => {
-    const y = getScrollTop();
-    if (y > lastScrollY + 1) lastScrollDirection = 'down';
-    else if (y < lastScrollY - 1) lastScrollDirection = 'up';
-    lastScrollY = y;
-
-    if (scrollRaf !== null) return;
-    scrollRaf = window.requestAnimationFrame(() => {
-      scrollRaf = null;
-      syncAllElementsFromLayout(lastScrollDirection);
-    });
-  };
-
 
   window.addEventListener('resize', sharedResizeHandler);
-  window.addEventListener('scroll', sharedScrollHandler, { passive: true });
 }
 
 function destroySharedObservers() {
   sharedNearObserver?.disconnect();
   sharedActiveObserver?.disconnect();
   if (sharedResizeHandler) window.removeEventListener('resize', sharedResizeHandler);
-  if (sharedScrollHandler) window.removeEventListener('scroll', sharedScrollHandler);
-  if (scrollRaf !== null) window.cancelAnimationFrame(scrollRaf);
   sharedNearObserver = null;
   sharedActiveObserver = null;
   sharedResizeHandler = null;
-  sharedScrollHandler = null;
-  scrollRaf = null;
-  lastScrollDirection = 'none';
 }
 
 function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
   ensureSharedObservers();
   observerRefCount++;
 
-  const reg: RegisteredElement = { near: false, active: false, state: 'active', disableHardSuspend };
+  const reg: RegisteredElement = { visible: false, prewarm: false, state: 'active', disableHardSuspend };
   elementStates.set(el, reg);
   sharedNearObserver!.observe(el);
   sharedActiveObserver!.observe(el);
 
   // Sync initial state from layout.
-  syncElementFromLayout(el, reg, 'none');
+  syncElementFromLayout(el, reg);
 
 }
 
