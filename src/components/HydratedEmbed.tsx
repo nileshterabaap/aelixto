@@ -103,6 +103,10 @@ export const HydratedEmbed = memo(({
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
     mediaTypeHint === 'audio' ||
+    mediaKindHint === 'video' ||
+    mediaKindHint === 'reel' ||
+    mediaKindHint === 'short' ||
+    mediaKindHint === 'clip' ||
     r.kind === 'video' ||
     platformHint === 'youtube' ||
     platformHint === 'spotify' ||
@@ -127,6 +131,11 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('pin.it/') ||
     lowerUrl.includes('twitter.com/') ||
     lowerUrl.includes('x.com/') ||
+    lowerUrl.includes('player.vimeo.com/') ||
+    lowerUrl.includes('vimeo.com/') ||
+    lowerUrl.includes('dailymotion.com/') ||
+    lowerUrl.includes('streamable.com/') ||
+    lowerUrl.includes('player.twitch.tv/') ||
     lowerUrl.includes('/reel/') ||
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
@@ -167,6 +176,10 @@ export const HydratedEmbed = memo(({
       lowerUrl.includes('youtu.be/') ||
       lowerUrl.includes('tiktok.com/') ||
       lowerUrl.includes('fb.watch/') ||
+      lowerUrl.includes('vimeo.com/') ||
+      lowerUrl.includes('dailymotion.com/') ||
+      lowerUrl.includes('streamable.com/') ||
+      lowerUrl.includes('player.twitch.tv/') ||
       // Generated platform iframe URLs often hide the media type. A confirmed
       // video_play event is authoritative proof that this post is a video.
       (hasBeenPlayed && isPlayableMediaPost));
