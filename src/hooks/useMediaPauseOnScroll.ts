@@ -101,6 +101,29 @@ function getActiveDistancePx(): number {
   return Math.min(Math.max(Math.round(vh * 0.45), 80), 220);
 }
 
+/**
+ * The feed's usable viewport excludes UI that visually covers posts. A played
+ * embed should be suspended as soon as it passes behind the sticky header or
+ * fixed bottom navigation, rather than after it has travelled beyond the raw
+ * browser viewport.
+ */
+function getUsableViewportBounds(): { top: number; bottom: number } {
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  const header = document.querySelector<HTMLElement>('header');
+  const bottomNav = document.querySelector<HTMLElement>('nav.fixed.bottom-0');
+  const headerRect = header?.getBoundingClientRect();
+  const bottomNavRect = bottomNav?.getBoundingClientRect();
+
+  const top = headerRect && headerRect.bottom > 0 && headerRect.top <= 0
+    ? Math.min(headerRect.bottom, vh)
+    : 0;
+  const bottom = bottomNavRect && bottomNavRect.top > 0 && bottomNavRect.top < vh
+    ? bottomNavRect.top
+    : vh;
+
+  return { top, bottom: Math.max(top, bottom) };
+}
+
 // ── Stage A helpers ───────────────────────────────────────────────────
 
 function pauseNativeMedia(root: HTMLElement) {
@@ -313,13 +336,12 @@ function getScrollTop(): number {
 
 function getDirectionalNearState(
   rect: DOMRect,
-  vh: number,
-  hardDist: number,
   prewarmDist: number,
   direction: ScrollDirection,
   currentState: LifecycleState,
 ): boolean {
-  const withinStopBuffer = rect.bottom > -hardDist && rect.top < vh + hardDist;
+  const viewport = getUsableViewportBounds();
+  const withinStopBuffer = rect.bottom > viewport.top && rect.top < viewport.bottom;
   if (withinStopBuffer) return true;
 
   // A post that is currently live/paused must be suspended as soon as it
@@ -327,28 +349,26 @@ function getDirectionalNearState(
   // directional zone is only for restoring frames that are already suspended.
   if (currentState !== 'suspended') return false;
 
-  const aboveViewport = rect.bottom <= -hardDist;
-  const belowViewport = rect.top >= vh + hardDist;
+  const aboveViewport = rect.bottom <= viewport.top;
+  const belowViewport = rect.top >= viewport.bottom;
 
   if (aboveViewport) {
-    return direction === 'up' && rect.bottom > -prewarmDist;
+    return direction === 'up' && rect.bottom > viewport.top - prewarmDist;
   }
 
   if (belowViewport) {
-    return direction === 'down' && rect.top < vh + prewarmDist;
+    return direction === 'down' && rect.top < viewport.bottom + prewarmDist;
   }
 
   return false;
 }
 
 function syncElementFromLayout(el: HTMLElement, reg: RegisteredElement, direction: ScrollDirection) {
-  const vh = window.innerHeight || document.documentElement.clientHeight;
-  const hardDist = getHardSuspendDistancePx(6);
   const prewarmDist = getPrewarmDistancePx();
   const activeDist = getActiveDistancePx();
   const rect = el.getBoundingClientRect();
 
-  reg.near = getDirectionalNearState(rect, vh, hardDist, prewarmDist, direction, reg.state);
+  reg.near = getDirectionalNearState(rect, prewarmDist, direction, reg.state);
   reg.active = rect.bottom > activeDist && rect.top < vh - activeDist;
   reconcileElement(el, reg);
 }
@@ -388,7 +408,6 @@ function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
 function ensureSharedObservers() {
   if (sharedNearObserver) return;
 
-  const hardDist = getHardSuspendDistancePx(6);
   const prewarmDist = getPrewarmDistancePx();
   const activeDist = getActiveDistancePx();
   lastScrollY = getScrollTop();
@@ -399,11 +418,8 @@ function ensureSharedObservers() {
       const el = entry.target as HTMLElement;
       const reg = elementStates.get(el);
       if (!reg) continue;
-      const vh = window.innerHeight || document.documentElement.clientHeight;
       reg.near = entry.isIntersecting && getDirectionalNearState(
         el.getBoundingClientRect(),
-        vh,
-        hardDist,
         prewarmDist,
         lastScrollDirection,
         reg.state,
