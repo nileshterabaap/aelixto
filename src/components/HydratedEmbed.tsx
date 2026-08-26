@@ -97,11 +97,16 @@ export const HydratedEmbed = memo(({
   const mediaUrl = post.mediaUrl || (post as any).media_url || r.url;
   const platformHint = (post.platform || '').toLowerCase();
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
+  const mediaKindHint = String((post as any).media_kind || (post as any).mediaKind || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
 
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
     mediaTypeHint === 'audio' ||
+    mediaKindHint === 'video' ||
+    mediaKindHint === 'reel' ||
+    mediaKindHint === 'short' ||
+    mediaKindHint === 'clip' ||
     r.kind === 'video' ||
     platformHint === 'youtube' ||
     platformHint === 'spotify' ||
@@ -126,6 +131,11 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('pin.it/') ||
     lowerUrl.includes('twitter.com/') ||
     lowerUrl.includes('x.com/') ||
+    lowerUrl.includes('player.vimeo.com/') ||
+    lowerUrl.includes('vimeo.com/') ||
+    lowerUrl.includes('dailymotion.com/') ||
+    lowerUrl.includes('streamable.com/') ||
+    lowerUrl.includes('player.twitch.tv/') ||
     lowerUrl.includes('/reel/') ||
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
@@ -147,9 +157,15 @@ export const HydratedEmbed = memo(({
     mediaTypeHint === 'article' ||
     mediaTypeHint === 'link';
 
+  const hasBeenPlayed = useHasPostBeenPlayed(post.id);
+
   const isVideoPost =
     !isNonVideoPost &&
     (mediaTypeHint === 'video' ||
+      mediaKindHint === 'video' ||
+      mediaKindHint === 'reel' ||
+      mediaKindHint === 'short' ||
+      mediaKindHint === 'clip' ||
       r.kind === 'video' ||
       lowerUrl.includes('/reel/') ||
       lowerUrl.includes('/reels/') ||
@@ -160,12 +176,13 @@ export const HydratedEmbed = memo(({
       lowerUrl.includes('youtu.be/') ||
       lowerUrl.includes('tiktok.com/') ||
       lowerUrl.includes('fb.watch/') ||
-      // Threads/IG/FB permalinks don't reveal the media type in the URL —
-      // a recorded play is itself proof the post contains video.
-      mediaTypeHint === '');
-
-
-  const hasBeenPlayed = useHasPostBeenPlayed(post.id);
+      lowerUrl.includes('vimeo.com/') ||
+      lowerUrl.includes('dailymotion.com/') ||
+      lowerUrl.includes('streamable.com/') ||
+      lowerUrl.includes('player.twitch.tv/') ||
+      // Generated platform iframe URLs often hide the media type. A confirmed
+      // video_play event is authoritative proof that this post is a video.
+      (hasBeenPlayed && isPlayableMediaPost));
 
   useMediaPauseOnScroll(
     embedContainerRef,
