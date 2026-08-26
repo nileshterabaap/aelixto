@@ -217,13 +217,18 @@ const WARMING_FLAG = 'aelixWarming';
 const OVERLAY_CLASS = 'aelix-warm-overlay';
 const WARM_REVEAL_TIMEOUT_MS = 5000;
 
-/** API-pausable frames are never hard-suspended — postMessage handles them. */
+/**
+ * A confirmed played-video iframe is always hard-suspended off-screen.
+ * postMessage pause commands are best-effort only: older/raw YouTube embeds may
+ * omit enablejsapi and other providers can silently ignore their pause command.
+ * Clearing src is the only provider-independent guarantee that audio stops.
+ */
 function shouldHardSuspend(iframe: HTMLIFrameElement): boolean {
   // This function is only reached for a post that has emitted a confirmed
   // video_play event. Third-party SDKs frequently generate opaque iframe URLs
   // that cannot be identified reliably, so every non-API iframe in that
   // confirmed video post must be treated as the player.
-  return !iframe.matches(`${API_PAUSABLE_SELECTOR}, ${VIMEO_SELECTOR}`);
+  return iframe.getAttribute('src') !== 'about:blank';
 }
 
 function ensureWarmOverlay(iframe: HTMLIFrameElement) {
