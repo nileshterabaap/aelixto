@@ -365,10 +365,14 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
   if (target === 'active') {
     stageAResume(el);
   } else if (target === 'paused') {
-    if (current === 'suspended') restoreHardSuspended(el);
+    if (current === 'suspended') {
+      restoreHardSuspended(el);
+      // The single allowed refresh has now been spent.
+      reg.cycleUsed = true;
+    }
     stageAPause(el);
   } else if (target === 'suspended') {
-    if (reg.disableHardSuspend) {
+    if (reg.disableHardSuspend || reg.cycleUsed) {
       stageAPause(el);
       reg.state = 'paused';
       return;
@@ -386,9 +390,10 @@ function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
     return;
   }
 
-  // Never-played posts still receive cheap API/native pause commands, but
-  // their iframe is not destroyed or reloaded.
-  if (reg.disableHardSuspend) {
+  // Never-played posts (and played posts that already spent their one refresh)
+  // still receive cheap API/native pause commands, but their iframe is not
+  // destroyed or reloaded again.
+  if (reg.disableHardSuspend || reg.cycleUsed) {
     transitionElement(el, reg, 'suspended');
     return;
   }
@@ -402,6 +407,7 @@ function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
     transitionElement(el, reg, 'paused');
   }
 }
+
 
 function ensureSharedObservers() {
   if (sharedNearObserver) return;
