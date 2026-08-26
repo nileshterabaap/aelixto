@@ -73,19 +73,6 @@ function hasLifecycleTargets(root: HTMLElement): boolean {
 }
 
 /**
- * Boundary between "suspended" (src killed, audio stopped) and "pre-warming"
- * (hidden reload in flight). ~1.5 viewports gives the embed time to load
- * before the post can actually be seen.
- */
-function getHardSuspendDistancePx(_hardSuspendDistanceVh: number): number {
-  // Distance ABOVE the viewport at which a post is considered "far" and its
-  // iframes get hard-suspended. Kept tiny (no 300px floor) so audio from
-  // Post A dies as soon as it clears the screen — i.e. at Post B, not Post C.
-  const vh = window.innerHeight || document.documentElement.clientHeight;
-  return Math.min(Math.round(vh * 0.08), 80);
-}
-
-/**
  * Distance BELOW the viewport at which a suspended post starts pre-warming
  * (hidden reload). Must stay generous so the embed is live before it is seen.
  */
@@ -364,6 +351,7 @@ function getDirectionalNearState(
 }
 
 function syncElementFromLayout(el: HTMLElement, reg: RegisteredElement, direction: ScrollDirection) {
+  const vh = window.innerHeight || document.documentElement.clientHeight;
   const prewarmDist = getPrewarmDistancePx();
   const activeDist = getActiveDistancePx();
   const rect = el.getBoundingClientRect();
