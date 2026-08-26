@@ -321,7 +321,14 @@ interface RegisteredElement {
   prewarm: boolean;
   state: LifecycleState;
   disableHardSuspend: boolean;
+  /**
+   * One-shot guard: a played video is suspended + pre-warmed exactly ONCE after
+   * it leaves the viewport. Until the user taps play again, it then stays
+   * loaded and is never reloaded on subsequent scroll passes.
+   */
+  cycleUsed: boolean;
 }
+
 
 const elementStates = new Map<HTMLElement, RegisteredElement>();
 
