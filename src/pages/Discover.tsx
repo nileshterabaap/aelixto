@@ -10,8 +10,12 @@ import { useUserSearch, SearchResult } from "@/hooks/useUserSearch";
 import { SearchResultItem } from "@/components/SearchResultItem";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-const HISTORY_KEY = "aelixto:visited-profiles";
+const HISTORY_KEY_BASE = "aelixto:visited-profiles";
 const MAX_HISTORY = 10;
+
+// Per-account key so one user's recent searches never leak into another's.
+const historyKeyFor = (userId?: string | null) =>
+  userId ? `${HISTORY_KEY_BASE}:${userId}` : `${HISTORY_KEY_BASE}:anon`;
 
 type VisitedProfile = {
   user_id: string;
