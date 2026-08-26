@@ -24,9 +24,9 @@ type VisitedProfile = {
   avatar_url: string | null;
 };
 
-const loadHistory = (): VisitedProfile[] => {
+const loadHistory = (key: string): VisitedProfile[] => {
   try {
-    const raw = localStorage.getItem(HISTORY_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed)
@@ -37,45 +37,58 @@ const loadHistory = (): VisitedProfile[] => {
   }
 };
 
-const saveHistory = (items: VisitedProfile[]) => {
-  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(items)); } catch {}
+const saveHistory = (key: string, items: VisitedProfile[]) => {
+  try { localStorage.setItem(key, JSON.stringify(items)); } catch {}
 };
 
 const Discover = () => {
   const navigate = useNavigate();
+  const { user } = useSession();
+  const historyKey = historyKeyFor(user?.id);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const [searchQuery, setSearchQuery] = useState("");
   const { results, loading, hasMore, loadMore } = useUserSearch(searchQuery, true);
-  const [history, setHistory] = useState<VisitedProfile[]>(() => loadHistory());
+  const [history, setHistory] = useState<VisitedProfile[]>([]);
+
+  // Clean up the legacy shared key so old cross-account history disappears.
+  useEffect(() => {
+    try { localStorage.removeItem(HISTORY_KEY_BASE); } catch {}
+  }, []);
+
+  // Reload whenever the signed-in account changes.
+  useEffect(() => {
+    setHistory(loadHistory(historyKey));
+  }, [historyKey]);
 
   // Refresh from storage when returning to this page (e.g., after visiting a profile)
   useEffect(() => {
-    const onFocus = () => setHistory(loadHistory());
+    const onFocus = () => setHistory(loadHistory(historyKey));
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
-  }, []);
+  }, [historyKey]);
 
   const addToHistory = useCallback((p: VisitedProfile) => {
     setHistory((prev) => {
       const next = [p, ...prev.filter((h) => h.user_id !== p.user_id)].slice(0, MAX_HISTORY);
-      saveHistory(next);
+      saveHistory(historyKey, next);
       return next;
     });
-  }, []);
+  }, [historyKey]);
 
   const removeHistoryItem = (user_id: string) => {
     setHistory((prev) => {
       const next = prev.filter((h) => h.user_id !== user_id);
-      saveHistory(next);
+      saveHistory(historyKey, next);
       return next;
     });
   };
 
   const clearHistory = () => {
     setHistory([]);
-    try { localStorage.removeItem(HISTORY_KEY); } catch {}
+    try { localStorage.removeItem(historyKey); } catch {}
   };
+
 
   const handleResultSelect = (r: SearchResult) => {
     addToHistory({
