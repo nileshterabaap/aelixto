@@ -250,13 +250,25 @@ span[data-pin-href] button {
   100% { transform: scale(1); }
 }
 
-/* Global tap bounce for all interactive elements */
+/* Global press feedback for all interactive elements — a smooth, immediate
+   press-in while held, with a soft spring release. */
+button,
+[role="button"],
+a,
+.tap-press {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 220ms cubic-bezier(0.34, 1.4, 0.64, 1),
+              opacity 220ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
 button:active:not(:disabled),
 [role="button"]:active:not(:disabled),
-a:active:not(:disabled) {
-  animation: tap-bounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  -webkit-tap-highlight-color: transparent;
+a:active:not(:disabled),
+.tap-press:active:not(:disabled) {
+  transform: scale(0.96);
+  opacity: 0.88;
+  transition: transform 70ms ease-out, opacity 70ms ease-out;
 }
+
 
 /* Press-in tap: element stays visibly pressed while held, then releases.
    Use on grid thumbnails and message rows instead of the bouncy tap. */
