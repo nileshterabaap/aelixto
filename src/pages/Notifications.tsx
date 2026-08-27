@@ -46,7 +46,7 @@ const getNotificationMessage = (type: string) => {
     case 'follow_request':
       return 'asked to Follow';
     case 'follow_accepted':
-      return 'agreed your follow ask';
+      return 'accepted your follow ask';
     case 'message':
       return 'sent you a message';
     default:
@@ -248,7 +248,7 @@ const NotificationItem = ({
                     disabled={reqBusy !== null}
                     className="text-xs font-medium px-3 py-1.5 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition disabled:opacity-50"
                   >
-                    {reqBusy === "approve" ? "Alright…" : "Alright"}
+                    {reqBusy === "approve" ? "Sure…" : "Sure"}
                   </button>
                   <button
                     onClick={handleDeclineFollow}
