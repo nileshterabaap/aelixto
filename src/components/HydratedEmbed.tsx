@@ -161,10 +161,11 @@ export const HydratedEmbed = memo(({
     mediaTypeHint === 'article' ||
     mediaTypeHint === 'link';
 
-  const hasBeenPlayed = useHasPostBeenPlayed(post.id);
+  const hasBeenPlayed = hasBeenPlayedEarly;
 
   const isVideoPost =
-    !isNonVideoPost &&
+    hasBeenPlayed ||
+    (!isNonVideoPost &&
     (mediaTypeHint === 'video' ||
       mediaKindHint === 'video' ||
       mediaKindHint === 'reel' ||
