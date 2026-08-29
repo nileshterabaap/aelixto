@@ -69,6 +69,13 @@ export function useEmbedEngagementFallback(
       }, 0);
     };
 
+    // Some embeds (Instagram/Facebook plugin frames) hand the user off to the
+    // native app without ever giving the iframe DOM focus, so a plain tap
+    // inside the embed also counts as a handoff candidate.
+    const handlePointerDown = () => {
+      lastIframeFocusRef.current = Date.now();
+    };
+
     const handleVisibility = () => {
       if (document.visibilityState !== 'hidden') return;
       const focusedOurIframe =
@@ -83,11 +90,15 @@ export function useEmbedEngagementFallback(
       fireVisit();
     };
 
+    el.addEventListener('pointerdown', handlePointerDown, true);
+    el.addEventListener('touchstart', handlePointerDown, { capture: true, passive: true });
     window.addEventListener('blur', handleBlur);
     document.addEventListener('visibilitychange', handleVisibility);
     window.addEventListener('pagehide', handlePageHide);
 
     return () => {
+      el.removeEventListener('pointerdown', handlePointerDown, true);
+      el.removeEventListener('touchstart', handlePointerDown, true);
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('pagehide', handlePageHide);

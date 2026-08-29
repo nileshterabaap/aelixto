@@ -319,6 +319,14 @@ type LifecycleState = 'active' | 'paused' | 'suspended';
 interface RegisteredElement {
   visible: boolean;
   prewarm: boolean;
+  /**
+   * Set when the post is hard-suspended. While true, the post is NOT restored
+   * just because it still sits inside the (generous) pre-warm envelope — it
+   * must first travel fully outside that envelope. Without this, a played
+   * video was reloaded (and audible again) the instant it slipped behind the
+   * bottom nav, so audio only really stopped a whole post later.
+   */
+  awaitingReentry: boolean;
   state: LifecycleState;
   disableHardSuspend: boolean;
   /**
@@ -349,6 +357,7 @@ function syncElementFromLayout(el: HTMLElement, reg: RegisteredElement) {
 
   reg.visible = isInsideUsableViewport(rect);
   reg.prewarm = rect.bottom > viewport.top - prewarmDist && rect.top < viewport.bottom + prewarmDist;
+  if (!reg.prewarm) reg.awaitingReentry = false;
   reconcileElement(el, reg);
 }
 
@@ -379,6 +388,7 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
     }
     if (current === 'active') stageAPause(el);
     hardSuspendIframes(el);
+    reg.awaitingReentry = true;
   }
 
   reg.state = target;
@@ -403,7 +413,7 @@ function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
   // it on re-entry while it is still well off-screen.
   if (reg.state !== 'suspended') {
     transitionElement(el, reg, 'suspended');
-  } else if (reg.prewarm) {
+  } else if (reg.prewarm && !reg.awaitingReentry) {
     transitionElement(el, reg, 'paused');
   }
 }
@@ -420,6 +430,9 @@ function ensureSharedObservers() {
       const reg = elementStates.get(el);
       if (!reg) continue;
       reg.prewarm = entry.isIntersecting;
+      // Fully outside the pre-warm envelope → the post is a genuine re-entry
+      // candidate again, so the next approach may pre-warm it.
+      if (!reg.prewarm) reg.awaitingReentry = false;
       reconcileElement(el, reg);
     }
   }, {
@@ -469,6 +482,7 @@ function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
     state: 'active',
     disableHardSuspend,
     cycleUsed: false,
+    awaitingReentry: false,
   };
   elementStates.set(el, reg);
   sharedNearObserver!.observe(el);
