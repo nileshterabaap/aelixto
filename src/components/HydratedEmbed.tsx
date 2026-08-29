@@ -1,6 +1,7 @@
 import { useState, memo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
+import { useEmbedEngagementFallback } from '@/hooks/useEmbedEngagementFallback';
 import type { Post } from '@/data/demoData';
 import { supabase } from '@/integrations/supabase/client';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
@@ -198,6 +199,10 @@ export const HydratedEmbed = memo(({
   // Track click-throughs to the original platform (iframe focus or anchor clicks).
   // Awards +1 engagement score to the author on top of the impression score.
   useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost);
+
+  // Restores July-31 scoring for cross-origin iframes (X, Threads, YouTube,
+  // TikTok, Spotify, Pinterest, LinkedIn…) that expose no parent-side anchor.
+  useEmbedEngagementFallback(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost);
 
   const forceTwitterRenderer =
     r.kind === 'raw' &&
