@@ -141,9 +141,12 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
 
+  const hasBeenPlayedEarly = useHasPostBeenPlayed(post.id);
+
   const mediaLifecycleEnabled =
     shouldHydrate &&
     (isPlayableMediaPost ||
+      hasBeenPlayedEarly ||
       r.kind === 'raw' ||
       r.kind === 'twitter' ||
       r.kind === 'universal' ||
