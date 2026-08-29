@@ -319,6 +319,14 @@ type LifecycleState = 'active' | 'paused' | 'suspended';
 interface RegisteredElement {
   visible: boolean;
   prewarm: boolean;
+  /**
+   * Set when the post is hard-suspended. While true, the post is NOT restored
+   * just because it still sits inside the (generous) pre-warm envelope — it
+   * must first travel fully outside that envelope. Without this, a played
+   * video was reloaded (and audible again) the instant it slipped behind the
+   * bottom nav, so audio only really stopped a whole post later.
+   */
+  awaitingReentry: boolean;
   state: LifecycleState;
   disableHardSuspend: boolean;
   /**
