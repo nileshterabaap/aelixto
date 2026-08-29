@@ -97,6 +97,8 @@ export function useEmbedEngagementFallback(
     window.addEventListener('pagehide', handlePageHide);
 
     return () => {
+      el.removeEventListener('pointerdown', handlePointerDown, true);
+      el.removeEventListener('touchstart', handlePointerDown, true);
       window.removeEventListener('blur', handleBlur);
       document.removeEventListener('visibilitychange', handleVisibility);
       window.removeEventListener('pagehide', handlePageHide);
