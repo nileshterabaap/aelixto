@@ -182,8 +182,9 @@ export const HydratedEmbed = memo(({
       lowerUrl.includes('streamable.com/') ||
       lowerUrl.includes('player.twitch.tv/') ||
       // Generated platform iframe URLs often hide the media type. A confirmed
-      // video_play event is authoritative proof that this post is a video.
-      (hasBeenPlayed && isPlayableMediaPost));
+      // video_play event is authoritative proof that this post is a video —
+      // regardless of platform (Reddit, TikTok, Vimeo, Twitch, etc.).
+      hasBeenPlayed);
 
   useMediaPauseOnScroll(
     embedContainerRef,
