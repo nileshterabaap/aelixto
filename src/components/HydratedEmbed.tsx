@@ -188,7 +188,7 @@ export const HydratedEmbed = memo(({
       // Generated platform iframe URLs often hide the media type. A confirmed
       // video_play event is authoritative proof that this post is a video —
       // regardless of platform (Reddit, TikTok, Vimeo, Twitch, etc.).
-      hasBeenPlayed);
+      hasBeenPlayed));
 
   useMediaPauseOnScroll(
     embedContainerRef,
