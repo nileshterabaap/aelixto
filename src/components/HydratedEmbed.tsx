@@ -141,9 +141,12 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
 
+  const hasBeenPlayedEarly = useHasPostBeenPlayed(post.id);
+
   const mediaLifecycleEnabled =
     shouldHydrate &&
     (isPlayableMediaPost ||
+      hasBeenPlayedEarly ||
       r.kind === 'raw' ||
       r.kind === 'twitter' ||
       r.kind === 'universal' ||
@@ -158,10 +161,11 @@ export const HydratedEmbed = memo(({
     mediaTypeHint === 'article' ||
     mediaTypeHint === 'link';
 
-  const hasBeenPlayed = useHasPostBeenPlayed(post.id);
+  const hasBeenPlayed = hasBeenPlayedEarly;
 
   const isVideoPost =
-    !isNonVideoPost &&
+    hasBeenPlayed ||
+    (!isNonVideoPost &&
     (mediaTypeHint === 'video' ||
       mediaKindHint === 'video' ||
       mediaKindHint === 'reel' ||
@@ -182,8 +186,9 @@ export const HydratedEmbed = memo(({
       lowerUrl.includes('streamable.com/') ||
       lowerUrl.includes('player.twitch.tv/') ||
       // Generated platform iframe URLs often hide the media type. A confirmed
-      // video_play event is authoritative proof that this post is a video.
-      (hasBeenPlayed && isPlayableMediaPost));
+      // video_play event is authoritative proof that this post is a video —
+      // regardless of platform (Reddit, TikTok, Vimeo, Twitch, etc.).
+      hasBeenPlayed));
 
   useMediaPauseOnScroll(
     embedContainerRef,
