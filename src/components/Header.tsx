@@ -135,7 +135,8 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
   const ringCircumference = 2 * Math.PI * ringRadius;
   const ringProgress = (remaining / limit) * ringCircumference;
 
-  const totalUnreadMessages = conversations.reduce((total, conv) => total + conv.unread_count, 0);
+  // Count distinct people who have unread messages, not the number of messages
+  const totalUnreadMessages = conversations.filter((conv) => conv.unread_count > 0).length;
 
   useEffect(() => {
     const onScroll = () => {
