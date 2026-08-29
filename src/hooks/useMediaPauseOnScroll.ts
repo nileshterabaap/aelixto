@@ -412,7 +412,7 @@ function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
   // it on re-entry while it is still well off-screen.
   if (reg.state !== 'suspended') {
     transitionElement(el, reg, 'suspended');
-  } else if (reg.prewarm) {
+  } else if (reg.prewarm && !reg.awaitingReentry) {
     transitionElement(el, reg, 'paused');
   }
 }
