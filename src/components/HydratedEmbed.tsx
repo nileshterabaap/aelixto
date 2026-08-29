@@ -199,6 +199,10 @@ export const HydratedEmbed = memo(({
   // Awards +1 engagement score to the author on top of the impression score.
   useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost);
 
+  // Restores July-31 scoring for cross-origin iframes (X, Threads, YouTube,
+  // TikTok, Spotify, Pinterest, LinkedIn…) that expose no parent-side anchor.
+  useEmbedEngagementFallback(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost);
+
   const forceTwitterRenderer =
     r.kind === 'raw' &&
     !!mediaUrl &&
