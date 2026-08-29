@@ -387,6 +387,7 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
     }
     if (current === 'active') stageAPause(el);
     hardSuspendIframes(el);
+    reg.awaitingReentry = true;
   }
 
   reg.state = target;
