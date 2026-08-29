@@ -482,6 +482,7 @@ function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
     state: 'active',
     disableHardSuspend,
     cycleUsed: false,
+    awaitingReentry: false,
   };
   elementStates.set(el, reg);
   sharedNearObserver!.observe(el);
