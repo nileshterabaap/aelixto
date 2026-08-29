@@ -357,6 +357,7 @@ function syncElementFromLayout(el: HTMLElement, reg: RegisteredElement) {
 
   reg.visible = isInsideUsableViewport(rect);
   reg.prewarm = rect.bottom > viewport.top - prewarmDist && rect.top < viewport.bottom + prewarmDist;
+  if (!reg.prewarm) reg.awaitingReentry = false;
   reconcileElement(el, reg);
 }
 
