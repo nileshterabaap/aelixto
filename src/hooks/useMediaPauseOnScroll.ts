@@ -429,6 +429,9 @@ function ensureSharedObservers() {
       const reg = elementStates.get(el);
       if (!reg) continue;
       reg.prewarm = entry.isIntersecting;
+      // Fully outside the pre-warm envelope → the post is a genuine re-entry
+      // candidate again, so the next approach may pre-warm it.
+      if (!reg.prewarm) reg.awaitingReentry = false;
       reconcileElement(el, reg);
     }
   }, {
