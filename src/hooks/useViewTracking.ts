@@ -48,7 +48,20 @@ export async function trackView({ postId, eventType, durationMs = 0 }: TrackView
   }
 }
 
+// [SCORE-DIAG] Temporary diagnostic instrumentation (safe to delete).
+// Grep logcat for "[score-diag]" to trace original_visit transport.
+const diagT0 = Date.now();
+export function scoreDiag(stage: string, fields: Record<string, unknown> = {}) {
+  const flat = Object.entries(fields)
+    .map(([k, v]) => `${k}=${typeof v === 'string' ? v : JSON.stringify(v)}`)
+    .join(' ');
+  // Logcat flattens objects, so emit a single flat string.
+  console.log(`[score-diag] t=${Date.now() - diagT0}ms stage=${stage} ${flat}`);
+}
+
 async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: TrackViewParams): Promise<boolean> {
+  const started = Date.now();
+  scoreDiag('event_generated', { eventType, postId });
   try {
     const { data: { session } } = await supabase.auth.getSession();
     const deviceHash = await sha256(getDeviceId());
@@ -65,10 +78,22 @@ async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: 
     const url = supabaseUrl
       ? `${supabaseUrl.replace(/\/$/, '')}/functions/v1/record-view`
       : `https://${projectId}.functions.supabase.co/record-view`;
+    scoreDiag('payload_ready', {
+      eventType,
+      postId,
+      hasViewer: !!session?.user?.id,
+      urlHost: (() => { try { return new URL(url).host; } catch { return 'invalid'; } })(),
+      prepMs: Date.now() - started,
+    });
     // No custom headers/content-type here: outbound clicks can navigate away
     // immediately, so this must avoid CORS preflight and use keepalive/beacon.
-    if (navigator.sendBeacon && navigator.sendBeacon(url, payload)) {
-      return true;
+    const beaconSupported = typeof navigator.sendBeacon === 'function';
+    if (beaconSupported) {
+      const queued = navigator.sendBeacon(url, payload);
+      scoreDiag('transport_beacon', { eventType, postId, queued, elapsedMs: Date.now() - started });
+      if (queued) return true;
+    } else {
+      scoreDiag('transport_beacon', { eventType, postId, queued: false, reason: 'unsupported' });
     }
 
     const res = await fetch(url, {
@@ -76,8 +101,24 @@ async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: 
       body: payload,
       keepalive: true,
     });
+    let bodyText = '';
+    try { bodyText = (await res.clone().text()).slice(0, 200); } catch { /* ignore */ }
+    scoreDiag('transport_fetch', {
+      eventType,
+      postId,
+      status: res.status,
+      ok: res.ok,
+      body: bodyText,
+      elapsedMs: Date.now() - started,
+    });
     return true;
   } catch (error) {
+    scoreDiag('transport_error', {
+      eventType,
+      postId,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+      elapsedMs: Date.now() - started,
+    });
     return false;
   }
 }
