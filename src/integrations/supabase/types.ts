@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "13.0.5"
   }
   public: {
     Tables: {
@@ -1194,7 +1194,6 @@ export type Database = {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
-      delete_post_with_score: { Args: { p_post_id: string }; Returns: Json }
       email_queue_dispatch: { Args: never; Returns: undefined }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
@@ -1415,15 +1414,6 @@ export type Database = {
         }
         Returns: number
       }
-      notif_flag_allowed: {
-        Args: { _key: string; _recipient: string }
-        Returns: boolean
-      }
-      notif_scope_allowed: {
-        Args: { _actor: string; _key: string; _recipient: string }
-        Returns: boolean
-      }
-      post_delete_score_preview: { Args: { p_post_id: string }; Returns: Json }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
