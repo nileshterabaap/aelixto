@@ -700,15 +700,6 @@ function readAttrNumber(tag: string, attr: string): number | null {
 // Store thumbnail permanently to avoid CDN expiration
 async function storeThumbnailPermanently(postId: string, imageUrl: string): Promise<string | null> {
   try {
-    // Guard: preview-only calls have no postId. Previously this produced the
-    // shared storage path `thumbnails/undefined.<ext>` with upsert:true, so
-    // every new preview overwrote the same object and unrelated posts ended up
-    // sharing (and later mutating) one another's thumbnail. Never write to a
-    // non-post-scoped path — just hand back the source URL.
-    if (!postId) {
-      console.log('[fetch-post-preview] No postId (preview-only) — skipping permanent storage');
-      return imageUrl;
-    }
     console.log(`[fetch-post-preview] Downloading and storing thumbnail for ${postId}`);
     
     const imageResponse = await fetch(imageUrl, {

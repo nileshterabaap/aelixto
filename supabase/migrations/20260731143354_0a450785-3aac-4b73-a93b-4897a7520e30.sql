@@ -1,1 +1,0 @@
-delete from public.link_previews where (data->'site'->>'domain') ilike '%jina.ai%' or (data->>'resolvedUrl') ilike '%jina.ai%' or url ilike '%imf.org%';

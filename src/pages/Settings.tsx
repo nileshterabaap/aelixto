@@ -15,7 +15,6 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { showPrivacyOptionsForm } from "@/lib/adConsent";
-import { AD_TEST_LS_KEY, AD_TEST_MODE } from "@/config/ads";
 import { Capacitor } from "@capacitor/core";
 
 const Settings = () => {
@@ -35,50 +34,6 @@ const Settings = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [adTestMode, setAdTestMode] = useState(AD_TEST_MODE);
-  // "Manage ad preferences" is only shown when the UMP privacy message
-  // actually applies to the user's region (GDPR/CPRA). Elsewhere (and in
-  // release builds outside those regions) the row stays hidden.
-  const [adPrefsAvailable, setAdPrefsAvailable] = useState(false);
-
-  useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const { GamNative } = await import('aelixto-gam-native');
-        const info = await GamNative.requestConsentInfo();
-        if (!cancelled) setAdPrefsAvailable(!!info?.privacyOptionsRequired);
-      } catch {
-        if (!cancelled) setAdPrefsAvailable(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const handleAdPreferences = async () => {
-    const res = await showPrivacyOptionsForm();
-    if (!res.ok) {
-      toast({
-        title: "Ad preferences unavailable",
-        description: res.message || "No privacy options form is available for your region.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const toggleAdTestMode = () => {
-    const next = !adTestMode;
-    try {
-      if (next) localStorage.setItem(AD_TEST_LS_KEY, '1');
-      else localStorage.removeItem(AD_TEST_LS_KEY);
-    } catch { /* ignore */ }
-    setAdTestMode(next);
-    toast({
-      title: next ? "Ad test mode ON" : "Ad test mode OFF",
-      description: "Restart the app for it to take effect.",
-    });
-  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -201,18 +156,8 @@ const Settings = () => {
           <Row label="Change password" onClick={() => setChangePasswordOpen(true)} />
           <Row label="Notifications" onClick={() => navigate('/settings/notifications')} />
           <Row label="Privacy settings" onClick={() => navigate('/settings/privacy')} />
-          {Capacitor.isNativePlatform() && adPrefsAvailable && (
-            <Row label="Manage ad preferences" onClick={() => { void handleAdPreferences(); }} />
-          )}
-          {Capacitor.isNativePlatform() && (import.meta.env.DEV || adTestMode) && (
-            <button
-              type="button"
-              onClick={toggleAdTestMode}
-              className="w-full flex items-center justify-between py-4 text-left"
-            >
-              <span className="text-base text-foreground">Ad test mode (debug)</span>
-              <span className="text-sm text-muted-foreground">{adTestMode ? 'On' : 'Off'}</span>
-            </button>
+          {Capacitor.isNativePlatform() && (
+            <Row label="Manage ad preferences" onClick={() => { void showPrivacyOptionsForm(); }} />
           )}
           <div className="py-4 space-y-3">
             <p className="text-sm text-muted-foreground">Theme</p>

@@ -34,17 +34,12 @@ export function useOriginalVisitTracker(
   const recentPointerRef = useRef(0);
   const lastIframeInteractionRef = useRef(0);
   const originalDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Tracks whether the most recent pointerdown landed on an outbound anchor
-  // (article/link-card CTA). Used to stop non-playable posts from inferring a
-  // "visited the original" event from an unrelated body tap + app background.
-  const recentAnchorPointerRef = useRef(0);
 
   useEffect(() => {
     firedRef.current = false;
     playFiredRef.current = false;
     recentPointerRef.current = 0;
     lastIframeInteractionRef.current = 0;
-    recentAnchorPointerRef.current = 0;
     if (originalDwellTimerRef.current) {
       clearTimeout(originalDwellTimerRef.current);
       originalDwellTimerRef.current = null;
@@ -132,10 +127,6 @@ export function useOriginalVisitTracker(
       const now = Date.now();
       recentPointerRef.current = now;
       const t = e.target as Element | null;
-      const anchorAtPointer = t?.closest?.('a[href]') as HTMLAnchorElement | null;
-      if (anchorAtPointer && !anchorAtPointer.href.startsWith('javascript:')) {
-        recentAnchorPointerRef.current = now;
-      }
       const path: string[] = [];
       let cur: Element | null = t;
       for (let i = 0; cur && i < 6; i++) {
@@ -271,15 +262,8 @@ export function useOriginalVisitTracker(
       // never infer visit from an app-background here on playable posts.
       if (trackPlayableInteraction) return;
       const now = Date.now();
-      // Only credit a Visit when the backgrounding plausibly followed an
-      // outbound tap: an anchor/CTA pointerdown, or an iframe interaction.
-      // A bare body tap (scrolling, tapping the card, opening the app
-      // switcher) must NOT award a visit — that used to give article/quora
-      // posts a phantom +1 on top of the impression, and then the real
-      // "Continue Reading" tap scored nothing because the event was already
-      // consumed for that viewer.
       if (
-        now - recentAnchorPointerRef.current < 3000 ||
+        now - recentPointerRef.current < 3000 ||
         now - lastIframeInteractionRef.current < 10000
       ) {
         fireOriginal();

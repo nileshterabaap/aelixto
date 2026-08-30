@@ -105,9 +105,24 @@ const ThreadsIframeEmbed = ({
     const el = catcherRef.current;
     if (!el) return;
 
+    const atTop = () => window.scrollY <= 2;
+    let suppressed = false;
+
+    const arm = () => { el.style.pointerEvents = 'auto'; };
     const disarm = () => { el.style.pointerEvents = 'none'; };
+    const sync = () => {
+      if (suppressed) { disarm(); return; }
+      // Only ever armed to let Pull-to-Refresh observe a touch at scroll-top.
+      // It is NOT armed for scoring: the guarded tracker already owns the
+      // one-shot Threads video_play, so taps elsewhere (grid, scrolled feed)
+      // reach the native player on the very first tap.
+      if (atTop()) arm();
+      else disarm();
+    };
 
     const onStart = () => {
+      // Hand the tap straight back to the native player.
+      suppressed = true;
       disarm();
       if (postId && !threadsPlayFired.has(postId)) {
         threadsPlayFired.add(postId);
@@ -117,41 +132,21 @@ const ThreadsIframeEmbed = ({
       }
     };
 
-    // The layer is permanently disarmed: the guarded tracker owns the one-shot
-    // video_play, so the very first tap must reach the native Threads player.
-    disarm();
+    const onScroll = () => {
+      suppressed = false;
+      sync();
+    };
+
+    sync();
     el.addEventListener('touchstart', onStart, { passive: true });
     el.addEventListener('pointerdown', onStart, { passive: true });
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       el.removeEventListener('touchstart', onStart);
       el.removeEventListener('pointerdown', onStart);
+      window.removeEventListener('scroll', onScroll);
     };
   }, [postId]);
-
-  // Regression fix: the capture layer is permanently disarmed (so the first
-  // tap reaches the native player), which means no parent-side pointer event
-  // exists for a cross-origin Threads tap. Tapping the iframe still moves
-  // focus into it, blurring the window. Detect exactly that — window blur
-  // while the page stays visible AND this post's iframe is the active
-  // element — and record the one-shot video_play. Server dedupes overlap.
-  useEffect(() => {
-    if (!postId) return;
-    const onBlur = () => {
-      if (threadsPlayFired.has(postId)) return;
-      setTimeout(() => {
-        if (threadsPlayFired.has(postId)) return;
-        if (document.visibilityState === 'hidden') return;
-        if (document.activeElement !== iframeRef.current) return;
-        threadsPlayFired.add(postId);
-        trackView({ postId, eventType: 'video_play' }).catch(() => {
-          threadsPlayFired.delete(postId);
-        });
-      }, 80);
-    };
-    window.addEventListener('blur', onBlur);
-    return () => window.removeEventListener('blur', onBlur);
-  }, [postId]);
-
   // Pinterest-style smooth reveal (presentational only — the overlay below
   // stays at z-index 2 and keeps owning the first-tap video_play).
   const threadsRevealed = useSmoothReveal(hasLoaded);

@@ -135,8 +135,7 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
   const ringCircumference = 2 * Math.PI * ringRadius;
   const ringProgress = (remaining / limit) * ringCircumference;
 
-  // Count distinct people who have unread messages, not the number of messages
-  const totalUnreadMessages = conversations.filter((conv) => conv.unread_count > 0).length;
+  const totalUnreadMessages = conversations.reduce((total, conv) => total + conv.unread_count, 0);
 
   useEffect(() => {
     const onScroll = () => {
@@ -228,11 +227,7 @@ className="h-14 w-14"
           >
             <h1
               className="absolute inset-0 flex items-center justify-center text-3xl font-bold tracking-tight"
-              style={{
-                backfaceVisibility: "hidden",
-                WebkitBackfaceVisibility: "hidden",
-                color: "hsl(var(--brand-blue))",
-              }}
+              style={{ backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden" }}
             >
               Aelixto
             </h1>

@@ -1,56 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { AD_MIN_REQUEST_INTERVAL_MS, getNativeFeedAdUnitId, isAdTestMode, isInstallAgeBypassed } from '@/config/ads';
+import { AD_MIN_REQUEST_INTERVAL_MS, getNativeFeedAdUnitId } from '@/config/ads';
 import { adsReady } from '@/lib/adConsent';
 import { GamNative, type NativeAdCreative } from 'aelixto-gam-native';
 
 let lastRequestAt = 0;
-let slotSeq = 0;
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-async function requestNativeAd(tag: string): Promise<NativeAdCreative | null> {
-  if (!Capacitor.isNativePlatform()) {
-    console.log(`[ads]${tag} step 3 request SKIPPED: not a native platform`);
-    return null;
-  }
-
-  // Global rate limit. Previously a throttled slot returned null forever and
-  // rendered nothing; now it waits out the window so later slots still fill.
-  const waitMs = AD_MIN_REQUEST_INTERVAL_MS - (Date.now() - lastRequestAt);
-  if (waitMs > 0) {
-    console.log(`[ads]${tag} step 3 throttled — waiting ${waitMs}ms (min interval ${AD_MIN_REQUEST_INTERVAL_MS}ms)`);
-    await sleep(waitMs);
-  }
-  lastRequestAt = Date.now();
+async function requestNativeAd(): Promise<NativeAdCreative | null> {
+  if (!Capacitor.isNativePlatform()) return null;
+  const now = Date.now();
+  if (now - lastRequestAt < AD_MIN_REQUEST_INTERVAL_MS) return null;
+  lastRequestAt = now;
 
   const platform = Capacitor.getPlatform() as 'android' | 'ios' | 'web';
-  const testMode = isAdTestMode();
   const adUnitId = getNativeFeedAdUnitId(platform);
-  console.log(`[ads]${tag} step 2 adUnitId =`, adUnitId,
-    '| kind =', testMode ? 'TEST (Google sample unit)' : 'LIVE (Ad Manager unit)',
-    '| platform =', platform,
-    '| testMode =', testMode, '| installAgeBypass =', isInstallAgeBypassed());
-  if (!adUnitId) {
-    console.log(`[ads]${tag} step 3 request ABORTED: empty adUnitId`);
-    return null;
-  }
+  if (!adUnitId) return null;
 
-  const t0 = Date.now();
-  console.log(`[ads]${tag} step 3 request SENT to GamNative.loadNativeAd`);
   try {
     const result = await GamNative.loadNativeAd({ adUnitId });
-    if (result) {
-      console.log(`[ads]${tag} step 4 LOAD SUCCESS in ${Date.now() - t0}ms:`, JSON.stringify(result));
-    } else {
-      console.log(`[ads]${tag} step 4 LOAD RETURNED NULL (no-fill) in ${Date.now() - t0}ms`);
-    }
     return result ?? null;
-  } catch (e: any) {
-    console.warn(`[ads]${tag} step 5 LOAD FAILED in ${Date.now() - t0}ms`,
-      '| code =', e?.code ?? e?.errorCode ?? 'n/a',
-      '| message =', e?.message ?? String(e),
-      '| raw =', (() => { try { return JSON.stringify(e); } catch { return String(e); } })());
+  } catch (e) {
+    console.warn('[ads] loadNativeAd failed', e);
     return null;
   }
 }
@@ -72,22 +42,14 @@ export function NativeFeedAd() {
   const slotRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const presentedRef = useRef(false);
-  const tagRef = useRef(`[slot#${++slotSeq}]`);
 
   useEffect(() => {
     mountedRef.current = true;
     (async () => {
-      const tag = tagRef.current;
-      console.log(`[ads]${tag} step 1 slot mounted — awaiting consent/SDK (adsReady)`);
       const ok = await adsReady();
-      if (!ok || !mountedRef.current) {
-        console.log(`[ads]${tag} step 1 BLOCKED: adsReady =`, ok, '| stillMounted =', mountedRef.current);
-        return;
-      }
-      console.log(`[ads]${tag} step 1 OK: consent resolved + SDK initialized`);
-      const creative = await requestNativeAd(tag);
+      if (!ok || !mountedRef.current) return;
+      const creative = await requestNativeAd();
       if (!mountedRef.current) return;
-      console.log(`[ads]${tag} step 6 render decision:`, creative ? 'RENDER overlay' : 'RENDER NOTHING (no creative)');
       setAd(creative);
       setReady(true);
     })();
@@ -107,36 +69,17 @@ export function NativeFeedAd() {
     const adId = ad.adId;
     const el = slotRef.current;
 
-function measureClip() {
-  // Fixed bottom nav height (incl. safe-area) — the overlay must never paint
-  // over it. The floating "create post" FAB overhangs the nav's top edge, so
-  // the clip must start at the highest of the two. Falls back to 0 when the
-  // nav is not mounted on this route.
-  let clipBottom = 0;
-  const nav = document.querySelector('nav.fixed.bottom-0') as HTMLElement | null;
-  if (nav) {
-    let top = nav.getBoundingClientRect().top;
-    const fab = nav.querySelector('[aria-label="Create post"]') as HTMLElement | null;
-    if (fab) top = Math.min(top, fab.getBoundingClientRect().top);
-    clipBottom = Math.max(0, Math.round(window.innerHeight - top));
-  }
-  return { clipTop: 0, clipBottom };
-}
-
     const pushFrame = () => {
       const r = el.getBoundingClientRect();
-      const clip = measureClip();
       const payload = {
         adId,
         x: Math.round(r.left),
         y: Math.round(r.top),
         width: Math.round(r.width),
         height: Math.round(r.height),
-        ...clip,
       };
       if (!presentedRef.current) {
         presentedRef.current = true;
-        console.log('[ads] presentNativeAd overlay for adId =', adId, 'frame =', JSON.stringify(payload));
         void GamNative.presentNativeAd(payload).catch(() => {});
       } else {
         void GamNative.updateNativeAdFrame(payload).catch(() => {});

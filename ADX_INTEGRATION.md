@@ -53,27 +53,13 @@ GAM_APP_ID_IOS      = 'ca-app-pub-4944388830758437~4837623196';
 
 ### 3. Native app IDs (after `npx cap sync`)
 
-**Android — nothing to do.** The plugin's own library manifest
-(`capacitor-plugins/gam-native/android/src/main/AndroidManifest.xml`) already
-declares:
+**`android/app/src/main/AndroidManifest.xml`** — inside `<application>`:
 
 ```xml
 <meta-data
   android:name="com.google.android.gms.ads.APPLICATION_ID"
   android:value="ca-app-pub-4944388830758437~6705238632"/>
 ```
-
-The manifest merger folds this into `android/app/build/intermediates/merged_manifests/.../AndroidManifest.xml`,
-which is what `MobileAdsInitProvider` reads at process start. Without it the
-app crashes before launch with `IllegalStateException: Missing application ID`.
-Verify after a build:
-
-```bash
-grep -r "ads.APPLICATION_ID" android/app/build/intermediates/merged_manifests/
-```
-
-If `android/app/src/main/AndroidManifest.xml` also declares this key, it must
-use the same value or the merge fails with a conflict.
 
 **`ios/App/App/Info.plist`**:
 

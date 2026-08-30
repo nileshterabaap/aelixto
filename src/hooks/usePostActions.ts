@@ -174,20 +174,25 @@ export const usePostActions = (
         return { createdAt: undefined as string | undefined, deletedRepost: true };
       }
 
-      // Atomic delete + (in-cycle only) Aelix Score deduction, server-side.
-      const { data, error } = await supabase.rpc("delete_post_with_score", {
-        p_post_id: postId,
-      });
+      // Fetch created_at first so we can decide whether to refund the daily credit
+      const { data: existing } = await supabase
+        .from("posts")
+        .select("created_at")
+        .eq("id", postId)
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      const { data: deletedRows, error } = await supabase
+        .from("posts")
+        .delete()
+        .eq("id", postId)
+        .eq("user_id", userId)
+        .select("id");
+
       if (error) throw error;
-      const res = (data ?? {}) as {
-        created_at?: string;
-        deducted?: number;
-      };
-      return {
-        createdAt: res.created_at,
-        deletedRepost: false,
-        deducted: res.deducted ?? 0,
-      };
+      if (!deletedRows || deletedRows.length === 0) throw new Error("Post not found or not owned");
+
+      return { createdAt: existing?.created_at as string | undefined, deletedRepost: false };
     },
     onSuccess: (result) => {
       // Refund the daily post credit only if the post was created today (same local day)
@@ -210,10 +215,6 @@ export const usePostActions = (
       queryClient.invalidateQueries({ queryKey: ["saved-posts"] });
       queryClient.invalidateQueries({ queryKey: ["user-posts"] });
       queryClient.invalidateQueries({ queryKey: ["profile-posts"] });
-      if (result?.deducted) {
-        queryClient.invalidateQueries({ queryKey: ["current-profile"] });
-        queryClient.invalidateQueries({ queryKey: ["profile"] });
-      }
 
       options.onDeleted?.();
 

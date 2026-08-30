@@ -12,7 +12,7 @@ import FacebookIcon from "@/assets/platforms/facebook.svg";
 import YoutubeIcon from "@/assets/platforms/youtube.svg";
 import TiktokIcon from "@/assets/platforms/tiktok.svg";
 import XIcon from "@/assets/platforms/x.svg";
-import BlogIcon from "@/assets/platforms/articles.svg";
+import BlogIcon from "@/assets/platforms/blog.svg";
 import ThreadsIcon from "@/assets/platforms/threads.svg";
 import RedditIcon from "@/assets/platforms/reddit.svg";
 import PinterestIcon from "@/assets/platforms/pinterest.svg";
