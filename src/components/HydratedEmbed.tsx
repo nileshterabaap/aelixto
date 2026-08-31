@@ -128,11 +128,6 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('pin.it/') ||
     lowerUrl.includes('twitter.com/') ||
     lowerUrl.includes('x.com/') ||
-    lowerUrl.includes('player.vimeo.com/') ||
-    lowerUrl.includes('vimeo.com/') ||
-    lowerUrl.includes('dailymotion.com/') ||
-    lowerUrl.includes('streamable.com/') ||
-    lowerUrl.includes('player.twitch.tv/') ||
     lowerUrl.includes('/reel/') ||
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
