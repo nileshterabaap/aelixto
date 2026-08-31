@@ -196,7 +196,6 @@
       "description": "Aelix Score event detection + award pipeline (view / play / original visit). Covers all platforms.",
       "files": [
         "src/hooks/useViewTracking.ts",
-        "src/hooks/useEmbedEngagementFallback.ts",
         "src/components/HydratedEmbed.tsx",
         "src/lib/playedPosts.ts",
         "src/features/article-embeds/ArticleContentEmbed.tsx"

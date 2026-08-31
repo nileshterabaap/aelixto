@@ -1,7 +1,7 @@
 import { useState, memo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
-import { useEmbedEngagementFallback } from '@/hooks/useEmbedEngagementFallback';
+
 import type { Post } from '@/data/demoData';
 import { supabase } from '@/integrations/supabase/client';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
@@ -104,10 +104,6 @@ export const HydratedEmbed = memo(({
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
     mediaTypeHint === 'audio' ||
-    mediaKindHint === 'video' ||
-    mediaKindHint === 'reel' ||
-    mediaKindHint === 'short' ||
-    mediaKindHint === 'clip' ||
     r.kind === 'video' ||
     platformHint === 'youtube' ||
     platformHint === 'spotify' ||
@@ -132,11 +128,6 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('pin.it/') ||
     lowerUrl.includes('twitter.com/') ||
     lowerUrl.includes('x.com/') ||
-    lowerUrl.includes('player.vimeo.com/') ||
-    lowerUrl.includes('vimeo.com/') ||
-    lowerUrl.includes('dailymotion.com/') ||
-    lowerUrl.includes('streamable.com/') ||
-    lowerUrl.includes('player.twitch.tv/') ||
     lowerUrl.includes('/reel/') ||
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
@@ -205,9 +196,6 @@ export const HydratedEmbed = memo(({
   // Awards +1 engagement score to the author on top of the impression score.
   useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost);
 
-  // Restores July-31 scoring for cross-origin iframes (X, Threads, YouTube,
-  // TikTok, Spotify, Pinterest, LinkedIn…) that expose no parent-side anchor.
-  useEmbedEngagementFallback(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost);
 
   const forceTwitterRenderer =
     r.kind === 'raw' &&
