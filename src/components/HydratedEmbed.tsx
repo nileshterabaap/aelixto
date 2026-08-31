@@ -1,7 +1,7 @@
 import { useState, memo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
-import { useEmbedEngagementFallback } from '@/hooks/useEmbedEngagementFallback';
+
 import type { Post } from '@/data/demoData';
 import { supabase } from '@/integrations/supabase/client';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
