@@ -250,13 +250,25 @@ span[data-pin-href] button {
   100% { transform: scale(1); }
 }
 
-/* Global tap bounce for all interactive elements */
+/* Global press feedback for all interactive elements — a smooth, immediate
+   press-in while held, with a soft spring release. */
+button,
+[role="button"],
+a,
+.tap-press {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 220ms cubic-bezier(0.34, 1.4, 0.64, 1),
+              opacity 220ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
 button:active:not(:disabled),
 [role="button"]:active:not(:disabled),
-a:active:not(:disabled) {
-  animation: tap-bounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  -webkit-tap-highlight-color: transparent;
+a:active:not(:disabled),
+.tap-press:active:not(:disabled) {
+  transform: scale(0.96);
+  opacity: 0.88;
+  transition: transform 70ms ease-out, opacity 70ms ease-out;
 }
+
 
 /* Press-in tap: element stays visibly pressed while held, then releases.
    Use on grid thumbnails and message rows instead of the bouncy tap. */
@@ -295,6 +307,30 @@ body.at-scroll-top .twitter-embed-container iframe {
   pointer-events: auto !important;
 }
 
+/* YouTube only: the player iframe must stay tappable at scroll-top, otherwise
+   taps on the native play button are swallowed by the Pull-to-Refresh iframe
+   lock above. Same tradeoff as X. */
+body.at-scroll-top iframe[src*="youtube.com"],
+body.at-scroll-top iframe[src*="youtube-nocookie.com"],
+body.at-scroll-top iframe[src*="youtu.be"] {
+  pointer-events: auto !important;
+}
+
+/* Spotify only: same tradeoff — the player iframe must stay tappable at
+   scroll-top so the first tap on the native play button isn't swallowed by
+   the Pull-to-Refresh iframe lock above. */
+body.at-scroll-top iframe[src*="open.spotify.com"],
+body.at-scroll-top iframe[src*="spotify.com/embed"] {
+  pointer-events: auto !important;
+}
+
+/* Reddit only: the embed iframe must stay tappable at scroll-top so the
+   "Read more" control isn't swallowed by the Pull-to-Refresh iframe lock. */
+body.at-scroll-top iframe[src*="redditmedia.com"],
+body.at-scroll-top iframe[src*="reddit.com"] {
+  pointer-events: auto !important;
+}
+
 /* Threads iframes stay interactive (tap-to-play), so a transparent catcher
    layer above them lets Pull-to-Refresh see the touch while the page is at
    scroll-top. It hands the tap straight back to the iframe on touchstart. */
@@ -305,9 +341,9 @@ body.at-scroll-top .twitter-embed-container iframe {
   background: transparent;
   pointer-events: none;
 }
-body.at-scroll-top .threads-ptr-catcher {
-  pointer-events: auto;
-}
+/* Never armed: an armed catcher swallowed the first tap on the native
+   Threads player in the feed. Same tradeoff as X — PTR from directly over a
+   Threads media area at scroll-top is given up in favour of first-tap play. */
 
 /* Disable the browser's native pull-to-refresh so our in-app PullToRefresh
    component owns the gesture on every page (especially short empty states). */

@@ -4,6 +4,7 @@ import { createLovableAuth } from "@lovable.dev/cloud-auth-js";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
+import { canUseNativeSocialAuth, nativeSocialSignIn } from "@/lib/nativeSocialAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,11 +34,11 @@ const AppleIcon = () => (
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  // Hide Apple sign-in on Android. Apple's guidelines require the native
-  // Apple sheet on iOS, and non-Apple platforms should not offer this option
-  // (matches how other apps behave).
-  const showApple =
-    !(Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android");
+  // Sign in with Apple is offered everywhere:
+  //   • iOS/iPadOS → native ASAuthorizationController sheet
+  //   • Android / web → Apple's web OAuth flow in a Chrome Custom Tab / popup
+  //     (there is no Apple SDK on Android, so the web flow is the supported path)
+  const showApple = true;
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
@@ -281,114 +282,130 @@ const Auth = () => {
     setLoading(false);
   };
 
-  const handleGoogleSignIn = async () => {
-    const isNative = Capacitor.isNativePlatform();
-    if (isNative) {
-      // Native flow (APK/AAB):
-      // 1. Open Chrome Custom Tab to the OAuth broker.
-      // 2. Broker finishes and redirects to our /~auth-bridge web page.
-      // 3. Bridge page rewrites to com.aelixto.app10://oauth-callback#tokens.
-      // 4. Android resolves the custom scheme back into our installed app,
-      //    where the App.appUrlOpen listener completes the sign-in.
-      const bridgeUri = "https://aelixto.com/~auth-bridge";
-      const result = await nativeLovableAuth.signInWithOAuth("google", {
-        redirect_uri: bridgeUri,
-      });
+  // Which social button is mid-flight (for inline spinners).
+  const [oauthPending, setOauthPending] = useState<null | "google" | "apple">(null);
 
-      if (result.error) {
-        toast({ title: "Error", description: result.error.message, variant: "destructive" });
-        return;
-      }
+  /**
+   * Native (Capacitor) social sign-in.
+   *
+   * Both Google and Apple must run in a *system* browser surface — Google
+   * hard-blocks embedded WebViews (`disallowed_useragent`, 403) and Apple's
+   * web flow behaves the same way. `@capacitor/browser` gives us the most
+   * integrated officially supported surface on each OS:
+   *   • Android → Chrome Custom Tab (in-app, shares the system session)
+   *   • iOS     → SFSafariViewController (in-app sheet)
+   * The broker redirects to /~auth-bridge, which hands the tokens straight
+   * back to the app via the com.aelixto.app10:// deep link, where
+   * capacitor-init's appUrlOpen listener closes the tab and sets the session.
+   */
+  const browserSocialSignIn = async (provider: "google" | "apple") => {
+    const label = provider === "google" ? "Google" : "Apple";
+    const result = await nativeLovableAuth.signInWithOAuth(provider, {
+      redirect_uri: "https://aelixto.com/~auth-bridge",
+    });
 
-      // Open the broker URL in a system browser tab so Google trusts it.
-      // (Google blocks OAuth inside embedded WebViews.)
-      const targetUrl = (result as { url?: string }).url;
-      if (targetUrl) {
-        try {
-          const { Browser } = await import("@capacitor/browser");
-          // Chrome Custom Tab — Google trusts this user agent.
-          await Browser.open({ url: targetUrl, presentationStyle: "fullscreen" });
-          return;
-        } catch (e) {
-          // Custom Tab failed (e.g. no Chrome / no browser supporting Custom Tabs).
-          // DO NOT fall back to window.location.href — that loads the OAuth page
-          // inside the Android WebView and Google blocks it with
-          // `disallowed_useragent` (Error 403). Instead, ask Android to open the
-          // URL with the user's default external browser via an ACTION_VIEW intent.
-          try {
-            const { App } = await import("@capacitor/app");
-            // App.openUrl asks the OS to resolve the URL — for https:// links
-            // this hands off to the default browser app, not our WebView.
-            // Available on Capacitor 5+.
-            await (App as unknown as { openUrl: (o: { url: string }) => Promise<unknown> }).openUrl({ url: targetUrl });
-            return;
-          } catch (e2) {
-            console.error("Native OAuth: no external browser available", e, e2);
-            toast({
-              title: "Browser required",
-              description:
-                "Google sign-in needs to open in a real browser. Please install Chrome (or another browser) and try again.",
-              variant: "destructive",
-            });
-            return;
-          }
-        }
-      }
-
-      // If the SDK already set tokens directly (rare on native), persist them.
-      if ((result as { tokens?: { access_token: string; refresh_token: string } }).tokens) {
-        const tokens = (result as { tokens: { access_token: string; refresh_token: string } }).tokens;
-        const { error } = await supabase.auth.setSession(tokens);
-        if (error) {
-          toast({ title: "Error", description: error.message, variant: "destructive" });
-        }
-      }
+    if (result.error) {
+      toast({ title: `${label} sign-in failed`, description: result.error.message, variant: "destructive" });
       return;
     }
 
-    // Web flow.
-    try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/auth`,
-      });
-      if (result.error) {
-        console.error("Google sign-in error", result.error);
-        toast({
-          title: "Google sign-in failed",
-          description: result.error.message || "Please try again.",
-          variant: "destructive",
-        });
+    const targetUrl = (result as { url?: string }).url;
+    if (targetUrl) {
+      try {
+        const { Browser } = await import("@capacitor/browser");
+        await Browser.open({ url: targetUrl, presentationStyle: "fullscreen" });
+        return;
+      } catch (e) {
+        // Custom Tab / SFSafariViewController unavailable. Never fall back to
+        // window.location.href — that would load the provider page inside the
+        // WebView, which Google and Apple both reject.
+        try {
+          const { App } = await import("@capacitor/app");
+          await (App as unknown as { openUrl: (o: { url: string }) => Promise<unknown> }).openUrl({ url: targetUrl });
+          return;
+        } catch (e2) {
+          console.error("Native OAuth: no external browser available", e, e2);
+          toast({
+            title: "Browser required",
+            description: `${label} sign-in needs a system browser. Please install Chrome (or another browser) and try again.`,
+            variant: "destructive",
+          });
+          return;
+        }
       }
-    } catch (e) {
-      console.error("Google sign-in threw", e);
-      toast({
-        title: "Google sign-in failed",
-        description: (e as Error)?.message || "Please try again.",
-        variant: "destructive",
-      });
+    }
+
+    // Rare: the SDK returned tokens inline.
+    const tokens = (result as { tokens?: { access_token: string; refresh_token: string } }).tokens;
+    if (tokens) {
+      const { error } = await supabase.auth.setSession(tokens);
+      if (error) toast({ title: `${label} sign-in failed`, description: error.message, variant: "destructive" });
     }
   };
 
-  const handleAppleSignIn = async () => {
+  const handleSocialSignIn = async (provider: "google" | "apple") => {
+    const label = provider === "google" ? "Google" : "Apple";
+    if (oauthPending) return;
+    setOauthPending(provider);
     try {
-      const result = await lovable.auth.signInWithOAuth("apple", {
+      if (Capacitor.isNativePlatform()) {
+        // Preferred: fully native, no browser surface at all.
+        //   Android → Credential Manager bottom sheet (Google)
+        //   iOS     → GoogleSignIn sheet / ASAuthorizationController (Apple)
+        // The ID token is exchanged in-process, so the user is signed in
+        // without ever leaving Aelixto.
+        if (canUseNativeSocialAuth(provider)) {
+          const res = await nativeSocialSignIn(provider);
+          if (res.ok) return;
+          if (res.cancelled) return;
+          console.warn(`Native ${label} sign-in failed:`, res.message);
+          toast({
+            title: "Native sign-in failed",
+            description: (res.message || "Unknown reason").slice(0, 180),
+            variant: "destructive",
+          });
+        } else if (provider === "apple") {
+          // Android has no native Apple SDK — use Apple's web OAuth flow in a
+          // Chrome Custom Tab. Tokens return via the /~auth-bridge deep link.
+          await browserSocialSignIn("apple");
+          return;
+        } else {
+          toast({
+            title: "Native sign-in not compiled in",
+            description: "SocialLogin plugin missing — run npx cap sync android and rebuild.",
+          });
+        }
+        // Native builds never fall back to browser OAuth. A native error stays
+        // visible so configuration problems cannot silently open Chrome.
+        return;
+      }
+      // Web: the managed helper opens the provider popup and sets the session
+      // in place, so the user never leaves the page.
+      const result = await lovable.auth.signInWithOAuth(provider, {
         redirect_uri: `${window.location.origin}/auth`,
       });
       if (result.error) {
+        console.error(`${label} sign-in error`, result.error);
         toast({
-          title: "Apple sign-in failed",
+          title: `${label} sign-in failed`,
           description: result.error.message || "Please try again.",
           variant: "destructive",
         });
       }
     } catch (e) {
+      console.error(`${label} sign-in threw`, e);
       toast({
-        title: "Apple sign-in failed",
+        title: `${label} sign-in failed`,
         description: (e as Error)?.message || "Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setOauthPending(null);
     }
   };
+
+  const handleGoogleSignIn = () => handleSocialSignIn("google");
+  const handleAppleSignIn = () => handleSocialSignIn("apple");
 
   // While the initial Supabase session probe is running, render nothing so
   // the splash screen (kept alive in main.tsx) covers the wait. Otherwise
@@ -530,10 +547,10 @@ const Auth = () => {
                 variant="outline"
                 className="w-full h-12 rounded-full text-base font-medium gap-2"
                 onClick={handleGoogleSignIn}
-                disabled={loading}
+                disabled={loading || !!oauthPending}
               >
                 <GoogleIcon />
-                Continue with Google
+                {oauthPending === "google" ? "Connecting…" : "Continue with Google"}
               </Button>
 
               {showApple && (
@@ -542,10 +559,10 @@ const Auth = () => {
                   variant="outline"
                   className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
                   onClick={handleAppleSignIn}
-                  disabled={loading}
+                  disabled={loading || !!oauthPending}
                 >
                   <AppleIcon />
-                  Continue with Apple
+                  {oauthPending === "apple" ? "Connecting…" : "Continue with Apple"}
                 </Button>
               )}
             </form>
@@ -610,10 +627,10 @@ const Auth = () => {
                 variant="outline"
                 className="w-full h-12 rounded-full text-base font-medium gap-2"
                 onClick={handleGoogleSignIn}
-                disabled={loading}
+                disabled={loading || !!oauthPending}
               >
                 <GoogleIcon />
-                Continue with Google
+                {oauthPending === "google" ? "Connecting…" : "Continue with Google"}
               </Button>
 
               {showApple && (
@@ -622,10 +639,10 @@ const Auth = () => {
                   variant="outline"
                   className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
                   onClick={handleAppleSignIn}
-                  disabled={loading}
+                  disabled={loading || !!oauthPending}
                 >
                   <AppleIcon />
-                  Continue with Apple
+                  {oauthPending === "apple" ? "Connecting…" : "Continue with Apple"}
                 </Button>
               )}
             </form>

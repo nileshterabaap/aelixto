@@ -7,6 +7,7 @@ import { prefetchRoute } from "@/lib/prefetch";
 import { setScrollPosition } from "@/hooks/useScrollRestoration";
 import { useNotificationCount } from "@/hooks/useNotifications";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
+import { triggerFeedRefresh } from "@/components/PullToRefresh";
 
 interface BottomNavProps {
   onCreatePost: () => void;
@@ -93,6 +94,9 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     if (isAlreadyOnHome) {
       if (!isAtTop) {
         window.scrollTo({ top: 0, behavior: "smooth" });
+      } else {
+        // Already at the top (or "All caught up") — refresh the feed.
+        triggerFeedRefresh();
       }
     } else {
       // Navigate to home

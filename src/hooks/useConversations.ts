@@ -223,17 +223,7 @@ export const useConversations = () => {
         return bTime - aTime;
       });
 
-      // Preload avatars so they appear together with the list (avoid pop-in)
-      const avatarUrls = conversationsWithDetails
-        .map(c => c.other_user.avatar_url)
-        .filter((u): u is string => !!u);
-      if (avatarUrls.length > 0) {
-        await Promise.race([
-          Promise.all(avatarUrls.map(u => preloadImageWithPromise(u))),
-          new Promise<void>(resolve => setTimeout(resolve, 1200)),
-        ]);
-      }
-
+      // Render immediately — avatars warm up in the background (no blocking wait)
       setConversations(conversationsWithDetails);
       if (cacheKey) {
         try {
@@ -242,6 +232,11 @@ export const useConversations = () => {
           /* quota exceeded - ignore */
         }
       }
+
+      conversationsWithDetails
+        .map(c => c.other_user.avatar_url)
+        .filter((u): u is string => !!u)
+        .forEach(u => { void preloadImageWithPromise(u); });
     } catch (error) {
       console.error('Error fetching conversations:', error);
     } finally {

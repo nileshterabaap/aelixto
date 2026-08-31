@@ -297,13 +297,23 @@ const EditProfile = () => {
                   {formData.display_name?.[0] || formData.username[0] || "?"}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1">
+              <div className="flex-1 space-y-2">
                 <ImageUploadButton
                   onFileSelect={handleAvatarUpload}
                   uploading={uploading}
                 >
                   Upload Avatar
                 </ImageUploadButton>
+                {formData.avatar_url && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => setFormData({ ...formData, avatar_url: '' })}
+                  >
+                    Remove Avatar
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -325,6 +335,16 @@ const EditProfile = () => {
             >
               Upload Cover Image
             </ImageUploadButton>
+            {formData.cover_url && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full mt-2"
+                onClick={() => setFormData({ ...formData, cover_url: '' })}
+              >
+                Remove Cover Image
+              </Button>
+            )}
           </div>
 
           <div className="space-y-2">

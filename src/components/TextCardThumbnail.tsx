@@ -11,7 +11,7 @@ import redditIcon from "@/assets/platforms/reddit.svg";
 import tiktokIcon from "@/assets/platforms/tiktok.svg";
 import pinterestIcon from "@/assets/platforms/pinterest.svg";
 import quoraIcon from "@/assets/platforms/quora.svg";
-import blogIcon from "@/assets/platforms/blog.svg";
+import blogIcon from "@/assets/platforms/articles.svg";
 import externalIcon from "@/assets/platforms/external.svg";
 
 const ICONS: Record<string, string> = {
@@ -29,7 +29,14 @@ const ICONS: Record<string, string> = {
   pinterest: pinterestIcon,
   quora: quoraIcon,
   article: blogIcon,
+  articles: blogIcon,
+  external: externalIcon,
+  link: externalIcon,
 };
+
+// Link-type posts (Quora / articles / external links) with no image should
+// always fall back to their platform logo tile — never a text card.
+const LOGO_ONLY = new Set(["quora", "article", "articles", "external", "link"]);
 
 // Brand-tinted gradient tokens tuned for legibility and independent of Tailwind's generated class scan.
 const GRADIENTS: Record<string, string> = {
@@ -92,6 +99,9 @@ const PLATFORM_LABEL: Record<string, string> = {
   quora: "Quora",
   article: "Article",
 };
+PLATFORM_LABEL.articles = "Article";
+PLATFORM_LABEL.external = "Link";
+PLATFORM_LABEL.link = "Link";
 
 /**
  * Typographic fallback thumbnail for text-only posts (Threads, X text,
@@ -113,9 +123,10 @@ export function TextCardThumbnail({
   const key = (platform || "").toLowerCase();
   const icon = ICONS[key];
   const gradient = GRADIENTS[key] || GRADIENTS.external;
-  const display = trimText(text, maxChars);
+  const logoOnly = LOGO_ONLY.has(key);
+  const display = logoOnly ? "" : trimText(text, maxChars);
   const label = PLATFORM_LABEL[key] || "Post";
-  const canShowProfile = preferProfile && (!!profileAvatarUrl || !!displayName || !!username);
+  const canShowProfile = !logoOnly && preferProfile && (!!profileAvatarUrl || !!displayName || !!username);
   const avatarSrc = profileAvatarUrl && !avatarError ? profileAvatarUrl : null;
 
   if (canShowProfile) {

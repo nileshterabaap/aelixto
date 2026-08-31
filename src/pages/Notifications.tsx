@@ -2,7 +2,7 @@ import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { Heart, MessageCircle, Repeat2, Bell, Shield, UserPlus } from "lucide-react";
+import { Heart, MessageCircle, Repeat2, Bell, Shield, UserPlus, UserCheck, MessageSquare } from "lucide-react";
 import { useState, useCallback, useEffect } from "react";
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,6 +22,10 @@ const getNotificationIcon = (type: string) => {
       return { icon: Repeat2, bgColor: 'bg-green-100', iconColor: 'text-green-500' };
     case 'follow_request':
       return { icon: UserPlus, bgColor: 'bg-violet-100', iconColor: 'text-violet-500' };
+    case 'follow_accepted':
+      return { icon: UserCheck, bgColor: 'bg-violet-100', iconColor: 'text-violet-500' };
+    case 'message':
+      return { icon: MessageSquare, bgColor: 'bg-sky-100', iconColor: 'text-sky-500' };
     case 'report_outcome':
       return { icon: Shield, bgColor: 'bg-amber-100', iconColor: 'text-amber-600' };
     default:
@@ -41,6 +45,10 @@ const getNotificationMessage = (type: string) => {
       return 'started following you';
     case 'follow_request':
       return 'asked to Follow';
+    case 'follow_accepted':
+      return 'accepted your follow ask';
+    case 'message':
+      return 'sent you a message';
     default:
       return 'interacted with you';
   }
@@ -62,9 +70,7 @@ const NotificationItem = ({
   const message = getNotificationMessage(notification.type);
   const isReportOutcome = notification.type === 'report_outcome';
   const isFollowRequest = notification.type === 'follow_request';
-  const actorName = isFollowRequest && notification.actor?.username
-    ? `@${notification.actor.username}`
-    : notification.actor?.display_name || `@${notification.actor?.username}` || 'Someone';
+  const actorName = notification.actor?.username || 'Someone';
   const outcome = notification.metadata?.action as 'removed' | 'kept' | undefined;
   const reportKind = notification.metadata?.kind as
     | 'report_outcome'
@@ -242,7 +248,7 @@ const NotificationItem = ({
                     disabled={reqBusy !== null}
                     className="text-xs font-medium px-3 py-1.5 rounded-full bg-primary text-primary-foreground hover:opacity-90 transition disabled:opacity-50"
                   >
-                    {reqBusy === "approve" ? "Alright…" : "Alright"}
+                    {reqBusy === "approve" ? "Sure…" : "Sure"}
                   </button>
                   <button
                     onClick={handleDeclineFollow}
@@ -305,7 +311,11 @@ const Notifications = () => {
   const handleNotificationClick = (notification: Notification) => {
     if (notification.type === 'report_outcome') return; // no navigation for moderation outcomes
     if (notification.post_id) {
-      navigate(`/post/${notification.post_id}`);
+      const commentParam =
+        notification.type === 'comment' && notification.comment_id
+          ? `?comment=${notification.comment_id}`
+          : '';
+      navigate(`/post/${notification.post_id}${commentParam}`);
     } else if (notification.actor?.username) {
       navigate(`/u/${notification.actor.username}`);
     }

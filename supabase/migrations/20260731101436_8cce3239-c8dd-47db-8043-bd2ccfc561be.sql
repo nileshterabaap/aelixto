@@ -1,0 +1,1 @@
+UPDATE public.posts SET thumbnail_url = NULL WHERE platform = 'tiktok' AND thumbnail_url LIKE '%thumbnails/undefined%';

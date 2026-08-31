@@ -5,6 +5,49 @@ import { initAdsAndConsent } from "@/lib/adConsent";
 export async function initCapacitorPlugins() {
   if (!Capacitor.isNativePlatform()) return;
 
+  // Runtime proof of exactly what Android is executing. A bundled Capacitor
+  // app uses the local Capacitor origin (normally http://localhost); an https
+  // URL here proves that a remote server is being loaded instead. The marker
+  // also proves that this specific JS bundle reached the device.
+  const bundleMarker = "aelixto-bundle-2026-08-04-1";
+  const entryScript = Array.from(document.scripts)
+    .map((script) => script.src)
+    .find((src) => src.includes("/assets/")) ?? "not-found";
+  try {
+    const { App } = await import("@capacitor/app");
+    const appInfo = await App.getInfo();
+    console.log(
+      `[bundle] runtime marker=${bundleMarker} origin=${window.location.origin} entry=${entryScript} appVersion=${appInfo.version} appBuild=${appInfo.build}`,
+    );
+  } catch (error) {
+    console.warn("[bundle] runtime diagnostic failed", {
+      marker: bundleMarker,
+      href: window.location.href,
+      origin: window.location.origin,
+      entryScript,
+      error,
+    });
+  }
+
+  // Which native plugins the running APK actually has compiled in. If a plugin
+  // shows `false` here, the JS bundle is fine but `npx cap sync android` was
+  // never run (or the Gradle module was not picked up) — that single fact
+  // explains native Google sign-in falling back to Chrome AND no native ads.
+  try {
+    // Logcat flattens objects to "[object Object]", so log flat strings only.
+    const socialLogin = Capacitor.isPluginAvailable("SocialLogin");
+    const gamNative = Capacitor.isPluginAvailable("GamNative");
+    const push = Capacitor.isPluginAvailable("PushNotifications");
+    console.log(
+      `[plugins] available SocialLogin=${socialLogin} GamNative=${gamNative} PushNotifications=${push}`,
+    );
+    console.log(`[plugins] isWebView=${/;\s*wv/i.test(navigator.userAgent)}`);
+    console.log(`[plugins] userAgent=${navigator.userAgent}`);
+    console.log(`[plugins] allPlugins=${Object.keys((window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } }).Capacitor?.Plugins ?? {}).join(",")}`);
+  } catch (error) {
+    console.warn("[plugins] availability probe failed", error);
+  }
+
   const openNativeExternal = async (url: string) => {
     try {
       const { AppLauncher } = await import("@capacitor/app-launcher");
@@ -148,12 +191,20 @@ export async function initCapacitorPlugins() {
           /* ignore — tab may already be closed */
         }
 
+        let sessionApplied = false;
         if (access_token && refresh_token) {
-          await supabase.auth.setSession({ access_token, refresh_token });
+          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+          sessionApplied = !error;
         }
 
-        // Land the user on home regardless.
-        if (window.location.pathname !== "/") {
+        if (window.location.pathname === "/") return;
+
+        if (sessionApplied) {
+          // Soft client-side navigation — React Router picks this up via
+          // popstate, so the app continues instantly with no reload/splash.
+          window.history.replaceState({}, "", "/");
+          window.dispatchEvent(new PopStateEvent("popstate"));
+        } else {
           window.location.replace("/");
         }
       } catch (e) {

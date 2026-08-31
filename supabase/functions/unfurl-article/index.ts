@@ -502,8 +502,46 @@ serve(async (req) => {
               meta['twitter:image'] ||
               meta.image ||
               '';
+            // Quora frequently sets og:image to the *answer author's profile
+            // photo*, which is hosted on the same qph/quoracdn hosts as real
+            // content images, so URL shape alone cannot tell them apart.
+            // Collect the avatars declared in the scraped body (alt text
+            // "Profile photo for X", or tiny <img> dimensions) and treat any
+            // matching candidate as an avatar, never as the post thumbnail.
+            const avatarUrls = new Set<string>();
+            const rememberAvatar = (src: string | null | undefined) => {
+              if (!src) return;
+              const normalized = normalizeImageCandidate(src, targetUrl);
+              if (normalized) avatarUrls.add(normalized.split('?')[0]);
+            };
+            if (fcHtml) {
+              const imgTagRegex = /<img\b[^>]*>/gi;
+              let am: RegExpExecArray | null;
+              while ((am = imgTagRegex.exec(fcHtml)) !== null) {
+                const tag = am[0];
+                const alt = tag.match(/\salt=["']([^"']*)["']/i)?.[1] || '';
+                const w = parseInt(tag.match(/\swidth=["']?(\d+)/i)?.[1] || '0', 10);
+                const h = parseInt(tag.match(/\sheight=["']?(\d+)/i)?.[1] || '0', 10);
+                const looksAvatar =
+                  /profile photo|profile picture|avatar/i.test(alt) ||
+                  (w > 0 && w <= 120) ||
+                  (h > 0 && h <= 120);
+                if (looksAvatar) rememberAvatar(extractImageFromImgTag(tag, targetUrl));
+              }
+            }
+            if (md) {
+              const mdAvatar = /!\[([^\]]*(?:profile photo|profile picture|avatar)[^\]]*)\]\((https?:\/\/[^\s)]+)\)/gi;
+              let am: RegExpExecArray | null;
+              while ((am = mdAvatar.exec(md)) !== null) rememberAvatar(am[2]);
+            }
+            const isKnownAvatar = (src: string | null | undefined) =>
+              !!src && avatarUrls.has(src.split('?')[0]);
+
             const normalizedOgImage = normalizeImageCandidate(ogImage, targetUrl);
             if (normalizedOgImage && /^https?:\/\//i.test(normalizedOgImage) && !isLikelyRealContentImage(normalizedOgImage)) {
+              fcImage = null;
+            } else if (normalizedOgImage && isKnownAvatar(normalizedOgImage)) {
+              // og:image is the author's avatar — fall through to the body scans.
               fcImage = null;
             } else if (normalizedOgImage && /^https?:\/\//i.test(normalizedOgImage)) {
               fcImage = normalizedOgImage;
@@ -512,7 +550,8 @@ serve(async (req) => {
             const isQuoraContentImg = (src: string) =>
               /(?:^|\.)quoracdn\.net\//i.test(src) || /\/\/qph\./i.test(src) || /main-qimg/i.test(src);
             const isJunkImg = (src: string) =>
-              /\/-?\d-images\.|\bavatar\b|\bprofile\b|\bspacer\b|\b1x1\b|tracking|favicon|logo|sprite|emoji|default_user/i.test(src);
+              /\/-?\d-images\.|\bavatar\b|\bprofile\b|\bspacer\b|\b1x1\b|tracking|favicon|logo|sprite|emoji|default_user/i.test(src) ||
+              isKnownAvatar(src);
 
             if (!fcImage && fcHtml) {
               const imgRegex = /<img\b[^>]*>/gi;
@@ -648,6 +687,7 @@ serve(async (req) => {
       ];
 
       let okResp: Response | null = null;
+      let usedProxy = false;
       for (const ua of uaChain) {
         try {
           const r = await fetch(targetUrl, { headers: buildHeaders(ua), redirect: 'follow' });
@@ -665,7 +705,12 @@ serve(async (req) => {
             headers: { 'User-Agent': 'Mozilla/5.0', 'Accept': 'text/html,*/*' },
             redirect: 'follow',
           });
-          if (jina.ok) { okResp = jina; resolvedUrl = targetUrl; console.log('[unfurl-article] Jina proxy succeeded'); }
+          if (jina.ok) {
+            okResp = jina;
+            usedProxy = true;
+            resolvedUrl = targetUrl;
+            console.log('[unfurl-article] Jina proxy succeeded');
+          }
         } catch (e) {
           console.log('[unfurl-article] Jina proxy failed:', e instanceof Error ? e.message : String(e));
         }
@@ -732,11 +777,31 @@ serve(async (req) => {
       }
 
       html = await okResp.text();
-      resolvedUrl = okResp.url || resolvedUrl;
+      // Never let a proxy origin (r.jina.ai) become the resolved article URL —
+      // it would poison the site name, domain and favicon shown on the card.
+      if (!usedProxy) {
+        const candidate = okResp.url || resolvedUrl;
+        try {
+          if (!/(^|\.)r\.jina\.ai$/i.test(new URL(candidate).hostname)) resolvedUrl = candidate;
+        } catch { /* keep existing resolvedUrl */ }
+      }
     }
 
     // Extract metadata
-    const title = extractTitle(html);
+    let title = extractTitle(html);
+    // Proxy/reader output has no <title>; it prefixes a "Title: ..." line.
+    if (!title) {
+      const m = html.match(/^\s*Title:\s*(.+)$/m);
+      if (m) title = m[1].trim();
+    }
+    // Last resort: humanise the URL slug so the card never renders title-less.
+    if (!title) {
+      try {
+        const seg = new URL(resolvedUrl).pathname.split('/').filter(Boolean).pop() || '';
+        const words = decodeURIComponent(seg).replace(/\.(html?|php|aspx)$/i, '').replace(/[-_]+/g, ' ').trim();
+        if (words) title = words.replace(/\b\w/g, (c) => c.toUpperCase());
+      } catch { /* ignore */ }
+    }
     console.log('[unfurl-article] Extracted title:', title);
     
     // Description with fallback to content excerpt

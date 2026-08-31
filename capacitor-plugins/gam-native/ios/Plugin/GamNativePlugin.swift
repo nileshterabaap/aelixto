@@ -42,7 +42,9 @@ public class GamNativePlugin: CAPPlugin, GADNativeAdLoaderDelegate, GADAdLoaderD
             let formAvailable = UMPConsentInformation.sharedInstance.formStatus == .available
             call.resolve([
                 "status": self.mapConsentStatus(status),
-                "isConsentFormAvailable": formAvailable
+                "isConsentFormAvailable": formAvailable,
+                "privacyOptionsRequired":
+                    UMPConsentInformation.sharedInstance.privacyOptionsRequirementStatus == .required
             ])
         }
     }
