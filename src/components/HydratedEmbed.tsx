@@ -104,10 +104,6 @@ export const HydratedEmbed = memo(({
   const isPlayableMediaPost =
     mediaTypeHint === 'video' ||
     mediaTypeHint === 'audio' ||
-    mediaKindHint === 'video' ||
-    mediaKindHint === 'reel' ||
-    mediaKindHint === 'short' ||
-    mediaKindHint === 'clip' ||
     r.kind === 'video' ||
     platformHint === 'youtube' ||
     platformHint === 'spotify' ||
