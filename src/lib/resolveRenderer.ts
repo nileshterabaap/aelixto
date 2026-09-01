@@ -49,7 +49,7 @@ export function resolveRenderer(post: any): Renderer {
   if (!isBlocked && mediaType === 'none') return { kind: 'article', url };
 
   // 5) universal meta (not reddit) — includes TikTok for client-side embed building
-  const universalAllow = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','threads.net','threads.com','linkedin.com','tiktok.com'];
+  const universalAllow = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','threads.net','threads.com','linkedin.com','lnkd.in','tiktok.com'];
   if (universalAllow.some(d => url.includes(d))) return { kind: 'universal', url };
 
   // 6) media fallbacks
