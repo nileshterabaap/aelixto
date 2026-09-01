@@ -44,7 +44,7 @@ export function resolveRenderer(post: any): Renderer {
   if (!url) return { kind: 'none' };
 
   // 4) article extractor for blogs/quora/medium/etc (never reddit)
-  const blocked = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','twitter.com','x.com','pinterest.com','youtube.com','youtu.be','tiktok.com','reddit.com','redd.it','threads.net','threads.com','linkedin.com'];
+  const blocked = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','twitter.com','x.com','pinterest.com','youtube.com','youtu.be','tiktok.com','reddit.com','redd.it','threads.net','threads.com','linkedin.com','lnkd.in'];
   const isBlocked = blocked.some(d => url.includes(d));
   if (!isBlocked && mediaType === 'none') return { kind: 'article', url };
 
