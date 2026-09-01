@@ -94,7 +94,7 @@ export const PostOwnerActionsSheet = ({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="bottom"
-          className="p-0 rounded-t-2xl max-h-[85vh] pb-[env(safe-area-inset-bottom)]"
+          className="p-0 rounded-t-2xl max-h-[85vh] pb-[var(--safe-bottom)]"
         >
           <div className="mx-auto mt-2 mb-1 h-1 w-10 rounded-full bg-muted-foreground/30" />
           <div className="py-2 divide-y divide-border/50">

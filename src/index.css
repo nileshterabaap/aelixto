@@ -358,3 +358,22 @@ body.at-scroll-top iframe[src*="reddit.com"] {
 html, body {
   overscroll-behavior-y: none;
 }
+
+/* Edge-to-edge safe-area helpers */
+.pt-safe { padding-top: var(--safe-top); }
+.pb-safe { padding-bottom: var(--safe-bottom); }
+.px-safe { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+
+/* Status-bar strip keeps the app background behind the system bars so the
+   webview drawing edge-to-edge never shows a transparent/black band. */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--safe-top);
+  background: hsl(var(--background));
+  z-index: 60;
+  pointer-events: none;
+}
