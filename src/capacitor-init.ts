@@ -127,17 +127,34 @@ export async function initCapacitorPlugins() {
     true,
   );
 
+  // Edge-to-edge + correct safe-area insets on every device.
+  // The SafeArea plugin makes env(safe-area-inset-*) report real values inside
+  // the Android webview (it is a no-op polyfill on iOS/modern Chromium), and the
+  // app's layout consumes those values via the --safe-* CSS variables.
+  try {
+    const { SafeArea } = await import("@capacitor-community/safe-area");
+    SafeArea.enable({
+      config: {
+        customColorsForSystemBars: true,
+        statusBarColor: "#00000000",
+        statusBarContent: "dark",
+        navigationBarColor: "#00000000",
+        navigationBarContent: "dark",
+      },
+    });
+  } catch (e) {
+    console.warn("SafeArea plugin not available", e);
+  }
+
   try {
     const { StatusBar, Style } = await import("@capacitor/status-bar");
-    // Webview should NOT draw under the status bar — the OS reserves that space
-    // and paints it with our backgroundColor below. This avoids the giant gap
-    // we'd otherwise need to compensate for in CSS via env(safe-area-inset-top).
-    await StatusBar.setOverlaysWebView({ overlay: false });
+    // Edge-to-edge: the webview draws behind the status bar; CSS safe-area
+    // insets reserve the space so nothing is clipped on notched devices.
+    await StatusBar.setOverlaysWebView({ overlay: true });
     // Style.Light = light status-bar (white bg) with DARK icons/text.
     // (Capacitor's naming is the opposite of what you'd expect — Style.Dark
     // actually produces a dark bar with light icons.)
     await StatusBar.setStyle({ style: Style.Light });
-    await StatusBar.setBackgroundColor({ color: "#FFFFFF" });
   } catch (e) {
     console.warn("StatusBar plugin not available", e);
   }
