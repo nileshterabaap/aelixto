@@ -45,8 +45,10 @@ STABILITY_TOKEN='pick-a-long-secret' npm run platform:seal
 Store the token somewhere safe (password manager). Do **not** paste it in chat.
 
 ## Currently frozen platforms
+Run `npm run platform:status` for the live list. Highlights:
 - `x` → `src/hooks/useOriginalVisitTracker.ts`, `src/components/embeds/TwitterEmbed.tsx`
 - `threads` → `src/hooks/useOriginalVisitTracker.ts`
+- `scoring` (all platforms) → `useViewTracking.ts`, `useOriginalVisitTracker.ts`, `HydratedEmbed.tsx`, `ImageViewTracker.tsx`, `useActivePostTracker.ts`, `playedPosts.ts`, `openExternalUrl.ts`, `ArticleContentEmbed.tsx`, `supabase/functions/record-view/index.ts`
 
 ## Commands
 | Command | Needs token? | Purpose |
