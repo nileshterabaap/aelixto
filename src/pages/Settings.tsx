@@ -181,7 +181,7 @@ const Settings = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background pb-[calc(5rem+var(--safe-bottom))]">
+    <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
       <main className="mx-auto max-w-2xl px-4 py-4">

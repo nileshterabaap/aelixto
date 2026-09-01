@@ -34,19 +34,8 @@ const config: CapacitorConfig = {
     StatusBar: {
       // "LIGHT" = light status-bar background → dark icons/text (correct for our white header)
       style: "LIGHT",
-      backgroundColor: "#00000000",
-      // Edge-to-edge: the webview draws behind the system bars and the app
-      // compensates with env(safe-area-inset-*) so every device (notch,
-      // punch-hole, gesture bar, 3-button bar) fits correctly.
-      overlaysWebView: true,
-    },
-    SafeArea: {
-      // Polyfills correct env(safe-area-inset-*) values on Android webviews
-      // that report 0 in edge-to-edge mode.
-      statusBarStyle: "LIGHT",
-      navigationBarStyle: "LIGHT",
-      detectViewportFitCoverChanges: true,
-      initialViewportFitCover: true,
+      backgroundColor: "#FFFFFF",
+      overlaysWebView: false,
     },
   },
 };

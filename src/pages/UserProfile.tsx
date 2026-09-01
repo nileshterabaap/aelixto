@@ -171,11 +171,11 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
 
   return (
-    <div className="min-h-screen bg-background pb-[calc(5rem+var(--safe-bottom))] relative">
+    <div className="min-h-screen bg-background pb-20 relative">
       {/* Full-page skeleton overlay — crossfades out once content is ready */}
       <div
         aria-hidden={!showSkeleton}
-        className="absolute inset-0 z-30 pb-[calc(5rem+var(--safe-bottom))] pointer-events-none transition-opacity duration-500 ease-out"
+        className="absolute inset-0 z-30 pb-20 pointer-events-none transition-opacity duration-500 ease-out"
         style={{ opacity: showSkeleton ? 1 : 0 }}
       >
         {/* Centered morphing Aelixto logo — fades out with the rest of the skeleton */}

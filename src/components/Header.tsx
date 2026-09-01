@@ -163,7 +163,6 @@ export const Header = ({ onCreatePost }: HeaderProps) => {
     <header
       className="sticky top-0 z-50 w-full bg-background border-b transition-transform duration-300 ease-out"
       style={{
-        paddingTop: "var(--safe-top)",
         transform: hidden ? "translateY(-100%)" : "translateY(0)",
       }}
     >
