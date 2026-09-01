@@ -132,16 +132,9 @@ export async function initCapacitorPlugins() {
   // the Android webview (it is a no-op polyfill on iOS/modern Chromium), and the
   // app's layout consumes those values via the --safe-* CSS variables.
   try {
-    const { SafeArea } = await import("@capacitor-community/safe-area");
-    SafeArea.enable({
-      config: {
-        customColorsForSystemBars: true,
-        statusBarColor: "#00000000",
-        statusBarContent: "dark",
-        navigationBarColor: "#00000000",
-        navigationBarContent: "dark",
-      },
-    });
+    const { SafeArea, SystemBarsStyle } = await import("@capacitor-community/safe-area");
+    // LIGHT = dark icons/content on our white background (both bars).
+    await SafeArea.setSystemBarsStyle({ style: SystemBarsStyle.Light });
   } catch (e) {
     console.warn("SafeArea plugin not available", e);
   }
