@@ -246,7 +246,7 @@ export const CommentsDialog = ({ open, onOpenChange, postId, postAuthorId, highl
 
         <div
           className="border-t bg-background flex-shrink-0 px-4 py-3"
-          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+          style={{ paddingBottom: "max(0.75rem, var(--safe-bottom))" }}
         >
           {commentDisabled ? (
             <p className="text-sm text-muted-foreground text-center py-2">
