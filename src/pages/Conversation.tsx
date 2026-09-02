@@ -416,12 +416,9 @@ const Conversation = () => {
   }
 
   return (
-    <div
-      className="bg-background flex flex-col overflow-hidden"
-      style={{ height: 'calc(100dvh - var(--kb))' }}
-    >
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background border-b border-border pt-safe">
+      <header className="sticky top-0 z-10 bg-background border-b border-border">
         <div className="container max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
           <Button
             variant="ghost"

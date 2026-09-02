@@ -44,12 +44,12 @@ export function resolveRenderer(post: any): Renderer {
   if (!url) return { kind: 'none' };
 
   // 4) article extractor for blogs/quora/medium/etc (never reddit)
-  const blocked = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','twitter.com','x.com','pinterest.com','youtube.com','youtu.be','tiktok.com','reddit.com','redd.it','threads.net','threads.com','linkedin.com','lnkd.in'];
+  const blocked = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','twitter.com','x.com','pinterest.com','youtube.com','youtu.be','tiktok.com','reddit.com','redd.it','threads.net','threads.com','linkedin.com'];
   const isBlocked = blocked.some(d => url.includes(d));
   if (!isBlocked && mediaType === 'none') return { kind: 'article', url };
 
   // 5) universal meta (not reddit) — includes TikTok for client-side embed building
-  const universalAllow = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','threads.net','threads.com','linkedin.com','lnkd.in','tiktok.com'];
+  const universalAllow = ['instagram.com','facebook.com','fb.watch','fb.me','spotify.com','threads.net','threads.com','linkedin.com','tiktok.com'];
   if (universalAllow.some(d => url.includes(d))) return { kind: 'universal', url };
 
   // 6) media fallbacks

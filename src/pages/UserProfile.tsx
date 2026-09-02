@@ -146,7 +146,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   if (profile && !isMe && amIBlockedBy && !amIBlockedByLoading) {
     return (
       <div className="min-h-screen bg-background flex flex-col">
-        <header className="sticky top-0 z-10 bg-background border-b border-border pt-safe">
+        <header className="sticky top-0 z-10 bg-background border-b border-border">
           <div className="container max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-5 w-5" />
@@ -171,11 +171,11 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
 
   return (
-    <div className="min-h-screen bg-background pb-[calc(5rem+var(--safe-bottom))] relative">
+    <div className="min-h-screen bg-background pb-20 relative">
       {/* Full-page skeleton overlay — crossfades out once content is ready */}
       <div
         aria-hidden={!showSkeleton}
-        className="absolute inset-0 z-30 pb-[calc(5rem+var(--safe-bottom))] pointer-events-none transition-opacity duration-500 ease-out"
+        className="absolute inset-0 z-30 pb-20 pointer-events-none transition-opacity duration-500 ease-out"
         style={{ opacity: showSkeleton ? 1 : 0 }}
       >
         {/* Centered morphing Aelixto logo — fades out with the rest of the skeleton */}
@@ -241,7 +241,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           )}
           
           {/* Header Overlay */}
-          <div className="absolute top-0 left-0 right-0 z-10 pt-safe">
+          <div className="absolute top-0 left-0 right-0 z-10">
             <div className="mx-auto max-w-2xl px-4 py-3 flex items-center justify-between">
               <div className="flex items-center gap-3 flex-1">
                 <Button

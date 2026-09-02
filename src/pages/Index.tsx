@@ -303,7 +303,7 @@ const Index = () => {
   if (shouldShowSkeleton || shouldWaitForEmptyState) {
     return (
       <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
-        <div className="min-h-screen bg-background pb-[calc(5rem+var(--safe-bottom))]">
+        <div className="min-h-screen bg-background pb-20">
           <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
           <main className="mx-auto max-w-2xl px-4 py-6">
             <div className="space-y-4">
@@ -319,7 +319,7 @@ const Index = () => {
 
   return (
     <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
-      <div className="min-h-screen bg-background pb-[calc(5rem+var(--safe-bottom))]">
+      <div className="min-h-screen bg-background pb-20">
         <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
       <PullToRefresh onRefresh={handleRefresh}>

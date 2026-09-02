@@ -79,7 +79,7 @@ const Messages = () => {
 
   return (
     <SwipeableView leftRoute="/" leftLabel="Home">
-    <div className="min-h-screen bg-background pb-[calc(5rem+var(--safe-bottom))]">
+    <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
       <PullToRefresh onRefresh={handleRefresh}>
