@@ -133,7 +133,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
   if (!isLoading && !profile) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="screen bg-background flex items-center justify-center">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Profile not found</p>
           <Button onClick={() => navigate('/')}>Go Home</Button>
@@ -145,7 +145,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
   // If the profile owner has blocked me, show a minimal "blocked you" screen.
   if (profile && !isMe && amIBlockedBy && !amIBlockedByLoading) {
     return (
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="screen bg-background flex flex-col">
         <header className="sticky top-0 z-10 bg-background border-b border-border pt-safe">
           <div className="container max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
@@ -171,7 +171,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
 
 
   return (
-    <div className="min-h-screen bg-background pb-[calc(5rem+var(--safe-bottom))] relative">
+    <div className="screen-nav bg-background relative">
       {/* Full-page skeleton overlay — crossfades out once content is ready */}
       <div
         aria-hidden={!showSkeleton}

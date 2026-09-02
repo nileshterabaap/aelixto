@@ -404,6 +404,8 @@ body::before {
   right: 0;
   height: var(--safe-top);
   background: hsl(var(--background));
-  z-index: 60;
+  /* Below the sticky header (z-50) so it can never visually crop it; still
+     above ordinary page content. */
+  z-index: 45;
   pointer-events: none;
 }

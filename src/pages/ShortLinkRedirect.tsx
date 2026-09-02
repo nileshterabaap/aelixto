@@ -36,7 +36,7 @@ const ShortLinkRedirect = () => {
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="screen bg-background flex items-center justify-center">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">This link is invalid or has expired.</p>
           <button
@@ -51,7 +51,7 @@ const ShortLinkRedirect = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="screen bg-background flex items-center justify-center">
       <p className="text-muted-foreground text-sm">Opening link…</p>
     </div>
   );

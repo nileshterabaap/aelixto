@@ -66,7 +66,7 @@ const AuthBridge = () => {
   }, []);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="screen flex items-center justify-center bg-background">
       <p className="text-sm text-muted-foreground">Returning to the app…</p>
     </div>
   );

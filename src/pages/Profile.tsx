@@ -24,7 +24,7 @@ const Profile = () => {
 
   if (sessionLoading || profileLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="screen bg-background flex items-center justify-center">
         <AelixtoLoader size={96} />
       </div>
     );
@@ -32,7 +32,7 @@ const Profile = () => {
 
   // This will redirect, but show loading state meanwhile
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="screen bg-background flex items-center justify-center">
       <AelixtoLoader size={96} />
     </div>
   );

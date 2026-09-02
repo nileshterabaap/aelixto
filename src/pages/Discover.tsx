@@ -114,7 +114,7 @@ const Discover = () => {
   }, [searchQuery]);
 
   return (
-    <div className="min-h-screen bg-background pb-[calc(5rem+var(--safe-bottom))]">
+    <div className="screen-nav bg-background">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
       <PullToRefresh onRefresh={handleRefresh}>

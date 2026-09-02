@@ -182,7 +182,7 @@ const EditProfile = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="screen bg-background flex items-center justify-center">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Please sign in to edit your profile</p>
           <Button onClick={() => navigate('/auth')}>Sign In</Button>
@@ -193,14 +193,14 @@ const EditProfile = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="screen bg-background flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-[calc(5rem+var(--safe-bottom))]">
+    <div className="screen-nav bg-background">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
       <main className="mx-auto max-w-2xl px-4 py-6">
