@@ -1,54 +1,50 @@
-# Why Pinterest Feels Smoother — Analysis + Minimal Shared Fix
+# Android fit: review of your plan + what I found
 
-Read-only investigation complete. No files changed.
+## Do I agree with the plan?
+Yes — the audit-first ordering is right, and "don't layer another inset mechanism" is exactly the correct instinct. I already ran Steps 1–3 read-only. One change I'd make: your plan treats safe-area and viewport-height as possibly separate causes. They are **both** present here, and there is also a **third** cause you didn't list — the safe-area plugin is never actually enabled. That's the biggest one.
 
-## 1. Exact reasons Pinterest feels smoother
+## Most likely cause of the screenshots (in order of confidence)
 
-`src/components/embeds/PinterestEmbed.tsx` is the only embed that combines all four smoothness mechanisms at once:
+1. **`SafeArea.enable(...)` is never called.** `src/capacitor-init.ts` only calls `SafeArea.setSystemBarsStyle(...)`. In `@capacitor-community/safe-area` v8, `enable()` is what turns on edge-to-edge + injects real inset values into `env(safe-area-inset-*)`. Without it, Android WebViews that don't natively report cutout insets return **0px**, so `--safe-top` = 0 and the header/username sit under the status bar — exactly your screenshots. It "works" on your dev phone because its newer WebView/Android 15 forced edge-to-edge reports insets natively; the Play-Store phone doesn't. This alone explains the device-to-device difference.
 
-1. **Zero-roundtrip URL resolution** — the pin ID is pulled out with a synchronous regex (line 12-17), so `loading` starts as `false` for normal `/pin/<id>/` links and the iframe src (`assets.pinterest.com/ext/embed.html?id=…`, line 119) exists on the very first render. No oEmbed call, no OG scrape, no SDK script.
-2. **Height reserved before the iframe exists** — the wrapper div gets a fixed pixel height seeded from the stored `suggestedHeight` (clamped 320–1400, default 600) at lines 31-35 and 113. Nothing shifts when content arrives.
-3. **Skeleton stacked underneath, not swapped** — the pulse is `absolute inset-0` inside the same fixed-height relative wrapper (line 112-117), so skeleton and iframe occupy the identical box; the handoff causes no reflow.
-4. **A real 300 ms opacity fade driven by the iframe's own `onLoad`** (lines 132-135) — one native event, no MutationObserver, no artificial timer.
+2. **Bottom padding math is short by the gesture-bar height.** `BottomNav` is `fixed` and adds `pb-[var(--safe-bottom)]`, so its real height is `5rem + safe-bottom`. Every page reserves `pb-[calc(5rem+var(--safe-bottom))]`… which is correct — but the nav's own inner height plus border makes it taller than 5rem on 3-button-nav devices, and screens that use plain `min-h-screen` with no bottom padding (PostDetail, Profile, NotFound, AuthBridge, ShortLinkRedirect) reserve nothing at all. Those clip at the bottom.
 
-The smoothness is **our implementation**, not the browser or Pinterest's SDK. Notably, Pinterest *opts out* of the shared `SkeletonGate`/`LazyEmbed` MutationObserver plumbing (it's rendered directly in `HydratedEmbed.tsx:403-411`) and self-manages a tight load→fade instead.
+3. **`min-h-screen` = `100vh`.** On Android Chrome `100vh` is the *large* viewport (URL bar / system bars excluded), so full-height screens overflow by the system-bar height under edge-to-edge. `100dvh` is the correct unit here. This is a real contributor, not just theory.
 
-## 2. Differences from every other platform
+4. Not a cause, but worth noting: `body::before` paints a `--safe-top` strip at `z-index: 60`, above the header (`z-50`). With correct insets it's harmless; with wrong ones it can visually crop the header.
 
-| | Instant src | Pre-reserved height | Stacked skeleton | Fade on load |
-|---|---|---|---|---|
-| **Pinterest** | yes | yes (fixed px) | yes | yes, 300 ms via `onLoad` |
-| **Reddit** | no — async normalize + possible `expand-url` call before any iframe (`RedditEmbed.tsx:217-259`) | heuristic, changes after load | partial | no fade; readiness via `load` + 8.5 s fallback timer |
-| **X / Twitter** | no — SDK script then `twttr.widgets.createTweet()` DOM replacement (`TwitterEmbed.tsx:55-79`) | no (generic `aspect-[4/3]` block + `-85px` margin hack) | no | none |
-| **Threads** | src is sync, but mount is gated behind an IntersectionObserver + 6 s retry (`ThreadsEmbed.tsx:177-209`) | yes (default 280) | no | none |
-| **LinkedIn** | yes | fixed 760 px always, never matches content | no | none, no loading state at all |
-| **Instagram** | yes | estimate → postMessage MEASURE | yes | yes but only 180 ms, gated by a 2200 ms fallback timer, not `onLoad` |
-| **Facebook** | yes | postMessage only, 12 s failure fallback | no | none |
+## Double-applied insets — any risk?
+Two real ones, both small:
+- `StatusBar.setOverlaysWebView({overlay:true})` **and** `SafeArea.enable()` both drive edge-to-edge. They don't add up numerically, but they can fight over system-bar colors. I'd let SafeArea own edge-to-edge and keep StatusBar only for icon style.
+- `html.kb-open { --safe-bottom: 0 }` is correct and must stay — without it the composer double-pads when the keyboard is open.
 
-Two structural gaps dominate: **no fade** (X, Threads, LinkedIn, Facebook, Reddit) and **no height reserved before mount** (X, Reddit partially).
+No page currently adds `pb-safe` *and* `pb-[calc(...var(--safe-bottom))]` together, so no stacking there.
 
-## 3. Risk assessment for applying this globally
+## What I'd keep
+- The whole `--safe-top/bottom/left/right` variable layer and `.pt-safe/.pb-safe/.px-safe` helpers — this is the right single source of truth.
+- `viewport-fit=cover` in `index.html` (already correct).
+- `@capacitor-community/safe-area` as the only inset plugin. No new plugin.
+- Keyboard handling (`--kb`, `resize: 'none'`, `kb-open`) — unrelated and working.
+- Header / BottomNav / CTA bar / comment input / sheet consumers — the consumption pattern is right, only the *values* were wrong.
 
-- **Low risk / purely visual:** adding a `relative` fixed-height wrapper + absolute pulse + opacity fade on `onLoad`. It changes no scoring, no navigation lock, no postMessage handling.
-- **Medium risk:** the fade can *mask* a slow embed and, if the readiness signal never fires, leave content at `opacity: 0`. Mitigation: always pair the fade with a fallback reveal timer, and never gate `pointer-events` on it.
-- **Blocked by the stability guard:** `PinterestEmbed.tsx`, `TwitterEmbed.tsx`, `LinkedInEmbed.tsx`, and `UniversalMetaEmbed.tsx` (Facebook + Instagram) are all frozen in `.stability-platforms.json`. Any edit fails `platform:check` and the production build. So X, LinkedIn, Facebook and Instagram **cannot** receive this without you clearing their baselines.
-- **Threads-specific risk:** the transparent first-tap overlay is the single source of truth for `video_play`. A fade wrapper must sit *below* that overlay in z-order and must not intercept pointer events, or the one-shot play regresses.
+## What I'd modify
+- `src/capacitor-init.ts` — call `SafeArea.enable({ config: { customColorsForSystemBars: true, statusBarColor: '#00000000', navigationBarColor: '#00000000' } })` before styling; drop the redundant `setOverlaysWebView` (keep `setStyle`).
+- `src/index.css` — add a JS-independent fallback so insets are never 0 when they shouldn't be; lower the `body::before` strip below the header; add a `min-h-dvh`-based screen helper.
+- Replace `min-h-screen` with the dynamic-viewport equivalent on full-height page roots, and add the missing bottom reserve on the screens that have none.
 
-## 4. Recommended smallest shared improvement
+## Files I intend to change
+- `src/capacitor-init.ts`
+- `src/index.css`
+- `src/components/BottomNav.tsx` (height/inset composition only)
+- Page roots that use bare `min-h-screen`: `src/pages/PostDetail.tsx`, `src/pages/Profile.tsx`, `src/pages/UserProfile.tsx`, `src/pages/AuthBridge.tsx`, `src/pages/ShortLinkRedirect.tsx`, `src/pages/NotFound.tsx`, `src/pages/Unsubscribe.tsx`, `src/components/SwipeableView.tsx`
+- `src/components/saved/SavedPostViewer.tsx` (`100vh` → `100dvh`)
 
-Extract Pinterest's pattern into one tiny reusable presentational wrapper and apply it only to the **unguarded** platforms.
+No new dependency. No device-specific values. Nothing touching scoring, embeds, or guarded platform files.
 
-### New file: `src/components/embeds/SmoothEmbedFrame.tsx`
-A ~40-line presentational component: `relative` wrapper with a caller-supplied fixed height, an `absolute inset-0 animate-pulse bg-muted` skeleton while not ready, `opacity 0→1 / 300 ms ease` on the child, plus a safety timer (~2.5 s) that force-reveals so nothing can get stuck invisible. `pointer-events` untouched. No data fetching, no measurement logic.
+## Better approach than the plan?
+Only one refinement: rather than auditing every screen by hand (your Step 7), I'd make correctness structural — one `.screen` utility (`min-height: 100dvh` + bottom nav reserve) that every page root uses, so a new page can't reintroduce the bug. Same outcome, far less surface to re-check.
 
-### Apply to (all unguarded):
-- **Reddit** (`RedditEmbed.tsx`) — wrap the existing iframe; keep the current `computeInitialHeight`, postMessage height sync, collapsed-text cap and 8.5 s fallback exactly as-is. Only the fade + stacked skeleton are added.
-- **Threads** (`ThreadsEmbed.tsx`) — wrap the iframe only, with the fade layer rendered strictly *beneath* the existing transparent play overlay. Visibility gate, retry, navigation lock and `video_play` capture untouched.
+## Verification
+I can't rebuild your APK from here, so after the change you must run `npx cap sync android` and rebuild. I'll verify in-browser that insets and heights resolve correctly and that nothing regresses at `--safe-*: 0`.
 
-### Explicitly out of scope
-Pinterest (already correct and frozen), X, LinkedIn, Facebook, Instagram — frozen. If you want those included later, you'd need to clear their guard baselines first; I'd do that as a separate, per-platform request.
-
-### Verification
-`npm run platform:check` must pass unchanged (all 10 platforms), plus a typecheck and build. Then manual confirmation that Reddit and Threads still play, still score, and still size correctly.
-
-Probability of success: **93%** — the change is presentational and confined to two unguarded files.
+Probability this fully fixes the Play-Store-phone fit: **~85%** (the remaining 15% is Android-15 forced edge-to-edge quirks I can only confirm on-device).
