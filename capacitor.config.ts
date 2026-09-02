@@ -46,6 +46,12 @@ const config: CapacitorConfig = {
       resize: "none" as never,
       resizeOnFullScreen: false,
     },
+    // Capacitor 8 ships a built-in SystemBars plugin that also applies insets.
+    // Disable its inset handling so @capacitor-community/safe-area is the only
+    // owner of Android inset handling (per the safe-area docs).
+    SystemBars: {
+      insetsHandling: "disable",
+    },
     SafeArea: {
       // Polyfills correct env(safe-area-inset-*) values on Android webviews
       // that report 0 in edge-to-edge mode.
@@ -54,6 +60,7 @@ const config: CapacitorConfig = {
       detectViewportFitCoverChanges: true,
       initialViewportFitCover: true,
     },
+
   },
 };
 
