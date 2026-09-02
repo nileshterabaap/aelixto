@@ -181,7 +181,7 @@ const Settings = () => {
   );
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-[calc(5rem+var(--safe-bottom))]">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
       <main className="mx-auto max-w-2xl px-4 py-4">
@@ -204,7 +204,7 @@ const Settings = () => {
           {Capacitor.isNativePlatform() && adPrefsAvailable && (
             <Row label="Manage ad preferences" onClick={() => { void handleAdPreferences(); }} />
           )}
-          {Capacitor.isNativePlatform() && (import.meta.env.DEV || adTestMode) && (
+          {Capacitor.isNativePlatform() && (
             <button
               type="button"
               onClick={toggleAdTestMode}

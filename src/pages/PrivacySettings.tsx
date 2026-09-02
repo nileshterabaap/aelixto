@@ -136,7 +136,7 @@ const PrivacySettings = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-[calc(5rem+var(--safe-bottom))]">
       <main className="mx-auto max-w-2xl px-4 py-4">
         <div className="flex items-center gap-3 mb-2">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="-ml-2">

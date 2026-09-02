@@ -97,6 +97,32 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
   const handleLinkSubmit = async () => {
     if (!linkUrl.trim()) return;
+    let resolvedUrl = linkUrl.trim();
+    // LinkedIn now shares posts as lnkd.in short links. Expand them to the real
+    // linkedin.com/posts/... URL so the post is classified + embedded as LinkedIn
+    // instead of falling through to Article/External.
+    if (/^https?:\/\/(www\.)?lnkd\.in\//i.test(resolvedUrl)) {
+      try {
+        setIsLoadingPreview(true);
+        const { data } = await supabase.functions.invoke('expand-url', {
+          body: { url: resolvedUrl },
+        });
+        const finalUrl = typeof data?.finalUrl === 'string' ? data.finalUrl : '';
+        if (finalUrl && finalUrl.toLowerCase().includes('linkedin.com')) {
+          resolvedUrl = finalUrl.split('?')[0];
+          setLinkUrl(resolvedUrl);
+        }
+      } catch (e) {
+        console.warn('[CreatePostDialog] lnkd.in expansion failed:', e);
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    }
+    return processLinkSubmit(resolvedUrl);
+  };
+
+  const processLinkSubmit = async (linkUrl: string) => {
+    if (!linkUrl.trim()) return;
     fetchedPreviewTextRef.current = null;
     measuredHeightRef.current = null;
     measurePromiseRef.current = null;

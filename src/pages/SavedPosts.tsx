@@ -143,7 +143,7 @@ export default function SavedPosts() {
   if (loading || isLoading) {
     return (
       <SwipeableView rightRoute="/" rightLabel="Home">
-        <div className="min-h-screen pb-20">
+        <div className="min-h-screen pb-[calc(5rem+var(--safe-bottom))]">
           <Header onCreatePost={() => setCreatePostOpen(true)} />
           <SavedSkeleton />
         </div>
@@ -153,7 +153,7 @@ export default function SavedPosts() {
 
   return (
     <SwipeableView rightRoute="/" rightLabel="Home">
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-[calc(5rem+var(--safe-bottom))]">
       <Header onCreatePost={() => setCreatePostOpen(true)} />
 
       <PullToRefresh onRefresh={handleRefresh}>
