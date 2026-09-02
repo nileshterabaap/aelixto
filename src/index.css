@@ -366,6 +366,22 @@ html, body {
 .pb-safe { padding-bottom: var(--safe-bottom); }
 .px-safe { padding-left: var(--safe-left); padding-right: var(--safe-right); }
 
+/* Single structural full-height page root.
+   `min-h-screen` resolves to 100vh, which on Android is the LARGE viewport
+   (system bars excluded) — full-height pages then overflow by the height of
+   the bars under edge-to-edge. 100dvh always matches what is actually
+   visible. `.screen-nav` additionally reserves the fixed bottom tab bar
+   (h-14 content + its own safe-bottom padding) so page content can never sit
+   underneath it, on gesture bars and 3-button bars alike. */
+.screen {
+  min-height: 100dvh;
+}
+.screen-nav {
+  min-height: 100dvh;
+  padding-bottom: calc(5rem + var(--safe-bottom));
+}
+
+
 /* While the soft keyboard is open the OS gesture/nav bar is covered by it, so
    the bottom safe inset must collapse — otherwise composers sit too high. */
 html.kb-open {
