@@ -41,7 +41,7 @@ const InteractionSettings = () => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Please sign in to access settings</p>
       </div>
     );
@@ -49,14 +49,14 @@ const InteractionSettings = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="screen bg-background flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background pb-[calc(5rem+var(--safe-bottom))]">
+    <div className="screen-nav bg-background">
       <main className="mx-auto max-w-2xl px-4 py-6">
         <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>

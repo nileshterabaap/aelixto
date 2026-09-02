@@ -128,9 +128,18 @@ export async function initCapacitorPlugins() {
   );
 
   // Edge-to-edge + correct safe-area insets on every device.
-  // The SafeArea plugin makes env(safe-area-inset-*) report real values inside
-  // the Android webview (it is a no-op polyfill on iOS/modern Chromium), and the
-  // app's layout consumes those values via the --safe-* CSS variables.
+  //
+  // @capacitor-community/safe-area is the SINGLE source of truth for system
+  // insets. It enables itself automatically and, depending on the device's
+  // Chromium version, either (a) lets env(safe-area-inset-*) report real
+  // values (Chromium >= 140) or (b) pads the webview natively and reports 0px
+  // (older WebViews, where env() is broken). Either way the app's --safe-*
+  // variables resolve to exactly the space it must reserve — never twice.
+  //
+  // @capacitor/status-bar is deliberately NOT used here: its
+  // setOverlaysWebView() drives edge-to-edge independently, which on older
+  // WebViews produced "behind the bars, no padding, env() == 0" — the clipped
+  // header/nav seen on some Play Store devices.
   try {
     const { SafeArea, SystemBarsStyle } = await import("@capacitor-community/safe-area");
     // LIGHT = dark icons/content on our white background (both bars).
@@ -139,18 +148,6 @@ export async function initCapacitorPlugins() {
     console.warn("SafeArea plugin not available", e);
   }
 
-  try {
-    const { StatusBar, Style } = await import("@capacitor/status-bar");
-    // Edge-to-edge: the webview draws behind the status bar; CSS safe-area
-    // insets reserve the space so nothing is clipped on notched devices.
-    await StatusBar.setOverlaysWebView({ overlay: true });
-    // Style.Light = light status-bar (white bg) with DARK icons/text.
-    // (Capacitor's naming is the opposite of what you'd expect — Style.Dark
-    // actually produces a dark bar with light icons.)
-    await StatusBar.setStyle({ style: Style.Light });
-  } catch (e) {
-    console.warn("StatusBar plugin not available", e);
-  }
 
   try {
     const { SplashScreen } = await import("@capacitor/splash-screen");

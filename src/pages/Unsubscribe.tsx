@@ -50,7 +50,7 @@ const Unsubscribe = () => {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-6 bg-background">
+    <main className="screen flex items-center justify-center px-6 bg-background">
       <div className="w-full max-w-md text-center space-y-4 border border-border rounded-2xl p-8 bg-card">
         <h1 className="text-2xl font-bold">Email preferences</h1>
         {state === "loading" && <p className="text-muted-foreground">Checking link…</p>}
