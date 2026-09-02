@@ -31,15 +31,12 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true,
     },
-    StatusBar: {
-      // "LIGHT" = light status-bar background → dark icons/text (correct for our white header)
-      style: "LIGHT",
-      backgroundColor: "#00000000",
-      // Edge-to-edge: the webview draws behind the system bars and the app
-      // compensates with env(safe-area-inset-*) so every device (notch,
-      // punch-hole, gesture bar, 3-button bar) fits correctly.
-      overlaysWebView: true,
-    },
+    // NOTE: no `StatusBar` block on purpose. @capacitor-community/safe-area
+    // owns edge-to-edge and the system bars; @capacitor/status-bar's
+    // `overlaysWebView` fights with it and makes the webview draw behind the
+    // bars WITHOUT any inset compensation (content clipped at top/bottom on
+    // devices whose WebView reports env(safe-area-inset-*) as 0).
+
     Keyboard: {
       // The WebView must NOT be resized by the soft keyboard. Android's
       // adjustResize combined with edge-to-edge produced stale viewport
