@@ -204,7 +204,7 @@ const Settings = () => {
           {Capacitor.isNativePlatform() && adPrefsAvailable && (
             <Row label="Manage ad preferences" onClick={() => { void handleAdPreferences(); }} />
           )}
-          {Capacitor.isNativePlatform() && (import.meta.env.DEV || adTestMode) && (
+          {Capacitor.isNativePlatform() && (
             <button
               type="button"
               onClick={toggleAdTestMode}
