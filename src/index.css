@@ -366,6 +366,18 @@ html, body {
 .pb-safe { padding-bottom: var(--safe-bottom); }
 .px-safe { padding-left: var(--safe-left); padding-right: var(--safe-right); }
 
+/* While the soft keyboard is open the OS gesture/nav bar is covered by it, so
+   the bottom safe inset must collapse — otherwise composers sit too high. */
+html.kb-open {
+  --safe-bottom: 0px;
+}
+
+/* The tab bar is meaningless while typing (Instagram hides it too) and would
+   otherwise float on top of the keyboard. */
+html.kb-open nav.fixed.bottom-0 {
+  display: none;
+}
+
 /* Status-bar strip keeps the app background behind the system bars so the
    webview drawing edge-to-edge never shows a transparent/black band. */
 body::before {

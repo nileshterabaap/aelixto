@@ -422,7 +422,10 @@ const Auth = () => {
   if (!sessionChecked || user) return null;
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center bg-background p-5 overflow-hidden">
+    <div
+      className="relative flex items-start justify-center overflow-y-auto bg-background p-5 py-10"
+      style={{ minHeight: 'calc(100dvh - var(--kb))', maxHeight: 'calc(100dvh - var(--kb))' }}
+    >
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
