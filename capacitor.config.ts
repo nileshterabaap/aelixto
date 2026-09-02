@@ -40,6 +40,15 @@ const config: CapacitorConfig = {
       // punch-hole, gesture bar, 3-button bar) fits correctly.
       overlaysWebView: true,
     },
+    Keyboard: {
+      // The WebView must NOT be resized by the soft keyboard. Android's
+      // adjustResize combined with edge-to-edge produced stale viewport
+      // heights (squashed auth form, blank message thread, composer floating
+      // mid-screen). The app tracks the keyboard height itself via
+      // `initKeyboardInsets()` and offsets layout with `--kb`.
+      resize: "none" as never,
+      resizeOnFullScreen: false,
+    },
     SafeArea: {
       // Polyfills correct env(safe-area-inset-*) values on Android webviews
       // that report 0 in edge-to-edge mode.
