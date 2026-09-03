@@ -18,10 +18,27 @@ import { Capacitor } from '@capacitor/core';
 
 function apply(height: number) {
   const root = document.documentElement;
-  const px = Math.max(0, Math.round(height));
+  let value = Math.max(0, height);
+
+  // Android's Keyboard plugin reports the keyboard height in PHYSICAL pixels on
+  // some devices/WebViews, while CSS works in density-independent pixels. On a
+  // 2.75x device a ~350dp keyboard arrives as ~960 — subtracting that from
+  // 100dvh collapses the whole screen (blank chat, composer stuck under the
+  // header). Normalise anything that is implausibly tall for a keyboard.
+  const viewportH = window.innerHeight || 0;
+  const dpr = window.devicePixelRatio || 1;
+  if (viewportH > 0 && dpr > 1 && value > viewportH * 0.75) {
+    value = value / dpr;
+  }
+  // Hard safety net: a keyboard never legitimately covers more than 70% of the
+  // viewport; clamping keeps the layout usable even if the report is bogus.
+  if (viewportH > 0) value = Math.min(value, viewportH * 0.7);
+
+  const px = Math.max(0, Math.round(value));
   root.style.setProperty('--kb', `${px}px`);
   root.classList.toggle('kb-open', px > 0);
 }
+
 
 let started = false;
 
