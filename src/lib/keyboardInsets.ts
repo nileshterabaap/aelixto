@@ -16,11 +16,11 @@
 
 import { Capacitor } from '@capacitor/core';
 
-function set(px: number) {
+function set(px: number, open = px > 0) {
   const root = document.documentElement;
   const value = Math.max(0, Math.round(px));
   root.style.setProperty('--kb', `${value}px`);
-  root.classList.toggle('kb-open', value > 0);
+  root.classList.toggle('kb-open', open);
 }
 
 let started = false;
