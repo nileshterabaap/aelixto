@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { showPrivacyOptionsForm } from "@/lib/adConsent";
 import { AD_TEST_LS_KEY, AD_TEST_MODE } from "@/config/ads";
+import { isKeyboardDebugEnabled, setKeyboardDebugEnabled } from "@/lib/keyboardInsets";
 import { Capacitor } from "@capacitor/core";
 
 const Settings = () => {
@@ -36,6 +37,7 @@ const Settings = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [adTestMode, setAdTestMode] = useState(AD_TEST_MODE);
+  const [kbDebug, setKbDebug] = useState(isKeyboardDebugEnabled);
   // "Manage ad preferences" is only shown when the UMP privacy message
   // actually applies to the user's region (GDPR/CPRA). Elsewhere (and in
   // release builds outside those regions) the row stays hidden.
@@ -212,6 +214,20 @@ const Settings = () => {
             >
               <span className="text-base text-foreground">Ad test mode (debug)</span>
               <span className="text-sm text-muted-foreground">{adTestMode ? 'On' : 'Off'}</span>
+            </button>
+          )}
+          {Capacitor.isNativePlatform() && (
+            <button
+              type="button"
+              onClick={() => {
+                const next = !kbDebug;
+                setKeyboardDebugEnabled(next);
+                setKbDebug(next);
+              }}
+              className="w-full flex items-center justify-between py-4 text-left"
+            >
+              <span className="text-base text-foreground">Layout debug (keyboard)</span>
+              <span className="text-sm text-muted-foreground">{kbDebug ? 'On' : 'Off'}</span>
             </button>
           )}
           <div className="py-4 space-y-3">

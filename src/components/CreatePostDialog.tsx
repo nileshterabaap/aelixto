@@ -683,25 +683,27 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const panelTransition = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.82 };
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={handleClose}>
+    // modal={false}: Radix's modal mode locks body scroll, sets
+    // `pointer-events:none` on <body> and aria-hides every sibling; all of that
+    // is torn down only after the exit animation finishes — ~0.5–1s after the
+    // close tap — which forces a full relayout of the embed-heavy feed on the
+    // Android WebView and shows as a one-frame flicker. Non-modal skips those
+    // body/tree mutations entirely; our own backdrop blocks interaction and
+    // taps on it still dismiss via Radix's outside-press handling.
+    <DialogPrimitive.Root open={open} onOpenChange={handleClose} modal={false}>
       <AnimatePresence>
         {open && (
           <DialogPrimitive.Portal forceMount>
-            {/* Blurred backdrop */}
-            <DialogPrimitive.Overlay asChild forceMount>
-              <motion.div
-                // No backdrop-filter at all: on the Android WebView, tearing
-                // down a backdrop-blur layer causes a one-frame flash a beat
-                // after close. A plain translucent tint composites cleanly.
-                className="fixed inset-0 z-50 bg-foreground/55"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                style={{ willChange: "opacity", backfaceVisibility: "hidden" }}
-              />
-
-            </DialogPrimitive.Overlay>
+            {/* Backdrop (plain tint — no backdrop-filter, see above) */}
+            <motion.div
+              aria-hidden
+              className="fixed inset-0 z-50 bg-foreground/55 touch-none"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              style={{ willChange: "opacity", backfaceVisibility: "hidden" }}
+            />
 
             {/* Centered card with viewport-safe sizing */}
             <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
