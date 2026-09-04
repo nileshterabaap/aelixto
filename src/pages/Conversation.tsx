@@ -455,7 +455,7 @@ const Conversation = () => {
       </header>
 
       {/* Messages */}
-      <main ref={scrollAreaRef} className="flex-1 overflow-y-auto flex flex-col">
+      <main data-kbdebug="list" ref={scrollAreaRef} className="flex-1 overflow-y-auto flex flex-col">
         <div className="container max-w-2xl mx-auto w-full px-4 py-4 space-y-1 animate-fade-in mt-auto">
           {messages.map((message, idx) => {
             const isOwn = message.sender_id === user?.id;
@@ -729,7 +729,7 @@ const Conversation = () => {
       )}
 
       {/* Input */}
-      <div className="sticky bottom-0 bg-background border-t border-border">
+      <div data-kbdebug="composer" className="sticky bottom-0 bg-background border-t border-border">
         <div className="container max-w-2xl mx-auto px-4 py-4">
           <form
             autoComplete="off"
