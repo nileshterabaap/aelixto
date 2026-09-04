@@ -690,10 +690,14 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             {/* Blurred backdrop */}
             <DialogPrimitive.Overlay asChild forceMount>
               <motion.div
-                className="fixed inset-0 z-50 bg-foreground/45"
-                initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-                animate={{ opacity: 1, backdropFilter: "blur(9px)" }}
-                exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                // Blur is a static CSS layer (animating backdrop-filter forces a
+                // fresh, expensive compositing pass on Android WebView — that is
+                // what made the first few opens skip their animation and made a
+                // flicker appear a beat after closing). Only opacity animates.
+                className="fixed inset-0 z-50 bg-foreground/45 backdrop-blur-lg"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
               />
             </DialogPrimitive.Overlay>
