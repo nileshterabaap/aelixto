@@ -729,7 +729,7 @@ const Conversation = () => {
       )}
 
       {/* Input */}
-      <div data-kbdebug="composer" className="sticky bottom-0 bg-background border-t border-border">
+      <div data-kbdebug="composer" className="sticky bottom-0 bg-background border-t border-border pb-safe">
         <div className="container max-w-2xl mx-auto px-4 py-4">
           <form
             autoComplete="off"
