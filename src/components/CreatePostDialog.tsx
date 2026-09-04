@@ -656,28 +656,69 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setShowThumbnailInput(false);
   };
 
+  const closingRef = useRef(false);
+
   const handleClose = () => {
-    // Drop the soft keyboard NOW, together with the backdrop fade. Otherwise
-    // the focused input keeps the IME up until the exit animation finishes
-    // (~1s), and the WebView's late 417→716 resize + relayout of the
-    // embed-heavy page is the delayed flicker seen on Android.
-    (document.activeElement as HTMLElement | null)?.blur?.();
-    setStep(1);
-    setLinkUrl("");
-    setThumbnailUrl("");
-    setTitle("");
-    setCaption("");
-    setShowThumbnailInput(false);
-    setIsLoadingPreview(false);
-    setEmbedHtml("");
-    setOgType(null);
-    setDraftId(null);
-    setSubmitState(null);
-    fetchedPreviewTextRef.current = null;
-    measuredHeightRef.current = null;
-    measurePromiseRef.current = null;
-    onOpenChange(false);
+    if (closingRef.current) return;
+    closingRef.current = true;
+
+    // Drop the soft keyboard FIRST and only tear the box down once the WebView
+    // has grown back to its keyboard-closed height. Otherwise the 417→716
+    // resize lands ~300ms after the box is gone and relayouts the whole
+    // embed-heavy feed in plain sight — that is the half-second full-screen
+    // flicker. Doing it behind the still-visible backdrop hides it entirely.
+    const el = document.activeElement as HTMLElement | null;
+    const hadFocus = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+    el?.blur?.();
+
+    const finish = () => {
+      closingRef.current = false;
+      setStep(1);
+      setLinkUrl("");
+      setThumbnailUrl("");
+      setTitle("");
+      setCaption("");
+      setShowThumbnailInput(false);
+      setIsLoadingPreview(false);
+      setEmbedHtml("");
+      setOgType(null);
+      setDraftId(null);
+      setSubmitState(null);
+      fetchedPreviewTextRef.current = null;
+      measuredHeightRef.current = null;
+      measurePromiseRef.current = null;
+      onOpenChange(false);
+    };
+
+    if (!hadFocus || !Capacitor.isNativePlatform()) {
+      finish();
+      return;
+    }
+
+    void (async () => {
+      try {
+        const { Keyboard } = await import("@capacitor/keyboard");
+        await Keyboard.hide();
+      } catch {
+        /* plugin unavailable — fall through to the timeout */
+      }
+    })();
+
+    // Wait for the WebView to finish growing back (or bail out after 420ms).
+    const start = window.innerHeight;
+    const t0 = Date.now();
+    const settled = () => {
+      if (window.innerHeight > start + 80 || Date.now() - t0 > 420) {
+        window.removeEventListener("resize", settled);
+        window.clearInterval(poll);
+        // One more frame so the relayout paints under the backdrop.
+        requestAnimationFrame(() => requestAnimationFrame(finish));
+      }
+    };
+    const poll = window.setInterval(settled, 60);
+    window.addEventListener("resize", settled);
   };
+
 
   const stepVariants = {
     initial: (dir: number) => ({ opacity: 0, x: dir * 18, filter: "blur(5px)" }),
