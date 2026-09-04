@@ -417,6 +417,7 @@ const Conversation = () => {
 
   return (
     <div
+      data-kbdebug="chat-root"
       className="bg-background flex flex-col overflow-hidden"
       style={{ height: 'calc(100dvh - var(--kb))' }}
     >
