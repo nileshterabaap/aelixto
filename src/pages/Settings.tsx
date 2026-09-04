@@ -214,6 +214,20 @@ const Settings = () => {
               <span className="text-sm text-muted-foreground">{adTestMode ? 'On' : 'Off'}</span>
             </button>
           )}
+          {Capacitor.isNativePlatform() && (
+            <button
+              type="button"
+              onClick={() => {
+                const next = !kbDebug;
+                setKeyboardDebugEnabled(next);
+                setKbDebug(next);
+              }}
+              className="w-full flex items-center justify-between py-4 text-left"
+            >
+              <span className="text-base text-foreground">Layout debug (keyboard)</span>
+              <span className="text-sm text-muted-foreground">{kbDebug ? 'On' : 'Off'}</span>
+            </button>
+          )}
           <div className="py-4 space-y-3">
             <p className="text-sm text-muted-foreground">Theme</p>
             <div className="flex items-center justify-between">
