@@ -13,6 +13,7 @@ import { useRealtimeInvalidations } from "@/hooks/useRealtimeInvalidations";
 import { PageTransition } from "@/components/PageTransition";
 import { KeepAliveRoutes } from "@/components/KeepAliveRoutes";
 import { PersistentBottomNav } from "@/components/PersistentBottomNav";
+import { KeyboardDebugPanel } from "@/components/KeyboardDebugPanel";
 import { persistOptions } from "@/lib/queryPersister";
 import Index from "./pages/Index";
 import Discover from "./pages/Discover";
@@ -124,6 +125,8 @@ const AnimatedRoutes = () => {
       {/* Persistent navigation — lives OUTSIDE PageTransition so it
           stays mounted across route changes and never flickers. */}
       <PersistentBottomNav />
+      {/* DEBUG ONLY — temporary keyboard measurement overlay (native builds) */}
+      <KeyboardDebugPanel />
     </>
   );
 };
