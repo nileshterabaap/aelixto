@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { showPrivacyOptionsForm } from "@/lib/adConsent";
 import { AD_TEST_LS_KEY, AD_TEST_MODE } from "@/config/ads";
+import { isKeyboardDebugEnabled, setKeyboardDebugEnabled } from "@/lib/keyboardInsets";
 import { Capacitor } from "@capacitor/core";
 
 const Settings = () => {
