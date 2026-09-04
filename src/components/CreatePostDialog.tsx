@@ -657,6 +657,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   };
 
   const handleClose = () => {
+    // Drop the soft keyboard NOW, together with the backdrop fade. Otherwise
+    // the focused input keeps the IME up until the exit animation finishes
+    // (~1s), and the WebView's late 417→716 resize + relayout of the
+    // embed-heavy page is the delayed flicker seen on Android.
+    (document.activeElement as HTMLElement | null)?.blur?.();
     setStep(1);
     setLinkUrl("");
     setThumbnailUrl("");
@@ -706,12 +711,25 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             />
 
             {/* Centered card with viewport-safe sizing */}
-            <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
+            <DialogPrimitive.Content
+              asChild
+              forceMount
+              aria-describedby={undefined}
+              // Don't hand focus back to the FAB when the box unmounts — on the
+              // WebView that late focus() is another relayout trigger.
+              onCloseAutoFocus={(e) => e.preventDefault()}
+            >
               <motion.div
                 className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none"
                 initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)" }}
                 animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
-                exit={{ opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)" }}
+                // Short, non-spring exit: a spring "settles" for close to a
+                // second, which is exactly how long the box (and anything it
+                // tears down) lingered after the tap.
+                exit={{
+                  opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)",
+                  transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] },
+                }}
                 transition={panelTransition}
                 style={{ transformOrigin: "50% calc(100% + 120px)", willChange: "transform, opacity" }}
               >

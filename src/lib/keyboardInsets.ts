@@ -47,14 +47,24 @@ export function initKeyboardInsets() {
     let baseline = window.innerHeight;
     let pluginOpen = false;
 
+    const editableFocused = () => {
+      const el = document.activeElement as HTMLElement | null;
+      if (!el) return false;
+      const tag = el.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+    };
+
     const apply = () => {
       const h = window.innerHeight;
       const shrink = Math.max(0, baseline - h);
       const shrunk = shrink > 120;
-      const open = shrunk || pluginOpen;
+      // Stateless third signal: an editable is focused AND the WebView is far
+      // shorter than the physical screen. Can't be poisoned by event order.
+      const focusedShort = editableFocused() && h < (window.screen?.height ?? Infinity) * 0.75;
+      const open = shrunk || pluginOpen || focusedShort;
       // WebView absorbed the keyboard -> nothing to compensate. Only when it
       // did NOT shrink (rare WebView builds) do we use the plugin height.
-      const kb = shrunk ? 0 : pluginOpen ? Math.min(lastReported, h * 0.7) : 0;
+      const kb = shrunk || focusedShort ? 0 : pluginOpen ? Math.min(lastReported, h * 0.7) : 0;
       set(kb, open);
       if (!open) baseline = Math.max(baseline, h);
     };
@@ -65,6 +75,11 @@ export function initKeyboardInsets() {
       if (!pluginOpen && h > baseline) baseline = h;
       apply();
     });
+    // Focus moves (composer <-> nothing) re-evaluate immediately and again
+    // once the WebView has had a frame to resize.
+    const onFocusChange = () => { apply(); window.setTimeout(apply, 100); window.setTimeout(apply, 300); };
+    document.addEventListener('focusin', onFocusChange);
+    document.addEventListener('focusout', onFocusChange);
 
     void (async () => {
       try {
