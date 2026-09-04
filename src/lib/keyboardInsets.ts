@@ -16,45 +16,52 @@
 
 import { Capacitor } from '@capacitor/core';
 
-function apply(height: number) {
+function set(px: number) {
   const root = document.documentElement;
-  let value = Math.max(0, height);
-
-  // Android's Keyboard plugin reports the keyboard height in PHYSICAL pixels on
-  // some devices/WebViews, while CSS works in density-independent pixels. On a
-  // 2.75x device a ~350dp keyboard arrives as ~960 — subtracting that from
-  // 100dvh collapses the whole screen (blank chat, composer stuck under the
-  // header). Normalise anything that is implausibly tall for a keyboard.
-  const viewportH = window.innerHeight || 0;
-  const dpr = window.devicePixelRatio || 1;
-  if (viewportH > 0 && dpr > 1 && value > viewportH * 0.75) {
-    value = value / dpr;
-  }
-  // Hard safety net: a keyboard never legitimately covers more than 70% of the
-  // viewport; clamping keeps the layout usable even if the report is bogus.
-  if (viewportH > 0) value = Math.min(value, viewportH * 0.7);
-
-  const px = Math.max(0, Math.round(value));
-  root.style.setProperty('--kb', `${px}px`);
-  root.classList.toggle('kb-open', px > 0);
+  const value = Math.max(0, Math.round(px));
+  root.style.setProperty('--kb', `${value}px`);
+  root.classList.toggle('kb-open', value > 0);
 }
-
 
 let started = false;
 
 export function initKeyboardInsets() {
   if (started) return;
   started = true;
-  apply(0);
+  set(0);
 
   if (Capacitor.isNativePlatform()) {
+    // Device measurements (Sep 2026) show the Android WebView DOES shrink when
+    // the IME opens (innerHeight 716 -> 417) even with `resize: none`, because
+    // the activity runs edge-to-edge with adjustResize. Subtracting the plugin
+    // reported keyboard height on top of that double-counts the keyboard and
+    // collapses the chat to ~125px. So on native the WebView height is the
+    // single source of truth: --kb stays 0 whenever the viewport already
+    // shrank, and only compensates the leftover gap if it did not.
+    let baseline = window.innerHeight;
+
     void (async () => {
       try {
         const { Keyboard } = await import('@capacitor/keyboard');
-        await Keyboard.addListener('keyboardWillShow', (info) => apply(info.keyboardHeight));
-        await Keyboard.addListener('keyboardDidShow', (info) => apply(info.keyboardHeight));
-        await Keyboard.addListener('keyboardWillHide', () => apply(0));
-        await Keyboard.addListener('keyboardDidHide', () => apply(0));
+        const onShow = (reported: number) => {
+          // Give the WebView a frame to settle into its resized height.
+          window.setTimeout(() => {
+            const shrink = Math.max(0, baseline - window.innerHeight);
+            const kb = Math.max(0, Math.min(reported, window.innerHeight * 0.7));
+            // Viewport already absorbed (most of) the keyboard -> nothing to do.
+            set(shrink > 80 ? 0 : kb);
+          }, 60);
+        };
+        const onHide = () => {
+          set(0);
+          window.setTimeout(() => {
+            baseline = Math.max(baseline, window.innerHeight);
+          }, 120);
+        };
+        await Keyboard.addListener('keyboardWillShow', (i) => onShow(i.keyboardHeight));
+        await Keyboard.addListener('keyboardDidShow', (i) => onShow(i.keyboardHeight));
+        await Keyboard.addListener('keyboardWillHide', onHide);
+        await Keyboard.addListener('keyboardDidHide', onHide);
       } catch (error) {
         console.warn('[keyboard] plugin listeners unavailable', error);
       }
@@ -62,12 +69,13 @@ export function initKeyboardInsets() {
     return;
   }
 
+
   // Web / PWA fallback: visualViewport shrinks when the on-screen keyboard opens.
   const vv = window.visualViewport;
   if (!vv) return;
   const onResize = () => {
     const overlap = window.innerHeight - (vv.height + vv.offsetTop);
-    apply(overlap > 80 ? overlap : 0);
+    set(overlap > 80 ? overlap : 0);
   };
   vv.addEventListener('resize', onResize);
   vv.addEventListener('scroll', onResize);
