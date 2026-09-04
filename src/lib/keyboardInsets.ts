@@ -75,7 +75,7 @@ export function initKeyboardInsets() {
   if (!vv) return;
   const onResize = () => {
     const overlap = window.innerHeight - (vv.height + vv.offsetTop);
-    apply(overlap > 80 ? overlap : 0);
+    set(overlap > 80 ? overlap : 0);
   };
   vv.addEventListener('resize', onResize);
   vv.addEventListener('scroll', onResize);
