@@ -37,6 +37,7 @@ const Settings = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [adTestMode, setAdTestMode] = useState(AD_TEST_MODE);
+  const [kbDebug, setKbDebug] = useState(isKeyboardDebugEnabled);
   // "Manage ad preferences" is only shown when the UMP privacy message
   // actually applies to the user's region (GDPR/CPRA). Elsewhere (and in
   // release builds outside those regions) the row stays hidden.
