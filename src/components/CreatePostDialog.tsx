@@ -657,6 +657,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   };
 
   const handleClose = () => {
+    // Drop the soft keyboard NOW, together with the backdrop fade. Otherwise
+    // the focused input keeps the IME up until the exit animation finishes
+    // (~1s), and the WebView's late 417→716 resize + relayout of the
+    // embed-heavy page is the delayed flicker seen on Android.
+    (document.activeElement as HTMLElement | null)?.blur?.();
     setStep(1);
     setLinkUrl("");
     setThumbnailUrl("");
