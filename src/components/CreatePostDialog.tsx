@@ -690,10 +690,14 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             {/* Blurred backdrop */}
             <DialogPrimitive.Overlay asChild forceMount>
               <motion.div
-                className="fixed inset-0 z-50 bg-foreground/45"
-                initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-                animate={{ opacity: 1, backdropFilter: "blur(9px)" }}
-                exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                // Blur is a static CSS layer (animating backdrop-filter forces a
+                // fresh, expensive compositing pass on Android WebView — that is
+                // what made the first few opens skip their animation and made a
+                // flicker appear a beat after closing). Only opacity animates.
+                className="fixed inset-0 z-50 bg-foreground/45 backdrop-blur-lg"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
               />
             </DialogPrimitive.Overlay>
@@ -702,11 +706,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
               <motion.div
                 className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none"
-                initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)", filter: "blur(10px)" }}
-                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%", filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)", filter: "blur(8px)" }}
+                initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)" }}
+                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+                exit={{ opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)" }}
                 transition={panelTransition}
-                style={{ transformOrigin: "50% calc(100% + 120px)" }}
+                style={{ transformOrigin: "50% calc(100% + 120px)", willChange: "transform, opacity" }}
               >
                 <motion.div
                   transition={panelTransition}

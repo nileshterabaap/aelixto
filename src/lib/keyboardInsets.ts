@@ -16,11 +16,11 @@
 
 import { Capacitor } from '@capacitor/core';
 
-function set(px: number) {
+function set(px: number, open = px > 0) {
   const root = document.documentElement;
   const value = Math.max(0, Math.round(px));
   root.style.setProperty('--kb', `${value}px`);
-  root.classList.toggle('kb-open', value > 0);
+  root.classList.toggle('kb-open', open);
 }
 
 let started = false;
@@ -48,8 +48,11 @@ export function initKeyboardInsets() {
           window.setTimeout(() => {
             const shrink = Math.max(0, baseline - window.innerHeight);
             const kb = Math.max(0, Math.min(reported, window.innerHeight * 0.7));
-            // Viewport already absorbed (most of) the keyboard -> nothing to do.
-            set(shrink > 80 ? 0 : kb);
+            // The WebView usually absorbs (most of) the keyboard itself. Only
+            // compensate the leftover gap, and always flag kb-open so the
+            // bottom safe inset / tab bar collapse while typing.
+            const leftover = shrink > 80 ? Math.max(0, kb - shrink) : kb;
+            set(leftover, true);
           }, 60);
         };
         const onHide = () => {
