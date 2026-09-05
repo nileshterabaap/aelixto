@@ -1,0 +1,19 @@
+{
+  "name": "aelixto-window-insets",
+  "version": "0.1.0",
+  "description": "Custom Capacitor plugin — single owner of Android window insets (system bars + keyboard) for Aelixto.",
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "types": "src/index.ts",
+  "files": [
+    "android/src/main/",
+    "android/build.gradle",
+    "src/"
+  ],
+  "capacitor": {
+    "android": { "src": "android" }
+  },
+  "peerDependencies": {
+    "@capacitor/core": ">=7.0.0"
+  }
+}
