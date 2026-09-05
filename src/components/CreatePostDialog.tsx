@@ -734,7 +734,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
               onCloseAutoFocus={(e) => e.preventDefault()}
             >
               <motion.div
-                className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none"
+                className="fixed left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none transition-[top] duration-200 ease-out"
                 initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)" }}
                 animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
                 // Short, non-spring exit: a spring "settles" for close to a
@@ -745,11 +745,17 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                   transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] },
                 }}
                 transition={panelTransition}
-                style={{ transformOrigin: "50% calc(100% + 120px)", willChange: "transform, opacity" }}
+                style={{
+                  // Centre inside the part of the screen the keyboard does not
+                  // cover (--kb is 0 whenever the viewport itself shrank).
+                  top: "calc((100dvh - var(--kb, 0px)) / 2)",
+                  transformOrigin: "50% calc(100% + 120px)",
+                  willChange: "transform, opacity",
+                }}
               >
                 <motion.div
                   transition={panelTransition}
-                  className="relative max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[32px] bg-background shadow-[0_34px_90px_-24px_hsl(var(--foreground)/0.45)] ring-1 ring-border/15"
+                  className="relative max-h-[calc(100dvh-var(--kb,0px)-1.5rem)] overflow-hidden rounded-[32px] bg-background shadow-[0_34px_90px_-24px_hsl(var(--foreground)/0.45)] ring-1 ring-border/15"
                 >
                   {/* Soft gradient sheen */}
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--foreground)/0.10),transparent_42%)]" />
