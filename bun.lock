@@ -53,6 +53,7 @@
         "@tanstack/react-virtual": "^3.13.12",
         "@types/dompurify": "^3.0.5",
         "aelixto-gam-native": "./capacitor-plugins/gam-native",
+        "aelixto-window-insets": "./capacitor-plugins/window-insets",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "cmdk": "^1.1.1",
@@ -761,6 +762,8 @@
     "acorn-jsx": ["acorn-jsx@5.3.2", "", { "peerDependencies": { "acorn": "^6.0.0 || ^7.0.0 || ^8.0.0" } }, "sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ=="],
 
     "aelixto-gam-native": ["aelixto-gam-native@file:capacitor-plugins/gam-native", { "devDependencies": { "@capacitor/core": "^7.0.0", "typescript": "^5.3.0" }, "peerDependencies": { "@capacitor/core": "^7.0.0" } }],
+
+    "aelixto-window-insets": ["aelixto-window-insets@file:capacitor-plugins/window-insets", { "peerDependencies": { "@capacitor/core": ">=7.0.0" } }],
 
     "ajv": ["ajv@6.12.6", "", { "dependencies": { "fast-deep-equal": "^3.1.1", "fast-json-stable-stringify": "^2.0.0", "json-schema-traverse": "^0.4.1", "uri-js": "^4.2.2" } }, "sha512-j3fVLgvTo527anyYyJOGTYJbG+vnnQYvE0m5mmkc1TK+nxAppkCLMIL0aZ4dblVCNoGShhm+kzE4ZUykBoMg4g=="],
 
