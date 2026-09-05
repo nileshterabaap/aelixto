@@ -26,6 +26,33 @@ import { Capacitor } from '@capacitor/core';
 const DEBUG_KEY = 'aelixto:kbdebug';
 let lastReported = 0;
 
+// Native inset owner (Android, aelixto-window-insets). In `overlay` mode the
+// WebView is NOT resized for the keyboard and these numbers are what --kb is
+// derived from: keyboard band minus the nav-bar band it overlaps.
+type NativeInsets = { mode: 'resize' | 'overlay'; imeBottom: number; barsBottom: number; paddingBottom: number; passthrough: boolean; webViewMajor: number };
+let native: NativeInsets | null = null;
+let nativeMode: 'resize' | 'overlay' = 'resize';
+let reapply: () => void = () => {};
+
+const isAndroidNative = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+
+/**
+ * Switch the native keyboard model. `overlay` keeps the WebView at full
+ * height while the keyboard is up (no page relayout); `resize` is the default
+ * where the WebView shrinks and layouts sit on its bottom edge.
+ */
+export async function setKeyboardOverlayMode(on: boolean) {
+  if (!isAndroidNative()) return;
+  nativeMode = on ? 'overlay' : 'resize';
+  reapply();
+  try {
+    const { WindowInsetsOwner } = await import('aelixto-window-insets');
+    await WindowInsetsOwner.setMode({ mode: nativeMode });
+  } catch (error) {
+    console.warn('[keyboard] WindowInsetsOwner.setMode unavailable', error);
+  }
+}
+
 function set(px: number, open = px > 0) {
   const root = document.documentElement;
   const value = Math.max(0, Math.round(px));
