@@ -88,13 +88,28 @@ export function initKeyboardInsets() {
       // Stateless third signal: an editable is focused AND the WebView is far
       // shorter than the physical screen. Can't be poisoned by event order.
       const focusedShort = editableFocused() && h < (window.screen?.height ?? Infinity) * 0.75;
-      const open = shrunk || pluginOpen || focusedShort;
-      // WebView absorbed the keyboard -> nothing to compensate. Only when it
-      // did NOT shrink (rare WebView builds) do we use the plugin height.
-      const kb = shrunk || focusedShort ? 0 : pluginOpen ? Math.min(lastReported, h * 0.7) : 0;
+
+      // Overlay mode (native owner keeps the WebView full height): the exact
+      // uncovered band is keyboard minus the nav bar it sits on top of.
+      const overlayKb = nativeMode === 'overlay' && native
+        ? Math.max(0, native.imeBottom - native.barsBottom)
+        : 0;
+
+      const open = shrunk || pluginOpen || focusedShort || overlayKb > 0;
+      let kb = 0;
+      if (shrunk || focusedShort) {
+        // WebView absorbed the keyboard -> nothing to compensate.
+        kb = 0;
+      } else if (nativeMode === 'overlay') {
+        kb = overlayKb;
+      } else if (pluginOpen) {
+        // Rare WebView builds that never resize: fall back to the plugin height.
+        kb = Math.min(lastReported, h * 0.7);
+      }
       set(kb, open);
       if (!open) baseline = Math.max(baseline, h);
     };
+    reapply = apply;
 
     // Plugin-independent detection: the WebView resizing IS the keyboard.
     window.addEventListener('resize', () => {
@@ -107,6 +122,25 @@ export function initKeyboardInsets() {
     const onFocusChange = () => { apply(); window.setTimeout(apply, 100); window.setTimeout(apply, 300); };
     document.addEventListener('focusin', onFocusChange);
     document.addEventListener('focusout', onFocusChange);
+
+    // Exact numbers from the native inset owner (Android only).
+    if (isAndroidNative()) {
+      void (async () => {
+        try {
+          const { WindowInsetsOwner } = await import('aelixto-window-insets');
+          const onInsets = (state: NativeInsets) => {
+            native = state;
+            nativeMode = state.mode;
+            apply();
+          };
+          await WindowInsetsOwner.addListener('insets', onInsets);
+          onInsets(await WindowInsetsOwner.getState());
+        } catch (error) {
+          console.warn('[keyboard] WindowInsetsOwner unavailable (run npx cap sync android)', error);
+        }
+      })();
+    }
+
 
     void (async () => {
       try {
