@@ -10,6 +10,7 @@ import { useCreatePost } from "@/hooks/usePosts";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { ImageUploadButton } from "@/components/ImageUploadButton";
 import { supabase } from "@/integrations/supabase/client";
+import { setKeyboardOverlayMode } from "@/lib/keyboardInsets";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
 import {
   extractRootDomain,
