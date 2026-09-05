@@ -18,8 +18,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 import { SwipeableView } from "@/components/SwipeableView";
 import { markScrolledPast, reorderBySlowness, subscribeEmbedReadiness } from "@/lib/embedReadiness";
-import { useFeedWithAds } from "@/hooks/useFeedWithAds";
-import { NativeFeedAd } from "@/components/ads/NativeFeedAd";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -224,9 +222,6 @@ const Index = () => {
     useMemo(() => displayPosts.map((p) => p.id), [displayPosts])
   );
 
-  // Interleave native ads after every N posts (only for eligible native users).
-  const feedWithAds = useFeedWithAds(displayPosts as Array<{ id: string } & Record<string, any>>);
-
   useEffect(() => {
     if (!sessionLoading && !user && !isDemoMode) {
       navigate("/auth");
@@ -246,26 +241,11 @@ const Index = () => {
   }, [allPosts.length, queryClient, seenFeedStorageKey, user?.id]);
 
   const handleRefresh = useCallback(async () => {
-    // Collapse the infinite feed back to a single page first. Otherwise every
-    // loaded page is refetched sequentially on refresh, which is what makes the
-    // spinner feel "stuck" after the user has scrolled a while.
-    if (!showDemoFeed) {
-      queryClient.setQueryData(["following-feed"], (old: any) =>
-        old?.pages?.length > 1
-          ? { pages: old.pages.slice(0, 1), pageParams: old.pageParams.slice(0, 1) }
-          : old,
-      );
-    }
-
-    // Only await the primary list; secondary counters refresh in the background
-    // so the indicator never waits on them.
-    queryClient.invalidateQueries({ queryKey: ["my-following-count", user?.id] });
-    queryClient.invalidateQueries({ queryKey: ["has-seen-any-posts", user?.id] });
-
-    await queryClient.refetchQueries({
-      queryKey: showDemoFeed ? ["posts"] : ["following-feed"],
-      type: "active",
-    });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: showDemoFeed ? ["posts"] : ["following-feed"] }),
+      queryClient.invalidateQueries({ queryKey: ["my-following-count", user?.id] }),
+      queryClient.invalidateQueries({ queryKey: ["has-seen-any-posts", user?.id] }),
+    ]);
   }, [queryClient, showDemoFeed, user?.id]);
 
   // Data-friendly invisible pagination: load the next page only when the
@@ -303,7 +283,7 @@ const Index = () => {
   if (shouldShowSkeleton || shouldWaitForEmptyState) {
     return (
       <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
-        <div className="screen-nav bg-background">
+        <div className="min-h-screen bg-background pb-20">
           <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
           <main className="mx-auto max-w-2xl px-4 py-6">
             <div className="space-y-4">
@@ -319,7 +299,7 @@ const Index = () => {
 
   return (
     <SwipeableView leftRoute="/saved" rightRoute="/messages" leftLabel="Saved" rightLabel="Messages">
-      <div className="screen-nav bg-background">
+      <div className="min-h-screen bg-background pb-20">
         <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
 
       <PullToRefresh onRefresh={handleRefresh}>
@@ -359,33 +339,26 @@ const Index = () => {
             )
           ) : (
             <div className="space-y-6">
-              {feedWithAds.map((item) => {
-                if (item.kind === 'ad') {
-                  return <NativeFeedAd key={`ad-${item.slotIndex}`} />;
-                }
-                const post = item.post as any;
-                const index = item.slotIndex;
-                return (
-                  <div
-                    key={post.id}
-                    ref={(el) => {
-                      registerItem(post.id)(el);
-                      if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
-                      if (el) observeForPast(el);
-                      if (index === prefetchTriggerIndex) {
-                        prefetchSentinelRef.current = el;
-                      }
-                    }}
-                    data-feed-item-id={post.id}
-                  >
-                    <FeedPost
-                      post={post}
-                      userId={user?.id}
-                      startHydrated={index < 4}
-                    />
-                  </div>
-                );
-              })}
+              {displayPosts.map((post, index) => (
+                <div 
+                  key={post.id} 
+                  ref={(el) => {
+                    registerItem(post.id)(el);
+                    if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
+                    if (el) observeForPast(el);
+                    if (index === prefetchTriggerIndex) {
+                      prefetchSentinelRef.current = el;
+                    }
+                  }}
+                  data-feed-item-id={post.id}
+                >
+                  <FeedPost 
+                    post={post} 
+                    userId={user?.id} 
+                    startHydrated={index < 4}
+                  />
+                </div>
+              ))}
               {/* No visible loader — pagination happens silently far before
                   the user reaches the end. */}
               {/* All caught up message */}

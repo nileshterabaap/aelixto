@@ -223,7 +223,17 @@ export const useConversations = () => {
         return bTime - aTime;
       });
 
-      // Render immediately — avatars warm up in the background (no blocking wait)
+      // Preload avatars so they appear together with the list (avoid pop-in)
+      const avatarUrls = conversationsWithDetails
+        .map(c => c.other_user.avatar_url)
+        .filter((u): u is string => !!u);
+      if (avatarUrls.length > 0) {
+        await Promise.race([
+          Promise.all(avatarUrls.map(u => preloadImageWithPromise(u))),
+          new Promise<void>(resolve => setTimeout(resolve, 1200)),
+        ]);
+      }
+
       setConversations(conversationsWithDetails);
       if (cacheKey) {
         try {
@@ -232,11 +242,6 @@ export const useConversations = () => {
           /* quota exceeded - ignore */
         }
       }
-
-      conversationsWithDetails
-        .map(c => c.other_user.avatar_url)
-        .filter((u): u is string => !!u)
-        .forEach(u => { void preloadImageWithPromise(u); });
     } catch (error) {
       console.error('Error fetching conversations:', error);
     } finally {
@@ -244,35 +249,5 @@ export const useConversations = () => {
     }
   };
 
-  const deleteConversation = async (conversationId: string) => {
-    setConversations(prev => {
-      const next = prev.filter(c => c.id !== conversationId);
-      if (cacheKey) {
-        try {
-          window.localStorage.setItem(cacheKey, JSON.stringify(next));
-        } catch {
-          /* quota exceeded - ignore */
-        }
-      }
-      return next;
-    });
-
-    const { error } = await supabase.rpc('delete_conversation', {
-      _conversation_id: conversationId,
-    });
-
-    if (error) {
-      console.error('Error deleting conversation:', error);
-      fetchConversations();
-      throw error;
-    }
-
-    try {
-      window.localStorage.removeItem(`aelixto-messages-${conversationId}`);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  return { conversations, loading, refetch: fetchConversations, deleteConversation };
+  return { conversations, loading, refetch: fetchConversations };
 };

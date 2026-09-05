@@ -10,7 +10,6 @@ import { useCreatePost } from "@/hooks/usePosts";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { ImageUploadButton } from "@/components/ImageUploadButton";
 import { supabase } from "@/integrations/supabase/client";
-import { setKeyboardOverlayMode } from "@/lib/keyboardInsets";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
 import {
   extractRootDomain,
@@ -27,20 +26,6 @@ import { getThumbnailText } from "@/lib/getThumbnailText";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 
 const isYouTubeShortUrl = (url: string) => decodeURIComponent(url).toLowerCase().includes('/shorts/');
-
-// Extract the first http(s) URL from a pasted string (which may include
-// share-sheet text like "Answer to ... by X https://...?ch=...").
-const extractUrlFromText = (raw: string): string => {
-  if (!raw) return raw;
-  const trimmed = raw.trim();
-  const match = trimmed.match(/https?:\/\/[^\s<>"']+/i);
-  if (match) return match[0].replace(/[.,;:!?)\]]+$/, '');
-  // No protocol found — take the first whitespace-delimited token and
-  // add https:// if it looks like a domain.
-  const first = trimmed.split(/\s+/)[0];
-  if (/^[a-z0-9-]+\.[a-z]{2,}/i.test(first)) return `https://${first}`;
-  return trimmed;
-};
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -64,15 +49,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
   const { uploadImage, uploading: uploadingThumbnail } = useImageUpload();
-  const {
-    reached: limitReached,
-    remaining,
-    limit,
-    increment: incrementDailyCount,
-    isUnlimited,
-    resetCountdown,
-    resetLabel,
-  } = useDailyPostLimit();
+  const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
   // Height measured offscreen at create-time so the very first viewer
   // (including the creator) opens the card at its real size — no blank space.
   const measuredHeightRef = useRef<number | null>(null);
@@ -97,32 +74,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   }, [open, initialDraft]);
 
   const handleLinkSubmit = async () => {
-    if (!linkUrl.trim()) return;
-    let resolvedUrl = linkUrl.trim();
-    // LinkedIn now shares posts as lnkd.in short links. Expand them to the real
-    // linkedin.com/posts/... URL so the post is classified + embedded as LinkedIn
-    // instead of falling through to Article/External.
-    if (/^https?:\/\/(www\.)?lnkd\.in\//i.test(resolvedUrl)) {
-      try {
-        setIsLoadingPreview(true);
-        const { data } = await supabase.functions.invoke('expand-url', {
-          body: { url: resolvedUrl },
-        });
-        const finalUrl = typeof data?.finalUrl === 'string' ? data.finalUrl : '';
-        if (finalUrl && finalUrl.toLowerCase().includes('linkedin.com')) {
-          resolvedUrl = finalUrl.split('?')[0];
-          setLinkUrl(resolvedUrl);
-        }
-      } catch (e) {
-        console.warn('[CreatePostDialog] lnkd.in expansion failed:', e);
-      } finally {
-        setIsLoadingPreview(false);
-      }
-    }
-    return processLinkSubmit(resolvedUrl);
-  };
-
-  const processLinkSubmit = async (linkUrl: string) => {
     if (!linkUrl.trim()) return;
     fetchedPreviewTextRef.current = null;
     measuredHeightRef.current = null;
@@ -367,22 +318,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
         console.error('[CreatePostDialog] oEmbed fetch failed:', error);
       }
 
-      // Threads' og:image is the author's profile picture, never the post's
-      // own media. Drop it so the typographic text card renders instead
-      // (matches X / Reddit behavior).
-      {
-        const lowerLink = linkUrl.toLowerCase();
-        const isThreadsLink = lowerLink.includes('threads.net') || lowerLink.includes('threads.com');
-        if (isThreadsLink && thumbnail) {
-          const t = thumbnail.toLowerCase();
-          const isMetaAvatar =
-            t.includes('profile_pic') ||
-            /\/t\d+\.[\d-]*-19\//.test(t) ||
-            /[?&]stp=[^&]*_19/.test(t);
-          if (isMetaAvatar) thumbnail = "";
-        }
-      }
-
       setThumbnailUrl(thumbnail);
       setTitle(videoTitle);
 
@@ -496,9 +431,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     if (!linkUrl.trim()) return;
 
     if (limitReached) {
-      toast.error(`Your daily slots reset in ${resetCountdown}`, {
-        description: resetLabel,
-      });
+      toast.error(`You've reached your ${limit} post limit for today. Resets at midnight.`);
       return;
     }
 
@@ -657,26 +590,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setShowThumbnailInput(false);
   };
 
-  // Android: while the box is open the keyboard OVERLAYS the page instead of
-  // resizing the WebView. A WebView resize relayouts the whole embed-heavy
-  // feed and re-fires every IntersectionObserver (media suspend/pre-warm
-  // swaps) — that relayout, landing ~0.5–1s after the close tap when the
-  // keyboard had finished hiding, was the "screen lock + flicker". In overlay
-  // mode nothing underneath ever changes size.
-  useEffect(() => {
-    if (!open) return;
-    void setKeyboardOverlayMode(true);
-    return () => {
-      // Hand ownership back only once the keyboard is gone; switching while it
-      // is still visible would itself trigger the resize we are avoiding.
-      window.setTimeout(() => { void setKeyboardOverlayMode(false); }, 450);
-    };
-  }, [open]);
-
   const handleClose = () => {
-    // Drop the soft keyboard NOW, together with the backdrop fade, so the IME
-    // hide runs alongside the exit animation instead of after it.
-    (document.activeElement as HTMLElement | null)?.blur?.();
     setStep(1);
     setLinkUrl("");
     setThumbnailUrl("");
@@ -703,60 +617,34 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const panelTransition = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.82 };
 
   return (
-    // modal={false}: Radix's modal mode locks body scroll, sets
-    // `pointer-events:none` on <body> and aria-hides every sibling; all of that
-    // is torn down only after the exit animation finishes — ~0.5–1s after the
-    // close tap — which forces a full relayout of the embed-heavy feed on the
-    // Android WebView and shows as a one-frame flicker. Non-modal skips those
-    // body/tree mutations entirely; our own backdrop blocks interaction and
-    // taps on it still dismiss via Radix's outside-press handling.
-    <DialogPrimitive.Root open={open} onOpenChange={handleClose} modal={false}>
+    <DialogPrimitive.Root open={open} onOpenChange={handleClose}>
       <AnimatePresence>
         {open && (
           <DialogPrimitive.Portal forceMount>
-            {/* Backdrop (plain tint — no backdrop-filter, see above) */}
-            <motion.div
-              aria-hidden
-              className="fixed inset-0 z-50 bg-foreground/55 touch-none"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              style={{ willChange: "opacity", backfaceVisibility: "hidden" }}
-            />
+            {/* Blurred backdrop */}
+            <DialogPrimitive.Overlay asChild forceMount>
+              <motion.div
+                className="fixed inset-0 z-50 bg-foreground/45"
+                initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                animate={{ opacity: 1, backdropFilter: "blur(9px)" }}
+                exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              />
+            </DialogPrimitive.Overlay>
 
             {/* Centered card with viewport-safe sizing */}
-            <DialogPrimitive.Content
-              asChild
-              forceMount
-              aria-describedby={undefined}
-              // Don't hand focus back to the FAB when the box unmounts — on the
-              // WebView that late focus() is another relayout trigger.
-              onCloseAutoFocus={(e) => e.preventDefault()}
-            >
+            <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
               <motion.div
-                className="fixed left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none transition-[top] duration-200 ease-out"
-                initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)" }}
-                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
-                // Short, non-spring exit: a spring "settles" for close to a
-                // second, which is exactly how long the box (and anything it
-                // tears down) lingered after the tap.
-                exit={{
-                  opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)",
-                  transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] },
-                }}
+                className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none"
+                initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)", filter: "blur(10px)" }}
+                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%", filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)", filter: "blur(8px)" }}
                 transition={panelTransition}
-                style={{
-                  // Centre inside the part of the screen the keyboard does not
-                  // cover (--kb is 0 whenever the viewport itself shrank).
-                  top: "calc((100dvh - var(--kb, 0px)) / 2)",
-                  transformOrigin: "50% calc(100% + 120px)",
-                  willChange: "transform, opacity",
-                }}
+                style={{ transformOrigin: "50% calc(100% + 120px)" }}
               >
                 <motion.div
                   transition={panelTransition}
-                  className="relative max-h-[calc(100dvh-var(--kb,0px)-1.5rem)] overflow-hidden rounded-[32px] bg-background shadow-[0_34px_90px_-24px_hsl(var(--foreground)/0.45)] ring-1 ring-border/15"
+                  className="relative max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[32px] bg-background shadow-[0_34px_90px_-24px_hsl(var(--foreground)/0.45)] ring-1 ring-border/15"
                 >
                   {/* Soft gradient sheen */}
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--foreground)/0.10),transparent_42%)]" />
@@ -837,16 +725,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                               type="url"
                               placeholder=" "
                               value={linkUrl}
-                              onChange={(e) => {
-                                const raw = e.target.value;
-                                // If user pasted share text like
-                                // "Answer to ... by X https://quora.com/...",
-                                // auto-extract the URL so downstream logic
-                                // recognises the platform.
-                                const looksLikeText = /\s/.test(raw.trim()) || /^[A-Za-z]/.test(raw.trim());
-                                const cleaned = looksLikeText ? extractUrlFromText(raw) : raw;
-                                setLinkUrl(cleaned);
-                              }}
+                              onChange={(e) => setLinkUrl(e.target.value)}
                               className="mt-2 h-14 w-full rounded-[24px] border border-input bg-background px-4 text-base outline-none shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04),0_0_0_4px_hsl(var(--muted)/0.75)] transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04),0_0_0_5px_hsl(var(--foreground)/0.06)]"
                             />
                           </div>
@@ -984,26 +863,19 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                                   <Check className="mr-1.5 h-5 w-5" /> Posted
                                 </motion.span>
                               ) : limitReached ? (
-                                "Daily slots used"
+                                "Daily limit reached"
                               ) : (
                                 "Post"
                               )}
                             </Button>
                           </motion.div>
                           {limitReached ? (
-                            <div className="text-center">
-                              <p className="text-xs text-muted-foreground">
-                                Your daily slots reset in {resetCountdown}
-                              </p>
-                              <p className="mt-0.5 text-[10px] text-muted-foreground/70">
-                                {resetLabel}
-                              </p>
-                            </div>
+                            <p className="text-center text-xs text-muted-foreground">
+                              You've reached your {limit} post limit for today. Resets at midnight.
+                            </p>
                           ) : (
                             <p className="text-center text-xs text-muted-foreground">
-                              {isUnlimited
-                                ? "Unlimited slots"
-                                : `${remaining} of ${limit} slots remaining today`}
+                              {remaining} of {limit} posts remaining today
                             </p>
                           )}
                           <motion.div whileTap={{ scale: 0.98 }}>

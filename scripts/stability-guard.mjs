@@ -28,9 +28,7 @@ const writeJson = (filePath, value) => {
 
 const getAbsolutePath = (relativePath) => path.join(PROJECT_ROOT, relativePath);
 
-// Normalize CRLF → LF so Windows checkouts hash identically to the LF baseline.
-const readTextFile = (relativePath) =>
-  fs.readFileSync(getAbsolutePath(relativePath), 'utf8').replace(/\r\n/g, '\n');
+const readTextFile = (relativePath) => fs.readFileSync(getAbsolutePath(relativePath), 'utf8');
 
 const ensureLockFile = () => {
   if (!fs.existsSync(LOCK_FILE)) {

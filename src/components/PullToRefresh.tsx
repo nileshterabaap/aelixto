@@ -10,16 +10,6 @@ interface PullToRefreshProps {
 const THRESHOLD = 55;
 const MAX_PULL = 100;
 const LOADING_REST = 45;
-// Never let the spinner hang: if a refresh takes longer than this, we release
-// the indicator and let the data land whenever it lands.
-const MAX_SPINNER_MS = 5000;
-
-// Allows other UI (e.g. tapping the Home tab while already at the top of the
-// feed) to trigger the same refresh + spinner as a manual pull.
-export const FEED_REFRESH_EVENT = "aelixto:feed-refresh";
-export const triggerFeedRefresh = () => {
-  window.dispatchEvent(new CustomEvent(FEED_REFRESH_EVENT));
-};
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -118,10 +108,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
 
         void (async () => {
           try {
-            await Promise.race([
-              Promise.resolve(onRefresh()).catch(() => undefined),
-              new Promise((resolve) => setTimeout(resolve, MAX_SPINNER_MS)),
-            ]);
+            await onRefresh();
           } finally {
             setRefreshing(false);
             animate(pullY, 0, { type: "spring", stiffness: 250, damping: 28 });
@@ -151,28 +138,6 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       document.body.classList.remove("at-scroll-top");
     };
   }, [isAtTop, onRefresh, pullY, refreshing]);
-
-  // Programmatic refresh (Home tab tap at top of feed)
-  useEffect(() => {
-    const handleExternalRefresh = () => {
-      if (refreshing) return;
-      animate(pullY, LOADING_REST, { type: "spring", stiffness: 200, damping: 25 });
-      setRefreshing(true);
-      void (async () => {
-        try {
-          await Promise.race([
-            Promise.resolve(onRefresh()).catch(() => undefined),
-            new Promise((resolve) => setTimeout(resolve, MAX_SPINNER_MS)),
-          ]);
-        } finally {
-          setRefreshing(false);
-          animate(pullY, 0, { type: "spring", stiffness: 250, damping: 28 });
-        }
-      })();
-    };
-    window.addEventListener(FEED_REFRESH_EVENT, handleExternalRefresh);
-    return () => window.removeEventListener(FEED_REFRESH_EVENT, handleExternalRefresh);
-  }, [onRefresh, pullY, refreshing]);
 
   return (
     <div

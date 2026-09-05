@@ -58,16 +58,6 @@ All colors MUST be HSL.
     --thumb-gradient-article: linear-gradient(135deg, hsl(158 64% 26%), hsl(173 80% 36%));
     --thumb-gradient-external: linear-gradient(135deg, hsl(215 25% 27%), hsl(215 16% 47%));
 
-    /* Device safe-area insets. On iOS/web these come straight from the OS;
-       on Android the SafeArea plugin makes env() report real values while the
-       app runs edge-to-edge. Everything that touches a screen edge reads these. */
-    /* Soft-keyboard height, maintained by initKeyboardInsets(). */
-    --kb: 0px;
-    --safe-top: env(safe-area-inset-top, 0px);
-    --safe-bottom: env(safe-area-inset-bottom, 0px);
-    --safe-left: env(safe-area-inset-left, 0px);
-    --safe-right: env(safe-area-inset-right, 0px);
-
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -260,25 +250,13 @@ span[data-pin-href] button {
   100% { transform: scale(1); }
 }
 
-/* Global press feedback for all interactive elements — a smooth, immediate
-   press-in while held, with a soft spring release. */
-button,
-[role="button"],
-a,
-.tap-press {
-  -webkit-tap-highlight-color: transparent;
-  transition: transform 220ms cubic-bezier(0.34, 1.4, 0.64, 1),
-              opacity 220ms cubic-bezier(0.34, 1.4, 0.64, 1);
-}
+/* Global tap bounce for all interactive elements */
 button:active:not(:disabled),
 [role="button"]:active:not(:disabled),
-a:active:not(:disabled),
-.tap-press:active:not(:disabled) {
-  transform: scale(0.96);
-  opacity: 0.88;
-  transition: transform 70ms ease-out, opacity 70ms ease-out;
+a:active:not(:disabled) {
+  animation: tap-bounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  -webkit-tap-highlight-color: transparent;
 }
-
 
 /* Press-in tap: element stays visibly pressed while held, then releases.
    Use on grid thumbnails and message rows instead of the bouncy tap. */
@@ -306,106 +284,12 @@ a:active:not(:disabled),
    (including over YouTube/Instagram/Twitter embeds). Once the user
    scrolls down at all, this class is removed and iframes become
    interactive again. */
-body.at-scroll-top iframe:not([src*="threads."]) {
+body.at-scroll-top iframe {
   pointer-events: none !important;
 }
-
-/* X (Twitter) only: the widget iframe must stay tappable at scroll-top,
-   otherwise the first taps on the native player are swallowed by the
-   Pull-to-Refresh iframe lock above. */
-body.at-scroll-top .twitter-embed-container iframe {
-  pointer-events: auto !important;
-}
-
-/* YouTube only: the player iframe must stay tappable at scroll-top, otherwise
-   taps on the native play button are swallowed by the Pull-to-Refresh iframe
-   lock above. Same tradeoff as X. */
-body.at-scroll-top iframe[src*="youtube.com"],
-body.at-scroll-top iframe[src*="youtube-nocookie.com"],
-body.at-scroll-top iframe[src*="youtu.be"] {
-  pointer-events: auto !important;
-}
-
-/* Spotify only: same tradeoff — the player iframe must stay tappable at
-   scroll-top so the first tap on the native play button isn't swallowed by
-   the Pull-to-Refresh iframe lock above. */
-body.at-scroll-top iframe[src*="open.spotify.com"],
-body.at-scroll-top iframe[src*="spotify.com/embed"] {
-  pointer-events: auto !important;
-}
-
-/* Reddit only: the embed iframe must stay tappable at scroll-top so the
-   "Read more" control isn't swallowed by the Pull-to-Refresh iframe lock. */
-body.at-scroll-top iframe[src*="redditmedia.com"],
-body.at-scroll-top iframe[src*="reddit.com"] {
-  pointer-events: auto !important;
-}
-
-/* Threads iframes stay interactive (tap-to-play), so a transparent catcher
-   layer above them lets Pull-to-Refresh see the touch while the page is at
-   scroll-top. It hands the tap straight back to the iframe on touchstart. */
-.threads-ptr-catcher {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  background: transparent;
-  pointer-events: none;
-}
-/* Never armed: an armed catcher swallowed the first tap on the native
-   Threads player in the feed. Same tradeoff as X — PTR from directly over a
-   Threads media area at scroll-top is given up in favour of first-tap play. */
 
 /* Disable the browser's native pull-to-refresh so our in-app PullToRefresh
    component owns the gesture on every page (especially short empty states). */
 html, body {
   overscroll-behavior-y: none;
-}
-
-/* Edge-to-edge safe-area helpers */
-.pt-safe { padding-top: var(--safe-top); }
-.pb-safe { padding-bottom: var(--safe-bottom); }
-.px-safe { padding-left: var(--safe-left); padding-right: var(--safe-right); }
-
-/* Single structural full-height page root.
-   `min-h-screen` resolves to 100vh, which on Android is the LARGE viewport
-   (system bars excluded) — full-height pages then overflow by the height of
-   the bars under edge-to-edge. 100dvh always matches what is actually
-   visible. `.screen-nav` additionally reserves the fixed bottom tab bar
-   (h-14 content + its own safe-bottom padding) so page content can never sit
-   underneath it, on gesture bars and 3-button bars alike. */
-.screen {
-  min-height: 100dvh;
-}
-.screen-nav {
-  min-height: 100dvh;
-  padding-bottom: calc(5rem + var(--safe-bottom));
-}
-
-
-/* While the soft keyboard is open the OS gesture/nav bar is covered by it, so
-   the bottom safe inset must collapse — otherwise composers sit too high. */
-html.kb-open {
-  --safe-bottom: 0px;
-}
-
-/* The tab bar is meaningless while typing (Instagram hides it too) and would
-   otherwise float on top of the keyboard. */
-html.kb-open nav.fixed.bottom-0 {
-  display: none;
-}
-
-/* Status-bar strip keeps the app background behind the system bars so the
-   webview drawing edge-to-edge never shows a transparent/black band. */
-body::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: var(--safe-top);
-  background: hsl(var(--background));
-  /* Below the sticky header (z-50) so it can never visually crop it; still
-     above ordinary page content. */
-  z-index: 45;
-  pointer-events: none;
 }
