@@ -9,6 +9,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.WebView;
 
+import androidx.activity.ComponentActivity;
 import androidx.activity.EdgeToEdge;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -81,7 +82,9 @@ public class WindowInsetsOwnerPlugin extends Plugin {
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         // (2) Edge-to-edge, exactly what the safe-area README asks MainActivity to do.
         try {
-            EdgeToEdge.enable(activity);
+            if (activity instanceof ComponentActivity) {
+                EdgeToEdge.enable((ComponentActivity) activity);
+            }
         } catch (Throwable t) {
             Log.w(TAG, "EdgeToEdge.enable failed; falling back to WindowCompat", t);
         }
