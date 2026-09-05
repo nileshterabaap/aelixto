@@ -220,11 +220,15 @@ function renderDebug() {
   const rect = composer?.getBoundingClientRect();
   const composerGap = rect ? Math.round(window.innerHeight - rect.bottom) : null;
   const composerPad = composer ? getComputedStyle(composer).paddingBottom : '-';
+  const nativeLine = native
+    ? `native ${native.mode} ime ${native.imeBottom} bars ${native.barsBottom} pad ${native.paddingBottom} wv ${native.webViewMajor}${native.passthrough ? ' pt' : ''}\n`
+    : `native owner: not installed\n`;
   debugEl.textContent =
     `DEBUG ONLY\n` +
     `innerH ${window.innerHeight}  vv ${Math.round(window.visualViewport?.height ?? 0)}\n` +
     `plugin ${lastReported}  --kb ${cs.getPropertyValue('--kb').trim()}\n` +
     `kb-open ${document.documentElement.classList.contains('kb-open')}\n` +
+    nativeLine +
     `--safe-bottom ${cs.getPropertyValue('--safe-bottom').trim()}\n` +
     `composer pad-b ${composerPad}  gap ${composerGap ?? '-'}px`;
 }
