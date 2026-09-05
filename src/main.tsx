@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { initCapacitorPlugins } from "./capacitor-init";
+import { initKeyboardInsets } from "./lib/keyboardInsets";
 import { supabase } from "./integrations/supabase/client";
 
 const unregisterAppServiceWorkers = async () => {
@@ -39,6 +40,7 @@ const dismissSplash = () => {
 };
 
 void unregisterAppServiceWorkers();
+initKeyboardInsets();
 
 createRoot(document.getElementById("root")!).render(<App />);
 

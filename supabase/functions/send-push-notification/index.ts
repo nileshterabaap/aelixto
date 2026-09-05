@@ -274,11 +274,15 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth: only the service role (used by DB triggers) may invoke this function.
+    // Auth: only the service role or the DB trigger shared secret may invoke this.
     const authHeader = req.headers.get("Authorization") || "";
     const token = authHeader.replace(/^Bearer\s+/i, "");
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    if (!token || !serviceKey || token !== serviceKey) {
+    const triggerSecret = Deno.env.get("PUSH_TRIGGER_SECRET") ?? "";
+    const providedSecret = req.headers.get("x-push-secret") || "";
+    const okServiceRole = !!token && !!serviceKey && token === serviceKey;
+    const okTrigger = !!providedSecret && !!triggerSecret && providedSecret === triggerSecret;
+    if (!okServiceRole && !okTrigger) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } },

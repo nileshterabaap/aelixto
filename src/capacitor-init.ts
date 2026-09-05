@@ -1,8 +1,52 @@
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
+import { initAdsAndConsent } from "@/lib/adConsent";
 
 export async function initCapacitorPlugins() {
   if (!Capacitor.isNativePlatform()) return;
+
+  // Runtime proof of exactly what Android is executing. A bundled Capacitor
+  // app uses the local Capacitor origin (normally http://localhost); an https
+  // URL here proves that a remote server is being loaded instead. The marker
+  // also proves that this specific JS bundle reached the device.
+  const bundleMarker = "aelixto-bundle-2026-08-04-1";
+  const entryScript = Array.from(document.scripts)
+    .map((script) => script.src)
+    .find((src) => src.includes("/assets/")) ?? "not-found";
+  try {
+    const { App } = await import("@capacitor/app");
+    const appInfo = await App.getInfo();
+    console.log(
+      `[bundle] runtime marker=${bundleMarker} origin=${window.location.origin} entry=${entryScript} appVersion=${appInfo.version} appBuild=${appInfo.build}`,
+    );
+  } catch (error) {
+    console.warn("[bundle] runtime diagnostic failed", {
+      marker: bundleMarker,
+      href: window.location.href,
+      origin: window.location.origin,
+      entryScript,
+      error,
+    });
+  }
+
+  // Which native plugins the running APK actually has compiled in. If a plugin
+  // shows `false` here, the JS bundle is fine but `npx cap sync android` was
+  // never run (or the Gradle module was not picked up) — that single fact
+  // explains native Google sign-in falling back to Chrome AND no native ads.
+  try {
+    // Logcat flattens objects to "[object Object]", so log flat strings only.
+    const socialLogin = Capacitor.isPluginAvailable("SocialLogin");
+    const gamNative = Capacitor.isPluginAvailable("GamNative");
+    const push = Capacitor.isPluginAvailable("PushNotifications");
+    console.log(
+      `[plugins] available SocialLogin=${socialLogin} GamNative=${gamNative} PushNotifications=${push}`,
+    );
+    console.log(`[plugins] isWebView=${/;\s*wv/i.test(navigator.userAgent)}`);
+    console.log(`[plugins] userAgent=${navigator.userAgent}`);
+    console.log(`[plugins] allPlugins=${Object.keys((window as unknown as { Capacitor?: { Plugins?: Record<string, unknown> } }).Capacitor?.Plugins ?? {}).join(",")}`);
+  } catch (error) {
+    console.warn("[plugins] availability probe failed", error);
+  }
 
   const openNativeExternal = async (url: string) => {
     try {
@@ -83,20 +127,27 @@ export async function initCapacitorPlugins() {
     true,
   );
 
+  // Edge-to-edge + correct safe-area insets on every device.
+  //
+  // @capacitor-community/safe-area is the SINGLE source of truth for system
+  // insets. It enables itself automatically and, depending on the device's
+  // Chromium version, either (a) lets env(safe-area-inset-*) report real
+  // values (Chromium >= 140) or (b) pads the webview natively and reports 0px
+  // (older WebViews, where env() is broken). Either way the app's --safe-*
+  // variables resolve to exactly the space it must reserve — never twice.
+  //
+  // @capacitor/status-bar is deliberately NOT used here: its
+  // setOverlaysWebView() drives edge-to-edge independently, which on older
+  // WebViews produced "behind the bars, no padding, env() == 0" — the clipped
+  // header/nav seen on some Play Store devices.
   try {
-    const { StatusBar, Style } = await import("@capacitor/status-bar");
-    // Webview should NOT draw under the status bar — the OS reserves that space
-    // and paints it with our backgroundColor below. This avoids the giant gap
-    // we'd otherwise need to compensate for in CSS via env(safe-area-inset-top).
-    await StatusBar.setOverlaysWebView({ overlay: false });
-    // Style.Light = light status-bar (white bg) with DARK icons/text.
-    // (Capacitor's naming is the opposite of what you'd expect — Style.Dark
-    // actually produces a dark bar with light icons.)
-    await StatusBar.setStyle({ style: Style.Light });
-    await StatusBar.setBackgroundColor({ color: "#FFFFFF" });
+    const { SafeArea, SystemBarsStyle } = await import("@capacitor-community/safe-area");
+    // LIGHT = dark icons/content on our white background (both bars).
+    await SafeArea.setSystemBarsStyle({ style: SystemBarsStyle.Light });
   } catch (e) {
-    console.warn("StatusBar plugin not available", e);
+    console.warn("SafeArea plugin not available", e);
   }
+
 
   try {
     const { SplashScreen } = await import("@capacitor/splash-screen");
@@ -147,12 +198,20 @@ export async function initCapacitorPlugins() {
           /* ignore — tab may already be closed */
         }
 
+        let sessionApplied = false;
         if (access_token && refresh_token) {
-          await supabase.auth.setSession({ access_token, refresh_token });
+          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+          sessionApplied = !error;
         }
 
-        // Land the user on home regardless.
-        if (window.location.pathname !== "/") {
+        if (window.location.pathname === "/") return;
+
+        if (sessionApplied) {
+          // Soft client-side navigation — React Router picks this up via
+          // popstate, so the app continues instantly with no reload/splash.
+          window.history.replaceState({}, "", "/");
+          window.dispatchEvent(new PopStateEvent("popstate"));
+        } else {
           window.location.replace("/");
         }
       } catch (e) {
@@ -229,4 +288,11 @@ export async function initCapacitorPlugins() {
     }, 2000);
   };
   initPushDetached();
+
+  // Fire-and-forget: consent + Google Mobile Ads SDK init. Runs after boot
+  // so it never blocks first paint. Ads only ever render inside the feed
+  // once this resolves AND install age is >= 48h AND the user is signed in.
+  setTimeout(() => {
+    void initAdsAndConsent();
+  }, 3000);
 }

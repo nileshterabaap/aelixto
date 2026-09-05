@@ -218,7 +218,7 @@ export const SwipeableView = ({
   const showRightShadow = activeDirection === "left" && translateX < 0;
 
   return (
-    <div ref={containerRef} className="relative min-h-screen overflow-x-hidden">
+    <div ref={containerRef} className="relative screen overflow-x-hidden">
       {/* Left edge shadow + label (swiping right to reveal Saved) */}
       {showLeftShadow && (
         <div
@@ -273,7 +273,7 @@ export const SwipeableView = ({
 
       {/* Main content with transform */}
       <div
-        className="min-h-screen"
+        className="screen"
         style={{
           transform: translateX !== 0 ? `translateX(${translateX}px)` : undefined,
           transition: isAnimating

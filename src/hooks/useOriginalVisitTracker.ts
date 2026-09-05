@@ -34,12 +34,17 @@ export function useOriginalVisitTracker(
   const recentPointerRef = useRef(0);
   const lastIframeInteractionRef = useRef(0);
   const originalDwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks whether the most recent pointerdown landed on an outbound anchor
+  // (article/link-card CTA). Used to stop non-playable posts from inferring a
+  // "visited the original" event from an unrelated body tap + app background.
+  const recentAnchorPointerRef = useRef(0);
 
   useEffect(() => {
     firedRef.current = false;
     playFiredRef.current = false;
     recentPointerRef.current = 0;
     lastIframeInteractionRef.current = 0;
+    recentAnchorPointerRef.current = 0;
     if (originalDwellTimerRef.current) {
       clearTimeout(originalDwellTimerRef.current);
       originalDwellTimerRef.current = null;
@@ -127,6 +132,10 @@ export function useOriginalVisitTracker(
       const now = Date.now();
       recentPointerRef.current = now;
       const t = e.target as Element | null;
+      const anchorAtPointer = t?.closest?.('a[href]') as HTMLAnchorElement | null;
+      if (anchorAtPointer && !anchorAtPointer.href.startsWith('javascript:')) {
+        recentAnchorPointerRef.current = now;
+      }
       const path: string[] = [];
       let cur: Element | null = t;
       for (let i = 0; cur && i < 6; i++) {
@@ -165,28 +174,14 @@ export function useOriginalVisitTracker(
         // inflated Threads embed as a play interaction (+1 only).
         fireThreadsPlayOnce();
       } else if (trackPlayableInteraction && isThreadsPost()) {
-        // Threads is rendered as a direct cross-origin iframe. On some mobile
-        // browsers a pointerdown on the iframe surface reports the event target
-        // as an ancestor element (not the IFRAME itself), so isInsideIframe
-        // above misses it. Fall back to a hit-test against the Threads iframe's
-        // bounding rect using the pointer coordinates.
-        const pe = e as PointerEvent | TouchEvent;
-        let x: number | null = null;
-        let y: number | null = null;
-        if ('clientX' in pe && typeof (pe as PointerEvent).clientX === 'number') {
-          x = (pe as PointerEvent).clientX;
-          y = (pe as PointerEvent).clientY;
-        } else if ('touches' in pe && (pe as TouchEvent).touches?.[0]) {
-          x = (pe as TouchEvent).touches[0].clientX;
-          y = (pe as TouchEvent).touches[0].clientY;
-        }
-        const iframe = getThreadsIframe();
-        if (iframe && x !== null && y !== null) {
-          const r = iframe.getBoundingClientRect();
-          if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-            fireThreadsPlayOnce();
-          }
-        }
+        // Threads is rendered as a direct cross-origin iframe. On mobile the
+        // event target for a tap on the iframe surface is often reported as
+        // an ancestor element (not IFRAME), *and* body.at-scroll-top applies
+        // pointer-events:none to iframes so the tap can land on a plain div
+        // ancestor entirely. A hit-test against the iframe rect is fragile
+        // in both cases. Since this container only hosts one Threads post,
+        // any pointerdown that reaches this handler is an intent to play.
+        fireThreadsPlayOnce();
       }
     };
 
@@ -276,8 +271,15 @@ export function useOriginalVisitTracker(
       // never infer visit from an app-background here on playable posts.
       if (trackPlayableInteraction) return;
       const now = Date.now();
+      // Only credit a Visit when the backgrounding plausibly followed an
+      // outbound tap: an anchor/CTA pointerdown, or an iframe interaction.
+      // A bare body tap (scrolling, tapping the card, opening the app
+      // switcher) must NOT award a visit — that used to give article/quora
+      // posts a phantom +1 on top of the impression, and then the real
+      // "Continue Reading" tap scored nothing because the event was already
+      // consumed for that viewer.
       if (
-        now - recentPointerRef.current < 3000 ||
+        now - recentAnchorPointerRef.current < 3000 ||
         now - lastIframeInteractionRef.current < 10000
       ) {
         fireOriginal();
@@ -323,17 +325,16 @@ export function useOriginalVisitTracker(
       }
     };
 
+    // Cleanup list retained for API compatibility with the effect teardown.
+    // The Threads play signal now rides on the container-level `touchstart`
+    // capture listener wired below (see `el.addEventListener('touchstart',
+    // onPointerDown, { capture: true, passive: true })`). On mobile Chrome
+    // and iOS Safari a touch that lands on a cross-origin iframe still
+    // dispatches `touchstart` on the parent in the capture phase, so
+    // `fireThreadsPlayOnce()` runs on the very first tap without inserting
+    // any visual/interactive overlay above the Threads player. This removes
+    // the duplicate "custom" Play affordance while preserving video_play.
     const threadsCaptureCleanups: Array<() => void> = [];
-    const threadsCaptureAttached = new WeakSet<HTMLIFrameElement>();
-
-    const attachThreadsPlayCapture = (iframe: HTMLIFrameElement) => {
-      // Overlay capture disabled: it swallowed the first tap on the native
-      // Play button, so the video never actually started. We now let taps
-      // pass straight through to the iframe and rely on pointerdown /
-      // window.blur / iframe focus signals below to credit Play.
-      void iframe;
-      void threadsCaptureAttached;
-    };
 
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
       iframe.addEventListener('focus', handleIframeFocus);
@@ -344,7 +345,6 @@ export function useOriginalVisitTracker(
           // Cross-origin iframes may reject direct listener attachment.
         }
       }, { once: true });
-      attachThreadsPlayCapture(iframe);
       applyNavLockSandbox(iframe);
     };
 

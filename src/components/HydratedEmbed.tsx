@@ -1,17 +1,19 @@
 import { useState, memo, useCallback, useEffect, useRef, type MouseEvent } from 'react';
 import { useMediaPauseOnScroll } from '@/hooks/useMediaPauseOnScroll';
 import { useOriginalVisitTracker } from '@/hooks/useOriginalVisitTracker';
+
 import type { Post } from '@/data/demoData';
 import { supabase } from '@/integrations/supabase/client';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
-import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
+import { ThreadsAwareMetaEmbed as UniversalMetaEmbed } from '@/components/ThreadsAwareMetaEmbed';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
 import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
 import { openExternalUrl } from '@/lib/openExternalUrl';
+import { useHasPostBeenPlayed } from '@/lib/playedPosts';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -96,6 +98,7 @@ export const HydratedEmbed = memo(({
   const mediaUrl = post.mediaUrl || (post as any).media_url || r.url;
   const platformHint = (post.platform || '').toLowerCase();
   const mediaTypeHint = String((post as any).mediaType || (post as any).media_type || '').toLowerCase();
+  const mediaKindHint = String((post as any).media_kind || (post as any).mediaKind || '').toLowerCase();
   const lowerUrl = (mediaUrl || '').toLowerCase();
 
   const isPlayableMediaPost =
@@ -129,23 +132,70 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
 
+  const hasBeenPlayedEarly = useHasPostBeenPlayed(post.id);
+
   const mediaLifecycleEnabled =
     shouldHydrate &&
     (isPlayableMediaPost ||
+      hasBeenPlayedEarly ||
       r.kind === 'raw' ||
       r.kind === 'twitter' ||
       r.kind === 'universal' ||
       r.kind === 'pinterest');
 
+  // Hard-suspend + pre-warm only matters for VIDEO posts the user actually played.
+  // Images/text/never-played embeds just load normally and stay put (no reload traffic).
+  const isNonVideoPost =
+    mediaTypeHint === 'image' ||
+    mediaTypeHint === 'photo' ||
+    mediaTypeHint === 'text' ||
+    mediaTypeHint === 'article' ||
+    mediaTypeHint === 'link';
+
+  const hasBeenPlayed = hasBeenPlayedEarly;
+
+  const isVideoPost =
+    hasBeenPlayed ||
+    (!isNonVideoPost &&
+    (mediaTypeHint === 'video' ||
+      mediaKindHint === 'video' ||
+      mediaKindHint === 'reel' ||
+      mediaKindHint === 'short' ||
+      mediaKindHint === 'clip' ||
+      r.kind === 'video' ||
+      lowerUrl.includes('/reel/') ||
+      lowerUrl.includes('/reels/') ||
+      lowerUrl.includes('/shorts/') ||
+      lowerUrl.includes('/video/') ||
+      lowerUrl.includes('/clips/') ||
+      lowerUrl.includes('youtube.com/') ||
+      lowerUrl.includes('youtu.be/') ||
+      lowerUrl.includes('tiktok.com/') ||
+      lowerUrl.includes('fb.watch/') ||
+      lowerUrl.includes('vimeo.com/') ||
+      lowerUrl.includes('dailymotion.com/') ||
+      lowerUrl.includes('streamable.com/') ||
+      lowerUrl.includes('player.twitch.tv/') ||
+      // Generated platform iframe URLs often hide the media type. A confirmed
+      // video_play event is authoritative proof that this post is a video —
+      // regardless of platform (Reddit, TikTok, Vimeo, Twitch, etc.).
+      hasBeenPlayed));
+
   useMediaPauseOnScroll(
     embedContainerRef,
     `${post.id}:${shouldHydrate ? 'hydrated' : 'placeholder'}:${r.kind}`,
-    { enabled: mediaLifecycleEnabled, hardSuspendDistanceVh: 6, disableHardSuspend: true }
+    {
+      enabled: mediaLifecycleEnabled,
+      hardSuspendDistanceVh: 6,
+      disableHardSuspend: !(hasBeenPlayed && isVideoPost),
+    }
   );
+
 
   // Track click-throughs to the original platform (iframe focus or anchor clicks).
   // Awards +1 engagement score to the author on top of the impression score.
   useOriginalVisitTracker(embedContainerRef, post.id, shouldHydrate, isPlayableMediaPost);
+
 
   const forceTwitterRenderer =
     r.kind === 'raw' &&

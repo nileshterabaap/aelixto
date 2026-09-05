@@ -2,6 +2,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
 import { useRef, useEffect, useMemo } from 'react';
+import { useSession } from '@/hooks/useSession';
 
 interface FeedPost {
   id: string;
@@ -98,6 +99,12 @@ const fetchFeedPage = async (cursor?: string) => {
 
 export const useFollowingFeed = (): UseFollowingFeedResult => {
   const preloadedRef = useRef(false);
+  // On a fresh install the Supabase session is restored asynchronously. Firing
+  // the feed RPC before that resolves returns zero rows, which rendered the
+  // "all caught up" / empty state until the user pulled to refresh. Gate the
+  // query on a known session instead.
+  const { user, loading: sessionLoading } = useSession();
+  const authReady = !sessionLoading && !!user?.id;
 
   // Fetch feed directly — no count gate, single RPC call
   const {
@@ -111,6 +118,7 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
   } = useInfiniteQuery({
     queryKey: ['following-feed'],
     queryFn: ({ pageParam }) => fetchFeedPage(pageParam),
+    enabled: authReady,
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     staleTime: 0, // feed depends on seen-state; always verify fresh data
@@ -162,8 +170,10 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
 
   return {
     items,
-    empty: !feedLoading && !isFetching && items.length === 0,
-    loading: feedLoading || (isFetching && items.length === 0),
+    empty:
+      (!sessionLoading && !user?.id) ||
+      (authReady && !feedLoading && !isFetching && items.length === 0),
+    loading: sessionLoading || (authReady && (feedLoading || (isFetching && items.length === 0))),
     error: feedError?.message ?? null,
     loadMore,
     hasMore: hasNextPage ?? false,

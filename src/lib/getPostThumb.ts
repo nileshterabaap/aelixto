@@ -66,6 +66,13 @@ function isTextOnlySocialAvatar(platform: string, url: string): boolean {
 function isThreadsProfilePictureUrl(lowerUrl: string): boolean {
   if (lowerUrl.includes("profile_pic")) return true;
   if (lowerUrl.includes("/t51.82787-19/")) return true;
+  // Meta CDN profile-picture buckets all end in "-19" (t51.2885-19,
+  // t51.82787-19, t51.30982-19, ...). Any Threads/IG CDN asset served from
+  // one of those buckets is an avatar, never the post's own media.
+  if (/\/t\d+\.[\d-]*-19\//.test(lowerUrl)) return true;
+  if (/[?&]stp=[^&]*_19/.test(lowerUrl)) return true;
+  if (lowerUrl.includes("cdninstagram.com") && lowerUrl.includes("-19/")) return true;
+  if (lowerUrl.includes("fbcdn.net") && lowerUrl.includes("-19/")) return true;
   return false;
 }
 
@@ -212,6 +219,20 @@ export function maybeProxy(url?: string | null, w = 480) {
     return null;
   }
   
+  // Some CDNs (Quora's qph.*.quoracdn.net, LinkedIn's licdn.com) hotlink-block
+  // direct <img> requests from third-party origins, so grid tiles render blank
+  // even though the same image works inside the embed (which proxies it).
+  // Route those hosts through our img-proxy edge function.
+  try {
+    const host = new URL(url).hostname;
+    if (/(^|\.)quoracdn\.net$|^qph\.|(^|\.)licdn\.com$/i.test(host)) {
+      const base = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+      if (base) return `${base}/functions/v1/img-proxy?u=${encodeURIComponent(url)}`;
+    }
+  } catch {
+    // fall through
+  }
+
   // Return ALL URLs directly - no proxying needed
   // Supabase storage URLs are permanent and public
   // YouTube thumbnails are stable

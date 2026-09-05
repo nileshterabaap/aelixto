@@ -171,12 +171,17 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
             .single();
           if (convError) throw convError;
 
+          // Insert self first: the RLS policy for adding the other participant
+          // requires the current user to already be a participant, and rows from
+          // the same multi-row statement are not visible to that check.
+          const { error: selfPartError } = await supabase
+            .from("conversation_participants")
+            .insert({ conversation_id: newConv.id, user_id: user.id });
+          if (selfPartError) throw selfPartError;
+
           const { error: partError } = await supabase
             .from("conversation_participants")
-            .insert([
-              { conversation_id: newConv.id, user_id: user.id },
-              { conversation_id: newConv.id, user_id: targetUserId },
-            ]);
+            .insert({ conversation_id: newConv.id, user_id: targetUserId });
           if (partError) throw partError;
           conversationId = newConv.id;
         }
