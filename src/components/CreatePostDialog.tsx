@@ -656,11 +656,25 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setShowThumbnailInput(false);
   };
 
+  // Android: while the box is open the keyboard OVERLAYS the page instead of
+  // resizing the WebView. A WebView resize relayouts the whole embed-heavy
+  // feed and re-fires every IntersectionObserver (media suspend/pre-warm
+  // swaps) — that relayout, landing ~0.5–1s after the close tap when the
+  // keyboard had finished hiding, was the "screen lock + flicker". In overlay
+  // mode nothing underneath ever changes size.
+  useEffect(() => {
+    if (!open) return;
+    void setKeyboardOverlayMode(true);
+    return () => {
+      // Hand ownership back only once the keyboard is gone; switching while it
+      // is still visible would itself trigger the resize we are avoiding.
+      window.setTimeout(() => { void setKeyboardOverlayMode(false); }, 450);
+    };
+  }, [open]);
+
   const handleClose = () => {
-    // Drop the soft keyboard NOW, together with the backdrop fade. Otherwise
-    // the focused input keeps the IME up until the exit animation finishes
-    // (~1s), and the WebView's late 417→716 resize + relayout of the
-    // embed-heavy page is the delayed flicker seen on Android.
+    // Drop the soft keyboard NOW, together with the backdrop fade, so the IME
+    // hide runs alongside the exit animation instead of after it.
     (document.activeElement as HTMLElement | null)?.blur?.();
     setStep(1);
     setLinkUrl("");
