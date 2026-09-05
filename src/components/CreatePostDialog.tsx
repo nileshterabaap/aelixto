@@ -10,6 +10,7 @@ import { useCreatePost } from "@/hooks/usePosts";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { ImageUploadButton } from "@/components/ImageUploadButton";
 import { supabase } from "@/integrations/supabase/client";
+import { setKeyboardOverlayMode } from "@/lib/keyboardInsets";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
 import {
   extractRootDomain,
@@ -656,11 +657,25 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setShowThumbnailInput(false);
   };
 
+  // Android: while the box is open the keyboard OVERLAYS the page instead of
+  // resizing the WebView. A WebView resize relayouts the whole embed-heavy
+  // feed and re-fires every IntersectionObserver (media suspend/pre-warm
+  // swaps) — that relayout, landing ~0.5–1s after the close tap when the
+  // keyboard had finished hiding, was the "screen lock + flicker". In overlay
+  // mode nothing underneath ever changes size.
+  useEffect(() => {
+    if (!open) return;
+    void setKeyboardOverlayMode(true);
+    return () => {
+      // Hand ownership back only once the keyboard is gone; switching while it
+      // is still visible would itself trigger the resize we are avoiding.
+      window.setTimeout(() => { void setKeyboardOverlayMode(false); }, 450);
+    };
+  }, [open]);
+
   const handleClose = () => {
-    // Drop the soft keyboard NOW, together with the backdrop fade. Otherwise
-    // the focused input keeps the IME up until the exit animation finishes
-    // (~1s), and the WebView's late 417→716 resize + relayout of the
-    // embed-heavy page is the delayed flicker seen on Android.
+    // Drop the soft keyboard NOW, together with the backdrop fade, so the IME
+    // hide runs alongside the exit animation instead of after it.
     (document.activeElement as HTMLElement | null)?.blur?.();
     setStep(1);
     setLinkUrl("");
@@ -720,7 +735,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
               onCloseAutoFocus={(e) => e.preventDefault()}
             >
               <motion.div
-                className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none"
+                className="fixed left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none transition-[top] duration-200 ease-out"
                 initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)" }}
                 animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
                 // Short, non-spring exit: a spring "settles" for close to a
@@ -731,11 +746,17 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                   transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] },
                 }}
                 transition={panelTransition}
-                style={{ transformOrigin: "50% calc(100% + 120px)", willChange: "transform, opacity" }}
+                style={{
+                  // Centre inside the part of the screen the keyboard does not
+                  // cover (--kb is 0 whenever the viewport itself shrank).
+                  top: "calc((100dvh - var(--kb, 0px)) / 2)",
+                  transformOrigin: "50% calc(100% + 120px)",
+                  willChange: "transform, opacity",
+                }}
               >
                 <motion.div
                   transition={panelTransition}
-                  className="relative max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[32px] bg-background shadow-[0_34px_90px_-24px_hsl(var(--foreground)/0.45)] ring-1 ring-border/15"
+                  className="relative max-h-[calc(100dvh-var(--kb,0px)-1.5rem)] overflow-hidden rounded-[32px] bg-background shadow-[0_34px_90px_-24px_hsl(var(--foreground)/0.45)] ring-1 ring-border/15"
                 >
                   {/* Soft gradient sheen */}
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--foreground)/0.10),transparent_42%)]" />

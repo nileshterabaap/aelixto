@@ -26,6 +26,33 @@ import { Capacitor } from '@capacitor/core';
 const DEBUG_KEY = 'aelixto:kbdebug';
 let lastReported = 0;
 
+// Native inset owner (Android, aelixto-window-insets). In `overlay` mode the
+// WebView is NOT resized for the keyboard and these numbers are what --kb is
+// derived from: keyboard band minus the nav-bar band it overlaps.
+type NativeInsets = { mode: 'resize' | 'overlay'; imeBottom: number; barsBottom: number; paddingBottom: number; passthrough: boolean; webViewMajor: number };
+let native: NativeInsets | null = null;
+let nativeMode: 'resize' | 'overlay' = 'resize';
+let reapply: () => void = () => {};
+
+const isAndroidNative = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
+
+/**
+ * Switch the native keyboard model. `overlay` keeps the WebView at full
+ * height while the keyboard is up (no page relayout); `resize` is the default
+ * where the WebView shrinks and layouts sit on its bottom edge.
+ */
+export async function setKeyboardOverlayMode(on: boolean) {
+  if (!isAndroidNative()) return;
+  nativeMode = on ? 'overlay' : 'resize';
+  reapply();
+  try {
+    const { WindowInsetsOwner } = await import('aelixto-window-insets');
+    await WindowInsetsOwner.setMode({ mode: nativeMode });
+  } catch (error) {
+    console.warn('[keyboard] WindowInsetsOwner.setMode unavailable', error);
+  }
+}
+
 function set(px: number, open = px > 0) {
   const root = document.documentElement;
   const value = Math.max(0, Math.round(px));
@@ -61,13 +88,28 @@ export function initKeyboardInsets() {
       // Stateless third signal: an editable is focused AND the WebView is far
       // shorter than the physical screen. Can't be poisoned by event order.
       const focusedShort = editableFocused() && h < (window.screen?.height ?? Infinity) * 0.75;
-      const open = shrunk || pluginOpen || focusedShort;
-      // WebView absorbed the keyboard -> nothing to compensate. Only when it
-      // did NOT shrink (rare WebView builds) do we use the plugin height.
-      const kb = shrunk || focusedShort ? 0 : pluginOpen ? Math.min(lastReported, h * 0.7) : 0;
+
+      // Overlay mode (native owner keeps the WebView full height): the exact
+      // uncovered band is keyboard minus the nav bar it sits on top of.
+      const overlayKb = nativeMode === 'overlay' && native
+        ? Math.max(0, native.imeBottom - native.barsBottom)
+        : 0;
+
+      const open = shrunk || pluginOpen || focusedShort || overlayKb > 0;
+      let kb = 0;
+      if (shrunk || focusedShort) {
+        // WebView absorbed the keyboard -> nothing to compensate.
+        kb = 0;
+      } else if (nativeMode === 'overlay') {
+        kb = overlayKb;
+      } else if (pluginOpen) {
+        // Rare WebView builds that never resize: fall back to the plugin height.
+        kb = Math.min(lastReported, h * 0.7);
+      }
       set(kb, open);
       if (!open) baseline = Math.max(baseline, h);
     };
+    reapply = apply;
 
     // Plugin-independent detection: the WebView resizing IS the keyboard.
     window.addEventListener('resize', () => {
@@ -80,6 +122,25 @@ export function initKeyboardInsets() {
     const onFocusChange = () => { apply(); window.setTimeout(apply, 100); window.setTimeout(apply, 300); };
     document.addEventListener('focusin', onFocusChange);
     document.addEventListener('focusout', onFocusChange);
+
+    // Exact numbers from the native inset owner (Android only).
+    if (isAndroidNative()) {
+      void (async () => {
+        try {
+          const { WindowInsetsOwner } = await import('aelixto-window-insets');
+          const onInsets = (state: NativeInsets) => {
+            native = state;
+            nativeMode = state.mode;
+            apply();
+          };
+          await WindowInsetsOwner.addListener('insets', onInsets);
+          onInsets(await WindowInsetsOwner.getState());
+        } catch (error) {
+          console.warn('[keyboard] WindowInsetsOwner unavailable (run npx cap sync android)', error);
+        }
+      })();
+    }
+
 
     void (async () => {
       try {
@@ -159,11 +220,15 @@ function renderDebug() {
   const rect = composer?.getBoundingClientRect();
   const composerGap = rect ? Math.round(window.innerHeight - rect.bottom) : null;
   const composerPad = composer ? getComputedStyle(composer).paddingBottom : '-';
+  const nativeLine = native
+    ? `native ${native.mode} ime ${native.imeBottom} bars ${native.barsBottom} pad ${native.paddingBottom} wv ${native.webViewMajor}${native.passthrough ? ' pt' : ''}\n`
+    : `native owner: not installed\n`;
   debugEl.textContent =
     `DEBUG ONLY\n` +
     `innerH ${window.innerHeight}  vv ${Math.round(window.visualViewport?.height ?? 0)}\n` +
     `plugin ${lastReported}  --kb ${cs.getPropertyValue('--kb').trim()}\n` +
     `kb-open ${document.documentElement.classList.contains('kb-open')}\n` +
+    nativeLine +
     `--safe-bottom ${cs.getPropertyValue('--safe-bottom').trim()}\n` +
     `composer pad-b ${composerPad}  gap ${composerGap ?? '-'}px`;
 }
