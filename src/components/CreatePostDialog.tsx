@@ -24,8 +24,6 @@ import { extractOriginalCaptionFromSourceTitle } from "@/lib/originalCaption";
 import { getPostThumb } from "@/lib/getPostThumb";
 import { getThumbnailText } from "@/lib/getThumbnailText";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
-// DEBUG ONLY — temporary link-box close flicker diagnostic.
-import { startFlickerCapture } from "@/lib/flickerDebug";
 
 const isYouTubeShortUrl = (url: string) => decodeURIComponent(url).toLowerCase().includes('/shorts/');
 
@@ -659,8 +657,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   };
 
   const handleClose = () => {
-    // DEBUG ONLY — records what repaints/remounts right after the link box closes.
-    startFlickerCapture("link box closed");
     setStep(1);
     setLinkUrl("");
     setThumbnailUrl("");
@@ -686,8 +682,12 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
   const panelTransition = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.82 };
 
+  // modal={false}: Radix's modal scroll-lock writes/removes inline styles on
+  // <body>, and releasing that lock forced the whole feed (embeds included) to
+  // reflow one beat after the dialog closed — that was the flicker. The overlay
+  // blocks background scrolling instead.
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={handleClose}>
+    <DialogPrimitive.Root open={open} onOpenChange={handleClose} modal={false}>
       <AnimatePresence>
         {open && (
           <DialogPrimitive.Portal forceMount>
@@ -699,6 +699,8 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                 // what made the first few opens skip their animation and made a
                 // flicker appear a beat after closing). Only opacity animates.
                 className="fixed inset-0 z-50 bg-foreground/45 backdrop-blur-lg"
+                style={{ touchAction: "none", overscrollBehavior: "contain" }}
+                onPointerDown={(e) => e.preventDefault()}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
