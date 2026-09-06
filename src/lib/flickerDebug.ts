@@ -110,11 +110,16 @@ export const startFlickerCapture = (reason: string) => {
 
   // 3. Layout shifts — names the exact element that jumped.
   try {
+    const isPanel = (n: any) =>
+      n instanceof Element && !!n.closest?.("[data-flicker-panel]");
     const po = new PerformanceObserver((list) => {
       for (const entry of list.getEntries() as any[]) {
         if (entry.entryType === "layout-shift" && entry.value > 0.0005) {
-          const src = (entry.sources || [])
-            .map((s: any) => (s.node ? describe(s.node) : "?"))
+          const nodes = (entry.sources || []).map((s: any) => s.node).filter(Boolean);
+          // Ignore shifts caused by this debug panel itself.
+          if (nodes.length > 0 && nodes.every(isPanel)) continue;
+          const src = nodes
+            .map((n: any) => describe(n))
             .slice(0, 3)
             .join(", ");
           push("layout-shift", `${entry.value.toFixed(4)} from ${src || "unknown"}`);

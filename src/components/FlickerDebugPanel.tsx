@@ -30,8 +30,9 @@ export const FlickerDebugPanel = () => {
 
   return (
     <div
+      data-flicker-panel
       className="fixed left-2 right-2 bottom-2 z-[9999] max-h-[45vh] overflow-auto rounded-lg border border-border bg-background/95 p-2 text-[10px] leading-tight shadow-lg"
-      style={{ pointerEvents: "auto" }}
+      style={{ pointerEvents: "auto", contain: "layout paint size style" }}
     >
       <div className="mb-1 flex items-center justify-between gap-2">
         <span className="font-bold">
