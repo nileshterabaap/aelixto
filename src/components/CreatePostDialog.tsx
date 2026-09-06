@@ -682,11 +682,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
   const panelTransition = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.82 };
 
+  // modal={false}: Radix's modal scroll-lock writes/removes inline styles on
+  // <body> at close, which forces the whole feed (and its embed iframes) to
+  // reflow a beat later — that was the flash. The full-screen overlay below
+  // already blocks interaction with the page behind.
   return (
-    {/* modal={false}: Radix's modal scroll-lock writes/removes inline styles on
-        <body> at close, which forces the whole feed (and its embed iframes) to
-        reflow a beat later — that was the flash. The full-screen overlay below
-        already blocks interaction with the page behind. */}
     <DialogPrimitive.Root open={open} onOpenChange={handleClose} modal={false}>
       <AnimatePresence>
         {open && (
