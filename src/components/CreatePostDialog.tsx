@@ -682,11 +682,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
   const panelTransition = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.82 };
 
+  // modal={false}: Radix's modal scroll-lock writes/removes inline styles on
+  // <body>, and releasing that lock forced the whole feed (embeds included) to
+  // reflow one beat after the dialog closed — that was the flicker. The overlay
+  // blocks background scrolling instead.
   return (
-    {/* modal={false}: Radix's modal scroll-lock writes/removes inline styles on
-        <body>, and releasing that lock forced the whole feed (embeds included)
-        to reflow one beat after the dialog closed — that was the flicker.
-        The overlay below blocks background scrolling instead. */}
     <DialogPrimitive.Root open={open} onOpenChange={handleClose} modal={false}>
       <AnimatePresence>
         {open && (
