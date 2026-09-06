@@ -25,7 +25,6 @@ import { getPostThumb } from "@/lib/getPostThumb";
 import { getThumbnailText } from "@/lib/getThumbnailText";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
 // DEBUG ONLY — temporary link-box close flicker diagnostic.
-import { startFlickerCapture } from "@/lib/flickerDebug";
 
 const isYouTubeShortUrl = (url: string) => decodeURIComponent(url).toLowerCase().includes('/shorts/');
 
