@@ -15,10 +15,15 @@ export const FlickerDebugPanel = () => {
   const [events, setEvents] = useState<FlickerEvent[]>([]);
   const [running, setRunning] = useState(false);
 
-  useEffect(() => subscribeFlicker((e, r) => {
-    setEvents(e);
-    setRunning(r);
-  }), []);
+  useEffect(() => {
+    const unsub = subscribeFlicker((e, r) => {
+      setEvents(e);
+      setRunning(r);
+    });
+    return () => {
+      unsub();
+    };
+  }, []);
 
   if (!Capacitor.isNativePlatform()) return null;
   if (events.length === 0) return null;
