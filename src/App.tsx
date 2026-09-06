@@ -13,6 +13,8 @@ import { useRealtimeInvalidations } from "@/hooks/useRealtimeInvalidations";
 import { PageTransition } from "@/components/PageTransition";
 import { KeepAliveRoutes } from "@/components/KeepAliveRoutes";
 import { PersistentBottomNav } from "@/components/PersistentBottomNav";
+// DEBUG ONLY — temporary flicker diagnostic panel (native builds only).
+import { FlickerDebugPanel } from "@/components/FlickerDebugPanel";
 import { persistOptions } from "@/lib/queryPersister";
 import Index from "./pages/Index";
 import Discover from "./pages/Discover";
@@ -124,6 +126,7 @@ const AnimatedRoutes = () => {
       {/* Persistent navigation — lives OUTSIDE PageTransition so it
           stays mounted across route changes and never flickers. */}
       <PersistentBottomNav />
+      <FlickerDebugPanel />
     </>
   );
 };
