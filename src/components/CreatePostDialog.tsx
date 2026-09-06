@@ -24,8 +24,6 @@ import { extractOriginalCaptionFromSourceTitle } from "@/lib/originalCaption";
 import { getPostThumb } from "@/lib/getPostThumb";
 import { getThumbnailText } from "@/lib/getThumbnailText";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
-// DEBUG ONLY — temporary link-box close flicker diagnostic.
-import { startFlickerCapture } from "@/lib/flickerDebug";
 
 const isYouTubeShortUrl = (url: string) => decodeURIComponent(url).toLowerCase().includes('/shorts/');
 
@@ -659,8 +657,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   };
 
   const handleClose = () => {
-    // DEBUG ONLY — records what repaints/remounts right after the link box closes.
-    startFlickerCapture("link box closed");
     setStep(1);
     setLinkUrl("");
     setThumbnailUrl("");
@@ -686,8 +682,12 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
   const panelTransition = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.82 };
 
+  // modal={false}: Radix's modal scroll-lock writes/removes inline styles on
+  // <body> at close, which forces the whole feed (and its embed iframes) to
+  // reflow a beat later — that was the flash. The full-screen overlay below
+  // already blocks interaction with the page behind.
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={handleClose}>
+    <DialogPrimitive.Root open={open} onOpenChange={handleClose} modal={false}>
       <AnimatePresence>
         {open && (
           <DialogPrimitive.Portal forceMount>
