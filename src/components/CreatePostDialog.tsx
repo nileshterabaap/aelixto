@@ -24,6 +24,8 @@ import { extractOriginalCaptionFromSourceTitle } from "@/lib/originalCaption";
 import { getPostThumb } from "@/lib/getPostThumb";
 import { getThumbnailText } from "@/lib/getThumbnailText";
 import { TextCardThumbnail } from "@/components/TextCardThumbnail";
+// DEBUG ONLY — temporary link-box close flicker diagnostic.
+import { startFlickerCapture } from "@/lib/flickerDebug";
 
 const isYouTubeShortUrl = (url: string) => decodeURIComponent(url).toLowerCase().includes('/shorts/');
 
@@ -657,6 +659,8 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   };
 
   const handleClose = () => {
+    // DEBUG ONLY — records what repaints/remounts right after the link box closes.
+    startFlickerCapture("link box closed");
     setStep(1);
     setLinkUrl("");
     setThumbnailUrl("");
