@@ -10,7 +10,6 @@ import { useCreatePost } from "@/hooks/usePosts";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { ImageUploadButton } from "@/components/ImageUploadButton";
 import { supabase } from "@/integrations/supabase/client";
-import { setKeyboardOverlayMode } from "@/lib/keyboardInsets";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
 import {
   extractRootDomain,
@@ -657,26 +656,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setShowThumbnailInput(false);
   };
 
-  // Android: while the box is open the keyboard OVERLAYS the page instead of
-  // resizing the WebView. A WebView resize relayouts the whole embed-heavy
-  // feed and re-fires every IntersectionObserver (media suspend/pre-warm
-  // swaps) — that relayout, landing ~0.5–1s after the close tap when the
-  // keyboard had finished hiding, was the "screen lock + flicker". In overlay
-  // mode nothing underneath ever changes size.
-  useEffect(() => {
-    if (!open) return;
-    void setKeyboardOverlayMode(true);
-    return () => {
-      // Hand ownership back only once the keyboard is gone; switching while it
-      // is still visible would itself trigger the resize we are avoiding.
-      window.setTimeout(() => { void setKeyboardOverlayMode(false); }, 450);
-    };
-  }, [open]);
-
   const handleClose = () => {
-    // Drop the soft keyboard NOW, together with the backdrop fade, so the IME
-    // hide runs alongside the exit animation instead of after it.
-    (document.activeElement as HTMLElement | null)?.blur?.();
     setStep(1);
     setLinkUrl("");
     setThumbnailUrl("");
@@ -703,60 +683,38 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const panelTransition = { type: "spring" as const, stiffness: 520, damping: 42, mass: 0.82 };
 
   return (
-    // modal={false}: Radix's modal mode locks body scroll, sets
-    // `pointer-events:none` on <body> and aria-hides every sibling; all of that
-    // is torn down only after the exit animation finishes — ~0.5–1s after the
-    // close tap — which forces a full relayout of the embed-heavy feed on the
-    // Android WebView and shows as a one-frame flicker. Non-modal skips those
-    // body/tree mutations entirely; our own backdrop blocks interaction and
-    // taps on it still dismiss via Radix's outside-press handling.
-    <DialogPrimitive.Root open={open} onOpenChange={handleClose} modal={false}>
+    <DialogPrimitive.Root open={open} onOpenChange={handleClose}>
       <AnimatePresence>
         {open && (
           <DialogPrimitive.Portal forceMount>
-            {/* Backdrop (plain tint — no backdrop-filter, see above) */}
-            <motion.div
-              aria-hidden
-              className="fixed inset-0 z-50 bg-foreground/55 touch-none"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-              style={{ willChange: "opacity", backfaceVisibility: "hidden" }}
-            />
+            {/* Blurred backdrop */}
+            <DialogPrimitive.Overlay asChild forceMount>
+              <motion.div
+                // Blur is a static CSS layer (animating backdrop-filter forces a
+                // fresh, expensive compositing pass on Android WebView — that is
+                // what made the first few opens skip their animation and made a
+                // flicker appear a beat after closing). Only opacity animates.
+                className="fixed inset-0 z-50 bg-foreground/45 backdrop-blur-lg"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              />
+            </DialogPrimitive.Overlay>
 
             {/* Centered card with viewport-safe sizing */}
-            <DialogPrimitive.Content
-              asChild
-              forceMount
-              aria-describedby={undefined}
-              // Don't hand focus back to the FAB when the box unmounts — on the
-              // WebView that late focus() is another relayout trigger.
-              onCloseAutoFocus={(e) => e.preventDefault()}
-            >
+            <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
               <motion.div
-                className="fixed left-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none transition-[top] duration-200 ease-out"
+                className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none"
                 initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)" }}
                 animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
-                // Short, non-spring exit: a spring "settles" for close to a
-                // second, which is exactly how long the box (and anything it
-                // tears down) lingered after the tap.
-                exit={{
-                  opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)",
-                  transition: { duration: 0.18, ease: [0.22, 1, 0.36, 1] },
-                }}
+                exit={{ opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)" }}
                 transition={panelTransition}
-                style={{
-                  // Centre inside the part of the screen the keyboard does not
-                  // cover (--kb is 0 whenever the viewport itself shrank).
-                  top: "calc((100dvh - var(--kb, 0px)) / 2)",
-                  transformOrigin: "50% calc(100% + 120px)",
-                  willChange: "transform, opacity",
-                }}
+                style={{ transformOrigin: "50% calc(100% + 120px)", willChange: "transform, opacity" }}
               >
                 <motion.div
                   transition={panelTransition}
-                  className="relative max-h-[calc(100dvh-var(--kb,0px)-1.5rem)] overflow-hidden rounded-[32px] bg-background shadow-[0_34px_90px_-24px_hsl(var(--foreground)/0.45)] ring-1 ring-border/15"
+                  className="relative max-h-[calc(100dvh-1.5rem)] overflow-hidden rounded-[32px] bg-background shadow-[0_34px_90px_-24px_hsl(var(--foreground)/0.45)] ring-1 ring-border/15"
                 >
                   {/* Soft gradient sheen */}
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,hsl(var(--foreground)/0.10),transparent_42%)]" />
