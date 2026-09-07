@@ -90,14 +90,16 @@ export function KeyboardGapDebugPanel() {
   const [events, setEvents] = useState<string[]>([]);
   const rawKb = useRef(0);
 
+  // TEMPORARY: always on for native builds (release APKs included) so the
+  // readout appears without any hidden switch. Set localStorage kbdebug=0 to
+  // silence it. Remove this component once measurements are captured.
   const enabled = (() => {
     if (!Capacitor.isNativePlatform()) return false;
     try {
-      if (import.meta.env.DEV) return true;
-      if (new URLSearchParams(window.location.search).get("kbdebug") === "1") return true;
-      return localStorage.getItem("kbdebug") === "1";
+      if (new URLSearchParams(window.location.search).get("kbdebug") === "0") return false;
+      return localStorage.getItem("kbdebug") !== "0";
     } catch {
-      return false;
+      return true;
     }
   })();
 
