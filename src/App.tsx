@@ -126,6 +126,7 @@ const AnimatedRoutes = () => {
       {/* Persistent navigation — lives OUTSIDE PageTransition so it
           stays mounted across route changes and never flickers. */}
       <PersistentBottomNav />
+      <KeyboardGapDebugPanel />
     </>
   );
 };
