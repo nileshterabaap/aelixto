@@ -40,36 +40,6 @@ export function initKeyboardInsets() {
     // shrank, and only compensates the leftover gap if it did not.
     let baseline = window.innerHeight;
 
-    // Some devices/WebViews are padded natively by the safe-area plugin while
-    // env(safe-area-inset-bottom) still reports 0. When the keyboard opens it
-    // covers the nav bar, so that natively trimmed strip is reserved twice and
-    // shows as a white band under the composer. Measure the real bottom inset
-    // once and expose it so the composer can be pulled down by exactly that
-    // amount while typing. Devices that report env() correctly get 0.
-    void (async () => {
-      try {
-        const probe = document.createElement('div');
-        probe.style.cssText =
-          'position:fixed;left:-9999px;top:-9999px;height:env(safe-area-inset-bottom, 0px);pointer-events:none;';
-        document.body.appendChild(probe);
-        const envBottom = parseFloat(getComputedStyle(probe).height) || 0;
-        probe.remove();
-        if (envBottom > 0) return; // env() is truthful — nothing to compensate.
-
-        const { SafeArea } = await import('@capacitor-community/safe-area');
-        const insets = await (SafeArea as unknown as {
-          getSafeAreaInsets?: () => Promise<{ insets?: { bottom?: number } }>;
-        }).getSafeAreaInsets?.();
-        const bottom = Math.max(0, Math.round(insets?.insets?.bottom ?? 0));
-        if (bottom > 0 && bottom < 120) {
-          document.documentElement.style.setProperty('--kb-native-bottom', `${bottom}px`);
-        }
-      } catch (error) {
-        console.warn('[keyboard] native bottom inset probe failed', error);
-      }
-    })();
-
-
     void (async () => {
       try {
         const { Keyboard } = await import('@capacitor/keyboard');
