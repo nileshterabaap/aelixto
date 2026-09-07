@@ -388,6 +388,19 @@ html.kb-open {
   --safe-bottom: 0px;
 }
 
+/* State A devices (WebView is natively trimmed by the nav-bar inset while
+   env(safe-area-inset-bottom) still reports 0): the keyboard covers that strip,
+   so the trimmed space is reserved twice and leaves a white band under the
+   composer. --kb-native-bottom is the measured native bottom inset (0 on
+   devices that report real env() values), so this rule is a no-op there. */
+.kb-shift {
+  transform: translateY(0);
+}
+html.kb-open .kb-shift {
+  transform: translateY(var(--kb-native-bottom, 0px));
+}
+
+
 /* The tab bar is meaningless while typing (Instagram hides it too) and would
    otherwise float on top of the keyboard. */
 html.kb-open nav.fixed.bottom-0 {
