@@ -36,6 +36,8 @@ import ChildSafety from "./pages/ChildSafety";
 import AuthBridge from "./pages/AuthBridge";
 import Unsubscribe from "./pages/Unsubscribe";
 import ShortLinkRedirect from "./pages/ShortLinkRedirect";
+// DEBUG ONLY — temporary keyboard/composer geometry probe (native + opt-in).
+import { KeyboardGapDebugPanel } from "@/components/KeyboardGapDebugPanel";
 
 // Configure QueryClient with aggressive caching for instant navigation
 const queryClient = new QueryClient({
@@ -124,6 +126,7 @@ const AnimatedRoutes = () => {
       {/* Persistent navigation — lives OUTSIDE PageTransition so it
           stays mounted across route changes and never flickers. */}
       <PersistentBottomNav />
+      <KeyboardGapDebugPanel />
     </>
   );
 };
