@@ -188,9 +188,7 @@ export function KeyboardGapDebugPanel() {
     >
       <div style={{ color: "#ff0" }}>DEBUG ONLY — keyboard/composer geometry</div>
       {[
-        "innerW","innerH","outerW","outerH","docClientW","docClientH","bodyClientW","bodyClientH",
-        "vvW","vvH","vvOffTop","vvOffLeft","vvPageTop","vvPageLeft","vvScale","dpr",
-        "envTop","envBottom","kbVar","safeBottomVar","kbOpenClass","rawPluginKb","chatRootH",
+        "rawPluginKb","chatRootH",
         "cTop","cBottom","cHeight","cLeft","cRight","cPosition","cCssBottom","cMarginBottom",
         "cPaddingBottom","cTransform","cCssHeight",
         "gap_innerH_minus_cBottom","gap_vvVisible_minus_cBottom","gap_docClientH_minus_cBottom",
