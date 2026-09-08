@@ -309,16 +309,17 @@ export function useOriginalVisitTracker(
       }
     };
 
-    // Cleanup list retained for API compatibility with the effect teardown.
-    // The Threads play signal now rides on the container-level `touchstart`
-    // capture listener wired below (see `el.addEventListener('touchstart',
-    // onPointerDown, { capture: true, passive: true })`). On mobile Chrome
-    // and iOS Safari a touch that lands on a cross-origin iframe still
-    // dispatches `touchstart` on the parent in the capture phase, so
-    // `fireThreadsPlayOnce()` runs on the very first tap without inserting
-    // any visual/interactive overlay above the Threads player. This removes
-    // the duplicate "custom" Play affordance while preserving video_play.
     const threadsCaptureCleanups: Array<() => void> = [];
+    const threadsCaptureAttached = new WeakSet<HTMLIFrameElement>();
+
+    const attachThreadsPlayCapture = (iframe: HTMLIFrameElement) => {
+      // Overlay capture disabled: it swallowed the first tap on the native
+      // Play button, so the video never actually started. We now let taps
+      // pass straight through to the iframe and rely on pointerdown /
+      // window.blur / iframe focus signals below to credit Play.
+      void iframe;
+      void threadsCaptureAttached;
+    };
 
     const attachIframeListeners = (iframe: HTMLIFrameElement) => {
       iframe.addEventListener('focus', handleIframeFocus);
@@ -329,6 +330,7 @@ export function useOriginalVisitTracker(
           // Cross-origin iframes may reject direct listener attachment.
         }
       }, { once: true });
+      attachThreadsPlayCapture(iframe);
       applyNavLockSandbox(iframe);
     };
 

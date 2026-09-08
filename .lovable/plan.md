@@ -1,47 +1,74 @@
-# Restore Threads `video_play` via one-shot capture overlay
+## Your goals (as I remember them)
 
-## Diagnosis (confirmed by reading `src/hooks/useOriginalVisitTracker.ts`)
+1. **Monetize Aelixto with Google Ad Manager (AdX)** demand — not AdMob.
+2. **Native in-feed ads only** — real native creatives (headline, media, CTA, advertiser), rendered inline in the feed, no banners / interstitials / rewarded.
+3. **Placement cadence:** one ad after every **5 posts**.
+4. **Install-age gate:** never show ads to a device whose install age is **< 48 h** (policy + quality signal).
+5. **Consent:** Google-certified CMP via **UMP / Funding Choices** (GDPR / EEA-UK, US-state, IDFA on iOS).
+6. **Android + iOS only** — web/PWA never requests ads.
+7. **Full SDK-tracked impressions + billable clicks** through a real `NativeAdView` / `GADNativeAdView` overlay (already implemented in the custom `aelixto-gam-native` plugin).
 
-- The Threads-only capture layer still exists as a function (`attachThreadsPlayCapture`, lines 315–322) but its body is **intentionally stubbed to a no-op**, with the comment: *"Overlay capture disabled: it swallowed the first tap on the native Play button…"*.
-- Nothing else in the client reliably fires `firePlay()` for Threads on mobile:
-  - `pointerdown` / `touchstart` on the container do not bubble out of a cross-origin Threads iframe on mobile Chrome/WebView.
-  - The `iframe.focus` listener rarely fires cross-origin on mobile.
-  - The `window.blur` fallback (line 191) is gated on `lastThreadsCaptureRef.postId === postId` set within 1200 ms — and that ref is only written inside `fireThreadsPlayOnce()`, which is only called from the paths above. So on mobile the guard is unreachable and the blur handler returns at line 202–203.
-- Net effect: **the client never sends `video_play` to `record-view` for Threads**. This is a client emission regression, not a `record-view` bug.
+If any of that is wrong, tell me and I'll adjust before we go live.
 
-**Regressing change:** the "let taps pass straight through to the iframe" refactor that stubbed `attachThreadsPlayCapture`. That was the last known working trigger and nothing replaced it with an equivalent one.
+---
 
-## Fix — restore the one-shot capture overlay (edit only `src/hooks/useOriginalVisitTracker.ts`)
+## Next steps now that AdX identity verification is approved
 
-Reimplement `attachThreadsPlayCapture(iframe)` so it:
+### Step 1 — Register both apps in Ad Manager (you, in the GAM dashboard)
+- **Admin → Apps → New app** for Android package `com.aelixto.app10`.
+- **Admin → Apps → New app** for iOS bundle (whatever the App Store Connect bundle ID is — confirm it with me if unsure).
+- Copy each **App ID** (`ca-app-pub-XXXXXXXXXXXXXXXX~YYYYYYYYYY`). You'll paste these into `AndroidManifest.xml` and `Info.plist` in Step 4.
 
-1. Only runs when `trackPlayableInteraction` is true and the iframe is Threads.
-2. Positions the iframe's parent as `position: relative` if it isn't already, then inserts a sibling `<div>` overlay that:
-   - Is absolutely positioned to exactly cover the iframe rect (`inset: 0`).
-   - Has `background: transparent`, `z-index: 2`, `touch-action: manipulation`, and `cursor: pointer`.
-   - Has `pointer-events: auto` initially.
-3. On the **first** `touchstart` (capture, passive) or `pointerdown` (capture) on the overlay:
-   - Calls `fireThreadsPlayOnce()` synchronously.
-   - Immediately removes the overlay from the DOM in the same tick (`overlay.remove()`), so the **same** tap sequence's subsequent `touchend` / `click` lands on the native Threads Play button underneath. Because the overlay is gone before the browser dispatches the click, Threads' native player receives the tap and starts playback — this is the same mechanism that worked in the last-known-working build.
-4. Registers a cleanup that removes the overlay if the effect tears down before the tap arrives, and pushes it into `threadsCaptureCleanups` (already wired at line 394).
-5. Uses `threadsCaptureAttached` (already declared, line 313) so we don't attach twice to the same iframe when the MutationObserver re-visits it.
-6. Skips attachment entirely if the parent already contains an overlay with `data-threads-play-capture="1"` (idempotency across React re-renders / stability guard).
+### Step 2 — Create the two Native ad units (you, in GAM)
+- **Inventory → Ad units → New native unit** — one per platform:
+  - `aelixto_feed_native_android`
+  - `aelixto_feed_native_ios`
+- Copy each fully-qualified path: `/NETWORK_CODE/aelixto_feed_native_android` and `/NETWORK_CODE/aelixto_feed_native_ios`.
 
-No other files change. `firePlay()`, `fireThreadsPlayOnce()`, the play dedupe set `threadsVideoPlayFiredPosts`, `record-view`'s Threads burst guard, and the unique index in the database all remain exactly as they are — they were correct; they just weren't being reached.
+### Step 3 — Turn on AdX demand + publish UMP messages (you, in GAM)
+- **Yield → Yield groups** — enable **AdX open auction** on both native units. Add any additional yield partners you want to compete.
+- **Privacy & messaging** — publish the **GDPR / EEA-UK**, **IDFA**, and **US-state** messages. This is exactly what the app's UMP call auto-fetches on first launch.
 
-## Verification steps after implementation
+### Step 4 — Paste live IDs into the code (I do this once you send them)
+Once you give me the 2 App IDs (Step 1) and the 2 ad-unit paths (Step 2), I will:
+- Set `AD_TEST_MODE = false` and paste both ad-unit paths in `src/config/ads.ts`.
+- Add the Android App ID `<meta-data>` in `android/app/src/main/AndroidManifest.xml`.
+- Add `GADApplicationIdentifier`, `NSUserTrackingUsageDescription`, and the current `SKAdNetworkItems` list in `ios/App/App/Info.plist`.
 
-1. Open a Threads post in the feed and tap the Play button once.
-   - Expected: video starts playing on the first tap (overlay removes itself in the same tick, tap reaches native control).
-2. Check Network → confirm one POST to `record-view` with `event_type: "video_play"` fires for that post's id.
-3. Confirm the Aelix Score for that post increments by exactly **1** (View 1 + Play 1 + Visit 0 = 2 total) after a first-time viewer session.
-4. Tap the same post again — no second `video_play` should be sent (guarded by `threadsVideoPlayFiredPosts` + DB unique index).
-5. Tap the platform icon in the header — should still fire `original_visit` (+1) exactly as before.
-6. Verify other platforms (X, YouTube, TikTok, Instagram, Facebook, LinkedIn, Pinterest, Spotify) are untouched — no code path outside the Threads branch changes.
+### Step 5 — You rebuild the native binaries
+```
+git pull
+npm install
+npx cap sync
+cd ios/App && pod install && cd ../..
+```
+Then open the native projects (`npx cap open android` / `npx cap open ios`) and build.
 
-## Stability guard
+### Step 6 — On-device QA (before flipping to production)
+Before Step 4 (so we're still on `AD_TEST_MODE = true` with Google's test unit IDs, which always fill), verify on a physical device:
+- **UMP form** appears on first launch (or via **Settings → Manage ad preferences**).
+- **ATT prompt** appears on iOS 14+ first launch.
+- A native ad card appears after every 5 posts, only once the app is ≥ 48 h old (clear `aelixto_install_first_seen_at` in `localStorage` + the `install_metadata` row to reset the gate during QA).
+- Tapping the **CTA** opens the landing page through Google's click handler.
+- Tapping anywhere else on the card is inert (no accidental navigation).
 
-`useOriginalVisitTracker.ts` is currently locked. I will re-approve the baseline after the edit is in and verified.
+### Step 7 — Store submissions
+- **Play Console:** Data safety form — declare ads + IDFA-equivalent. Content rating → yes, contains ads.
+- **App Store Connect:** privacy nutrition labels — declare IDFA use. In the submission notes, mention that the app shows the ATT prompt (already implemented). App review sometimes asks; be ready to point them at the "Manage ad preferences" screen.
 
-## Success probability
-**~93%.** The overlay mechanism is exactly what worked before. The only risk is that Threads' current SDK renders the Play button in a subtly different hit region than a year ago — if the first tap after this change plays *but* doesn't score, we widen the overlay to `inset: -4px`. If it scores *but* doesn't play, we swap `overlay.remove()` for a `pointer-events: none` toggle plus removal on the next animation frame.
+### Step 8 — Go live + monitor
+- After Step 4 is merged and Step 5 rebuild is submitted and approved, ads request against your real inventory.
+- **First 24 h:** fill rate is usually low while AdX learns your inventory — this is normal.
+- Watch **Ad Manager → Reports** for impressions, fill rate, eCPM. Add more yield partners in GAM as needed — **no more code changes required**.
+
+---
+
+## What I need from you to move forward
+
+- The **2 GAM App IDs** (Android + iOS) from Step 1.
+- The **2 native ad-unit paths** (Android + iOS) from Step 2.
+- Confirmation the **iOS bundle ID** is what's registered in App Store Connect.
+
+Send those and I'll wire everything in one turn.
+
+Success probability once live IDs are pasted and native rebuild ships: **93%**.
