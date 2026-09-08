@@ -7,6 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Link2, Loader2, Sparkles, X, Check } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
+import { useImageUpload } from "@/hooks/useImageUpload";
+import { ImageUploadButton } from "@/components/ImageUploadButton";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
 import {
@@ -19,6 +21,25 @@ import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 import { measureEmbedHeight } from "@/lib/measureEmbedHeight";
 import { estimateEmbedHeight } from "@/lib/estimateEmbedHeight";
 import { extractOriginalCaptionFromSourceTitle } from "@/lib/originalCaption";
+import { getPostThumb } from "@/lib/getPostThumb";
+import { getThumbnailText } from "@/lib/getThumbnailText";
+import { TextCardThumbnail } from "@/components/TextCardThumbnail";
+
+const isYouTubeShortUrl = (url: string) => decodeURIComponent(url).toLowerCase().includes('/shorts/');
+
+// Extract the first http(s) URL from a pasted string (which may include
+// share-sheet text like "Answer to ... by X https://...?ch=...").
+const extractUrlFromText = (raw: string): string => {
+  if (!raw) return raw;
+  const trimmed = raw.trim();
+  const match = trimmed.match(/https?:\/\/[^\s<>"']+/i);
+  if (match) return match[0].replace(/[.,;:!?)\]]+$/, '');
+  // No protocol found — take the first whitespace-delimited token and
+  // add https:// if it looks like a domain.
+  const first = trimmed.split(/\s+/)[0];
+  if (/^[a-z0-9-]+\.[a-z]{2,}/i.test(first)) return `https://${first}`;
+  return trimmed;
+};
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -41,7 +62,16 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const createPost = useCreatePost();
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
-  const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
+  const { uploadImage, uploading: uploadingThumbnail } = useImageUpload();
+  const {
+    reached: limitReached,
+    remaining,
+    limit,
+    increment: incrementDailyCount,
+    isUnlimited,
+    resetCountdown,
+    resetLabel,
+  } = useDailyPostLimit();
   // Height measured offscreen at create-time so the very first viewer
   // (including the creator) opens the card at its real size — no blank space.
   const measuredHeightRef = useRef<number | null>(null);
@@ -66,6 +96,32 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   }, [open, initialDraft]);
 
   const handleLinkSubmit = async () => {
+    if (!linkUrl.trim()) return;
+    let resolvedUrl = linkUrl.trim();
+    // LinkedIn now shares posts as lnkd.in short links. Expand them to the real
+    // linkedin.com/posts/... URL so the post is classified + embedded as LinkedIn
+    // instead of falling through to Article/External.
+    if (/^https?:\/\/(www\.)?lnkd\.in\//i.test(resolvedUrl)) {
+      try {
+        setIsLoadingPreview(true);
+        const { data } = await supabase.functions.invoke('expand-url', {
+          body: { url: resolvedUrl },
+        });
+        const finalUrl = typeof data?.finalUrl === 'string' ? data.finalUrl : '';
+        if (finalUrl && finalUrl.toLowerCase().includes('linkedin.com')) {
+          resolvedUrl = finalUrl.split('?')[0];
+          setLinkUrl(resolvedUrl);
+        }
+      } catch (e) {
+        console.warn('[CreatePostDialog] lnkd.in expansion failed:', e);
+      } finally {
+        setIsLoadingPreview(false);
+      }
+    }
+    return processLinkSubmit(resolvedUrl);
+  };
+
+  const processLinkSubmit = async (linkUrl: string) => {
     if (!linkUrl.trim()) return;
     fetchedPreviewTextRef.current = null;
     measuredHeightRef.current = null;
@@ -310,6 +366,22 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
         console.error('[CreatePostDialog] oEmbed fetch failed:', error);
       }
 
+      // Threads' og:image is the author's profile picture, never the post's
+      // own media. Drop it so the typographic text card renders instead
+      // (matches X / Reddit behavior).
+      {
+        const lowerLink = linkUrl.toLowerCase();
+        const isThreadsLink = lowerLink.includes('threads.net') || lowerLink.includes('threads.com');
+        if (isThreadsLink && thumbnail) {
+          const t = thumbnail.toLowerCase();
+          const isMetaAvatar =
+            t.includes('profile_pic') ||
+            /\/t\d+\.[\d-]*-19\//.test(t) ||
+            /[?&]stp=[^&]*_19/.test(t);
+          if (isMetaAvatar) thumbnail = "";
+        }
+      }
+
       setThumbnailUrl(thumbnail);
       setTitle(videoTitle);
 
@@ -423,7 +495,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     if (!linkUrl.trim()) return;
 
     if (limitReached) {
-      toast.error(`You've reached your ${limit} post limit for today. Resets at midnight.`);
+      toast.error(`Your daily slots reset in ${resetCountdown}`, {
+        description: resetLabel,
+      });
       return;
     }
 
@@ -438,6 +512,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
 
     const mediaType = deriveMediaType(linkUrl, platform);
+    const isYouTubeShort = platform === "youtube" && isYouTubeShortUrl(linkUrl);
 
     // Final safety net — never publish a card with nothing to show.
     if (!thumbnailUrl && !embedHtml && !title.trim()) {
@@ -511,6 +586,8 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       platform: platform,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
+      media_kind: isYouTubeShort ? "short" : undefined,
+      aspect_ratio: isYouTubeShort ? 9 / 16 : undefined,
       suggested_height: suggestedHeight,
       preview_text: fetchedPreviewTextRef.current || undefined,
     }, {
@@ -538,6 +615,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
     const platform = classifyUrl(linkUrl, ogType);
     const mediaType = deriveMediaType(linkUrl, platform);
+    const isYouTubeShort = platform === "youtube" && isYouTubeShortUrl(linkUrl);
     setSubmitState("draft");
     await saveDraft.mutateAsync({
       link_url: linkUrl,
@@ -612,10 +690,14 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             {/* Blurred backdrop */}
             <DialogPrimitive.Overlay asChild forceMount>
               <motion.div
-                className="fixed inset-0 z-50 bg-foreground/45"
-                initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
-                animate={{ opacity: 1, backdropFilter: "blur(9px)" }}
-                exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                // Blur is a static CSS layer (animating backdrop-filter forces a
+                // fresh, expensive compositing pass on Android WebView — that is
+                // what made the first few opens skip their animation and made a
+                // flicker appear a beat after closing). Only opacity animates.
+                className="fixed inset-0 z-50 bg-foreground/45 backdrop-blur-lg"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
               />
             </DialogPrimitive.Overlay>
@@ -624,11 +706,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
               <motion.div
                 className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none"
-                initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)", filter: "blur(10px)" }}
-                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%", filter: "blur(0px)" }}
-                exit={{ opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)", filter: "blur(8px)" }}
+                initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)" }}
+                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
+                exit={{ opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)" }}
                 transition={panelTransition}
-                style={{ transformOrigin: "50% calc(100% + 120px)" }}
+                style={{ transformOrigin: "50% calc(100% + 120px)", willChange: "transform, opacity" }}
               >
                 <motion.div
                   transition={panelTransition}
@@ -713,7 +795,16 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                               type="url"
                               placeholder=" "
                               value={linkUrl}
-                              onChange={(e) => setLinkUrl(e.target.value)}
+                              onChange={(e) => {
+                                const raw = e.target.value;
+                                // If user pasted share text like
+                                // "Answer to ... by X https://quora.com/...",
+                                // auto-extract the URL so downstream logic
+                                // recognises the platform.
+                                const looksLikeText = /\s/.test(raw.trim()) || /^[A-Za-z]/.test(raw.trim());
+                                const cleaned = looksLikeText ? extractUrlFromText(raw) : raw;
+                                setLinkUrl(cleaned);
+                              }}
                               className="mt-2 h-14 w-full rounded-[24px] border border-input bg-background px-4 text-base outline-none shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04),0_0_0_4px_hsl(var(--muted)/0.75)] transition-[border-color,box-shadow,background-color] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:shadow-[inset_0_1px_0_hsl(var(--foreground)/0.04),0_0_0_5px_hsl(var(--foreground)/0.06)]"
                             />
                           </div>
@@ -752,21 +843,47 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                           className="space-y-4"
                         >
-                          {thumbnailUrl && (
-                            <motion.div
-                              initial={{ opacity: 0, scale: 0.96 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ duration: 0.3 }}
-                              className="overflow-hidden rounded-2xl border border-border/60"
-                            >
-                              <img
-                                src={thumbnailUrl}
-                                alt="Preview"
-                                className="h-48 w-full object-cover"
-                                onError={() => setThumbnailUrl("")}
-                              />
-                            </motion.div>
-                          )}
+                          {(() => {
+                            const previewPlatform = classifyUrl(linkUrl, ogType);
+                            const syntheticPost = {
+                              platform: previewPlatform,
+                              title,
+                              content: caption,
+                              thumbnail_url: thumbnailUrl,
+                              preview_text: fetchedPreviewTextRef.current,
+                              embed_html: embedHtml,
+                            };
+                            const resolvedThumb = getPostThumb(syntheticPost);
+                            const textSource = getThumbnailText(syntheticPost);
+                            const hasAnyPreview = !!resolvedThumb || !!textSource ||
+                              ["x", "twitter", "threads", "reddit"].includes(previewPlatform);
+                            if (!hasAnyPreview) return null;
+                            return (
+                              <motion.div
+                                initial={{ opacity: 0, scale: 0.96 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                transition={{ duration: 0.3 }}
+                                className="overflow-hidden rounded-2xl border border-border/60"
+                              >
+                                {resolvedThumb ? (
+                                  <img
+                                    src={resolvedThumb}
+                                    alt="Preview"
+                                    className="h-48 w-full object-cover"
+                                    onError={() => setThumbnailUrl("")}
+                                  />
+                                ) : (
+                                  <div className="h-48 w-full">
+                                    <TextCardThumbnail
+                                      platform={previewPlatform}
+                                      text={textSource}
+                                      aspect="h-full"
+                                    />
+                                  </div>
+                                )}
+                              </motion.div>
+                            );
+                          })()}
 
                           <div>
                             <Label htmlFor="caption" className="text-sm font-medium text-foreground/80">
@@ -782,38 +899,31 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           </div>
 
                           <div className="space-y-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={() => setShowThumbnailInput(!showThumbnailInput)}
-                              className="h-11 w-full rounded-[20px] border-input bg-background"
+                            <ImageUploadButton
+                              uploading={uploadingThumbnail}
+                              onFileSelect={async (file) => {
+                                const { data: { user } } = await supabase.auth.getUser();
+                                if (!user) {
+                                  toast.error("Please sign in to upload a thumbnail");
+                                  return;
+                                }
+                                const url = await uploadImage(file, "posts", user.id);
+                                if (url) setThumbnailUrl(url);
+                              }}
+                              className="h-11 rounded-[20px] border-input bg-background"
                             >
-                              {showThumbnailInput ? "Hide" : "Change"} Thumbnail
-                            </Button>
-
-                            <AnimatePresence initial={false}>
-                              {showThumbnailInput && (
-                                <motion.div
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: "auto", opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  transition={{ duration: 0.25 }}
-                                  className="overflow-hidden"
-                                >
-                                  <Label htmlFor="thumbnail" className="text-sm font-medium">
-                                    Thumbnail URL
-                                  </Label>
-                                  <input
-                                    id="thumbnail"
-                                    type="url"
-                                    placeholder="https://..."
-                                    value={thumbnailUrl}
-                                    onChange={(e) => setThumbnailUrl(e.target.value)}
-                                    className="mt-2 h-12 w-full rounded-[22px] border border-input bg-background px-4 text-base outline-none shadow-[0_0_0_4px_hsl(var(--muted)/0.75)] transition-[border-color,box-shadow] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.06)]"
-                                  />
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
+                              {thumbnailUrl ? "Change Thumbnail" : "Choose Thumbnail from Gallery"}
+                            </ImageUploadButton>
+                            {thumbnailUrl && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setThumbnailUrl("")}
+                                className="h-9 w-full rounded-[18px] text-xs text-muted-foreground"
+                              >
+                                Remove thumbnail
+                              </Button>
+                            )}
                           </div>
 
                           <motion.div whileTap={{ scale: 0.98 }}>
@@ -832,19 +942,26 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                                   <Check className="mr-1.5 h-5 w-5" /> Posted
                                 </motion.span>
                               ) : limitReached ? (
-                                "Daily limit reached"
+                                "Daily slots used"
                               ) : (
                                 "Post"
                               )}
                             </Button>
                           </motion.div>
                           {limitReached ? (
-                            <p className="text-center text-xs text-muted-foreground">
-                              You've reached your {limit} post limit for today. Resets at midnight.
-                            </p>
+                            <div className="text-center">
+                              <p className="text-xs text-muted-foreground">
+                                Your daily slots reset in {resetCountdown}
+                              </p>
+                              <p className="mt-0.5 text-[10px] text-muted-foreground/70">
+                                {resetLabel}
+                              </p>
+                            </div>
                           ) : (
                             <p className="text-center text-xs text-muted-foreground">
-                              {remaining} of {limit} posts remaining today
+                              {isUnlimited
+                                ? "Unlimited slots"
+                                : `${remaining} of ${limit} slots remaining today`}
                             </p>
                           )}
                           <motion.div whileTap={{ scale: 0.98 }}>

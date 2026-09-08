@@ -3,6 +3,7 @@ import { OgCardFallback } from "@/components/OgCardFallback";
 import { supabase } from "@/integrations/supabase/client";
 import redditIcon from "@/assets/platforms/reddit.svg";
 import { usePersistEmbedHeight } from "@/hooks/usePersistEmbedHeight";
+import { EmbedFadeSkeleton, smoothFadeStyle, useSmoothReveal } from "@/components/embeds/SmoothEmbedFrame";
 
 type RedditEmbedProps = {
   url: string;
@@ -16,8 +17,11 @@ type RedditEmbedProps = {
   suggestedHeight?: number | null;
 };
 
-const REDDIT_EMBED_MIN_HEIGHT = 240;
-const REDDIT_EMBED_MAX_HEIGHT = 1600;
+// Allow the iframe to hug very short text previews (Reddit collapses the body
+// behind a "Read more" toggle, so the pre-expand height can be well under
+// 240px) and to grow far enough for long expanded threads without clipping.
+const REDDIT_EMBED_MIN_HEIGHT = 120;
+const REDDIT_EMBED_MAX_HEIGHT = 4000;
 const REDDIT_EMBED_INITIAL_HEIGHT = 380;
 const REDDIT_IFRAME_TIMEOUT = 8500;
 
@@ -142,6 +146,7 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const [resolving, setResolving] = useState(needsExpansion && !directUrl);
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const redditRevealed = useSmoothReveal(loaded);
   const [thumbBroken, setThumbBroken] = useState(false);
   const [fetchedThumb, setFetchedThumb] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -151,15 +156,12 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   // and anything unclassified falls back to the legacy initial value.
   const computeInitialHeight = (): number => {
     const viewportWidth = typeof window !== 'undefined' ? Math.min(window.innerWidth, 640) : 400;
-    if (mediaKind === 'text' && suggestedHeight && suggestedHeight > 0) {
-      return Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, suggestedHeight));
-    }
     if (mediaKind === 'text') {
-      // Text-only Reddit posts collapse behind a "Read more" toggle in the
-      // official embed. Start tight so there's no blank strip below the
-      // action bar; the postMessage listener below grows the iframe when
-      // the user expands the body.
-      return 360;
+      // Do not seed collapsed text posts from `suggested_height`: Reddit can
+      // report/persist the full expanded post height while the visible body is
+      // still collapsed behind "Read more", which creates the blank iframe
+      // viewport underneath the preview on first render.
+      return 240;
     }
     if (aspectRatio && aspectRatio > 0 && (mediaKind === 'video' || mediaKind === 'image' || mediaKind === 'gallery')) {
       // Reddit's chrome (header + action bar + comments button) takes ~210px.
@@ -172,6 +174,14 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     return REDDIT_EMBED_INITIAL_HEIGHT;
   };
   const [iframeHeight, setIframeHeight] = useState<number>(computeInitialHeight);
+  // Reddit's iframe reports the FULL post height even while the body is
+  // visually collapsed behind "Read more", producing a large blank strip
+  // under the preview. Cap the height for text posts until the user actually
+  // interacts with the iframe (tap = likely "Read more"), then follow
+  // Reddit's reported height freely.
+  const COLLAPSED_TEXT_CAP = 380;
+  const [userExpanded, setUserExpanded] = useState(false);
+  const firstHeightLoggedRef = useRef(false);
   const isDirectMedia = isDirectRedditMediaUrl(normalizedUrl);
   const effectiveThumb = thumbnailUrl || fetchedThumb;
   const validThumb = !!effectiveThumb && !thumbBroken && !sameUrl(effectiveThumb, authorAvatar);
@@ -179,18 +189,13 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const embedSrc = useMemo(() => (resolvedUrl ? toRedditEmbedSrc(resolvedUrl) : null), [resolvedUrl]);
   const persistHeight = usePersistEmbedHeight(postId);
 
-  // Detect broken/blocked Reddit thumbnails (e.g. URLs that 403 or 404) so the
-  // fallback card swaps to the author's profile picture instead of rendering a
-  // broken <img>, matching the X/Threads behavior.
-  useEffect(() => {
-    setThumbBroken(false);
-    if (!effectiveThumb || sameUrl(effectiveThumb, authorAvatar)) return;
-    let cancelled = false;
-    const probe = new Image();
-    probe.onerror = () => { if (!cancelled) setThumbBroken(true); };
-    probe.src = effectiveThumb;
-    return () => { cancelled = true; };
-  }, [effectiveThumb, authorAvatar]);
+  // Previously we ran an `Image()` probe here to mark broken thumbnails, but
+  // Reddit's `external-preview.redd.it` CDN sometimes rejects cross-origin
+  // probe requests inside the Capacitor WebView even though the actual
+  // `<img>` tag renders fine. That caused valid Reddit thumbnails to be
+  // dropped and the fallback card to collapse into the plain "Reddit Post"
+  // text placeholder. Trust the `<img>` tag itself and only mark the thumb
+  // broken if the real image tag we render below fires `onError`.
 
   // Lazily fetch + persist a real Reddit thumbnail when one isn't already
   // stored. This guarantees image posts have something to render if the
@@ -301,14 +306,43 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
           ? data.data.height
           : null;
       if (typeof candidate === "number" && candidate > 0) {
-        const clamped = Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, Math.ceil(candidate)));
-        setIframeHeight(clamped);
-        persistHeight(clamped, aspectRatio ?? null);
+        let clamped = Math.min(REDDIT_EMBED_MAX_HEIGHT, Math.max(REDDIT_EMBED_MIN_HEIGHT, Math.ceil(candidate)));
+        // For collapsed text posts, ignore Reddit's oversized initial
+        // report and cap to the visible-preview size. Once the user taps
+        // (userExpanded), follow Reddit's reported height so the card can
+        // grow naturally.
+        const isCollapsedText = mediaKind === 'text' && !userExpanded;
+        const applied = isCollapsedText ? Math.min(clamped, COLLAPSED_TEXT_CAP) : clamped;
+        if (!firstHeightLoggedRef.current) {
+          firstHeightLoggedRef.current = true;
+          console.log('[RedditEmbed] first-height', { postId, reported: Math.ceil(candidate), applied, mediaKind, userExpanded });
+        } else {
+          console.log('[RedditEmbed] resize', { postId, reported: Math.ceil(candidate), applied, userExpanded });
+        }
+        setIframeHeight(applied);
+        if (!isCollapsedText) {
+          persistHeight(applied, aspectRatio ?? null);
+        }
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [embedSrc, persistHeight, aspectRatio]);
+  }, [embedSrc, persistHeight, aspectRatio, mediaKind, userExpanded, postId]);
+
+  // Detect user interaction with the Reddit iframe (tap on "Read more",
+  // upvote, etc.). Cross-origin iframes swallow events, but we can infer a
+  // tap by watching window blur while the iframe is the activeElement.
+  useEffect(() => {
+    if (!embedSrc || mediaKind !== 'text' || userExpanded) return;
+    const onBlur = () => {
+      if (document.activeElement === iframeRef.current) {
+        console.log('[RedditEmbed] user-expanded (iframe focus)', { postId });
+        setUserExpanded(true);
+      }
+    };
+    window.addEventListener('blur', onBlur);
+    return () => window.removeEventListener('blur', onBlur);
+  }, [embedSrc, mediaKind, userExpanded, postId]);
 
   if (resolving || (!resolvedUrl && !failed)) {
     return <div data-embed-status="loading" className="w-full" style={{ minHeight: iframeHeight }} />;
@@ -368,21 +402,28 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   return (
     <div
       ref={containerRef}
-      className="relative w-full"
+      className="relative w-full overflow-hidden"
       style={{ height: iframeHeight }}
       data-embed-status={loaded ? "ready" : "loading"}
     >
+      <EmbedFadeSkeleton visible={!redditRevealed} />
       <iframe
         ref={iframeRef}
         src={embedSrc}
         title={title || "Reddit post"}
         width="640"
         height={iframeHeight}
-        scrolling="no"
+        // Reddit's embed only postMessages a new height on initial render, not
+        // reliably after the in-iframe "Read more" toggle. Falling back to
+        // `auto` lets the expanded body scroll inside the card instead of
+        // spilling out, while still letting the postMessage-driven grow path
+        // run when Reddit does emit a resize.
+        scrolling="auto"
         allowFullScreen
         sandbox="allow-scripts allow-same-origin allow-popups"
         allow="clipboard-read; clipboard-write"
         className="mx-auto block w-full h-full max-w-full rounded-lg border-0"
+        style={{ position: "relative", zIndex: 1, ...smoothFadeStyle(redditRevealed) }}
       />
     </div>
   );

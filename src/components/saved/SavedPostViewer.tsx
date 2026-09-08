@@ -17,6 +17,9 @@ interface SavedPost {
   preview_text?: string | null;
   preview_title?: string | null;
   preview_image_url?: string | null;
+  media_kind?: string | null;
+  aspect_ratio?: number | null;
+  suggested_height?: number | null;
   timestamp: Date | string;
   likes: number;
   comments: number;
@@ -193,7 +196,7 @@ export const SavedPostViewer = ({
       </div>
 
       {/* Scrollable posts */}
-      <div ref={scrollContainerRef} onScroll={handleScroll} className="h-[calc(100vh-56px)] overflow-y-auto pb-8">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="h-[calc(100dvh-56px)] overflow-y-auto pb-8">
         <div className="mx-auto max-w-2xl px-4 py-4 space-y-6">
           {(() => {
             return visiblePosts.map((post, visibleIdx) => {

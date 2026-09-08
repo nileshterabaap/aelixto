@@ -42,7 +42,7 @@ export const SearchResultItem = ({ result, onSelect }: SearchResultItemProps) =>
   return (
     <div
       onClick={handleClick}
-      className="flex items-center gap-3 p-3 hover:bg-accent/50 cursor-pointer transition-colors rounded-lg"
+      className="tap-press flex items-center gap-3 p-3 hover:bg-accent/50 cursor-pointer transition-colors rounded-lg"
     >
       <Avatar className="h-12 w-12">
         <AvatarImage src={result.avatar_url || undefined} alt={result.username} />

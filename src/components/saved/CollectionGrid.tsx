@@ -21,6 +21,24 @@ interface CollectionGridProps {
   isCreating: boolean;
 }
 
+function CollectionThumb({ src }: { src: string }) {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div className="relative w-full h-full">
+      {!loaded && (
+        <div className="absolute inset-0 bg-muted/70 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-transparent before:via-white/40 before:to-transparent before:animate-shimmer" />
+      )}
+      <img
+        src={src}
+        alt=""
+        onLoad={() => setLoaded(true)}
+        loading="lazy"
+        className={`w-full h-full object-cover transition-opacity duration-300 ${loaded ? "opacity-100" : "opacity-0"}`}
+      />
+    </div>
+  );
+}
+
 function CollectionTile({
   collection,
   onClick,
@@ -42,12 +60,7 @@ function CollectionTile({
             {[0, 1, 2, 3].map((i) => (
               <div key={i} className="bg-muted/80 overflow-hidden">
                 {thumbs[i] ? (
-                  <img
-                    src={maybeProxy(thumbs[i], 240)}
-                    alt=""
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
+                  <CollectionThumb src={maybeProxy(thumbs[i], 240)} />
                 ) : (
                   <div className="w-full h-full bg-muted" />
                 )}

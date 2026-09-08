@@ -29,12 +29,15 @@ import NotFound from "./pages/NotFound";
 import SavedPosts from "./pages/SavedPosts";
 import InteractionSettings from "./pages/InteractionSettings";
 import PrivacySettings from "./pages/PrivacySettings";
+import NotificationSettings from "./pages/NotificationSettings";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import ChildSafety from "./pages/ChildSafety";
 import AuthBridge from "./pages/AuthBridge";
 import Unsubscribe from "./pages/Unsubscribe";
 import ShortLinkRedirect from "./pages/ShortLinkRedirect";
+// DEBUG ONLY — temporary keyboard/composer geometry probe (native + opt-in).
+import { KeyboardGapDebugPanel } from "@/components/KeyboardGapDebugPanel";
 
 // Configure QueryClient with aggressive caching for instant navigation
 const queryClient = new QueryClient({
@@ -101,6 +104,7 @@ const AnimatedRoutes = () => {
             <Route path="/settings" element={<PageTransition><Settings /></PageTransition>} />
             <Route path="/settings/interactions" element={<PageTransition><InteractionSettings /></PageTransition>} />
             <Route path="/settings/privacy" element={<PageTransition><PrivacySettings /></PageTransition>} />
+            <Route path="/settings/notifications" element={<PageTransition><NotificationSettings /></PageTransition>} />
             <Route path="/edit-profile" element={<PageTransition><EditProfile /></PageTransition>} />
             <Route path="/saved" element={<PageTransition><SavedPosts /></PageTransition>} />
             <Route path="/auth" element={<PageTransition><Auth /></PageTransition>} />
@@ -122,6 +126,7 @@ const AnimatedRoutes = () => {
       {/* Persistent navigation — lives OUTSIDE PageTransition so it
           stays mounted across route changes and never flickers. */}
       <PersistentBottomNav />
+      <KeyboardGapDebugPanel />
     </>
   );
 };
