@@ -149,25 +149,14 @@ export const loadRedditEmbed = (): Promise<void> => {
 
 // Preload all embed SDKs early for faster embed rendering
 export const preloadEmbedSDKs = () => {
-  // Fire all SDK loads immediately in parallel. Modern browsers happily
-  // parallelise <script async> downloads, and staggering only made the
-  // first Twitter/Reddit/Pinterest embed wait 1–2s longer than needed.
-  const start = () => {
+  // Load in background without blocking — stagger to avoid bandwidth contention
+  setTimeout(() => {
     loadInstagramEmbed().catch(() => {});
     loadFacebookSDK().catch(() => {});
+  }, 500);
+  setTimeout(() => {
     loadTwitterEmbed().catch(() => {});
-    loadRedditEmbed().catch(() => {});
-    loadPinterestEmbed().catch(() => {});
-    loadThreadsEmbed().catch(() => {});
-    loadTikTokEmbed().catch(() => {});
-  };
-  // Defer past first paint so we don't compete with the app shell,
-  // but nowhere near the old 1500ms stagger.
-  if (typeof requestIdleCallback === 'function') {
-    requestIdleCallback(start, { timeout: 200 });
-  } else {
-    setTimeout(start, 0);
-  }
+  }, 1500);
 };
 
 // Type declarations for global window objects

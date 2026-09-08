@@ -2,7 +2,6 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/logo.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#2563EB" />
@@ -39,8 +38,8 @@
         pointer-events: none;
       }
       #splash-screen img {
-        width: 128px;
-        height: 128px;
+        width: 96px;
+        height: 96px;
         animation: splash-pulse 1.5s ease-in-out infinite;
       }
       @keyframes splash-pulse {
@@ -52,26 +51,11 @@
   <meta name="twitter:title" content="Aelixto - Share What Matters">
   <meta property="og:description" content="A minimalist social feed where attention earns rewards">
   <meta name="twitter:description" content="A minimalist social feed where attention earns rewards">
-
-  <!-- Preconnect to embed SDK origins so first Twitter/Reddit/Pinterest/FB/YT/Quora card renders faster -->
-  <link rel="preconnect" href="https://platform.twitter.com" crossorigin>
-  <link rel="preconnect" href="https://cdn.syndication.twimg.com" crossorigin>
-  <link rel="preconnect" href="https://embed.reddit.com" crossorigin>
-  <link rel="preconnect" href="https://www.redditstatic.com" crossorigin>
-  <link rel="preconnect" href="https://assets.pinterest.com" crossorigin>
-  <link rel="preconnect" href="https://widgets.pinterest.com" crossorigin>
-  <link rel="preconnect" href="https://connect.facebook.net" crossorigin>
-  <link rel="preconnect" href="https://www.facebook.com" crossorigin>
-  <link rel="preconnect" href="https://www.youtube.com" crossorigin>
-  <link rel="preconnect" href="https://i.ytimg.com" crossorigin>
-  <link rel="preconnect" href="https://www.quora.com" crossorigin>
-  <link rel="preconnect" href="https://www.instagram.com" crossorigin>
-  <link rel="preconnect" href="https://www.threads.net" crossorigin>
 </head>
 
   <body>
     <div id="splash-screen">
-      <img src="/splash-logo.png" alt="Aelixto" />
+      <img src="/logo.png" alt="Aelixto" />
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>

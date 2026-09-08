@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2, Check, CheckCheck } from "lucide-react";
+import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SharedPostCard } from "@/components/messages/SharedPostCard";
 import { Input } from "@/components/ui/input";
@@ -29,7 +29,7 @@ const Conversation = () => {
   const navigate = useNavigate();
   const { user } = useSession();
   const { toast } = useToast();
-  const { messages, loading, sendMessage, otherStatus } = useMessages(conversationId || null);
+  const { messages, loading, sendMessage } = useMessages(conversationId || null);
   const [newMessage, setNewMessage] = useState("");
   const [otherUser, setOtherUser] = useState<ConversationUser | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -39,20 +39,6 @@ const Conversation = () => {
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [highlightId, setHighlightId] = useState<string | null>(null);
-  // Swipe-to-reply state
-  const swipeRef = useRef<{
-    id: string;
-    x: number;
-    y: number;
-    dir: 1 | -1; // 1 = swipe right (other's msg), -1 = swipe left (own msg)
-    active: boolean;
-    cancelled: boolean;
-  } | null>(null);
-  const [swipe, setSwipe] = useState<{ id: string; dx: number } | null>(null);
-  const SWIPE_TRIGGER = 55;
-  const SWIPE_MAX = 90;
 
   useEffect(() => {
     if (conversationId && user) {
@@ -63,14 +49,6 @@ const Conversation = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  // When user triggers reply (via swipe or menu), scroll to bottom so the
-  // reply banner + input remain visible above the keyboard.
-  useEffect(() => {
-    if (replyTo) {
-      requestAnimationFrame(() => scrollToBottom());
-    }
-  }, [replyTo]);
 
   // Close menu on outside tap
   useEffect(() => {
@@ -120,11 +98,7 @@ const Conversation = () => {
 
   const handleSend = async () => {
     if (!newMessage.trim()) return;
-    let content = newMessage;
-    if (replyTo) {
-      content = `↪️__REPLY__:${replyTo.id}\n${newMessage}`;
-    }
-    await sendMessage(content);
+    await sendMessage(newMessage);
     setNewMessage("");
     setReplyTo(null);
   };
@@ -158,88 +132,12 @@ const Conversation = () => {
     return da.getFullYear() === db.getFullYear() && da.getMonth() === db.getMonth() && da.getDate() === db.getDate();
   };
 
-  const parseReply = (content: string): { replyToId: string | null; body: string } => {
-    const m = content.match(/^↪️__REPLY__:([a-f0-9-]{36})\n([\s\S]*)$/);
-    if (m) return { replyToId: m[1], body: m[2] };
-    return { replyToId: null, body: content };
-  };
-
-  const scrollToMessage = useCallback((id: string) => {
-    const el = messageRefs.current[id];
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setHighlightId(id);
-    window.setTimeout(() => setHighlightId((cur) => (cur === id ? null : cur)), 1400);
-  }, []);
-
-  const getDisplayName = (id: string | undefined) => {
-    if (!id) return '';
-    if (id === user?.id) return 'yourself';
-    return otherUser?.display_name || otherUser?.username || '';
-  };
-
-  const isPostShareContent = (body: string) => {
-    const trimmed = body.trim();
-    return /^https?:\/\/.+\/post\/[a-f0-9-]{36}$/.test(trimmed);
-  };
-  const extractPostId = (body: string) => {
-    const m = body.trim().match(/\/post\/([a-f0-9-]{36})$/);
-    return m ? m[1] : null;
-  };
-
   // Long press handlers
   const handleTouchStart = useCallback((msg: Message, e: React.TouchEvent) => {
     const touch = e.touches[0];
-    swipeRef.current = {
-      id: msg.id,
-      x: touch.clientX,
-      y: touch.clientY,
-      dir: msg.sender_id === user?.id ? -1 : 1,
-      active: false,
-      cancelled: false,
-    };
     longPressTimer.current = setTimeout(() => {
       setMenu({ message: msg, x: touch.clientX, y: touch.clientY });
     }, 500);
-  }, [user?.id]);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    const s = swipeRef.current;
-    if (!s || s.cancelled) return;
-    const touch = e.touches[0];
-    const dx = touch.clientX - s.x;
-    const dy = touch.clientY - s.y;
-    const rawDx = s.dir === 1 ? Math.max(0, dx) : Math.min(0, dx);
-
-    if (!s.active) {
-      // Cancel if vertical scroll dominates
-      if (Math.abs(dy) > 12 && Math.abs(dy) > Math.abs(rawDx)) {
-        s.cancelled = true;
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current);
-          longPressTimer.current = null;
-        }
-        setSwipe(null);
-        return;
-      }
-      if (Math.abs(rawDx) > 8) {
-        s.active = true;
-        if (longPressTimer.current) {
-          clearTimeout(longPressTimer.current);
-          longPressTimer.current = null;
-        }
-      } else {
-        return;
-      }
-    }
-
-    // Rubber-band beyond max
-    let display = rawDx;
-    if (Math.abs(rawDx) > SWIPE_MAX) {
-      const overflow = Math.abs(rawDx) - SWIPE_MAX;
-      display = (SWIPE_MAX + overflow * 0.25) * Math.sign(rawDx);
-    }
-    setSwipe({ id: s.id, dx: display });
   }, []);
 
   const handleTouchEnd = useCallback(() => {
@@ -247,14 +145,7 @@ const Conversation = () => {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
-    const s = swipeRef.current;
-    if (s?.active && swipe && swipe.id === s.id && Math.abs(swipe.dx) >= SWIPE_TRIGGER) {
-      const msg = messages.find(m => m.id === s.id);
-      if (msg) setReplyTo(msg);
-    }
-    swipeRef.current = null;
-    setSwipe(null);
-  }, [swipe, messages]);
+  }, []);
 
   const handleContextMenu = useCallback((msg: Message, e: React.MouseEvent) => {
     e.preventDefault();
@@ -264,7 +155,7 @@ const Conversation = () => {
   // Actions
   const handleCopy = () => {
     if (!menu.message) return;
-    navigator.clipboard.writeText(parseReply(menu.message.content).body);
+    navigator.clipboard.writeText(menu.message.content);
     toast({ description: "Copied to clipboard" });
     setMenu({ message: null, x: 0, y: 0 });
   };
@@ -278,20 +169,16 @@ const Conversation = () => {
   const handleEditStart = () => {
     if (!menu.message) return;
     setEditingId(menu.message.id);
-    setEditText(parseReply(menu.message.content).body);
+    setEditText(menu.message.content);
     setMenu({ message: null, x: 0, y: 0 });
   };
 
   const handleEditSave = async () => {
     if (!editingId || !editText.trim()) return;
-    const original = messages.find(m => m.id === editingId);
-    const prefix = original ? (parseReply(original.content).replyToId
-      ? `↪️__REPLY__:${parseReply(original.content).replyToId}\n`
-      : '') : '';
     try {
       const { error } = await supabase
         .from('messages')
-        .update({ content: prefix + editText.trim() })
+        .update({ content: editText.trim() })
         .eq('id', editingId)
         .eq('sender_id', user!.id);
       if (error) throw error;
@@ -325,17 +212,6 @@ const Conversation = () => {
   };
 
   const canUnsend = (msg: Message) => msg.sender_id === user?.id;
-
-  // Compute WhatsApp-style tick state for one of my messages
-  const getTickState = (msg: Message): 'sent' | 'delivered' | 'seen' => {
-    if (!otherStatus) return 'sent';
-    const created = new Date(msg.created_at).getTime();
-    const read = otherStatus.last_read_at ? new Date(otherStatus.last_read_at).getTime() : 0;
-    const delivered = otherStatus.last_delivered_at ? new Date(otherStatus.last_delivered_at).getTime() : 0;
-    if (read >= created) return 'seen';
-    if (delivered >= created) return 'delivered';
-    return 'sent';
-  };
 
   if (loading) {
     return (
@@ -385,11 +261,8 @@ const Conversation = () => {
         <div className="container max-w-2xl mx-auto w-full px-4 py-4 space-y-1 animate-fade-in mt-auto">
           {messages.map((message, idx) => {
             const isOwn = message.sender_id === user?.id;
-            const { replyToId, body } = parseReply(message.content);
-            const repliedMessage = replyToId ? messages.find(m => m.id === replyToId) : null;
-            const repliedBody = repliedMessage ? parseReply(repliedMessage.content).body : null;
-            const postMatch = body.match(/\/post\/([a-f0-9-]{36})$/);
-            const isPostShare = postMatch && body.trim().match(/^https?:\/\/.+\/post\/[a-f0-9-]{36}$/);
+            const postMatch = message.content.match(/\/post\/([a-f0-9-]{36})$/);
+            const isPostShare = postMatch && message.content.trim().match(/^https?:\/\/.+\/post\/[a-f0-9-]{36}$/);
             const isEditing = editingId === message.id;
             const prev = idx > 0 ? messages[idx - 1] : null;
             const senderChanged = !prev || prev.sender_id !== message.sender_id;
@@ -405,57 +278,14 @@ const Conversation = () => {
                   </div>
                 )}
                 <div
-                  ref={(el) => { messageRefs.current[message.id] = el; }}
                   className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${
                     senderChanged && !showDaySeparator ? 'mt-2' : ''
-                  } relative transition-colors duration-500 rounded-lg ${
-                    highlightId === message.id ? 'bg-primary/10' : ''
                   }`}
                   onTouchStart={(e) => handleTouchStart(message, e)}
-                  onTouchMove={(e) => handleTouchMove(e)}
                   onTouchEnd={handleTouchEnd}
-                  onTouchCancel={handleTouchEnd}
+                  onTouchMove={handleTouchEnd}
                   onContextMenu={(e) => handleContextMenu(message, e)}
                 >
-                  {/* Reply icon revealed during swipe */}
-                  {swipe?.id === message.id && (
-                    <div
-                      className={`absolute top-1/2 -translate-y-1/2 flex items-center justify-center rounded-full transition-colors ${
-                        isOwn ? 'right-2' : 'left-2'
-                      }`}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        opacity: Math.min(1, Math.abs(swipe.dx) / SWIPE_TRIGGER),
-                        background:
-                          Math.abs(swipe.dx) >= SWIPE_TRIGGER
-                            ? 'hsl(var(--primary) / 0.15)'
-                            : 'hsl(var(--muted))',
-                      }}
-                    >
-                      <Reply
-                        className="h-4 w-4"
-                        style={{
-                          color:
-                            Math.abs(swipe.dx) >= SWIPE_TRIGGER
-                              ? 'hsl(var(--primary))'
-                              : 'hsl(var(--muted-foreground))',
-                        }}
-                      />
-                    </div>
-                  )}
-                  <div
-                    className="w-full flex"
-                    style={{
-                      justifyContent: isOwn ? 'flex-end' : 'flex-start',
-                      transform:
-                        swipe?.id === message.id
-                          ? `translate3d(${swipe.dx}px, 0, 0)`
-                          : undefined,
-                      transition: swipe?.id === message.id ? 'none' : 'transform 180ms ease',
-                      touchAction: 'pan-y',
-                    }}
-                  >
                 {isPostShare && postMatch ? (
                   <SharedPostCard postId={postMatch[1]} isOwn={isOwn} />
                 ) : isEditing ? (
@@ -486,74 +316,25 @@ const Conversation = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className={`max-w-[70%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                    {replyToId && repliedMessage && (() => {
-                      const repliedIsPost = isPostShareContent(repliedBody || '');
-                      const repliedPostId = repliedIsPost ? extractPostId(repliedBody || '') : null;
-                      const authorLabel = message.sender_id === repliedMessage.sender_id
-                        ? (isOwn ? 'You replied to yourself' : `${getDisplayName(message.sender_id)} replied to themselves`)
-                        : (isOwn ? `You replied to ${getDisplayName(repliedMessage.sender_id)}` : 'Replied to you');
-                      return (
-                        <>
-                          <span className={`text-[11px] text-muted-foreground mb-1 px-1 ${isOwn ? 'text-right' : 'text-left'}`}>
-                            {authorLabel}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => scrollToMessage(repliedMessage.id)}
-                            className={`max-w-full flex ${isOwn ? 'justify-end' : 'justify-start'} focus:outline-none`}
-                            style={{ marginBottom: -10 }}
-                          >
-                            {repliedIsPost && repliedPostId ? (
-                              <div className="opacity-60 pointer-events-none scale-90 origin-bottom">
-                                <SharedPostCard postId={repliedPostId} isOwn={isOwn} />
-                              </div>
-                            ) : (
-                              <div
-                                className={`rounded-2xl px-3 py-1.5 text-sm opacity-60 max-w-full ${
-                                  isOwn ? 'bg-primary/40 text-primary-foreground' : 'bg-muted text-foreground'
-                                }`}
-                                style={{ paddingBottom: 14 }}
-                              >
-                                <span className="line-clamp-2 break-words">{repliedBody}</span>
-                              </div>
-                            )}
-                          </button>
-                        </>
-                      );
-                    })()}
-                    <div
-                      className={`rounded-lg px-3 py-1.5 ${
-                        isOwn
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-muted text-foreground'
-                      } ${replyToId && repliedMessage ? 'relative z-10' : ''}`}
-                    >
-                      <p className="text-sm whitespace-pre-wrap break-words">
-                        {body}
-                        <span
-                          className={`float-right ml-2 text-[10px] leading-none select-none relative top-[6px] ${
-                            isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                          }`}
-                        >
-                          {formatTime(message.created_at)}
-                          {isOwn && (() => {
-                            const state = getTickState(message);
-                            if (state === 'seen') {
-                              // 2 solid ticks — full opacity (reads as "black/dark" on own bubble)
-                              return <CheckCheck className="inline-block ml-1 h-3 w-3 align-[-2px] text-primary-foreground" />;
-                            }
-                            if (state === 'delivered') {
-                              return <CheckCheck className="inline-block ml-1 h-3 w-3 align-[-2px] text-primary-foreground/50" />;
-                            }
-                            return <Check className="inline-block ml-1 h-3 w-3 align-[-2px] text-primary-foreground/50" />;
-                          })()}
-                        </span>
-                      </p>
-                    </div>
+                  <div
+                    className={`max-w-[70%] rounded-lg px-3 py-1.5 ${
+                      isOwn
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-foreground'
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap break-words">
+                      {message.content}
+                      <span
+                        className={`float-right ml-2 text-[10px] leading-none select-none relative top-[6px] ${
+                          isOwn ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                        }`}
+                      >
+                        {formatTime(message.created_at)}
+                      </span>
+                    </p>
                   </div>
                 )}
-                  </div>
                 </div>
               </div>
             );
@@ -607,7 +388,7 @@ const Conversation = () => {
       {replyTo && (
         <div className="bg-muted/50 border-t border-border px-4 py-2 flex items-center justify-between">
           <div className="text-xs text-muted-foreground truncate flex-1">
-            Replying to: <span className="text-foreground">{parseReply(replyTo.content).body}</span>
+            Replying to: <span className="text-foreground">{replyTo.content}</span>
           </div>
           <button onClick={() => setReplyTo(null)} className="text-xs text-muted-foreground ml-2">✕</button>
         </div>
@@ -616,43 +397,22 @@ const Conversation = () => {
       {/* Input */}
       <div className="sticky bottom-0 bg-background border-t border-border">
         <div className="container max-w-2xl mx-auto px-4 py-4">
-          <form
-            autoComplete="off"
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="flex gap-2"
-          >
+          <div className="flex gap-2">
             <Input
               placeholder="Type a message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               className="flex-1"
-              // type="search" + autocomplete off suppresses Chrome Android's
-              // key/location/card autofill toolbar above the keyboard.
-              type="search"
-              enterKeyHint="send"
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="sentences"
-              spellCheck={false}
-              name={`msg-${conversationId ?? "new"}`}
-              inputMode="text"
-              data-form-type="other"
-              data-lpignore="true"
-              aria-autocomplete="none"
             />
             <Button
-              type="submit"
               size="icon"
               onClick={handleSend}
               disabled={!newMessage.trim()}
             >
               <Send className="h-5 w-5" />
             </Button>
-          </form>
+          </div>
         </div>
       </div>
     </div>

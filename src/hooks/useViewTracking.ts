@@ -35,12 +35,14 @@ export async function trackView({ postId, eventType, durationMs = 0 }: TrackView
     const { data, error } = await supabase.functions.invoke('record-view', { body: payload });
 
     if (error) {
+      console.error('[useViewTracking] Error:', error);
       return false;
     }
 
     const success = data?.ok === true;
     return success;
   } catch (error) {
+    console.error('[useViewTracking] Exception:', error);
     return false;
   }
 }
@@ -68,13 +70,14 @@ async function trackViewBeforeNavigation({ postId, eventType, durationMs = 0 }: 
       return true;
     }
 
-    const res = await fetch(url, {
+    await fetch(url, {
       method: 'POST',
       body: payload,
       keepalive: true,
     });
     return true;
   } catch (error) {
+    console.error('[useViewTracking] Navigation-safe exception:', error);
     return false;
   }
 }

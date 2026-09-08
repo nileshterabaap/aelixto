@@ -27,23 +27,6 @@ function isGenericPreviewText(text: string): boolean {
   return false;
 }
 
-/**
- * Clean X / Twitter OG-description-derived preview text so the tweet body
- * is what actually renders in the grid tile. Handles the common
- * "@handle on X: \"body\" https://t.co/xyz pic.twitter.com/abc" shape.
- */
-function cleanTweetText(text: string): string {
-  let t = text.trim();
-  // Strip leading "@handle on X:" / "Name (@handle) on X:" prefixes.
-  t = t.replace(/^[^:]{1,80}\s+on\s+(?:X|Twitter)\s*:\s*/i, "");
-  // Strip surrounding smart/regular quotes.
-  t = t.replace(/^["“'‘]+|["”'’]+$/g, "");
-  // Drop trailing shortened media links.
-  t = t.replace(/\s*https?:\/\/t\.co\/\S+/gi, "");
-  t = t.replace(/\s*pic\.twitter\.com\/\S+/gi, "");
-  return t.replace(/\s+/g, " ").trim();
-}
-
 function extractFromEmbedHtml(platform: string, embedHtml?: string | null): string {
   if (!embedHtml) return "";
   try {
@@ -97,13 +80,6 @@ export function getThumbnailText(post: ThumbnailTextSource): string {
   const content = decode(post.content);
   const previewTitle = decode(post.preview_title);
   const previewText = decode(post.preview_text);
-
-  // For X/Twitter, prefer the cleaned tweet body from preview_text before
-  // titles like "@handle on X" that don't carry any real content.
-  if ((platform === "x" || platform === "twitter") && previewText) {
-    const cleaned = cleanTweetText(previewText);
-    if (cleaned && !isGenericPreviewText(cleaned)) return cleaned;
-  }
 
   if (!isGenericTitle(title)) return title;
   if (content) return content;

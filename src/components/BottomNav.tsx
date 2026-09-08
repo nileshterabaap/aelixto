@@ -110,20 +110,6 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     navigate(path);
   };
 
-  const handleProfileClick = (e: MouseEvent<HTMLButtonElement>) => {
-    createRipple(e, "profile");
-    // If already on the profile tab (own /profile or own /u/username), a
-    // second tap should scroll back to the top instead of re-navigating.
-    if (isActive("/profile")) {
-      if (window.scrollY > 0) {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-      return;
-    }
-    setScrollPosition(location.pathname, window.scrollY);
-    navigate("/profile");
-  };
-
   const handleTouchStart = (path: string) => {
     // Prefetch immediately on touch for instant navigation
     handlePrefetch(path);
@@ -219,7 +205,7 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             variant="ghost"
             size="icon"
             className="h-14 w-14 active:scale-90 transition-transform flex flex-col items-center justify-center gap-1 overflow-hidden relative"
-            onClick={handleProfileClick}
+            onClick={(e) => handleClick(e, "/profile", "profile")}
             onMouseEnter={() => handlePrefetch("/profile")}
             onTouchStart={() => handleTouchStart("/profile")}
           >

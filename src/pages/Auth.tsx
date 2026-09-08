@@ -33,11 +33,6 @@ const AppleIcon = () => (
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  // Hide Apple sign-in on Android. Apple's guidelines require the native
-  // Apple sheet on iOS, and non-Apple platforms should not offer this option
-  // (matches how other apps behave).
-  const showApple =
-    !(Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
@@ -284,6 +279,25 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     const isNative = Capacitor.isNativePlatform();
     if (isNative) {
+      // 1) Try TRUE native Google Sign-In (system account picker, no browser tab).
+      try {
+        const { GoogleAuth } = await import("@codetrix-studio/capacitor-google-auth");
+        try { await GoogleAuth.initialize(); } catch { /* already initialized */ }
+        const gUser = await GoogleAuth.signIn();
+        const idToken = (gUser as { authentication?: { idToken?: string } })?.authentication?.idToken;
+        if (idToken) {
+          const { error } = await supabase.auth.signInWithIdToken({ provider: "google", token: idToken });
+          if (error) {
+            toast({ title: "Google sign-in failed", description: error.message, variant: "destructive" });
+            return;
+          }
+          return; // success — onAuthStateChange navigates
+        }
+        // No idToken → fall through to Custom Tabs fallback below.
+      } catch (nativeErr) {
+        console.warn("Native GoogleAuth failed, falling back to Custom Tabs", nativeErr);
+      }
+
       // Native flow (APK/AAB):
       // 1. Open Chrome Custom Tab to the OAuth broker.
       // 2. Broker finishes and redirects to our /~auth-bridge web page.
@@ -389,20 +403,6 @@ const Auth = () => {
       });
     }
   };
-
-  // While the initial Supabase session probe is running, render nothing so
-  // the splash screen (kept alive in main.tsx) covers the wait. Otherwise
-  // signed-in users would see the auth form flash for ~1s before the
-  // navigate("/") fires.
-  const [sessionChecked, setSessionChecked] = useState(false);
-  useEffect(() => {
-    let cancelled = false;
-    supabase.auth.getSession().then(() => {
-      if (!cancelled) setSessionChecked(true);
-    });
-    return () => { cancelled = true; };
-  }, []);
-  if (!sessionChecked || user) return null;
 
   return (
     <div className="relative min-h-screen flex items-center justify-center bg-background p-5 overflow-hidden">
@@ -536,18 +536,16 @@ const Auth = () => {
                 Continue with Google
               </Button>
 
-              {showApple && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
-                  onClick={handleAppleSignIn}
-                  disabled={loading}
-                >
-                  <AppleIcon />
-                  Continue with Apple
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
+                onClick={handleAppleSignIn}
+                disabled={loading}
+              >
+                <AppleIcon />
+                Continue with Apple
+              </Button>
             </form>
           </TabsContent>
 
@@ -616,18 +614,16 @@ const Auth = () => {
                 Continue with Google
               </Button>
 
-              {showApple && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
-                  onClick={handleAppleSignIn}
-                  disabled={loading}
-                >
-                  <AppleIcon />
-                  Continue with Apple
-                </Button>
-              )}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-12 rounded-full text-base font-medium gap-2 mt-2"
+                onClick={handleAppleSignIn}
+                disabled={loading}
+              >
+                <AppleIcon />
+                Continue with Apple
+              </Button>
             </form>
           </TabsContent>
         </Tabs>

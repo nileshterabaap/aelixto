@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { MoreVertical, Ban, UserMinus, Copy, Share2, Flag, ShieldOff } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { MoreVertical, Ban, UserMinus, Copy, Share2, Flag } from "lucide-react";
 import { ReportDialog } from "@/components/ReportDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,9 +28,7 @@ interface ProfileOptionsMenuProps {
   username: string;
   displayName?: string | null;
   isFollowedByTarget: boolean; // does this user follow ME?
-  isBlocked?: boolean;
   onBlocked?: () => void;
-  onUnblocked?: () => void;
   onRemovedFollower?: () => void;
 }
 
@@ -40,12 +37,9 @@ export const ProfileOptionsMenu = ({
   username,
   displayName,
   isFollowedByTarget,
-  isBlocked = false,
   onBlocked,
-  onUnblocked,
   onRemovedFollower,
 }: ProfileOptionsMenuProps) => {
-  const queryClient = useQueryClient();
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [removeFollowerDialogOpen, setRemoveFollowerDialogOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -99,10 +93,6 @@ export const ProfileOptionsMenu = ({
         .eq("following_id", user.id);
 
       toast.success(`Blocked @${username}`);
-      // Force everything that could be showing this user to refetch — the
-      // new RLS policies will now hide them from feed, search, profile,
-      // followers/following lists, notifications, and conversations.
-      await queryClient.invalidateQueries();
       onBlocked?.();
     } catch (error) {
       console.error("Error blocking user:", error);
@@ -110,31 +100,6 @@ export const ProfileOptionsMenu = ({
     } finally {
       setLoading(false);
       setBlockDialogOpen(false);
-    }
-  };
-
-  const handleUnblock = async () => {
-    setLoading(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase
-        .from("blocked_users")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("blocked_user_id", targetUserId);
-
-      if (error) throw error;
-
-      toast.success(`Unblocked @${username}`);
-      await queryClient.invalidateQueries();
-      onUnblocked?.();
-    } catch (error) {
-      console.error("Error unblocking user:", error);
-      toast.error("Failed to unblock user");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -201,23 +166,13 @@ export const ProfileOptionsMenu = ({
             <Flag className="h-4 w-4 mr-2" />
             Report @{username}
           </DropdownMenuItem>
-          {isBlocked ? (
-            <DropdownMenuItem
-              onClick={handleUnblock}
-              disabled={loading}
-            >
-              <ShieldOff className="h-4 w-4 mr-2" />
-              Unblock @{username}
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem
-              onClick={() => setBlockDialogOpen(true)}
-              className="text-destructive focus:text-destructive"
-            >
-              <Ban className="h-4 w-4 mr-2" />
-              Block @{username}
-            </DropdownMenuItem>
-          )}
+          <DropdownMenuItem
+            onClick={() => setBlockDialogOpen(true)}
+            className="text-destructive focus:text-destructive"
+          >
+            <Ban className="h-4 w-4 mr-2" />
+            Block @{username}
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 

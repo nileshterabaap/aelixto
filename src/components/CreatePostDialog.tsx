@@ -7,8 +7,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { ArrowLeft, Link2, Loader2, Sparkles, X, Check } from "lucide-react";
 import { useCreatePost } from "@/hooks/usePosts";
-import { useImageUpload } from "@/hooks/useImageUpload";
-import { ImageUploadButton } from "@/components/ImageUploadButton";
 import { supabase } from "@/integrations/supabase/client";
 import { classifyUrl, deriveMediaType } from "@/config/platformRegistry";
 import {
@@ -21,11 +19,6 @@ import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
 import { measureEmbedHeight } from "@/lib/measureEmbedHeight";
 import { estimateEmbedHeight } from "@/lib/estimateEmbedHeight";
 import { extractOriginalCaptionFromSourceTitle } from "@/lib/originalCaption";
-import { getPostThumb } from "@/lib/getPostThumb";
-import { getThumbnailText } from "@/lib/getThumbnailText";
-import { TextCardThumbnail } from "@/components/TextCardThumbnail";
-
-const isYouTubeShortUrl = (url: string) => decodeURIComponent(url).toLowerCase().includes('/shorts/');
 
 interface CreatePostDialogProps {
   open: boolean;
@@ -48,7 +41,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const createPost = useCreatePost();
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
-  const { uploadImage, uploading: uploadingThumbnail } = useImageUpload();
   const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
   // Height measured offscreen at create-time so the very first viewer
   // (including the creator) opens the card at its real size — no blank space.
@@ -446,7 +438,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
 
     const mediaType = deriveMediaType(linkUrl, platform);
-    const isYouTubeShort = platform === "youtube" && isYouTubeShortUrl(linkUrl);
 
     // Final safety net — never publish a card with nothing to show.
     if (!thumbnailUrl && !embedHtml && !title.trim()) {
@@ -520,8 +511,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
       platform: platform,
       thumbnail_url: thumbnailUrl || undefined,
       embed_html: embedHtml || undefined,
-      media_kind: isYouTubeShort ? "short" : undefined,
-      aspect_ratio: isYouTubeShort ? 9 / 16 : undefined,
       suggested_height: suggestedHeight,
       preview_text: fetchedPreviewTextRef.current || undefined,
     }, {
@@ -549,7 +538,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     }
     const platform = classifyUrl(linkUrl, ogType);
     const mediaType = deriveMediaType(linkUrl, platform);
-    const isYouTubeShort = platform === "youtube" && isYouTubeShortUrl(linkUrl);
     setSubmitState("draft");
     await saveDraft.mutateAsync({
       link_url: linkUrl,
@@ -764,47 +752,21 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                           className="space-y-4"
                         >
-                          {(() => {
-                            const previewPlatform = classifyUrl(linkUrl, ogType);
-                            const syntheticPost = {
-                              platform: previewPlatform,
-                              title,
-                              content: caption,
-                              thumbnail_url: thumbnailUrl,
-                              preview_text: fetchedPreviewTextRef.current,
-                              embed_html: embedHtml,
-                            };
-                            const resolvedThumb = getPostThumb(syntheticPost);
-                            const textSource = getThumbnailText(syntheticPost);
-                            const hasAnyPreview = !!resolvedThumb || !!textSource ||
-                              ["x", "twitter", "threads", "reddit"].includes(previewPlatform);
-                            if (!hasAnyPreview) return null;
-                            return (
-                              <motion.div
-                                initial={{ opacity: 0, scale: 0.96 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                transition={{ duration: 0.3 }}
-                                className="overflow-hidden rounded-2xl border border-border/60"
-                              >
-                                {resolvedThumb ? (
-                                  <img
-                                    src={resolvedThumb}
-                                    alt="Preview"
-                                    className="h-48 w-full object-cover"
-                                    onError={() => setThumbnailUrl("")}
-                                  />
-                                ) : (
-                                  <div className="h-48 w-full">
-                                    <TextCardThumbnail
-                                      platform={previewPlatform}
-                                      text={textSource}
-                                      aspect="h-full"
-                                    />
-                                  </div>
-                                )}
-                              </motion.div>
-                            );
-                          })()}
+                          {thumbnailUrl && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.96 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ duration: 0.3 }}
+                              className="overflow-hidden rounded-2xl border border-border/60"
+                            >
+                              <img
+                                src={thumbnailUrl}
+                                alt="Preview"
+                                className="h-48 w-full object-cover"
+                                onError={() => setThumbnailUrl("")}
+                              />
+                            </motion.div>
+                          )}
 
                           <div>
                             <Label htmlFor="caption" className="text-sm font-medium text-foreground/80">
@@ -820,31 +782,38 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           </div>
 
                           <div className="space-y-2">
-                            <ImageUploadButton
-                              uploading={uploadingThumbnail}
-                              onFileSelect={async (file) => {
-                                const { data: { user } } = await supabase.auth.getUser();
-                                if (!user) {
-                                  toast.error("Please sign in to upload a thumbnail");
-                                  return;
-                                }
-                                const url = await uploadImage(file, "posts", user.id);
-                                if (url) setThumbnailUrl(url);
-                              }}
-                              className="h-11 rounded-[20px] border-input bg-background"
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setShowThumbnailInput(!showThumbnailInput)}
+                              className="h-11 w-full rounded-[20px] border-input bg-background"
                             >
-                              {thumbnailUrl ? "Change Thumbnail" : "Choose Thumbnail from Gallery"}
-                            </ImageUploadButton>
-                            {thumbnailUrl && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                onClick={() => setThumbnailUrl("")}
-                                className="h-9 w-full rounded-[18px] text-xs text-muted-foreground"
-                              >
-                                Remove thumbnail
-                              </Button>
-                            )}
+                              {showThumbnailInput ? "Hide" : "Change"} Thumbnail
+                            </Button>
+
+                            <AnimatePresence initial={false}>
+                              {showThumbnailInput && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: "auto", opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.25 }}
+                                  className="overflow-hidden"
+                                >
+                                  <Label htmlFor="thumbnail" className="text-sm font-medium">
+                                    Thumbnail URL
+                                  </Label>
+                                  <input
+                                    id="thumbnail"
+                                    type="url"
+                                    placeholder="https://..."
+                                    value={thumbnailUrl}
+                                    onChange={(e) => setThumbnailUrl(e.target.value)}
+                                    className="mt-2 h-12 w-full rounded-[22px] border border-input bg-background px-4 text-base outline-none shadow-[0_0_0_4px_hsl(var(--muted)/0.75)] transition-[border-color,box-shadow] duration-200 placeholder:text-muted-foreground focus:border-foreground/25 focus:shadow-[0_0_0_5px_hsl(var(--foreground)/0.06)]"
+                                  />
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
 
                           <motion.div whileTap={{ scale: 0.98 }}>

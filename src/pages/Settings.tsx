@@ -14,8 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { showPrivacyOptionsForm } from "@/lib/adConsent";
-import { Capacitor } from "@capacitor/core";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -156,9 +154,6 @@ const Settings = () => {
           <Row label="Change password" onClick={() => setChangePasswordOpen(true)} />
           <Row label="Notifications" onClick={() => navigate('/settings/notifications')} />
           <Row label="Privacy settings" onClick={() => navigate('/settings/privacy')} />
-          {Capacitor.isNativePlatform() && (
-            <Row label="Manage ad preferences" onClick={() => { void showPrivacyOptionsForm(); }} />
-          )}
           <div className="py-4 space-y-3">
             <p className="text-sm text-muted-foreground">Theme</p>
             <div className="flex items-center justify-between">
