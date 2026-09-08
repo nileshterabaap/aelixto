@@ -37,15 +37,11 @@ const config: CapacitorConfig = {
     // bars WITHOUT any inset compensation (content clipped at top/bottom on
     // devices whose WebView reports env(safe-area-inset-*) as 0).
 
-    Keyboard: {
-      // The WebView must NOT be resized by the soft keyboard. Android's
-      // adjustResize combined with edge-to-edge produced stale viewport
-      // heights (squashed auth form, blank message thread, composer floating
-      // mid-screen). The app tracks the keyboard height itself via
-      // `initKeyboardInsets()` and offsets layout with `--kb`.
-      resize: "none" as never,
-      resizeOnFullScreen: false,
-    },
+    // NOTE: no `Keyboard` block on purpose — this restores the pre-September
+    // behaviour where Android natively resizes the WebView for the soft
+    // keyboard. The visible viewport then ends exactly at the top of the
+    // keyboard, so the app does no keyboard math at all (`--kb` stays 0) and
+    // no white band can appear under the composer.
     // Capacitor 8 ships a built-in SystemBars plugin that also applies insets.
     // Disable its inset handling so @capacitor-community/safe-area is the only
     // owner of Android inset handling (per the safe-area docs).
