@@ -182,7 +182,7 @@ const EditProfile = () => {
 
   if (!user) {
     return (
-      <div className="screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <p className="text-muted-foreground mb-4">Please sign in to edit your profile</p>
           <Button onClick={() => navigate('/auth')}>Sign In</Button>
@@ -193,14 +193,14 @@ const EditProfile = () => {
 
   if (loading) {
     return (
-      <div className="screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="screen-nav bg-background">
+    <div className="min-h-screen bg-background pb-20">
       <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
       
       <main className="mx-auto max-w-2xl px-4 py-6">
@@ -297,23 +297,13 @@ const EditProfile = () => {
                   {formData.display_name?.[0] || formData.username[0] || "?"}
                 </AvatarFallback>
               </Avatar>
-              <div className="flex-1 space-y-2">
+              <div className="flex-1">
                 <ImageUploadButton
                   onFileSelect={handleAvatarUpload}
                   uploading={uploading}
                 >
                   Upload Avatar
                 </ImageUploadButton>
-                {formData.avatar_url && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => setFormData({ ...formData, avatar_url: '' })}
-                  >
-                    Remove Avatar
-                  </Button>
-                )}
               </div>
             </div>
           </div>
@@ -335,16 +325,6 @@ const EditProfile = () => {
             >
               Upload Cover Image
             </ImageUploadButton>
-            {formData.cover_url && (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full mt-2"
-                onClick={() => setFormData({ ...formData, cover_url: '' })}
-              >
-                Remove Cover Image
-              </Button>
-            )}
           </div>
 
           <div className="space-y-2">

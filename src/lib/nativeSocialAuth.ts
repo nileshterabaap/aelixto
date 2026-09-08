@@ -28,22 +28,17 @@ const ensureInitialized = async () => {
   if (initPromise) return initPromise;
   initPromise = (async () => {
     const SocialLogin = await getPlugin();
-    // IMPORTANT: never pass an `apple` key on Android. The plugin validates it
-    // eagerly and throws "apple.android.redirectUrl is null or empty", which
-    // aborts the whole initialize() call — including Google.
-    const config: Record<string, unknown> = {
+    await SocialLogin.initialize({
       google: {
         webClientId: NATIVE_AUTH_CONFIG.googleWebClientId,
         iOSClientId: NATIVE_AUTH_CONFIG.googleIosClientId || undefined,
+        mode: "offline",
       },
-    };
-    if (Capacitor.getPlatform() === "ios") {
-      config.apple = {
+      apple: {
         clientId: NATIVE_AUTH_CONFIG.appleServiceId || undefined,
         redirectUrl: NATIVE_AUTH_CONFIG.appleRedirectUrl || undefined,
-      };
-    }
-    await SocialLogin.initialize(config as never);
+      },
+    });
   })().catch((e) => {
     initPromise = null;
     throw e;
@@ -65,27 +60,10 @@ const sha256 = async (value: string) => {
 };
 
 export const canUseNativeSocialAuth = (provider: "google" | "apple") => {
-  if (!Capacitor.isNativePlatform()) {
-    console.log("[auth] native social disabled: not a native platform");
-    return false;
-  }
-  if (!Capacitor.isPluginAvailable("SocialLogin")) {
-    console.warn(
-      "[auth] native social disabled: SocialLogin plugin is NOT registered in this build. " +
-        "Run `npm install && npx cap sync android` before assembling the APK.",
-    );
-    return false;
-  }
-  if (!isNativeAuthConfigured(provider)) {
-    console.log(
-      `[auth] native ${provider} sign-in NOT configured — missing client id ` +
-        "(VITE_GOOGLE_WEB_CLIENT_ID). Falling back to browser OAuth.",
-    );
-    return false;
-  }
+  if (!Capacitor.isNativePlatform()) return false;
+  if (!isNativeAuthConfigured(provider)) return false;
   // Sign in with Apple has no native surface on Android; it must use the web flow.
   if (provider === "apple" && Capacitor.getPlatform() !== "ios") return false;
-  console.log(`[auth] native ${provider} sign-in available`);
   return true;
 };
 
@@ -113,26 +91,10 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     const SocialLogin = await getPlugin();
 
     const rawNonce = randomNonce();
-    // Android's Credential Manager already requests the base OIDC email/profile
-    // claims. Passing `scopes` invokes the plugin's separate Google
-    // Authorization API, which requires a custom MainActivity and rejects before
-    // the account picker opens. Keep Android on the pure ID-token path.
-    //
-    // Google: no nonce at all. The plugin puts the raw nonce in the ID token and
-    // the backend re-hashes it before comparing, which produces "Nonces
-    // mismatch". Omitting it entirely keeps the exchange valid.
-    // `style: "standard"` opens the full "Sign in with Google" account picker
-    // (all accounts on the device) instead of the One Tap "sign back in" sheet,
-    // which only ever suggests a single, previously used account.
     const options =
       provider === "apple"
         ? { scopes: ["email", "name"], nonce: await sha256(rawNonce) }
-        : {
-            style: "standard" as const,
-            filterByAuthorizedAccounts: false,
-            autoSelectEnabled: false,
-            forcePrompt: true,
-          };
+        : { scopes: ["email", "profile"], nonce: rawNonce, forceRefreshToken: true };
 
     const res = (await SocialLogin.login({
       provider,
@@ -152,14 +114,13 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     const { error } = await supabase.auth.signInWithIdToken({
       provider,
       token: idToken,
-      ...(provider === "apple" ? { nonce: rawNonce } : {}),
+      nonce: rawNonce,
     });
 
     if (error) return { ok: false, cancelled: false, message: error.message };
     return { ok: true, cancelled: false, message: "" };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    console.warn(`[auth] native ${provider} sign-in threw:`, message, e);
     return { ok: false, cancelled: isCancellation(message), message };
   }
 };
@@ -172,13 +133,5 @@ export const nativeSocialSignOut = async () => {
     await SocialLogin.logout({ provider: "google" } as never);
   } catch {
     /* provider was never initialized — nothing to do */
-  }
-  if (Capacitor.getPlatform() === "ios") {
-    try {
-      const SocialLogin = await getPlugin();
-      await SocialLogin.logout({ provider: "apple" } as never);
-    } catch {
-      /* Apple was never used on this device — nothing to do */
-    }
   }
 };

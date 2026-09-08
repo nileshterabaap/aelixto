@@ -22,7 +22,7 @@ export const PLATFORM_REGISTRY: PlatformEntry[] = [
   { key: 'youtube',    label: 'YouTube',    domains: ['youtube.com', 'youtu.be'] },
   { key: 'twitter',    label: 'X',          domains: ['x.com', 'twitter.com'] },
   { key: 'reddit',     label: 'Reddit',     domains: ['reddit.com', 'redd.it'] },
-  { key: 'linkedin',   label: 'LinkedIn',   domains: ['linkedin.com', 'lnkd.in'] },
+  { key: 'linkedin',   label: 'LinkedIn',   domains: ['linkedin.com'] },
   { key: 'pinterest',  label: 'Pinterest',  domains: ['pinterest.com', 'pin.it'] },
   { key: 'tiktok',     label: 'TikTok',     domains: ['tiktok.com'] },
   { key: 'spotify',    label: 'Spotify',    domains: ['spotify.com'] },

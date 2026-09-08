@@ -16,10 +16,7 @@ const sha = (s) => createHash('sha256').update(s).digest('hex');
 const read = () => JSON.parse(fs.readFileSync(FILE, 'utf8'));
 const write = (v) => fs.writeFileSync(FILE, JSON.stringify(v, null, 2) + '\n');
 const abs = (p) => path.join(ROOT, p);
-// Normalize line endings so a Windows checkout (git autocrlf → CRLF) hashes
-// identically to the LF baseline stored in .stability-platforms.json.
-const normalize = (s) => s.replace(/\r\n/g, '\n');
-const rd = (p) => normalize(fs.readFileSync(abs(p), 'utf8'));
+const rd = (p) => fs.readFileSync(abs(p), 'utf8');
 
 const requireToken = (data) => {
   const t = process.env.STABILITY_TOKEN;

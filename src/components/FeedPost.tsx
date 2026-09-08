@@ -13,7 +13,6 @@ import { useState, useRef, memo, useCallback } from "react";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
-import { LikesSheet } from "@/components/LikesSheet";
 import { LazyEmbed } from "@/components/LazyEmbed";
 import { CollapsibleCaption } from "@/components/CollapsibleCaption";
 import { UsernameLink } from "@/components/UsernameLink";
@@ -111,7 +110,6 @@ const detectPlatformFromUrl = (url?: string) => {
 
 export const FeedPost = ({ post, userId }: FeedPostProps) => {
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [likesOpen, setLikesOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const [blogFavicon, setBlogFavicon] = useState<string | null>(null);
@@ -251,30 +249,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
   // Animated action handlers
   const handleLikeClick = useCallback(() => {
     if (!canUseActions) return;
-    if (longPressFiredRef.current) {
-      longPressFiredRef.current = false;
-      return;
-    }
     setLikeAnimating(true);
     toggleLike();
     setTimeout(() => setLikeAnimating(false), 400);
   }, [canUseActions, toggleLike]);
-
-  // Long-press (2s) on the like button opens the list of users who liked.
-  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressFiredRef = useRef(false);
-  const startLikeLongPress = useCallback(() => {
-    longPressFiredRef.current = false;
-    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = setTimeout(() => {
-      longPressFiredRef.current = true;
-      setLikesOpen(true);
-    }, 2000);
-  }, []);
-  const cancelLikeLongPress = useCallback(() => {
-    if (longPressTimerRef.current) clearTimeout(longPressTimerRef.current);
-    longPressTimerRef.current = null;
-  }, []);
 
   const handleRepostClick = useCallback(() => {
     if (!canUseActions) return;
@@ -363,11 +341,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           <div className="flex items-center justify-around px-2 py-4 mt-1">
             <button
               onClick={handleLikeClick}
-              onPointerDown={startLikeLongPress}
-              onPointerUp={cancelLikeLongPress}
-              onPointerLeave={cancelLikeLongPress}
-              onPointerCancel={cancelLikeLongPress}
-              onContextMenu={(e) => e.preventDefault()}
               className="action-btn p-2 active:scale-90 transition-transform flex items-center gap-1"
             >
               <Heart 
@@ -379,15 +352,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                   color: isLiked ? '#ef4444' : 'currentColor'
                 }}
               />
+              {!(post as any).hide_likes && (post as any).likes_count > 0 && (
+                <span className="text-xs text-muted-foreground">{(post as any).likes_count}</span>
+              )}
             </button>
-            {!(post as any).hide_likes && (post as any).likes_count > 0 && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setLikesOpen(true); }}
-                className="text-xs text-muted-foreground -ml-2 pr-1"
-              >
-                {(post as any).likes_count}
-              </button>
-            )}
             <button 
               onClick={() => setCommentsOpen(true)}
               className="action-btn p-2 active:scale-90 transition-transform flex items-center gap-1"
@@ -431,7 +399,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
             postAuthorId={(post as any).user_id}
           />
         )}
-        <LikesSheet open={likesOpen} onOpenChange={setLikesOpen} postId={post.id} />
         {(
           <SharePostSheet 
             open={shareOpen} 
@@ -795,11 +762,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         <div className="flex items-center justify-around px-2 py-4 mt-1">
           <button
             onClick={handleLikeClick}
-            onPointerDown={startLikeLongPress}
-            onPointerUp={cancelLikeLongPress}
-            onPointerLeave={cancelLikeLongPress}
-            onPointerCancel={cancelLikeLongPress}
-            onContextMenu={(e) => e.preventDefault()}
             className="action-btn p-2 active:scale-90 transition-transform flex items-center gap-1"
           >
             <Heart 
@@ -811,15 +773,10 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
                 color: isLiked ? '#ef4444' : 'currentColor'
               }}
             />
+            {!(post as any).hide_likes && (post as any).likes_count > 0 && (
+              <span className="text-xs text-muted-foreground">{(post as any).likes_count}</span>
+            )}
           </button>
-          {!(post as any).hide_likes && (post as any).likes_count > 0 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); setLikesOpen(true); }}
-              className="text-xs text-muted-foreground -ml-2 pr-1"
-            >
-              {(post as any).likes_count}
-            </button>
-          )}
           <button 
             onClick={() => setCommentsOpen(true)}
             className="action-btn p-2 active:scale-90 transition-transform flex items-center gap-1"
@@ -863,7 +820,6 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           postAuthorId={(post as any).user_id}
         />
       )}
-      <LikesSheet open={likesOpen} onOpenChange={setLikesOpen} postId={post.id} />
       {(
         <SharePostSheet 
           open={shareOpen} 

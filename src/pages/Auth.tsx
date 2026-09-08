@@ -34,11 +34,14 @@ const AppleIcon = () => (
 const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  // Sign in with Apple is offered everywhere:
-  //   • iOS/iPadOS → native ASAuthorizationController sheet
-  //   • Android / web → Apple's web OAuth flow in a Chrome Custom Tab / popup
-  //     (there is no Apple SDK on Android, so the web flow is the supported path)
-  const showApple = true;
+  // Sign in with Apple is shown only where Apple's own native flow exists:
+  // iOS/iPadOS (ASAuthorizationController), plus Apple/desktop browsers on the
+  // web build. It is never offered on Android — there is no Apple SDK there,
+  // and Apple only *requires* the button on Apple platforms.
+  const showApple = (() => {
+    if (Capacitor.isNativePlatform()) return Capacitor.getPlatform() === "ios";
+    return !/android/i.test(navigator.userAgent);
+  })();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
@@ -358,25 +361,10 @@ const Auth = () => {
           const res = await nativeSocialSignIn(provider);
           if (res.ok) return;
           if (res.cancelled) return;
-          console.warn(`Native ${label} sign-in failed:`, res.message);
-          toast({
-            title: "Native sign-in failed",
-            description: (res.message || "Unknown reason").slice(0, 180),
-            variant: "destructive",
-          });
-        } else if (provider === "apple") {
-          // Android has no native Apple SDK — use Apple's web OAuth flow in a
-          // Chrome Custom Tab. Tokens return via the /~auth-bridge deep link.
-          await browserSocialSignIn("apple");
-          return;
-        } else {
-          toast({
-            title: "Native sign-in not compiled in",
-            description: "SocialLogin plugin missing — run npx cap sync android and rebuild.",
-          });
+          console.warn(`Native ${label} sign-in unavailable, falling back to browser flow:`, res.message);
         }
-        // Native builds never fall back to browser OAuth. A native error stays
-        // visible so configuration problems cannot silently open Chrome.
+        // Fallback: system-browser OAuth (Custom Tab / SFSafariViewController).
+        await browserSocialSignIn(provider);
         return;
       }
       // Web: the managed helper opens the provider popup and sets the session
@@ -422,10 +410,7 @@ const Auth = () => {
   if (!sessionChecked || user) return null;
 
   return (
-    <div
-      className="relative flex items-start justify-center overflow-y-auto bg-background p-5 py-10"
-      style={{ minHeight: 'calc(100dvh - var(--kb))', maxHeight: 'calc(100dvh - var(--kb))' }}
-    >
+    <div className="relative min-h-screen flex items-center justify-center bg-background p-5 overflow-hidden">
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
