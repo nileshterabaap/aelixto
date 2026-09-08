@@ -37,11 +37,13 @@ const config: CapacitorConfig = {
     // bars WITHOUT any inset compensation (content clipped at top/bottom on
     // devices whose WebView reports env(safe-area-inset-*) as 0).
 
-    // NOTE: no `Keyboard` block on purpose — this restores the pre-September
-    // behaviour where Android natively resizes the WebView for the soft
-    // keyboard. The visible viewport then ends exactly at the top of the
-    // keyboard, so the app does no keyboard math at all (`--kb` stays 0) and
-    // no white band can appear under the composer.
+    Keyboard: {
+      // SafeArea already applies the IME inset to the WebView decor view.
+      // Prevent Capacitor/Android from resizing the WebView a second time.
+      // The page intentionally keeps --kb at 0 and follows the resulting
+      // visible viewport, preserving the existing status/nav-bar fitting.
+      resize: "none" as never,
+    },
     // Capacitor 8 ships a built-in SystemBars plugin that also applies insets.
     // Disable its inset handling so @capacitor-community/safe-area is the only
     // owner of Android inset handling (per the safe-area docs).
