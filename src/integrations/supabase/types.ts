@@ -1186,15 +1186,10 @@ export type Database = {
         Returns: undefined
       }
       create_short_link: { Args: { p_target_path: string }; Returns: string }
-      delete_conversation: {
-        Args: { _conversation_id: string }
-        Returns: boolean
-      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
       }
-      delete_post_with_score: { Args: { p_post_id: string }; Returns: Json }
       email_queue_dispatch: { Args: never; Returns: undefined }
       enqueue_email: {
         Args: { payload: Json; queue_name: string }
@@ -1415,7 +1410,6 @@ export type Database = {
         }
         Returns: number
       }
-      post_delete_score_preview: { Args: { p_post_id: string }; Returns: Json }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {
@@ -1590,7 +1584,6 @@ export type Database = {
           username: string
         }[]
       }
-      start_conversation: { Args: { _other_user_id: string }; Returns: string }
       update_post_dimensions: {
         Args: { _aspect?: number; _height: number; _post_id: string }
         Returns: undefined

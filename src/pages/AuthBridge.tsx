@@ -31,20 +31,9 @@ const AuthBridge = () => {
       return;
     }
 
-    // Hand the tokens off to the native app as fast as possible so the user
-    // never dwells on this page.
+    // Hand the tokens off to the native app. Chrome handles `intent://` links
+    // more reliably from Custom Tabs; keep the custom-scheme URL as fallback.
     const customSchemeLink = `${APP_SCHEME}://oauth-callback${payload}`;
-    const isAndroid = /android/i.test(navigator.userAgent);
-
-    if (!isAndroid) {
-      // iOS (SFSafariViewController) resolves the custom scheme directly —
-      // `intent://` is Android-only and would just error out.
-      window.location.replace(customSchemeLink);
-      const iosFallback = window.setTimeout(() => window.location.replace("/"), 1500);
-      return () => window.clearTimeout(iosFallback);
-    }
-
-    // Android: Chrome Custom Tabs handle `intent://` most reliably.
     const intentPayload = payload.startsWith("#") ? `?${payload.slice(1)}` : payload;
     const fallbackUrl = encodeURIComponent(`${window.location.origin}/`);
     const intentLink = `intent://oauth-callback${intentPayload}#Intent;scheme=${APP_SCHEME};package=${APP_PACKAGE};S.browser_fallback_url=${fallbackUrl};end`;
@@ -53,12 +42,12 @@ const AuthBridge = () => {
 
     const schemeFallback = window.setTimeout(() => {
       window.location.replace(customSchemeLink);
-    }, 400);
+    }, 500);
 
-    // Web fallback: if nothing handled the scheme, go home.
+    // Web fallback: if nothing handled the scheme within ~1.2s, go home.
     const fallback = window.setTimeout(() => {
       window.location.replace("/");
-    }, 1500);
+    }, 1200);
     return () => {
       window.clearTimeout(schemeFallback);
       window.clearTimeout(fallback);

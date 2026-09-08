@@ -148,20 +148,12 @@ export async function initCapacitorPlugins() {
           /* ignore — tab may already be closed */
         }
 
-        let sessionApplied = false;
         if (access_token && refresh_token) {
-          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
-          sessionApplied = !error;
+          await supabase.auth.setSession({ access_token, refresh_token });
         }
 
-        if (window.location.pathname === "/") return;
-
-        if (sessionApplied) {
-          // Soft client-side navigation — React Router picks this up via
-          // popstate, so the app continues instantly with no reload/splash.
-          window.history.replaceState({}, "", "/");
-          window.dispatchEvent(new PopStateEvent("popstate"));
-        } else {
+        // Land the user on home regardless.
+        if (window.location.pathname !== "/") {
           window.location.replace("/");
         }
       } catch (e) {

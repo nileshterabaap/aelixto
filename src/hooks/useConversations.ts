@@ -249,35 +249,5 @@ export const useConversations = () => {
     }
   };
 
-  const deleteConversation = async (conversationId: string) => {
-    setConversations(prev => {
-      const next = prev.filter(c => c.id !== conversationId);
-      if (cacheKey) {
-        try {
-          window.localStorage.setItem(cacheKey, JSON.stringify(next));
-        } catch {
-          /* quota exceeded - ignore */
-        }
-      }
-      return next;
-    });
-
-    const { error } = await supabase.rpc('delete_conversation', {
-      _conversation_id: conversationId,
-    });
-
-    if (error) {
-      console.error('Error deleting conversation:', error);
-      fetchConversations();
-      throw error;
-    }
-
-    try {
-      window.localStorage.removeItem(`aelixto-messages-${conversationId}`);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  return { conversations, loading, refetch: fetchConversations, deleteConversation };
+  return { conversations, loading, refetch: fetchConversations };
 };

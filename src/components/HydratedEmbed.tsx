@@ -6,7 +6,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
-import { ThreadsAwareMetaEmbed as UniversalMetaEmbed } from '@/components/ThreadsAwareMetaEmbed';
+import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';

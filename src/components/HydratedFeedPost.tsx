@@ -446,7 +446,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     : { 
         isLiked: false, 
         isSaved: false, 
-        toggleLike: () => false, 
+        toggleLike: () => {}, 
         toggleSave: () => {}, 
         deletePost: () => {},
         isDeleting: false 
@@ -522,14 +522,14 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
 
   const handleLikeClick = useCallback(() => {
     if (!canUseActions) return;
-    const nowLiked = toggleLike();
-    setDisplayLikeCount((current) => Math.max(0, current + (nowLiked ? 1 : -1)));
-    if (nowLiked) {
-      likeControls.start({ scale: [1, 1.4, 1], transition: { type: 'spring', stiffness: 500, damping: 15, duration: 0.3 } });
-    } else {
+    setDisplayLikeCount((current) => Math.max(0, current + (isLiked ? -1 : 1)));
+    toggleLike();
+    if (isLiked) {
       likeControls.start({ scale: [1, 0.85, 1], transition: { duration: 0.3, ease: 'easeOut' } });
+    } else {
+      likeControls.start({ scale: [1, 1.4, 1], transition: { type: 'spring', stiffness: 500, damping: 15, duration: 0.3 } });
     }
-  }, [canUseActions, toggleLike, likeControls]);
+  }, [canUseActions, isLiked, toggleLike, likeControls]);
 
   const handleRepostClick = useCallback(() => {
     if (!canUseActions) return;

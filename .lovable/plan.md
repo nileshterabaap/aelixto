@@ -1,54 +1,60 @@
-# Why Pinterest Feels Smoother — Analysis + Minimal Shared Fix
+# Facebook Reel viewport — root cause and fix
 
-Read-only investigation complete. No files changed.
+## Root cause (answering your questions directly)
 
-## 1. Exact reasons Pinterest feels smoother
+**1. Why doesn't our iframe render like Facebook's official embed?**
 
-`src/components/embeds/PinterestEmbed.tsx` is the only embed that combines all four smoothness mechanisms at once:
+Facebook's official Reel iframe is a **fixed-size box**:
+```html
+<iframe src="…/plugins/video.php?href=…&show_text=false&width=267&height=476&…"
+        width="267" height="476" …></iframe>
+```
+Notice: `width=267` **and** `height=476` are in **both** the src querystring **and** the iframe HTML attributes. The plugin renders to those exact numbers and doesn't need to renegotiate size.
 
-1. **Zero-roundtrip URL resolution** — the pin ID is pulled out with a synchronous regex (line 12-17), so `loading` starts as `false` for normal `/pin/<id>/` links and the iframe src (`assets.pinterest.com/ext/embed.html?id=…`, line 119) exists on the very first render. No oEmbed call, no OG scrape, no SDK script.
-2. **Height reserved before the iframe exists** — the wrapper div gets a fixed pixel height seeded from the stored `suggestedHeight` (clamped 320–1400, default 600) at lines 31-35 and 113. Nothing shifts when content arrives.
-3. **Skeleton stacked underneath, not swapped** — the pulse is `absolute inset-0` inside the same fixed-height relative wrapper (line 112-117), so skeleton and iframe occupy the identical box; the handoff causes no reflow.
-4. **A real 300 ms opacity fade driven by the iframe's own `onLoad`** (lines 132-135) — one native event, no MutationObserver, no artificial timer.
+Our generated iframe (`buildFacebookEmbed`, line 740-747) is:
+```html
+<iframe src="…/plugins/video.php?href=…&width=500"
+        style="border:none;width:100%;overflow:hidden;" scrolling="no" …></iframe>
+```
+Differences that matter:
+- We send only `width=500` in the src and **no `height`** — so the plugin must guess a height and then negotiate via postMessage.
+- We set CSS `width:100%` instead of a pixel width — the visual width no longer matches the `width=500` we told the plugin, which is why the reel renders with letterboxing / off-axis crop.
+- `FacebookIframeEmbed` (lines 341-458) then **rewrites the src** at runtime via `ResizeObserver` (`u.searchParams.set('width', containerWidth)`) and **overrides height** from postMessage. Every play/pause causes FB to re-post height → our container re-snaps → the visible viewport shifts. This is the exact shifting you're seeing.
 
-The smoothness is **our implementation**, not the browser or Pinterest's SDK. Notably, Pinterest *opts out* of the shared `SkeletonGate`/`LazyEmbed` MutationObserver plumbing (it's rendered directly in `HydratedEmbed.tsx:403-411`) and self-manages a tight load→fade instead.
+**2. Why are we rebuilding the plugin URL?** Historical: we assumed CSS-fluid + postMessage was more responsive. It is not — for `video.php` reels it fights Facebook's own layout, which is designed around explicit `width`+`height`.
 
-## 2. Differences from every other platform
+**3. Are we modifying width/height/src/CSS after creation?** Yes — three places:
+- `ResizeObserver` rewrites `src` `width` param and remounts the iframe.
+- `message` listener updates container `height` on every FB resize event.
+- Wrapper uses `width:100%` + `position:absolute` iframe, overriding intrinsic attributes.
 
-| | Instant src | Pre-reserved height | Stacked skeleton | Fade on load |
-|---|---|---|---|---|
-| **Pinterest** | yes | yes (fixed px) | yes | yes, 300 ms via `onLoad` |
-| **Reddit** | no — async normalize + possible `expand-url` call before any iframe (`RedditEmbed.tsx:217-259`) | heuristic, changes after load | partial | no fade; readiness via `load` + 8.5 s fallback timer |
-| **X / Twitter** | no — SDK script then `twttr.widgets.createTweet()` DOM replacement (`TwitterEmbed.tsx:55-79`) | no (generic `aspect-[4/3]` block + `-85px` margin hack) | no | none |
-| **Threads** | src is sync, but mount is gated behind an IntersectionObserver + 6 s retry (`ThreadsEmbed.tsx:177-209`) | yes (default 280) | no | none |
-| **LinkedIn** | yes | fixed 760 px always, never matches content | no | none, no loading state at all |
-| **Instagram** | yes | estimate → postMessage MEASURE | yes | yes but only 180 ms, gated by a 2200 ms fallback timer, not `onLoad` |
-| **Facebook** | yes | postMessage only, 12 s failure fallback | no | none |
+**4. Would Facebook's official iframe pasted verbatim render correctly?** Yes — because it carries its own `width`/`height` and the plugin's internal layout matches. Our wrapper's `width:100%` stretch is what breaks it.
 
-Two structural gaps dominate: **no fade** (X, Threads, LinkedIn, Facebook, Reddit) and **no height reserved before mount** (X, Reddit partially).
+## Fix — stop fighting Facebook, mirror the official embed
 
-## 3. Risk assessment for applying this globally
+Scope: only `buildFacebookEmbed` and `FacebookIframeEmbed` in `src/components/UniversalMetaEmbed.tsx`. No other files. Guarded platforms (x, threads, linkedin) not touched.
 
-- **Low risk / purely visual:** adding a `relative` fixed-height wrapper + absolute pulse + opacity fade on `onLoad`. It changes no scoring, no navigation lock, no postMessage handling.
-- **Medium risk:** the fade can *mask* a slow embed and, if the readiness signal never fires, leave content at `opacity: 0`. Mitigation: always pair the fade with a fallback reveal timer, and never gate `pointer-events` on it.
-- **Blocked by the stability guard:** `PinterestEmbed.tsx`, `TwitterEmbed.tsx`, `LinkedInEmbed.tsx`, and `UniversalMetaEmbed.tsx` (Facebook + Instagram) are all frozen in `.stability-platforms.json`. Any edit fails `platform:check` and the production build. So X, LinkedIn, Facebook and Instagram **cannot** receive this without you clearing their baselines.
-- **Threads-specific risk:** the transparent first-tap overlay is the single source of truth for `video_play`. A fade wrapper must sit *below* that overlay in z-order and must not intercept pointer events, or the one-shot play regresses.
+1. **`buildFacebookEmbed`**: emit the plugin URL with **both `width` and `height`** in the querystring, matching Facebook's official Reel dimensions (`width=267&height=476` for videos; `width=500&height=<computed>` or FB's default for posts). Include `show_text=false` for videos (matches official).
+2. **`FacebookIframeEmbed`**:
+   - Delete the `ResizeObserver` that rewrites `src` `width`.
+   - Delete the `message` listener that mutates height on the fly.
+   - Delete `lockedRef`, `FB_FOOTER_TRIM`, `MAX_HEIGHT`/`MIN_HEIGHT` clamps, `suggestedHeight` seeding for videos.
+   - Render the iframe at Facebook's fixed dimensions (267×476 for reels/videos). Center it in the wrapper (`display:flex; justify-content:center`) so the fixed-size player sits centered inside our card, exactly like the Blogspot test.
+   - For static posts (`post.php`), keep width=500 and let FB's `postMessage` grow height (posts genuinely vary in height and FB supports that path), OR also switch to fixed height from the query — decide based on your preference (I'd default to fixed-width, postMessage-height for posts only, since text posts vary).
+3. Keep `allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"` and no sandbox — Play already works.
+4. Keep the 12s no-render → `OgCardFallback` guard.
 
-## 4. Recommended smallest shared improvement
+## Trade-off you should confirm
 
-Extract Pinterest's pattern into one tiny reusable presentational wrapper and apply it only to the **unguarded** platforms.
+Fixed 267×476 means the Reel will render at Facebook's native size and will **not stretch to fill our card width** — it will sit centered with side padding on wider screens (this is exactly how the Blogspot test looks and matches Facebook's own embed everywhere else on the web). No more shifting on play/pause, no more crop.
 
-### New file: `src/components/embeds/SmoothEmbedFrame.tsx`
-A ~40-line presentational component: `relative` wrapper with a caller-supplied fixed height, an `absolute inset-0 animate-pulse bg-muted` skeleton while not ready, `opacity 0→1 / 300 ms ease` on the child, plus a safety timer (~2.5 s) that force-reveals so nothing can get stuck invisible. `pointer-events` untouched. No data fetching, no measurement logic.
+If you'd rather the Reel fill the card width edge-to-edge, we can't get there via `plugins/video.php` — that would require a different embed strategy (options B/C from the previous investigation). Confirm before I implement:
 
-### Apply to (all unguarded):
-- **Reddit** (`RedditEmbed.tsx`) — wrap the existing iframe; keep the current `computeInitialHeight`, postMessage height sync, collapsed-text cap and 8.5 s fallback exactly as-is. Only the fade + stacked skeleton are added.
-- **Threads** (`ThreadsEmbed.tsx`) — wrap the iframe only, with the fade layer rendered strictly *beneath* the existing transparent play overlay. Visibility gate, retry, navigation lock and `video_play` capture untouched.
+- **A (recommended, matches official):** fixed 267×476, centered — no shifting, matches Blogspot.
+- **B:** keep fluid width but accept the shifting — no change worth making.
 
-### Explicitly out of scope
-Pinterest (already correct and frozen), X, LinkedIn, Facebook, Instagram — frozen. If you want those included later, you'd need to clear their guard baselines first; I'd do that as a separate, per-platform request.
+## Post-edit checks
+1. `npm run platform:check` — must pass clean for x, threads, linkedin.
+2. Test the same Reel that renders correctly in Blogspot — should look identical in the app.
 
-### Verification
-`npm run platform:check` must pass unchanged (all 10 platforms), plus a typecheck and build. Then manual confirmation that Reddit and Threads still play, still score, and still size correctly.
-
-Probability of success: **93%** — the change is presentational and confined to two unguarded files.
+Success probability: 90% for option A.

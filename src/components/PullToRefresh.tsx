@@ -10,9 +10,6 @@ interface PullToRefreshProps {
 const THRESHOLD = 55;
 const MAX_PULL = 100;
 const LOADING_REST = 45;
-// Never let the spinner hang: if a refresh takes longer than this, we release
-// the indicator and let the data land whenever it lands.
-const MAX_SPINNER_MS = 5000;
 
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
@@ -111,10 +108,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
 
         void (async () => {
           try {
-            await Promise.race([
-              Promise.resolve(onRefresh()).catch(() => undefined),
-              new Promise((resolve) => setTimeout(resolve, MAX_SPINNER_MS)),
-            ]);
+            await onRefresh();
           } finally {
             setRefreshing(false);
             animate(pullY, 0, { type: "spring", stiffness: 250, damping: 28 });

@@ -1,1 +1,0 @@
-UPDATE public.posts SET thumbnail_url = NULL, preview_image_url = NULL WHERE platform = 'threads';

@@ -63,15 +63,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
   const { uploadImage, uploading: uploadingThumbnail } = useImageUpload();
-  const {
-    reached: limitReached,
-    remaining,
-    limit,
-    increment: incrementDailyCount,
-    isUnlimited,
-    resetCountdown,
-    resetLabel,
-  } = useDailyPostLimit();
+  const { reached: limitReached, remaining, limit, increment: incrementDailyCount } = useDailyPostLimit();
   // Height measured offscreen at create-time so the very first viewer
   // (including the creator) opens the card at its real size — no blank space.
   const measuredHeightRef = useRef<number | null>(null);
@@ -340,22 +332,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
         console.error('[CreatePostDialog] oEmbed fetch failed:', error);
       }
 
-      // Threads' og:image is the author's profile picture, never the post's
-      // own media. Drop it so the typographic text card renders instead
-      // (matches X / Reddit behavior).
-      {
-        const lowerLink = linkUrl.toLowerCase();
-        const isThreadsLink = lowerLink.includes('threads.net') || lowerLink.includes('threads.com');
-        if (isThreadsLink && thumbnail) {
-          const t = thumbnail.toLowerCase();
-          const isMetaAvatar =
-            t.includes('profile_pic') ||
-            /\/t\d+\.[\d-]*-19\//.test(t) ||
-            /[?&]stp=[^&]*_19/.test(t);
-          if (isMetaAvatar) thumbnail = "";
-        }
-      }
-
       setThumbnailUrl(thumbnail);
       setTitle(videoTitle);
 
@@ -469,9 +445,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     if (!linkUrl.trim()) return;
 
     if (limitReached) {
-      toast.error(`Your daily slots reset in ${resetCountdown}`, {
-        description: resetLabel,
-      });
+      toast.error(`You've reached your ${limit} post limit for today. Resets at midnight.`);
       return;
     }
 
@@ -912,26 +886,19 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                                   <Check className="mr-1.5 h-5 w-5" /> Posted
                                 </motion.span>
                               ) : limitReached ? (
-                                "Daily slots used"
+                                "Daily limit reached"
                               ) : (
                                 "Post"
                               )}
                             </Button>
                           </motion.div>
                           {limitReached ? (
-                            <div className="text-center">
-                              <p className="text-xs text-muted-foreground">
-                                Your daily slots reset in {resetCountdown}
-                              </p>
-                              <p className="mt-0.5 text-[10px] text-muted-foreground/70">
-                                {resetLabel}
-                              </p>
-                            </div>
+                            <p className="text-center text-xs text-muted-foreground">
+                              You've reached your {limit} post limit for today. Resets at midnight.
+                            </p>
                           ) : (
                             <p className="text-center text-xs text-muted-foreground">
-                              {isUnlimited
-                                ? "Unlimited slots"
-                                : `${remaining} of ${limit} slots remaining today`}
+                              {remaining} of {limit} posts remaining today
                             </p>
                           )}
                           <motion.div whileTap={{ scale: 0.98 }}>
