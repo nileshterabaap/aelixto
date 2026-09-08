@@ -123,7 +123,6 @@ export const PinterestEmbed = ({ url, postId, suggestedHeight }: PinterestEmbedP
             scrolling="no"
             allowFullScreen
             allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write"
-            sandbox="allow-scripts allow-same-origin allow-presentation"
             style={{
               border: 'none',
               display: 'block',

@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { trackArticleOpen, trackExternalVisit } from "@/hooks/useViewTracking";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 
@@ -140,12 +141,15 @@ interface ArticleContentEmbedProps {
 export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEmbedProps) => {
   const isExternal = platform === 'external';
   const ctaLabel = isExternal ? 'Visit' : 'Continue Reading';
-  // Note: the CTA anchor click bubbles up to useOriginalVisitTracker's
-  // container-level click listener, which fires exactly one `original_visit`
-  // event for non-playable posts (articles/external/quora). We intentionally
-  // do NOT also fire `article_open` / `external_visit` here — that would
-  // record two separate events for a single Continue Reading / Visit tap and
-  // award the author +2 score instead of +1.
+
+  const handleCtaClick = () => {
+    if (!postId) return;
+    if (isExternal) {
+      void trackExternalVisit(postId);
+    } else {
+      void trackArticleOpen(postId);
+    }
+  };
   const formatDate = (dateString: string | null) => {
     if (!dateString) return null;
     try {
@@ -282,6 +286,7 @@ export const ArticleContentEmbed = ({ data, postId, platform }: ArticleContentEm
               href={data.resolvedUrl}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={handleCtaClick}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
               {ctaLabel}

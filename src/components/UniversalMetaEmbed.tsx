@@ -353,62 +353,41 @@ const FacebookIframeEmbed = ({
 }) => {
   const [failed, setFailed] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
   const persistHeight = usePersistEmbedHeight(postId);
-  // Render Facebook's plugin iframe at fixed dimensions, matching Facebook's
-  // official embed exactly. For reels/videos we use 267x476 (Facebook's own
-  // Reel embed size) so the plugin renders its native viewport with no
-  // shifting on play/pause. For static posts we keep width=500 and follow
-  // the plugin's postMessage-reported height (posts vary in height).
+  // Unified interaction: tap the iframe's Play region plays the video
+  // natively. To open the original post, the user taps the "Open on
+  // Facebook" pill overlay rendered outside the iframe. No focus-steal
+  // detection or double-tap-to-open — those were inconsistent and hijacked
+  // the play button on some devices.
 
   const srcMatch = html.match(/src="([^"]+)"/);
-  const rawIframeSrc = srcMatch ? srcMatch[1] : '';
+  const iframeSrc = srcMatch ? srcMatch[1] : '';
 
-  const isVideo = /\/(video\.php|reel|videos|watch)/i.test(rawIframeSrc) || /fb\.watch/i.test(rawIframeSrc);
+  // Detect video vs static post — image posts get a tighter cap so there's
+  // no large blank strip below the photo before our action bar.
+  const isVideo = /\/(video\.php|reel|videos|watch)/i.test(iframeSrc) || /fb\.watch/i.test(iframeSrc);
+  const MAX_HEIGHT = isVideo ? 1400 : 640;
+  const DEFAULT_HEIGHT = isVideo ? 520 : 360;
+  const MIN_HEIGHT = 160;
+  // For image posts, the Facebook plugin appends a reactions/like/share footer
+  // (~120-150px) that creates a large blank strip above Aelix's own action
+  // bar. Render the iframe at full measured height but clip the wrapper so
+  // only the media area shows.
+  const FB_FOOTER_TRIM = isVideo ? 0 : 130;
+  const MAX_TRUSTED_SUGGESTED = isVideo ? 1400 : 760;
 
-  // Fixed native dimensions for videos/reels (matches Facebook's official embed).
-  const VIDEO_WIDTH = 267;
-  const VIDEO_HEIGHT = 476;
-
-  // Ensure the plugin src carries both width and height for videos so
-  // Facebook's plugin lays itself out at its native Reel size — no runtime
-  // src rewriting, no ResizeObserver.
-  const iframeSrc = (() => {
-    if (!rawIframeSrc) return rawIframeSrc;
-    try {
-      const u = new URL(rawIframeSrc);
-      if (isVideo) {
-        u.searchParams.set('width', String(VIDEO_WIDTH));
-        u.searchParams.set('height', String(VIDEO_HEIGHT));
-        u.searchParams.set('show_text', 'false');
-      } else {
-        if (!u.searchParams.get('width')) u.searchParams.set('width', '500');
-      }
-      return u.toString();
-    } catch {
-      return rawIframeSrc;
+  const [height, setHeight] = useState(() => {
+    if (suggestedHeight && suggestedHeight >= MIN_HEIGHT && suggestedHeight <= MAX_TRUSTED_SUGGESTED) {
+      return Math.min(MAX_HEIGHT, suggestedHeight);
     }
-  })();
-
-  // Post-only: follow plugin's reported height via postMessage.
-  const POST_MIN_HEIGHT = 160;
-  const POST_MAX_HEIGHT = 1200;
-  const POST_DEFAULT_HEIGHT = 360;
-  const POST_MAX_TRUSTED_SUGGESTED = 1000;
-  const [postHeight, setPostHeight] = useState(() => {
-    if (
-      !isVideo &&
-      suggestedHeight &&
-      suggestedHeight >= POST_MIN_HEIGHT &&
-      suggestedHeight <= POST_MAX_TRUSTED_SUGGESTED
-    ) {
-      return Math.min(POST_MAX_HEIGHT, suggestedHeight);
-    }
-    return POST_DEFAULT_HEIGHT;
+    return DEFAULT_HEIGHT;
   });
 
+  // Listen for Facebook's cross-origin resize messages. FB plugins post a
+  // few different shapes (`{type:"resize",height}`, nested xdArbiter payloads,
+  // `frame.height`, etc.) — use the generic extractor so we catch them all
+  // and snap the container to the real rendered height (kills blank space).
   useEffect(() => {
-    if (isVideo) return;
     const handler = (event: MessageEvent) => {
       const iframeWindow = iframeRef.current?.contentWindow;
       if (!iframeWindow || event.source !== iframeWindow) return;
@@ -416,13 +395,13 @@ const FacebookIframeEmbed = ({
       if (!origin.includes('facebook.com')) return;
       const next = parseThreadsHeightFromMessage(event.data);
       if (!next || next < 80) return;
-      const clamped = Math.min(POST_MAX_HEIGHT, Math.max(POST_MIN_HEIGHT, Math.round(next)));
-      setPostHeight((prev) => (Math.abs(prev - clamped) > 2 ? clamped : prev));
+      const clamped = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.round(next)));
+      setHeight((prev) => (Math.abs(prev - clamped) > 4 ? clamped : prev));
       persistHeight(clamped);
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, [isVideo, persistHeight]);
+  }, [MAX_HEIGHT]);
 
   // Fallback: if iframe doesn't render in 12s, show OG card
   useEffect(() => {
@@ -447,42 +426,14 @@ const FacebookIframeEmbed = ({
     );
   }
 
-  if (isVideo) {
-    // Fixed 267x476, centered — mirrors Facebook's official Reel embed.
-    return (
-      <div
-        ref={wrapperRef}
-        className="relative w-full overflow-hidden flex justify-center"
-        style={{ touchAction: 'pan-y', width: '100%', height: `${VIDEO_HEIGHT}px` }}
-      >
-        <iframe
-          ref={iframeRef}
-          src={iframeSrc}
-          width={VIDEO_WIDTH}
-          height={VIDEO_HEIGHT}
-          scrolling="no"
-          allowFullScreen
-          allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"
-          loading="lazy"
-          onError={() => setFailed(true)}
-          style={{
-            border: 'none',
-            width: `${VIDEO_WIDTH}px`,
-            height: `${VIDEO_HEIGHT}px`,
-            overflow: 'hidden',
-            display: 'block',
-          }}
-        />
-      </div>
-    );
-  }
-
-  // Static posts: fluid width, plugin drives height via postMessage.
   return (
     <div
-      ref={wrapperRef}
       className="relative w-full overflow-hidden"
-      style={{ touchAction: 'pan-y', width: '100%', height: `${postHeight}px` }}
+      style={{
+        touchAction: 'pan-y',
+        width: '100%',
+        height: `${Math.max(MIN_HEIGHT, height - FB_FOOTER_TRIM)}px`,
+      }}
     >
       <iframe
         ref={iframeRef}
@@ -491,6 +442,7 @@ const FacebookIframeEmbed = ({
         allowFullScreen
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"
         loading="lazy"
+        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
         onError={() => setFailed(true)}
         style={{
           border: 'none',
@@ -498,7 +450,7 @@ const FacebookIframeEmbed = ({
           top: 0,
           left: 0,
           width: '100%',
-          height: `${postHeight}px`,
+          height: `${height}px`,
           overflow: 'hidden',
           display: 'block',
         }}
@@ -762,10 +714,10 @@ const buildFacebookEmbed = (url: string): string | null => {
     ? `href=${encodedUrl}&width=500`
     : `href=${encodedUrl}&show_text=true&width=500`;
 
-  // No hard-coded aspect-ratio: FacebookIframeEmbed rebuilds the src with
-  // the real container width and lets Facebook's plugin drive the height
-  // via postMessage so the embed matches Facebook's native viewport.
-  return `<iframe src="https://www.facebook.com/plugins/${pluginEndpoint}?${query}" style="border:none;width:100%;overflow:hidden;" scrolling="no" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share" loading="lazy"></iframe>`;
+  // Reels / vertical video → 9:16, regular posts → 4:5
+  const aspectRatio = isVideo ? '9/16' : '4/5';
+
+  return `<iframe src="https://www.facebook.com/plugins/${pluginEndpoint}?${query}" style="border:none;width:100%;aspect-ratio:${aspectRatio};overflow:hidden;" scrolling="no" allowfullscreen allow="encrypted-media" loading="lazy"></iframe>`;
 };
 
 // Check if Spotify URL is embeddable (not wrapped-share or other special pages)

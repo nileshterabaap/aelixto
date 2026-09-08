@@ -1,60 +1,47 @@
-# Facebook Reel viewport — root cause and fix
+# Restore Threads `video_play` via one-shot capture overlay
 
-## Root cause (answering your questions directly)
+## Diagnosis (confirmed by reading `src/hooks/useOriginalVisitTracker.ts`)
 
-**1. Why doesn't our iframe render like Facebook's official embed?**
+- The Threads-only capture layer still exists as a function (`attachThreadsPlayCapture`, lines 315–322) but its body is **intentionally stubbed to a no-op**, with the comment: *"Overlay capture disabled: it swallowed the first tap on the native Play button…"*.
+- Nothing else in the client reliably fires `firePlay()` for Threads on mobile:
+  - `pointerdown` / `touchstart` on the container do not bubble out of a cross-origin Threads iframe on mobile Chrome/WebView.
+  - The `iframe.focus` listener rarely fires cross-origin on mobile.
+  - The `window.blur` fallback (line 191) is gated on `lastThreadsCaptureRef.postId === postId` set within 1200 ms — and that ref is only written inside `fireThreadsPlayOnce()`, which is only called from the paths above. So on mobile the guard is unreachable and the blur handler returns at line 202–203.
+- Net effect: **the client never sends `video_play` to `record-view` for Threads**. This is a client emission regression, not a `record-view` bug.
 
-Facebook's official Reel iframe is a **fixed-size box**:
-```html
-<iframe src="…/plugins/video.php?href=…&show_text=false&width=267&height=476&…"
-        width="267" height="476" …></iframe>
-```
-Notice: `width=267` **and** `height=476` are in **both** the src querystring **and** the iframe HTML attributes. The plugin renders to those exact numbers and doesn't need to renegotiate size.
+**Regressing change:** the "let taps pass straight through to the iframe" refactor that stubbed `attachThreadsPlayCapture`. That was the last known working trigger and nothing replaced it with an equivalent one.
 
-Our generated iframe (`buildFacebookEmbed`, line 740-747) is:
-```html
-<iframe src="…/plugins/video.php?href=…&width=500"
-        style="border:none;width:100%;overflow:hidden;" scrolling="no" …></iframe>
-```
-Differences that matter:
-- We send only `width=500` in the src and **no `height`** — so the plugin must guess a height and then negotiate via postMessage.
-- We set CSS `width:100%` instead of a pixel width — the visual width no longer matches the `width=500` we told the plugin, which is why the reel renders with letterboxing / off-axis crop.
-- `FacebookIframeEmbed` (lines 341-458) then **rewrites the src** at runtime via `ResizeObserver` (`u.searchParams.set('width', containerWidth)`) and **overrides height** from postMessage. Every play/pause causes FB to re-post height → our container re-snaps → the visible viewport shifts. This is the exact shifting you're seeing.
+## Fix — restore the one-shot capture overlay (edit only `src/hooks/useOriginalVisitTracker.ts`)
 
-**2. Why are we rebuilding the plugin URL?** Historical: we assumed CSS-fluid + postMessage was more responsive. It is not — for `video.php` reels it fights Facebook's own layout, which is designed around explicit `width`+`height`.
+Reimplement `attachThreadsPlayCapture(iframe)` so it:
 
-**3. Are we modifying width/height/src/CSS after creation?** Yes — three places:
-- `ResizeObserver` rewrites `src` `width` param and remounts the iframe.
-- `message` listener updates container `height` on every FB resize event.
-- Wrapper uses `width:100%` + `position:absolute` iframe, overriding intrinsic attributes.
+1. Only runs when `trackPlayableInteraction` is true and the iframe is Threads.
+2. Positions the iframe's parent as `position: relative` if it isn't already, then inserts a sibling `<div>` overlay that:
+   - Is absolutely positioned to exactly cover the iframe rect (`inset: 0`).
+   - Has `background: transparent`, `z-index: 2`, `touch-action: manipulation`, and `cursor: pointer`.
+   - Has `pointer-events: auto` initially.
+3. On the **first** `touchstart` (capture, passive) or `pointerdown` (capture) on the overlay:
+   - Calls `fireThreadsPlayOnce()` synchronously.
+   - Immediately removes the overlay from the DOM in the same tick (`overlay.remove()`), so the **same** tap sequence's subsequent `touchend` / `click` lands on the native Threads Play button underneath. Because the overlay is gone before the browser dispatches the click, Threads' native player receives the tap and starts playback — this is the same mechanism that worked in the last-known-working build.
+4. Registers a cleanup that removes the overlay if the effect tears down before the tap arrives, and pushes it into `threadsCaptureCleanups` (already wired at line 394).
+5. Uses `threadsCaptureAttached` (already declared, line 313) so we don't attach twice to the same iframe when the MutationObserver re-visits it.
+6. Skips attachment entirely if the parent already contains an overlay with `data-threads-play-capture="1"` (idempotency across React re-renders / stability guard).
 
-**4. Would Facebook's official iframe pasted verbatim render correctly?** Yes — because it carries its own `width`/`height` and the plugin's internal layout matches. Our wrapper's `width:100%` stretch is what breaks it.
+No other files change. `firePlay()`, `fireThreadsPlayOnce()`, the play dedupe set `threadsVideoPlayFiredPosts`, `record-view`'s Threads burst guard, and the unique index in the database all remain exactly as they are — they were correct; they just weren't being reached.
 
-## Fix — stop fighting Facebook, mirror the official embed
+## Verification steps after implementation
 
-Scope: only `buildFacebookEmbed` and `FacebookIframeEmbed` in `src/components/UniversalMetaEmbed.tsx`. No other files. Guarded platforms (x, threads, linkedin) not touched.
+1. Open a Threads post in the feed and tap the Play button once.
+   - Expected: video starts playing on the first tap (overlay removes itself in the same tick, tap reaches native control).
+2. Check Network → confirm one POST to `record-view` with `event_type: "video_play"` fires for that post's id.
+3. Confirm the Aelix Score for that post increments by exactly **1** (View 1 + Play 1 + Visit 0 = 2 total) after a first-time viewer session.
+4. Tap the same post again — no second `video_play` should be sent (guarded by `threadsVideoPlayFiredPosts` + DB unique index).
+5. Tap the platform icon in the header — should still fire `original_visit` (+1) exactly as before.
+6. Verify other platforms (X, YouTube, TikTok, Instagram, Facebook, LinkedIn, Pinterest, Spotify) are untouched — no code path outside the Threads branch changes.
 
-1. **`buildFacebookEmbed`**: emit the plugin URL with **both `width` and `height`** in the querystring, matching Facebook's official Reel dimensions (`width=267&height=476` for videos; `width=500&height=<computed>` or FB's default for posts). Include `show_text=false` for videos (matches official).
-2. **`FacebookIframeEmbed`**:
-   - Delete the `ResizeObserver` that rewrites `src` `width`.
-   - Delete the `message` listener that mutates height on the fly.
-   - Delete `lockedRef`, `FB_FOOTER_TRIM`, `MAX_HEIGHT`/`MIN_HEIGHT` clamps, `suggestedHeight` seeding for videos.
-   - Render the iframe at Facebook's fixed dimensions (267×476 for reels/videos). Center it in the wrapper (`display:flex; justify-content:center`) so the fixed-size player sits centered inside our card, exactly like the Blogspot test.
-   - For static posts (`post.php`), keep width=500 and let FB's `postMessage` grow height (posts genuinely vary in height and FB supports that path), OR also switch to fixed height from the query — decide based on your preference (I'd default to fixed-width, postMessage-height for posts only, since text posts vary).
-3. Keep `allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-write; web-share"` and no sandbox — Play already works.
-4. Keep the 12s no-render → `OgCardFallback` guard.
+## Stability guard
 
-## Trade-off you should confirm
+`useOriginalVisitTracker.ts` is currently locked. I will re-approve the baseline after the edit is in and verified.
 
-Fixed 267×476 means the Reel will render at Facebook's native size and will **not stretch to fill our card width** — it will sit centered with side padding on wider screens (this is exactly how the Blogspot test looks and matches Facebook's own embed everywhere else on the web). No more shifting on play/pause, no more crop.
-
-If you'd rather the Reel fill the card width edge-to-edge, we can't get there via `plugins/video.php` — that would require a different embed strategy (options B/C from the previous investigation). Confirm before I implement:
-
-- **A (recommended, matches official):** fixed 267×476, centered — no shifting, matches Blogspot.
-- **B:** keep fluid width but accept the shifting — no change worth making.
-
-## Post-edit checks
-1. `npm run platform:check` — must pass clean for x, threads, linkedin.
-2. Test the same Reel that renders correctly in Blogspot — should look identical in the app.
-
-Success probability: 90% for option A.
+## Success probability
+**~93%.** The overlay mechanism is exactly what worked before. The only risk is that Threads' current SDK renders the Play button in a subtly different hit region than a year ago — if the first tap after this change plays *but* doesn't score, we widen the overlay to `inset: -4px`. If it scores *but* doesn't play, we swap `overlay.remove()` for a `pointer-events: none` toggle plus removal on the next animation frame.
