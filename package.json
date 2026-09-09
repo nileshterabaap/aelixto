@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "postinstall": "node scripts/patch-safe-area-android.mjs",
     "build": "node scripts/platform-guard.mjs check && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
