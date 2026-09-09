@@ -97,32 +97,6 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
   const handleLinkSubmit = async () => {
     if (!linkUrl.trim()) return;
-    let resolvedUrl = linkUrl.trim();
-    // LinkedIn now shares posts as lnkd.in short links. Expand them to the real
-    // linkedin.com/posts/... URL so the post is classified + embedded as LinkedIn
-    // instead of falling through to Article/External.
-    if (/^https?:\/\/(www\.)?lnkd\.in\//i.test(resolvedUrl)) {
-      try {
-        setIsLoadingPreview(true);
-        const { data } = await supabase.functions.invoke('expand-url', {
-          body: { url: resolvedUrl },
-        });
-        const finalUrl = typeof data?.finalUrl === 'string' ? data.finalUrl : '';
-        if (finalUrl && finalUrl.toLowerCase().includes('linkedin.com')) {
-          resolvedUrl = finalUrl.split('?')[0];
-          setLinkUrl(resolvedUrl);
-        }
-      } catch (e) {
-        console.warn('[CreatePostDialog] lnkd.in expansion failed:', e);
-      } finally {
-        setIsLoadingPreview(false);
-      }
-    }
-    return processLinkSubmit(resolvedUrl);
-  };
-
-  const processLinkSubmit = async (linkUrl: string) => {
-    if (!linkUrl.trim()) return;
     fetchedPreviewTextRef.current = null;
     measuredHeightRef.current = null;
     measurePromiseRef.current = null;
@@ -690,14 +664,10 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             {/* Blurred backdrop */}
             <DialogPrimitive.Overlay asChild forceMount>
               <motion.div
-                // Blur is a static CSS layer (animating backdrop-filter forces a
-                // fresh, expensive compositing pass on Android WebView — that is
-                // what made the first few opens skip their animation and made a
-                // flicker appear a beat after closing). Only opacity animates.
-                className="fixed inset-0 z-50 bg-foreground/45 backdrop-blur-lg"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-50 bg-foreground/45"
+                initial={{ opacity: 0, backdropFilter: "blur(0px)" }}
+                animate={{ opacity: 1, backdropFilter: "blur(9px)" }}
+                exit={{ opacity: 0, backdropFilter: "blur(0px)" }}
                 transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
               />
             </DialogPrimitive.Overlay>
@@ -706,11 +676,11 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
             <DialogPrimitive.Content asChild forceMount aria-describedby={undefined}>
               <motion.div
                 className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-1.5rem)] max-w-md outline-none"
-                initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)" }}
-                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%" }}
-                exit={{ opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)" }}
+                initial={{ opacity: 0, scale: 0.18, x: "-50%", y: "calc(-50% + 230px)", filter: "blur(10px)" }}
+                animate={{ opacity: 1, scale: 1, x: "-50%", y: "-50%", filter: "blur(0px)" }}
+                exit={{ opacity: 0, scale: 0.92, x: "-50%", y: "calc(-50% + 28px)", filter: "blur(8px)" }}
                 transition={panelTransition}
-                style={{ transformOrigin: "50% calc(100% + 120px)", willChange: "transform, opacity" }}
+                style={{ transformOrigin: "50% calc(100% + 120px)" }}
               >
                 <motion.div
                   transition={panelTransition}

@@ -31,36 +31,12 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true,
     },
-    // NOTE: no `StatusBar` block on purpose. @capacitor-community/safe-area
-    // owns edge-to-edge and the system bars; @capacitor/status-bar's
-    // `overlaysWebView` fights with it and makes the webview draw behind the
-    // bars WITHOUT any inset compensation (content clipped at top/bottom on
-    // devices whose WebView reports env(safe-area-inset-*) as 0).
-
-    Keyboard: {
-      // The WebView must NOT be resized by the soft keyboard. Android's
-      // adjustResize combined with edge-to-edge produced stale viewport
-      // heights (squashed auth form, blank message thread, composer floating
-      // mid-screen). The app tracks the keyboard height itself via
-      // `initKeyboardInsets()` and offsets layout with `--kb`.
-      resize: "none" as never,
-      resizeOnFullScreen: false,
+    StatusBar: {
+      // "LIGHT" = light status-bar background → dark icons/text (correct for our white header)
+      style: "LIGHT",
+      backgroundColor: "#FFFFFF",
+      overlaysWebView: false,
     },
-    // Capacitor 8 ships a built-in SystemBars plugin that also applies insets.
-    // Disable its inset handling so @capacitor-community/safe-area is the only
-    // owner of Android inset handling (per the safe-area docs).
-    SystemBars: {
-      insetsHandling: "disable",
-    },
-    SafeArea: {
-      // Polyfills correct env(safe-area-inset-*) values on Android webviews
-      // that report 0 in edge-to-edge mode.
-      statusBarStyle: "LIGHT",
-      navigationBarStyle: "LIGHT",
-      detectViewportFitCoverChanges: true,
-      initialViewportFitCover: true,
-    },
-
   },
 };
 

@@ -409,20 +409,16 @@ const Conversation = () => {
 
   if (loading) {
     return (
-      <div className="screen bg-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div
-      data-kbdebug="chat-root"
-      className="bg-background flex flex-col overflow-hidden"
-      style={{ height: 'calc(100dvh - var(--kb))' }}
-    >
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background border-b border-border pt-safe">
+      <header className="sticky top-0 z-10 bg-background border-b border-border">
         <div className="container max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
           <Button
             variant="ghost"
@@ -455,7 +451,7 @@ const Conversation = () => {
       </header>
 
       {/* Messages */}
-      <main data-kbdebug="list" ref={scrollAreaRef} className="flex-1 overflow-y-auto flex flex-col">
+      <main ref={scrollAreaRef} className="flex-1 overflow-y-auto flex flex-col">
         <div className="container max-w-2xl mx-auto w-full px-4 py-4 space-y-1 animate-fade-in mt-auto">
           {messages.map((message, idx) => {
             const isOwn = message.sender_id === user?.id;
@@ -729,7 +725,7 @@ const Conversation = () => {
       )}
 
       {/* Input */}
-      <div data-kbdebug="composer" className="sticky bottom-0 bg-background border-t border-border">
+      <div className="sticky bottom-0 bg-background border-t border-border">
         <div className="container max-w-2xl mx-auto px-4 py-4">
           <form
             autoComplete="off"
