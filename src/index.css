@@ -388,8 +388,6 @@ html.kb-open {
   --safe-bottom: 0px;
 }
 
-
-
 /* The tab bar is meaningless while typing (Instagram hides it too) and would
    otherwise float on top of the keyboard. */
 html.kb-open nav.fixed.bottom-0 {
