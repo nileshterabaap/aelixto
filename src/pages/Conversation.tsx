@@ -409,16 +409,20 @@ const Conversation = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="screen bg-background flex items-center justify-center">
         <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div
+     
+      className="bg-background flex flex-col overflow-hidden"
+      style={{ height: 'calc(100dvh - var(--kb))' }}
+    >
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-background border-b border-border">
+      <header className="sticky top-0 z-10 bg-background border-b border-border pt-safe">
         <div className="container max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
           <Button
             variant="ghost"

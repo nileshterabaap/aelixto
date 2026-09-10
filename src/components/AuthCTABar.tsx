@@ -17,7 +17,7 @@ export const AuthCTABar = () => {
   return (
     <div
       className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      style={{ paddingBottom: "var(--safe-bottom)" }}
     >
       <div className="mx-auto max-w-2xl px-4 py-3">
         <p className="text-center text-xs text-muted-foreground mb-2">

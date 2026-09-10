@@ -196,7 +196,7 @@ export const SavedPostViewer = ({
       </div>
 
       {/* Scrollable posts */}
-      <div ref={scrollContainerRef} onScroll={handleScroll} className="h-[calc(100vh-56px)] overflow-y-auto pb-8">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="h-[calc(100dvh-56px)] overflow-y-auto pb-8">
         <div className="mx-auto max-w-2xl px-4 py-4 space-y-6">
           {(() => {
             return visiblePosts.map((post, visibleIdx) => {
