@@ -52,7 +52,6 @@
         "@tanstack/react-query-persist-client": "^5.90.21",
         "@tanstack/react-virtual": "^3.13.12",
         "@types/dompurify": "^3.0.5",
-        "aelixto-edge-to-edge": "./capacitor-plugins/edge-to-edge",
         "aelixto-gam-native": "./capacitor-plugins/gam-native",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
@@ -760,8 +759,6 @@
     "acorn": ["acorn@8.15.0", "", { "bin": "bin/acorn" }, "sha512-NZyJarBfL7nWwIq+FDL6Zp/yHEhePMNnnJ0y3qfieCrmNvYct8uvtiV41UvlSe6apAfk0fY1FbWx+NwfmpvtTg=="],
 
     "acorn-jsx": ["acorn-jsx@5.3.2", "", { "peerDependencies": { "acorn": "^6.0.0 || ^7.0.0 || ^8.0.0" } }, "sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ=="],
-
-    "aelixto-edge-to-edge": ["aelixto-edge-to-edge@file:capacitor-plugins/edge-to-edge", { "peerDependencies": { "@capacitor/core": "^8.0.0" } }],
 
     "aelixto-gam-native": ["aelixto-gam-native@file:capacitor-plugins/gam-native", { "devDependencies": { "@capacitor/core": "^7.0.0", "typescript": "^5.3.0" }, "peerDependencies": { "@capacitor/core": "^7.0.0" } }],
 

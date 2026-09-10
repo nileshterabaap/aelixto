@@ -5,7 +5,6 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "postinstall": "node scripts/patch-safe-area-android.mjs",
     "build": "node scripts/platform-guard.mjs check && vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
@@ -70,7 +69,6 @@
     "@tanstack/react-query-persist-client": "^5.90.21",
     "@tanstack/react-virtual": "^3.13.12",
     "@types/dompurify": "^3.0.5",
-    "aelixto-edge-to-edge": "./capacitor-plugins/edge-to-edge",
     "aelixto-gam-native": "./capacitor-plugins/gam-native",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

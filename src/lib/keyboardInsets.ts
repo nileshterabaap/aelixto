@@ -1,20 +1,26 @@
 /**
- * Keyboard state tracking (Aug-24 behaviour restored).
+ * Keyboard inset tracking.
  *
- * The soft keyboard is handled natively: Android resizes the WebView, so the
- * visible viewport already ends exactly at the top of the keyboard. The app
- * therefore performs NO keyboard math — `--kb` stays `0px` forever and is kept
- * only so existing `calc(... - var(--kb))` expressions stay valid.
+ * The Android WebView runs edge-to-edge (`overlaysWebView: true`), and letting
+ * Android resize the WebView for the soft keyboard produced broken layouts:
+ * pages laid out against a stale `100vh`, huge blank bands, and the composer
+ * floating in the middle of the screen. Instead the keyboard is configured to
+ * NOT resize the WebView (`Keyboard.resize = 'none'`) and the app reports the
+ * keyboard height itself as a CSS variable:
  *
- * The single thing tracked here is whether the keyboard is open, exposed as
- * `html.kb-open`, so the bottom tab bar hides and the bottom safe inset
- * collapses while typing (the keyboard covers the system nav bar).
+ *   --kb        keyboard height in px (0 when closed)
+ *   html.kb-open  present while the keyboard is visible
+ *
+ * Layouts that must sit above the keyboard use `calc(100dvh - var(--kb))`.
  */
 
 import { Capacitor } from '@capacitor/core';
 
-function setOpen(open: boolean) {
-  document.documentElement.classList.toggle('kb-open', open);
+function set(px: number, open = px > 0) {
+  const root = document.documentElement;
+  const value = Math.max(0, Math.round(px));
+  root.style.setProperty('--kb', `${value}px`);
+  root.classList.toggle('kb-open', open);
 }
 
 let started = false;
@@ -22,17 +28,43 @@ let started = false;
 export function initKeyboardInsets() {
   if (started) return;
   started = true;
-  document.documentElement.style.setProperty('--kb', '0px');
-  setOpen(false);
+  set(0);
 
   if (Capacitor.isNativePlatform()) {
+    // Device measurements (Sep 2026) show the Android WebView DOES shrink when
+    // the IME opens (innerHeight 716 -> 417) even with `resize: none`, because
+    // the activity runs edge-to-edge with adjustResize. Subtracting the plugin
+    // reported keyboard height on top of that double-counts the keyboard and
+    // collapses the chat to ~125px. So on native the WebView height is the
+    // single source of truth: --kb stays 0 whenever the viewport already
+    // shrank, and only compensates the leftover gap if it did not.
+    let baseline = window.innerHeight;
+
     void (async () => {
       try {
         const { Keyboard } = await import('@capacitor/keyboard');
-        await Keyboard.addListener('keyboardWillShow', () => setOpen(true));
-        await Keyboard.addListener('keyboardDidShow', () => setOpen(true));
-        await Keyboard.addListener('keyboardWillHide', () => setOpen(false));
-        await Keyboard.addListener('keyboardDidHide', () => setOpen(false));
+        const onShow = (reported: number) => {
+          // Give the WebView a frame to settle into its resized height.
+          window.setTimeout(() => {
+            const shrink = Math.max(0, baseline - window.innerHeight);
+            const kb = Math.max(0, Math.min(reported, window.innerHeight * 0.7));
+            // The WebView usually absorbs (most of) the keyboard itself. Only
+            // compensate the leftover gap, and always flag kb-open so the
+            // bottom safe inset / tab bar collapse while typing.
+            const leftover = shrink > 80 ? Math.max(0, kb - shrink) : kb;
+            set(leftover, true);
+          }, 60);
+        };
+        const onHide = () => {
+          set(0);
+          window.setTimeout(() => {
+            baseline = Math.max(baseline, window.innerHeight);
+          }, 120);
+        };
+        await Keyboard.addListener('keyboardWillShow', (i) => onShow(i.keyboardHeight));
+        await Keyboard.addListener('keyboardDidShow', (i) => onShow(i.keyboardHeight));
+        await Keyboard.addListener('keyboardWillHide', onHide);
+        await Keyboard.addListener('keyboardDidHide', onHide);
       } catch (error) {
         console.warn('[keyboard] plugin listeners unavailable', error);
       }
@@ -40,12 +72,13 @@ export function initKeyboardInsets() {
     return;
   }
 
-  // Web / PWA: visualViewport shrinks when the on-screen keyboard opens.
+
+  // Web / PWA fallback: visualViewport shrinks when the on-screen keyboard opens.
   const vv = window.visualViewport;
   if (!vv) return;
   const onResize = () => {
     const overlap = window.innerHeight - (vv.height + vv.offsetTop);
-    setOpen(overlap > 80);
+    set(overlap > 80 ? overlap : 0);
   };
   vv.addEventListener('resize', onResize);
   vv.addEventListener('scroll', onResize);
