@@ -453,7 +453,7 @@ export const PlatformPostViewer = ({
       onTouchEnd={handleTouchEnd}
     >
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pt-safe">
         <div className="mx-auto max-w-2xl px-4 py-3 flex items-center justify-between">
           <Button
             variant="ghost"
@@ -502,7 +502,7 @@ export const PlatformPostViewer = ({
       {/* Scrollable posts */}
       <div 
         ref={scrollContainerRef}
-        className="h-[calc(100dvh-56px)] overflow-y-auto overscroll-contain pb-8"
+        className="h-[calc(100dvh-56px-var(--safe-top))] overflow-y-auto overscroll-contain pb-8"
       >
         <div className="mx-auto max-w-2xl px-4 py-4 space-y-6">
           {(loading && posts.length === 0) || !profileReady ? (
