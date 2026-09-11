@@ -1,17 +1,10 @@
 /**
- * Keyboard inset tracking.
+ * Keyboard state tracking.
  *
- * The Android WebView runs edge-to-edge (`overlaysWebView: true`), and letting
- * Android resize the WebView for the soft keyboard produced broken layouts:
- * pages laid out against a stale `100vh`, huge blank bands, and the composer
- * floating in the middle of the screen. Instead the keyboard is configured to
- * NOT resize the WebView (`Keyboard.resize = 'none'`) and the app reports the
- * keyboard height itself as a CSS variable:
- *
- *   --kb        keyboard height in px (0 when closed)
- *   html.kb-open  present while the keyboard is visible
- *
- * Layouts that must sit above the keyboard use `calc(100dvh - var(--kb))`.
+ * Device measurements show Android already resizes the WebView for the IME
+ * (innerHeight 716 -> 417). Native layout therefore follows that resized
+ * viewport and never subtracts the keyboard height again. Keyboard events only
+ * toggle `kb-open`, which hides the tab bar and collapses the bottom safe inset.
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -31,38 +24,13 @@ export function initKeyboardInsets() {
   set(0);
 
   if (Capacitor.isNativePlatform()) {
-    // Device measurements (Sep 2026) show the Android WebView DOES shrink when
-    // the IME opens (innerHeight 716 -> 417) even with `resize: none`, because
-    // the activity runs edge-to-edge with adjustResize. Subtracting the plugin
-    // reported keyboard height on top of that double-counts the keyboard and
-    // collapses the chat to ~125px. So on native the WebView height is the
-    // single source of truth: --kb stays 0 whenever the viewport already
-    // shrank, and only compensates the leftover gap if it did not.
-    let baseline = window.innerHeight;
-
     void (async () => {
       try {
         const { Keyboard } = await import('@capacitor/keyboard');
-        const onShow = (reported: number) => {
-          // Give the WebView a frame to settle into its resized height.
-          window.setTimeout(() => {
-            const shrink = Math.max(0, baseline - window.innerHeight);
-            const kb = Math.max(0, Math.min(reported, window.innerHeight * 0.7));
-            // The WebView usually absorbs (most of) the keyboard itself. Only
-            // compensate the leftover gap, and always flag kb-open so the
-            // bottom safe inset / tab bar collapse while typing.
-            const leftover = shrink > 80 ? Math.max(0, kb - shrink) : kb;
-            set(leftover, true);
-          }, 60);
-        };
-        const onHide = () => {
-          set(0);
-          window.setTimeout(() => {
-            baseline = Math.max(baseline, window.innerHeight);
-          }, 120);
-        };
-        await Keyboard.addListener('keyboardWillShow', (i) => onShow(i.keyboardHeight));
-        await Keyboard.addListener('keyboardDidShow', (i) => onShow(i.keyboardHeight));
+        const onShow = () => set(0, true);
+        const onHide = () => set(0, false);
+        await Keyboard.addListener('keyboardWillShow', onShow);
+        await Keyboard.addListener('keyboardDidShow', onShow);
         await Keyboard.addListener('keyboardWillHide', onHide);
         await Keyboard.addListener('keyboardDidHide', onHide);
       } catch (error) {
