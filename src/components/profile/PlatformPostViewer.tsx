@@ -108,7 +108,6 @@ export const PlatformPostViewer = ({
   const [portalReady, setPortalReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const pendingPrependAnchor = useRef<{ postId: string; top: number } | null>(null);
   // Fires exactly once when the tapped target post is first attached to
   // the DOM — used to synchronously scroll the container to that post
   // BEFORE the browser paints, so post #0 never flashes.
