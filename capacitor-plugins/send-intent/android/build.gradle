@@ -21,7 +21,7 @@ apply plugin: 'com.android.library'
 
 android {
     namespace "de.mindlib.sendIntent.sendintent"
-    compileSdkVersion 35
+    compileSdkVersion project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 36
 
     defaultConfig {
         minSdkVersion 23
