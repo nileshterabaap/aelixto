@@ -198,6 +198,7 @@ export const PlatformPostViewer = ({
   );
   const renderedPostsRef = useRef(renderedPosts);
   renderedPostsRef.current = renderedPosts;
+  const postsLengthRef = useRef(posts.length);
 
   useEffect(() => {
     postRefs.current.clear();
@@ -207,7 +208,27 @@ export const PlatformPostViewer = ({
     } else {
       setRenderRange({ start: 0, end: posts.length - 1 });
     }
-  }, [isXViewer, posts.length, initialIdx, initialPostId, activeTab]);
+    postsLengthRef.current = posts.length;
+  }, [isXViewer, initialIdx, initialPostId, activeTab]);
+
+  // Appending the next grid page must not reset the render window around the
+  // originally tapped post. That reset unmounted every post the user had
+  // already scrolled through, forcing both images and untouched embeds to
+  // reload. If the current window already reached the old end, carry it into
+  // the newly appended page instead.
+  useEffect(() => {
+    const previousLength = postsLengthRef.current;
+    postsLengthRef.current = posts.length;
+    if (!isXViewer || posts.length <= previousLength) return;
+
+    setRenderRange((current) => {
+      if (current.end < previousLength - 1) return current;
+      return {
+        ...current,
+        end: Math.min(posts.length - 1, current.end + (posts.length - previousLength)),
+      };
+    });
+  }, [isXViewer, posts.length]);
 
   useEffect(() => {
     if (!isXViewer || initialIdx < 0) return;
@@ -226,7 +247,7 @@ export const PlatformPostViewer = ({
       setRenderRange(getXViewerRange(posts.length, initialIdx, BACKGROUND_X_WINDOW_RADIUS));
     }, 900);
     return () => window.clearTimeout(t);
-  }, [isXViewer, posts.length, initialIdx, initialPostId]);
+  }, [isXViewer, initialIdx, initialPostId]);
 
   useLayoutEffect(() => {
     if (!isXViewer) return;
