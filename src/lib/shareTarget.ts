@@ -1,5 +1,5 @@
 import { Capacitor } from "@capacitor/core";
-import { SendIntent } from "send-intent";
+import { SendIntent } from "./sendIntentPlugin";
 import { App } from "@capacitor/app";
 
 /**
