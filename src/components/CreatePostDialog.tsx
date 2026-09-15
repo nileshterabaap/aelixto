@@ -81,6 +81,18 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   // it renders inside the embedded card without ever touching the user's own caption.
   const fetchedPreviewTextRef = useRef<string | null>(null);
 
+  // A link shared into Aelixto from another app's share sheet lands here:
+  // prefill the URL field and run the normal preview flow straight away.
+  useEffect(() => {
+    if (!open || initialDraft) return;
+    const shared = consumePendingSharedLink();
+    if (!shared) return;
+    const cleaned = extractUrlFromText(shared);
+    setLinkUrl(cleaned);
+    void processLinkSubmit(cleaned);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   // Hydrate from existing draft when opening
   useEffect(() => {
     if (open && initialDraft) {
