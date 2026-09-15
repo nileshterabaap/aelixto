@@ -48,9 +48,24 @@ export function isAdTestMode(): boolean {
   return import.meta.env.DEV === true || ADS_TEST_FLAG || readRuntimeTestFlag();
 }
 
-/** Live read of the install-age bypass (same sources as test mode). */
+/**
+ * Debug-only: skip the 2-day install-age gate while still requesting the
+ * REAL Ad Manager units (unlike test mode, which swaps in Google's sample
+ * unit). Lets a fresh install verify the live pipeline immediately.
+ */
+export const AD_SKIP_INSTALL_WAIT_LS_KEY = 'aelixto_ads_skip_wait';
+
+function readSkipInstallWaitFlag(): boolean {
+  try {
+    return localStorage.getItem(AD_SKIP_INSTALL_WAIT_LS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Live read of the install-age bypass (test mode OR the skip-wait toggle). */
 export function isInstallAgeBypassed(): boolean {
-  return isAdTestMode();
+  return isAdTestMode() || readSkipInstallWaitFlag();
 }
 
 export const AD_TEST_MODE = import.meta.env.DEV === true || ADS_TEST_FLAG || RUNTIME_TEST_FLAG;

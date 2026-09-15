@@ -2,10 +2,9 @@
   "name": "send-intent",
   "version": "7.0.0",
   "description": "SendIntent",
-  "main": "dist/plugin.cjs.js",
+  "main": "dist/esm/index.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
-  "unpkg": "dist/plugin.js",
   "files": [
     "android/src/main/",
     "android/build.gradle",
