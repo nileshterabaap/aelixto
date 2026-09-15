@@ -356,15 +356,8 @@ export const ProfilePlatformGrid = ({
         </AnimatePresence>
 
         {hasMore && !isInitialLoading && items.length > 0 && (
-          <div className="flex justify-center pt-4">
-            <Button
-              onClick={loadMore}
-              disabled={loading}
-              variant="outline"
-              className="rounded-full"
-            >
-              {loading ? "Loading..." : "Load more"}
-            </Button>
+          <div ref={sentinelRef} className="flex justify-center pt-4 pb-2">
+            <div className="h-6 w-6 rounded-full border-2 border-muted-foreground/30 border-t-transparent animate-spin" />
           </div>
         )}
       </div>
