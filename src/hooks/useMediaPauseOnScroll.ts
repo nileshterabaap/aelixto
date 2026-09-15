@@ -488,14 +488,12 @@ function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
   sharedNearObserver!.observe(el);
   sharedActiveObserver!.observe(el);
 
-  // A fresh tap inside the post means the user (re)started playback, so the
-  // post earns another suspend + pre-warm cycle.
-  const onReplayIntent = () => {
-    reg.cycleUsed = false;
-  };
-  el.addEventListener('pointerdown', onReplayIntent, true);
-  el.addEventListener('touchstart', onReplayIntent, { capture: true, passive: true });
-  replayListeners.set(el, onReplayIntent);
+  // NOTE: we deliberately do NOT re-arm the suspend/pre-warm cycle on taps.
+  // Any touch that merely starts a scroll over the embed used to count as a
+  // "replay intent", which re-armed the cycle and caused repeated iframe
+  // reloads for posts the user never actually played. One suspend + pre-warm
+  // cycle per post per session is enough to guarantee audio stops.
+
 
   // Sync initial state from layout.
   syncElementFromLayout(el, reg);
