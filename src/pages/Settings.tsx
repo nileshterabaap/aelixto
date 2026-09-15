@@ -80,6 +80,19 @@ const Settings = () => {
     });
   };
 
+  const toggleAdSkipWait = () => {
+    const next = !adSkipWait;
+    try {
+      if (next) localStorage.setItem(AD_SKIP_INSTALL_WAIT_LS_KEY, '1');
+      else localStorage.removeItem(AD_SKIP_INSTALL_WAIT_LS_KEY);
+    } catch { /* ignore */ }
+    setAdSkipWait(next);
+    toast({
+      title: next ? "Install wait skipped" : "Install wait enforced",
+      description: "Restart the app for it to take effect.",
+    });
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate('/auth');
