@@ -59,6 +59,7 @@ const AnimatedRoutes = () => {
   const location = useLocation();
   useGlobalMediaPauseOnNavigate();
   useRealtimeInvalidations();
+  useAppReviewPrompt();
   
   // Disable browser's automatic scroll restoration
   useEffect(() => {
