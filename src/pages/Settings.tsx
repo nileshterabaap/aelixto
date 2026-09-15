@@ -230,6 +230,19 @@ const Settings = () => {
               <span className="text-sm text-muted-foreground">{adTestMode ? 'On' : 'Off'}</span>
             </button>
           )}
+          {Capacitor.isNativePlatform() && (
+            <button
+              type="button"
+              onClick={toggleAdSkipWait}
+              className="w-full flex items-center justify-between py-4 text-left"
+            >
+              <span className="flex flex-col">
+                <span className="text-base text-foreground">Skip 2-day ad wait (debug)</span>
+                <span className="text-xs text-muted-foreground">Requests real ads right away</span>
+              </span>
+              <span className="text-sm text-muted-foreground">{adSkipWait ? 'On' : 'Off'}</span>
+            </button>
+          )}
           <div className="py-4 space-y-3">
             <p className="text-sm text-muted-foreground">Theme</p>
             <div className="flex items-center justify-between">
