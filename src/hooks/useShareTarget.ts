@@ -11,7 +11,9 @@ export const useShareTarget = () => {
     initShareTarget();
     const off = onSharedLink(() => {
       // Let the composer mount/route settle before triggering it.
+      // On a cold start the composer may not be mounted yet, so retry once.
       setTimeout(() => triggerCreatePost(), 60);
+      setTimeout(() => triggerCreatePost(), 900);
     });
     return () => {
       off();
