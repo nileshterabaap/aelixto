@@ -182,11 +182,13 @@ export const PlatformPostViewer = ({
     [posts, initialPostId, initialPostIndex]
   );
   const targetPostId = initialIdx >= 0 ? posts[initialIdx]?.id : undefined;
-  const isXViewer = useMemo(() => {
-    const tab = (activeTab || "").toLowerCase();
-    const targetPlatform = String(posts[initialIdx]?.platform || "").toLowerCase();
-    return X_PLATFORMS.has(tab) || X_PLATFORMS.has(targetPlatform);
-  }, [activeTab, posts, initialIdx]);
+  // Windowed rendering is now used for EVERY platform. Rendering the full
+  // list and relying on scroll anchoring let late-hydrating embeds above the
+  // tapped post shift the scroll position, so the viewer landed on a
+  // different post than the one tapped. Starting with only the tapped post
+  // mounted makes the correct post the first thing rendered, always.
+  const isXViewer = true;
+
   const [renderRange, setRenderRange] = useState(() =>
     getXViewerRange(posts.length, initialIdx, INITIAL_X_WINDOW_RADIUS)
   );
