@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { showPrivacyOptionsForm } from "@/lib/adConsent";
-import { AD_TEST_LS_KEY, AD_TEST_MODE } from "@/config/ads";
+import { AD_TEST_LS_KEY, AD_TEST_MODE, AD_SKIP_INSTALL_WAIT_LS_KEY } from "@/config/ads";
 import { Capacitor } from "@capacitor/core";
 
 const Settings = () => {
@@ -36,6 +36,9 @@ const Settings = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [adTestMode, setAdTestMode] = useState(AD_TEST_MODE);
+  const [adSkipWait, setAdSkipWait] = useState(() => {
+    try { return localStorage.getItem(AD_SKIP_INSTALL_WAIT_LS_KEY) === '1'; } catch { return false; }
+  });
   // "Manage ad preferences" is only shown when the UMP privacy message
   // actually applies to the user's region (GDPR/CPRA). Elsewhere (and in
   // release builds outside those regions) the row stays hidden.
