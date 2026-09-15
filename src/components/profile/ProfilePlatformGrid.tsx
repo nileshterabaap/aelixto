@@ -241,6 +241,25 @@ export const ProfilePlatformGrid = ({
   const [actionsPost, setActionsPost] = useState<PlatformPost | null>(null);
   const location = useLocation();
 
+  // Infinite scroll: auto-load the next page as the user approaches the end,
+  // so the grid never stops behind a "Load more" button.
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef(loadMore);
+  loadMoreRef.current = loadMore;
+
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || !hasMore || loading) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) loadMoreRef.current();
+      },
+      { rootMargin: "1200px 0px" }
+    );
+    io.observe(node);
+    return () => io.disconnect();
+  }, [hasMore, loading, items.length, activeTab]);
+
   // Close the viewer when the route/location changes (e.g. user taps a nav button)
   useEffect(() => {
     if (viewerOpen) setViewerOpen(false);
