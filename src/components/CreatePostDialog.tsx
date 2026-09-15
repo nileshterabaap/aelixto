@@ -18,6 +18,7 @@ import {
 } from "@/lib/domainClassification";
 import { useSaveDraft, useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
 import { useDailyPostLimit } from "@/hooks/useDailyPostLimit";
+import { consumePendingSharedLink } from "@/lib/shareTarget";
 import { measureEmbedHeight } from "@/lib/measureEmbedHeight";
 import { estimateEmbedHeight } from "@/lib/estimateEmbedHeight";
 import { extractOriginalCaptionFromSourceTitle } from "@/lib/originalCaption";
