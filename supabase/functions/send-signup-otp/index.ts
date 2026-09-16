@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
 
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || email.length > 254) {
     return new Response(JSON.stringify({ error: 'Valid email is required' }), {
-      status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 
@@ -52,12 +52,12 @@ Deno.serve(async (req) => {
   if (mode === 'signup') {
     if (!password || password.length < 6) {
       return new Response(JSON.stringify({ error: 'Password must be at least 6 characters' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
     if (!username || username.length < 3) {
       return new Response(JSON.stringify({ error: 'Username is required' }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
@@ -88,8 +88,11 @@ Deno.serve(async (req) => {
         }
       } else {
         console.error('createUser failed', createErr)
-        return new Response(JSON.stringify({ error: createErr.message }), {
-          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        const friendly = msg.includes('weak') || msg.includes('easy to guess')
+          ? 'This password is too common. Please choose a stronger one.'
+          : createErr.message
+        return new Response(JSON.stringify({ error: friendly }), {
+          status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         })
       }
     }
@@ -110,7 +113,7 @@ Deno.serve(async (req) => {
     if (secsSince < 30) {
       return new Response(
         JSON.stringify({ error: `Please wait ${Math.ceil(30 - secsSince)}s before requesting a new code` }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
   }
