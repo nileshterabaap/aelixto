@@ -19,7 +19,8 @@
     "platform:unfreeze": "node scripts/platform-guard.mjs unfreeze",
     "platform:restore": "node scripts/platform-guard.mjs restore",
     "platform:seal": "node scripts/platform-guard.mjs seal",
-    "platform:rotate": "node scripts/platform-guard.mjs rotate"
+    "platform:rotate": "node scripts/platform-guard.mjs rotate",
+    "assets:generate": "capacitor-assets generate --android --ios --iconBackgroundColor '#ffffff' --iconBackgroundColorDark '#ffffff' --splashBackgroundColor '#ffffff' --splashBackgroundColorDark '#ffffff'"
   },
   "dependencies": {
     "@capacitor-community/in-app-review": "^8.0.0",
@@ -96,6 +97,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-plugin-dev-server-bridge": "^1.0.2",
     "@lovable.dev/vite-plugin-hmr-gate": "^1.5.0",
