@@ -19,7 +19,8 @@
     "platform:unfreeze": "node scripts/platform-guard.mjs unfreeze",
     "platform:restore": "node scripts/platform-guard.mjs restore",
     "platform:seal": "node scripts/platform-guard.mjs seal",
-    "platform:rotate": "node scripts/platform-guard.mjs rotate"
+    "platform:rotate": "node scripts/platform-guard.mjs rotate",
+    "assets:generate": "capacitor-assets generate --android --ios --iconBackgroundColor '#ffffff' --iconBackgroundColorDark '#ffffff' --splashBackgroundColor '#ffffff' --splashBackgroundColorDark '#ffffff'"
   },
   "dependencies": {
     "@capacitor-community/in-app-review": "^8.0.0",
