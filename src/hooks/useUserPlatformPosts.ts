@@ -302,11 +302,10 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
     };
   }, [items, platform, queryClient, userId]);
 
-  const visibleItems = useMemo(() => items.slice(0, visibleCount), [items, visibleCount]);
-  const hasMore = visibleCount < items.length;
+  const hasMore = !!hasNextPage;
   const loadMore = useCallback(() => {
-    setVisibleCount((current) => Math.min(current + 50, items.length));
-  }, [items.length]);
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  return { items: visibleItems, loading, error: null, hasMore, loadMore };
+  return { items, loading, error: null, hasMore, loadMore };
 };
