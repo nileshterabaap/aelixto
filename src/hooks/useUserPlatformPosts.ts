@@ -212,23 +212,42 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
         (profiles || []).map((profile) => [profile.user_id, profile])
       );
 
-      return enrichedPosts.map((post) => {
-        const profile = profileByUserId.get(post.user_id);
-        return {
-          ...post,
-          profile_username: profile?.username || null,
-          profile_display_name: profile?.display_name || null,
-          profile_avatar_url: profile?.avatar_url || null,
-        };
-      });
+      return {
+        items: enrichedPosts.map((post) => {
+          const profile = profileByUserId.get(post.user_id);
+          return {
+            ...post,
+            profile_username: profile?.username || null,
+            profile_display_name: profile?.display_name || null,
+            profile_avatar_url: profile?.avatar_url || null,
+          };
+        }) as PlatformPost[],
+        nextCursor,
+      };
     },
     enabled: !!userId && !!platform,
     staleTime: 30 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: "always",
+    refetchOnMount: true,
     refetchOnReconnect: false,
   });
+
+  // Pinned posts come back first from the RPC, which can re-emit the same post
+  // on a later page — keep the first occurrence only.
+  const items = useMemo(() => {
+    const seen = new Set<string>();
+    const flat: PlatformPost[] = [];
+    (data?.pages || []).forEach((page) => {
+      page.items.forEach((post) => {
+        if (!post.id || seen.has(post.id)) return;
+        seen.add(post.id);
+        flat.push(post);
+      });
+    });
+    return flat;
+  }, [data]);
+
 
   // Background thumbnail backfill for platforms that can expose media previews after creation.
   useEffect(() => {
