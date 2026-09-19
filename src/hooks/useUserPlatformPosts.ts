@@ -143,56 +143,47 @@ async function persistExistingThumbnail(post: PlatformPost) {
   }
 }
 
+const PAGE_SIZE = 50;
+
 export const useUserPlatformPosts = (userId: string | undefined, platform: string | undefined) => {
   const queryClient = useQueryClient();
-  const [visibleCount, setVisibleCount] = useState(50);
 
-  useEffect(() => {
-    setVisibleCount(50);
-  }, [userId, platform]);
-
-  const { data: items = [], isLoading: loading } = useQuery({
+  const {
+    data,
+    isLoading: loading,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
     queryKey: ["platform-posts", userId, platform],
-    queryFn: async () => {
-      if (!userId || !platform) return [];
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage: { items: PlatformPost[]; nextCursor: string | null }) =>
+      lastPage.nextCursor,
+    // Fetch ONE page at a time. Previously the grid pulled up to 20 sequential
+    // pages (1000 posts) before rendering anything, which is what made busy
+    // profiles take several seconds to open.
+    queryFn: async ({ pageParam }) => {
+      if (!userId || !platform) return { items: [] as PlatformPost[], nextCursor: null };
 
-      const all: PlatformPost[] = [];
-      let cursor: string | null = null;
-
-      for (let page = 0; page < 20; page += 1) {
-        const { data, error } = await supabase.rpc("get_user_platform_posts", {
-          target_user: userId,
-          platform_name: platform,
-          limit_count: 50,
-          cursor,
-        });
-
-        if (error) throw error;
-
-        const pageItems = (data || []) as PlatformPost[];
-        all.push(...pageItems.map((post) => ({
-          ...post,
-          profile_owner_id: userId,
-          preview_text: (post as any).preview_text ?? null,
-          preview_title: (post as any).preview_title ?? null,
-          preview_image_url: (post as any).preview_image_url ?? null,
-        })));
-        if (pageItems.length < 50) break;
-        cursor = pageItems[pageItems.length - 1]?.created_at || null;
-        if (!cursor) break;
-      }
-
-      // Pinned posts are returned first by the RPC, which breaks the
-      // created_at cursor ordering and can re-emit the same post on a later
-      // page. Keep only the first occurrence of each post id.
-      const seenIds = new Set<string>();
-      const deduped = all.filter((post) => {
-        if (!post.id || seenIds.has(post.id)) return false;
-        seenIds.add(post.id);
-        return true;
+      const { data: rpcData, error } = await supabase.rpc("get_user_platform_posts", {
+        target_user: userId,
+        platform_name: platform,
+        limit_count: PAGE_SIZE,
+        cursor: pageParam,
       });
-      all.length = 0;
-      all.push(...deduped);
+
+      if (error) throw error;
+
+      const all: PlatformPost[] = ((rpcData || []) as PlatformPost[]).map((post) => ({
+        ...post,
+        profile_owner_id: userId,
+        preview_text: (post as any).preview_text ?? null,
+        preview_title: (post as any).preview_title ?? null,
+        preview_image_url: (post as any).preview_image_url ?? null,
+      }));
+
+      const nextCursor =
+        all.length < PAGE_SIZE ? null : all[all.length - 1]?.created_at || null;
 
       const postIds = all.map((post) => post.id).filter(Boolean);
       const { data: postDetails } = postIds.length
