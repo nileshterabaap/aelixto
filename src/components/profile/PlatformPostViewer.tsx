@@ -464,7 +464,10 @@ export const PlatformPostViewer = ({
                       if (posts.length <= 1) onClose();
                     }}
                     userId={user?.id}
-                    startHydrated={true}
+                    // Only the tapped post and its immediate neighbours hydrate
+                    // up front. Hydrating the whole list at once pinned the main
+                    // thread on mobile and pushed the anchored post out of place.
+                    startHydrated={Math.abs(absoluteIdx - initialIdx) <= 2}
                     fastReveal={post.id === targetPostId}
                   />
                 </div>
