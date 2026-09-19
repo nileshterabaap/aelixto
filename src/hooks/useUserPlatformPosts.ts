@@ -200,7 +200,8 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       }));
 
       const userIds = [...new Set(enrichedPosts.map((post) => post.user_id).filter(Boolean))];
-      if (userIds.length === 0) return enrichedPosts;
+      if (userIds.length === 0) return { items: enrichedPosts as PlatformPost[], nextCursor };
+
 
       const { data: profiles } = await supabase
         .from("profiles")
