@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { showPrivacyOptionsForm } from "@/lib/adConsent";
-import { AD_TEST_LS_KEY, AD_TEST_MODE, AD_SKIP_INSTALL_WAIT_LS_KEY } from "@/config/ads";
+import { AD_TEST_LS_KEY, AD_TEST_MODE } from "@/config/ads";
 import { Capacitor } from "@capacitor/core";
 
 const Settings = () => {
@@ -36,9 +36,6 @@ const Settings = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [adTestMode, setAdTestMode] = useState(AD_TEST_MODE);
-  const [adSkipWait, setAdSkipWait] = useState(() => {
-    try { return localStorage.getItem(AD_SKIP_INSTALL_WAIT_LS_KEY) === '1'; } catch { return false; }
-  });
   // "Manage ad preferences" is only shown when the UMP privacy message
   // actually applies to the user's region (GDPR/CPRA). Elsewhere (and in
   // release builds outside those regions) the row stays hidden.
@@ -79,19 +76,6 @@ const Settings = () => {
     setAdTestMode(next);
     toast({
       title: next ? "Ad test mode ON" : "Ad test mode OFF",
-      description: "Restart the app for it to take effect.",
-    });
-  };
-
-  const toggleAdSkipWait = () => {
-    const next = !adSkipWait;
-    try {
-      if (next) localStorage.setItem(AD_SKIP_INSTALL_WAIT_LS_KEY, '1');
-      else localStorage.removeItem(AD_SKIP_INSTALL_WAIT_LS_KEY);
-    } catch { /* ignore */ }
-    setAdSkipWait(next);
-    toast({
-      title: next ? "Install wait skipped" : "Install wait enforced",
       description: "Restart the app for it to take effect.",
     });
   };
@@ -228,19 +212,6 @@ const Settings = () => {
             >
               <span className="text-base text-foreground">Ad test mode (debug)</span>
               <span className="text-sm text-muted-foreground">{adTestMode ? 'On' : 'Off'}</span>
-            </button>
-          )}
-          {Capacitor.isNativePlatform() && (
-            <button
-              type="button"
-              onClick={toggleAdSkipWait}
-              className="w-full flex items-center justify-between py-4 text-left"
-            >
-              <span className="flex flex-col">
-                <span className="text-base text-foreground">Skip 2-day ad wait (debug)</span>
-                <span className="text-xs text-muted-foreground">Requests real ads right away</span>
-              </span>
-              <span className="text-sm text-muted-foreground">{adSkipWait ? 'On' : 'Off'}</span>
             </button>
           )}
           <div className="py-4 space-y-3">

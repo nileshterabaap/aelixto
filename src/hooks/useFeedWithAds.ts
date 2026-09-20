@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { AD_INTERVAL, isAdTestMode, isInstallAgeBypassed } from '@/config/ads';
+import { AD_INTERVAL, isAdTestMode } from '@/config/ads';
 import { useAdsEligibility, adsEligibilityReason } from '@/hooks/useAdsEligibility';
 
 export type FeedItem<T> =
@@ -26,7 +26,7 @@ export function useFeedWithAds<T extends { id: string }>(posts: T[]): Array<Feed
     console.log('[ads] feed interleave: posts =', posts.length, 'eligible =', eligible,
       'interval =', AD_INTERVAL, 'adSlotsInserted =', adCount,
       '| reason =', adsEligibilityReason,
-      '| testMode =', isAdTestMode(), '| installAgeBypass =', isInstallAgeBypassed());
+      '| testMode =', isAdTestMode());
     return out;
   }, [posts, eligible]);
 }

@@ -45,11 +45,11 @@ GAM_APP_ID_ANDROID  = 'ca-app-pub-4944388830758437~6705238632';
 GAM_APP_ID_IOS      = 'ca-app-pub-4944388830758437~4837623196';
 ```
 
-`AD_TEST_MODE` and `AD_DEV_BYPASS_INSTALL_AGE` are both tied to
-`import.meta.env.DEV`, so:
+Ad test mode is selected at request time, so:
 
-- `vite dev` / Capacitor hot-reload → test ads, no 48h gate (fast QA).
-- `npm run build` (every release APK/IPA) → live Ad Manager IDs, 48h gate on.
+- `vite dev` / Capacitor hot-reload → test ads (fast QA).
+- `npm run build` (every release APK/IPA) → live Ad Manager IDs.
+- There is no install-age wait; eligible native sessions request ads immediately.
 
 ### 3. Native app IDs (after `npx cap sync`)
 
@@ -116,9 +116,7 @@ The plugin is picked up automatically via `package.json`:
 - Verify **UMP form** appears once on first launch (or force it via
   Settings → Manage ad preferences).
 - Verify **ATT prompt** appears on iOS 14+ first launch.
-- Verify a native ad card appears after every 5 posts once the app has been
-  installed ≥ 48 h (or clear `localStorage`'s `aelixto_install_first_seen_at`
-  and the `install_metadata` row to reset the gate during QA).
+- Verify a native ad request occurs after every 7 posts.
 - Tap the CTA — the landing page opens through Google's click handler and
   the click is billable on both platforms.
 - Ad Manager → Reports should show impressions and clicks within ~1 hour.
@@ -141,10 +139,8 @@ All must be true before any ad is requested:
 
 1. Running on Capacitor Android/iOS (never web).
 2. UMP consent resolved + `MobileAds` initialized (`adsReady()`).
-3. Install age ≥ 48 h — tracked in `public.install_metadata`, with a
-   `localStorage` fallback for signed-out sessions.
-4. Placement: one ad after every 5 posts (`AD_INTERVAL`).
-5. Rate limit: ≥ 20 s between successive ad requests
+3. Placement: one ad after every 7 posts (`AD_INTERVAL`).
+4. Rate limit: ≥ 20 s between successive ad requests
    (`AD_MIN_REQUEST_INTERVAL_MS`).
 
 Users can re-open their consent choices via **Settings → Manage ad

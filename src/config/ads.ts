@@ -48,34 +48,7 @@ export function isAdTestMode(): boolean {
   return import.meta.env.DEV === true || ADS_TEST_FLAG || readRuntimeTestFlag();
 }
 
-/**
- * Debug-only: skip the 2-day install-age gate while still requesting the
- * REAL Ad Manager units (unlike test mode, which swaps in Google's sample
- * unit). Lets a fresh install verify the live pipeline immediately.
- */
-export const AD_SKIP_INSTALL_WAIT_LS_KEY = 'aelixto_ads_skip_wait';
-
-function readSkipInstallWaitFlag(): boolean {
-  try {
-    return localStorage.getItem(AD_SKIP_INSTALL_WAIT_LS_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-/** Live read of the install-age bypass (test mode OR the skip-wait toggle). */
-export function isInstallAgeBypassed(): boolean {
-  return isAdTestMode() || readSkipInstallWaitFlag();
-}
-
 export const AD_TEST_MODE = import.meta.env.DEV === true || ADS_TEST_FLAG || RUNTIME_TEST_FLAG;
-
-/**
- * Developer-only bypass for the 48h install-age gate. Same DEV guard as
- * above, so release builds always enforce the 48h gate.
- */
-export const AD_DEV_BYPASS_INSTALL_AGE =
-  import.meta.env.DEV === true || ADS_TEST_FLAG || RUNTIME_TEST_FLAG;
 
 // Google **Ad Manager** sample native ad unit.
 // IMPORTANT: the plugin requests ads with `AdManagerAdRequest` + an Ad Manager
@@ -107,9 +80,6 @@ export function getNativeFeedAdUnitId(platform: 'android' | 'ios' | 'web'): stri
 /** Show 1 ad after every N real posts (test + live, Android + iOS). */
 export const AD_INTERVAL = 7;
 
-/** Minimum install age before any ad is requested. */
-export const AD_MIN_INSTALL_AGE_MS = 2 * 24 * 60 * 60 * 1000;
-
 /** Minimum spacing between successive ad requests (rate limit). */
 export const AD_MIN_REQUEST_INTERVAL_MS = 20_000;
 
@@ -117,4 +87,4 @@ export const AD_MIN_REQUEST_INTERVAL_MS = 20_000;
 console.log('[ads] config: DEV =', import.meta.env.DEV, 'VITE_ADS_TEST =',
   String(import.meta.env.VITE_ADS_TEST ?? ''), 'runtimeTestFlag =', RUNTIME_TEST_FLAG,
   'AD_TEST_MODE =', AD_TEST_MODE,
-  'installAgeBypass =', AD_DEV_BYPASS_INSTALL_AGE, 'adInterval =', AD_INTERVAL);
+  'adInterval =', AD_INTERVAL);

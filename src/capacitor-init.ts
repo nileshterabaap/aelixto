@@ -291,7 +291,7 @@ export async function initCapacitorPlugins() {
 
   // Fire-and-forget: consent + Google Mobile Ads SDK init. Runs after boot
   // so it never blocks first paint. Ads only ever render inside the feed
-  // once this resolves AND install age is >= 48h AND the user is signed in.
+  // once this resolves; there is no install-age delay.
   setTimeout(() => {
     void initAdsAndConsent();
   }, 3000);
