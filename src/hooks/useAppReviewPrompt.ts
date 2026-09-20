@@ -11,7 +11,7 @@ import { Capacitor } from '@capacitor/core';
  *  - Delayed a few seconds after launch so it never interrupts startup.
  */
 
-// Same key the ads install-age gate uses, so first-launch time is shared.
+// First-launch timestamp used only for the 24-hour store-review delay.
 const LS_INSTALL_KEY = 'aelixto_install_first_seen_at';
 const LS_REVIEW_ASKED_KEY = 'aelixto_review_asked_at';
 
