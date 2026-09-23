@@ -136,27 +136,43 @@ export const useCollectionItems = (collectionId: string | undefined) => {
     queryFn: async () => {
       if (!collectionId) return [];
 
-      const { data, error } = await supabase
+      // Step 1: item ids (avoids a deep nested join that can fail in some webviews)
+      const { data: items, error: itemsError } = await supabase
         .from("collection_items")
-        .select(`
-          post_id,
-          posts (
-            id, user_id, content, created_at, likes_count, saves_count,
-            comments_count, reposts_count, media_type, media_url,
-            platform, embed_html, thumbnail_url, title, is_public,
-            profiles:user_id (username, display_name, avatar_url)
-          )
-        `)
+        .select("post_id, created_at")
         .eq("collection_id", collectionId)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (itemsError) throw itemsError;
 
-      return (data || [])
-        .filter((item: any) => item.posts)
-        .map((item: any) => {
-          const post = item.posts;
-          const profile = post.profiles;
+      const postIds = (items || []).map((i: any) => i.post_id).filter(Boolean);
+      if (!postIds.length) return [];
+
+      // Step 2: posts
+      const { data: posts, error: postsError } = await supabase
+        .from("posts")
+        .select(
+          "id, user_id, content, created_at, likes_count, saves_count, comments_count, reposts_count, media_type, media_url, platform, embed_html, thumbnail_url, title, preview_text, preview_title, preview_image_url, is_public"
+        )
+        .in("id", postIds);
+
+      if (postsError) throw postsError;
+
+      // Step 3: authors
+      const authorIds = Array.from(new Set((posts || []).map((p: any) => p.user_id)));
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("user_id, username, display_name, avatar_url")
+        .in("user_id", authorIds.length ? authorIds : ["00000000-0000-0000-0000-000000000000"]);
+
+      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+      const postMap = new Map((posts || []).map((p: any) => [p.id, p]));
+
+      return postIds
+        .map((id: string) => postMap.get(id))
+        .filter(Boolean)
+        .map((post: any) => {
+          const profile = profileMap.get(post.user_id);
           return {
             id: post.id,
             user_id: post.user_id,
@@ -167,6 +183,9 @@ export const useCollectionItems = (collectionId: string | undefined) => {
             platform: post.platform,
             embed_html: post.embed_html,
             thumbnail_url: post.thumbnail_url,
+            preview_text: post.preview_text,
+            preview_title: post.preview_title,
+            preview_image_url: post.preview_image_url,
             timestamp: new Date(post.created_at),
             likes: post.likes_count || 0,
             comments: post.comments_count || 0,
@@ -182,5 +201,8 @@ export const useCollectionItems = (collectionId: string | undefined) => {
         });
     },
     enabled: !!collectionId,
+    retry: 2,
+    staleTime: 0,
   });
 };
+

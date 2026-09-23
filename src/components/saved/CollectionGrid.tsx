@@ -107,7 +107,7 @@ function CollectionDetail({
   userId?: string;
   onBack: () => void;
 }) {
-  const { data: items = [], isLoading } = useCollectionItems(collection.id);
+  const { data: items = [], isLoading, isError, refetch } = useCollectionItems(collection.id);
 
   return (
     <div>
@@ -117,11 +117,17 @@ function CollectionDetail({
       <h2 className="text-lg font-bold mb-4">{collection.name}</h2>
       {isLoading ? (
         <p className="text-muted-foreground text-sm text-center py-8">Loading...</p>
+      ) : isError ? (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground text-sm mb-3">Couldn't load this collection.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Try again</Button>
+        </div>
       ) : (
         <SavedThumbnailGrid posts={items} userId={userId} />
       )}
     </div>
   );
+
 }
 
 export const CollectionGrid = ({
