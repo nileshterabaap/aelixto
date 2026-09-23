@@ -205,7 +205,7 @@
         "src/features/article-embeds/ArticleContentEmbed.tsx",
         "supabase/functions/record-view/index.ts"
       ],
-      "frozen": true,
+      "frozen": false,
       "baseline": {
         "src/hooks/useViewTracking.ts": {
           "hash": "710cf8ffa692a25a93021bcc2f51d4a7f6df6c3c2797c1307b59c2ad5bcd5f43",
