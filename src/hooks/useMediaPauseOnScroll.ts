@@ -459,12 +459,35 @@ function ensureSharedObservers() {
   };
 
   window.addEventListener('resize', sharedResizeHandler);
+  // Safety net: IntersectionObserver only fires when a post crosses the whole
+  // screen edge, so a playing post that slid under the header — or whose
+  // layout shifted inside the grid viewer's own scroll container — could keep
+  // playing. On any scroll (captured from every scroll container), re-check
+  // only the posts currently 'active'. Usually 0–2 elements → negligible cost.
+  document.addEventListener('scroll', onAnyScroll, { capture: true, passive: true });
+}
+
+let scrollRaf = 0;
+function onAnyScroll() {
+  if (scrollRaf) return;
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0;
+    elementStates.forEach((reg, el) => {
+      if (reg.state !== 'active' || !el.isConnected) return;
+      if (!isInsideUsableViewport(el.getBoundingClientRect())) {
+        syncElementFromLayout(el, reg);
+      }
+    });
+  });
 }
 
 function destroySharedObservers() {
   sharedNearObserver?.disconnect();
   sharedActiveObserver?.disconnect();
   if (sharedResizeHandler) window.removeEventListener('resize', sharedResizeHandler);
+  document.removeEventListener('scroll', onAnyScroll, { capture: true } as EventListenerOptions);
+  if (scrollRaf) cancelAnimationFrame(scrollRaf);
+  scrollRaf = 0;
   sharedNearObserver = null;
   sharedActiveObserver = null;
   sharedResizeHandler = null;

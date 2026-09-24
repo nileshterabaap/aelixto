@@ -289,6 +289,54 @@ export const PlatformPostViewer = ({
     };
   }, [portalReady, targetPostId, posts, initialIdx, activeTab]);
 
+  // Keep whatever the user is looking at perfectly still when a post ABOVE
+  // the viewport changes height late. X / Quora / Pinterest / article cards
+  // grow seconds after mount (widget scripts, unfurls), long after the
+  // initial anchor lock has ended — that was shoving the current post away.
+  // Instagram/Threads/Facebook/LinkedIn/YouTube have height-locked frames,
+  // which is why they never showed the issue. Native CSS scroll anchoring is
+  // unreliable in Android WebView / iOS, so we compensate manually.
+  useEffect(() => {
+    if (!portalReady) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const heights = new WeakMap<Element, number>();
+    const ro = new ResizeObserver((entries) => {
+      const containerTop = container.getBoundingClientRect().top;
+      let delta = 0;
+      for (const entry of entries) {
+        const el = entry.target as HTMLElement;
+        const h = el.offsetHeight;
+        const prev = heights.get(el);
+        heights.set(el, h);
+        if (prev === undefined || prev === h) continue;
+        // Only posts fully above the visible top shift the content we see.
+        // (During the initial anchor window the anchor effect owns this.)
+        if (!userScrolledRef.current) continue;
+        if (el.getBoundingClientRect().bottom <= containerTop + 1) {
+          delta += h - prev;
+        }
+      }
+      if (delta !== 0) container.scrollTop += delta;
+    });
+    const observeAll = () => {
+      postRefs.current.forEach((el) => {
+        if (!heights.has(el)) {
+          heights.set(el, el.offsetHeight);
+          ro.observe(el);
+        }
+      });
+    };
+    observeAll();
+    const mo = new MutationObserver(observeAll);
+    mo.observe(container, { childList: true, subtree: true });
+    return () => {
+      ro.disconnect();
+      mo.disconnect();
+    };
+  }, [portalReady, posts, activeTab]);
+
+
 
   // Mark all visible posts as seen when viewing profile posts
   useEffect(() => {
