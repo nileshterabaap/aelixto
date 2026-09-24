@@ -329,9 +329,7 @@ export const PlatformPostViewer = ({
     };
     observeAll();
     const mo = new MutationObserver(observeAll);
-    mo.observe(container, { childList: true, subtree: false });
-    const inner = container.firstElementChild;
-    if (inner) mo.observe(inner, { childList: true });
+    mo.observe(container, { childList: true, subtree: true });
     return () => {
       ro.disconnect();
       mo.disconnect();
