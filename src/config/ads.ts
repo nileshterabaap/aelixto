@@ -82,8 +82,11 @@ export function getNativeFeedAdUnitId(platform: 'android' | 'ios' | 'web'): stri
 /** Show 1 ad after every N real posts (test + live, Android + iOS). */
 export const AD_INTERVAL = 7;
 
-/** Minimum spacing between successive ad requests (rate limit). */
-export const AD_MIN_REQUEST_INTERVAL_MS = 20_000;
+/** Minimum spacing between successive ad requests (rate limit).
+ *  Purely self-imposed — Google has no minimum. 5s still prevents the
+ *  simultaneous burst when several feed slots mount at once, while letting
+ *  a fast scroller reach the next ad slot without waiting ~20s. */
+export const AD_MIN_REQUEST_INTERVAL_MS = 5_000;
 
 // One-time boot log so the APK's Logcat shows exactly which mode is compiled in.
 console.log('[ads] config: DEV =', import.meta.env.DEV, 'VITE_ADS_TEST =',
