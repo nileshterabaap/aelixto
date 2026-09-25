@@ -9,6 +9,8 @@
 
     <application>
         <!-- Google Ad Manager (AdX) APPLICATION ID.
+             GameAdZone's app ID (2026-09-24 email) — "use these details only
+             for live ads from Google."
              MobileAdsInitProvider crashes at process start with
              "Missing application ID" if this meta-data is absent from the
              MERGED manifest. Declaring it in the plugin's library manifest
@@ -18,6 +20,6 @@
              SAME value (or add tools:replace="android:value" there). -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-4944388830758437~6705238632" />
+            android:value="ca-app-pub-7664893030317051~4883442346" />
     </application>
 </manifest>

@@ -59,14 +59,16 @@ export const AD_TEST_MODE = import.meta.env.DEV === true || ADS_TEST_FLAG || RUN
 const TEST_NATIVE_ANDROID = '/21775744923/example/native';
 const TEST_NATIVE_IOS     = '/21775744923/example/native';
 
-// Live Google Ad Manager (AdX) native ad units.
-// Network code 23362049225.
-const LIVE_NATIVE_ANDROID = '/23362049225/aelixto_feed_native_android';
+// Live GameAdZone / Google Ad Manager native ad units.
+// GameAdZone (2026-09-24 email): use these details only for live ads from Google.
+// Multi-network ad-unit path: GameAdZone network 21753324030 + Aelixto network 23362049225.
+const LIVE_NATIVE_ANDROID = '/21753324030,23362049225/com.aelixto.app10_Native';
 const LIVE_NATIVE_IOS     = '/23362049225/aelixto_feed_native_ios';
 
 // Live Google Ad Manager APPLICATION IDs (used by the native manifests, not
 // the JS layer — exported here for documentation / single source of truth).
-export const GAM_APP_ID_ANDROID = 'ca-app-pub-4944388830758437~6705238632';
+// Android App ID is GameAdZone's (2026-09-24 email); iOS unchanged.
+export const GAM_APP_ID_ANDROID = 'ca-app-pub-7664893030317051~4883442346';
 export const GAM_APP_ID_IOS     = 'ca-app-pub-4944388830758437~4837623196';
 
 export function getNativeFeedAdUnitId(platform: 'android' | 'ios' | 'web'): string {
