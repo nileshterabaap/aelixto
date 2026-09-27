@@ -41,6 +41,10 @@
       #splash-screen img {
         width: 128px;
         height: 128px;
+        object-fit: contain;
+        image-rendering: auto;
+        backface-visibility: hidden;
+        will-change: transform, opacity;
         animation: splash-pulse 1.5s ease-in-out infinite;
       }
       @keyframes splash-pulse {
@@ -71,7 +75,7 @@
 
   <body>
     <div id="splash-screen">
-      <img src="/splash-logo.png" alt="Aelixto" />
+      <img src="/icon-1024.png" alt="Aelixto" />
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
