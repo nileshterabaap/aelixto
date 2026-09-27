@@ -1,5 +1,6 @@
 import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
+import { onPostPlayConfirmed } from '@/lib/playedPosts';
 
 /**
  * Two-stage media lifecycle for playable media only.
