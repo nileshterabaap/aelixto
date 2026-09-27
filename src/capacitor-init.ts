@@ -149,14 +149,6 @@ export async function initCapacitorPlugins() {
   }
 
 
-  try {
-    const { SplashScreen } = await import("@capacitor/splash-screen");
-    // Auto-hide is configured, but we can also manually hide after app loads
-    await SplashScreen.hide();
-  } catch (e) {
-    console.warn("SplashScreen plugin not available", e);
-  }
-
   // Wire Android hardware back button to React Router history.
   // Default behavior exits the app from any screen — instead, navigate back
   // through history and only exit when there's nowhere left to go.
