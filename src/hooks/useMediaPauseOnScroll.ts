@@ -335,10 +335,32 @@ interface RegisteredElement {
    * loaded and is never reloaded on subsequent scroll passes.
    */
   cycleUsed: boolean;
+  postId: string;
 }
 
 
 const elementStates = new Map<HTMLElement, RegisteredElement>();
+
+/**
+ * Posts (by id) whose single suspend + pre-warm refresh is already spent, or
+ * whose "played" signal came from a scroll-over. Survives re-registration
+ * (hydration/key changes remount the observer), so a post is never reloaded
+ * more than once per session.
+ */
+const refreshSpentPosts = new Set<string>();
+
+/**
+ * Last time ANY scroll container moved. The played-post detector only watches
+ * window scroll, so a swipe inside the grid viewer's own scroll container was
+ * mistaken for a play tap. A "played" signal that lands right after scrolling
+ * is treated as a scroll-over, not a real play.
+ */
+let lastAnyScrollAt = 0;
+const SCROLL_OVER_WINDOW_MS = 450;
+if (typeof document !== 'undefined') {
+  document.addEventListener('scroll', () => { lastAnyScrollAt = performance.now(); }, { capture: true, passive: true });
+}
+const postIdFromKey = (key: unknown) => (key == null ? '' : String(key).split(':')[0]);
 
 let sharedNearObserver: IntersectionObserver | null = null;
 let sharedActiveObserver: IntersectionObserver | null = null;
@@ -378,6 +400,7 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
       restoreHardSuspended(el);
       // The single allowed refresh has now been spent.
       reg.cycleUsed = true;
+      if (reg.postId) refreshSpentPosts.add(reg.postId);
     }
     stageAPause(el);
   } else if (target === 'suspended') {
@@ -495,17 +518,23 @@ function destroySharedObservers() {
 
 const replayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
 
-function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
+function registerElement(el: HTMLElement, disableHardSuspend: boolean, postId: string) {
   ensureSharedObservers();
   observerRefCount++;
+
+  // Played signal arriving mid-scroll = finger swiped over the embed.
+  if (!disableHardSuspend && postId && performance.now() - lastAnyScrollAt < SCROLL_OVER_WINDOW_MS) {
+    refreshSpentPosts.add(postId);
+  }
 
   const reg: RegisteredElement = {
     visible: false,
     prewarm: false,
     state: 'active',
     disableHardSuspend,
-    cycleUsed: false,
+    cycleUsed: !!postId && refreshSpentPosts.has(postId),
     awaitingReentry: false,
+    postId,
   };
   elementStates.set(el, reg);
   sharedNearObserver!.observe(el);
@@ -570,7 +599,7 @@ export function useMediaPauseOnScroll(
       return;
     }
 
-    registerElement(el, disableHardSuspend);
+    registerElement(el, disableHardSuspend, postIdFromKey(observeKey));
     return () => unregisterElement(el);
   }, [containerRef, observeKey, enabled, disableHardSuspend]);
 
