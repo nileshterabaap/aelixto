@@ -349,16 +349,13 @@ const elementStates = new Map<HTMLElement, RegisteredElement>();
  */
 const refreshSpentPosts = new Set<string>();
 
-/**
- * Last time ANY scroll container moved. The played-post detector only watches
- * window scroll, so a swipe inside the grid viewer's own scroll container was
- * mistaken for a play tap. A "played" signal that lands right after scrolling
- * is treated as a scroll-over, not a real play.
- */
-let lastAnyScrollAt = 0;
-const SCROLL_OVER_WINDOW_MS = 450;
-if (typeof document !== 'undefined') {
-  document.addEventListener('scroll', () => { lastAnyScrollAt = performance.now(); }, { capture: true, passive: true });
+// A genuine repeat play re-arms the suspend cycle so audio always stops,
+// while scroll-overs (filtered in playedPosts) never trigger a reload.
+if (typeof window !== 'undefined') {
+  onPostPlayConfirmed((postId) => {
+    refreshSpentPosts.delete(postId);
+    elementStates.forEach((reg) => { if (reg.postId === postId) reg.cycleUsed = false; });
+  });
 }
 const postIdFromKey = (key: unknown) => (key == null ? '' : String(key).split(':')[0]);
 
@@ -521,11 +518,6 @@ const replayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
 function registerElement(el: HTMLElement, disableHardSuspend: boolean, postId: string) {
   ensureSharedObservers();
   observerRefCount++;
-
-  // Played signal arriving mid-scroll = finger swiped over the embed.
-  if (!disableHardSuspend && postId && performance.now() - lastAnyScrollAt < SCROLL_OVER_WINDOW_MS) {
-    refreshSpentPosts.add(postId);
-  }
 
   const reg: RegisteredElement = {
     visible: false,
