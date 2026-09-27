@@ -1,5 +1,6 @@
 import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
+import { onPostPlayConfirmed } from '@/lib/playedPosts';
 
 /**
  * Two-stage media lifecycle for playable media only.
@@ -335,10 +336,29 @@ interface RegisteredElement {
    * loaded and is never reloaded on subsequent scroll passes.
    */
   cycleUsed: boolean;
+  postId: string;
 }
 
 
 const elementStates = new Map<HTMLElement, RegisteredElement>();
+
+/**
+ * Posts (by id) whose single suspend + pre-warm refresh is already spent, or
+ * whose "played" signal came from a scroll-over. Survives re-registration
+ * (hydration/key changes remount the observer), so a post is never reloaded
+ * more than once per session.
+ */
+const refreshSpentPosts = new Set<string>();
+
+// A genuine repeat play re-arms the suspend cycle so audio always stops,
+// while scroll-overs (filtered in playedPosts) never trigger a reload.
+if (typeof window !== 'undefined') {
+  onPostPlayConfirmed((postId) => {
+    refreshSpentPosts.delete(postId);
+    elementStates.forEach((reg) => { if (reg.postId === postId) reg.cycleUsed = false; });
+  });
+}
+const postIdFromKey = (key: unknown) => (key == null ? '' : String(key).split(':')[0]);
 
 let sharedNearObserver: IntersectionObserver | null = null;
 let sharedActiveObserver: IntersectionObserver | null = null;
@@ -378,6 +398,7 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
       restoreHardSuspended(el);
       // The single allowed refresh has now been spent.
       reg.cycleUsed = true;
+      if (reg.postId) refreshSpentPosts.add(reg.postId);
     }
     stageAPause(el);
   } else if (target === 'suspended') {
@@ -495,7 +516,7 @@ function destroySharedObservers() {
 
 const replayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
 
-function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
+function registerElement(el: HTMLElement, disableHardSuspend: boolean, postId: string) {
   ensureSharedObservers();
   observerRefCount++;
 
@@ -504,8 +525,9 @@ function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
     prewarm: false,
     state: 'active',
     disableHardSuspend,
-    cycleUsed: false,
+    cycleUsed: !!postId && refreshSpentPosts.has(postId),
     awaitingReentry: false,
+    postId,
   };
   elementStates.set(el, reg);
   sharedNearObserver!.observe(el);
@@ -570,7 +592,7 @@ export function useMediaPauseOnScroll(
       return;
     }
 
-    registerElement(el, disableHardSuspend);
+    registerElement(el, disableHardSuspend, postIdFromKey(observeKey));
     return () => unregisterElement(el);
   }, [containerRef, observeKey, enabled, disableHardSuspend]);
 
