@@ -76,7 +76,7 @@ export const useConversations = () => {
 
     // Subscribe to realtime updates
     const channel = supabase
-      .channel('conversations-updates')
+      .channel(`conversations-updates-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -112,7 +112,13 @@ export const useConversations = () => {
       )
       .subscribe();
 
+    const onResume = () => { if (document.visibilityState === 'visible') fetchConversations(); };
+    document.addEventListener('visibilitychange', onResume);
+    const poll = window.setInterval(onResume, 30000);
+
     return () => {
+      document.removeEventListener('visibilitychange', onResume);
+      window.clearInterval(poll);
       stopListeningForReadEvents();
       supabase.removeChannel(channel);
     };
