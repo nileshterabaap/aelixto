@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed, clearScriptCache } from '@/lib/ScriptLoader';
+import { loadInstagramEmbed, loadFacebookSDK, loadThreadsEmbed } from '@/lib/ScriptLoader';
 import DOMPurify from 'dompurify';
 
 /** Decode HTML entities (&#064; → @, &#039; → ', etc.) using DOMParser */
@@ -398,38 +398,17 @@ export const RawEmbedRenderer = ({ embedHtml, onError, onOriginalVisit }: RawEmb
             checkFacebookError(3000);
             checkFacebookError(6000);
           }
-      } else if (platform === 'threads') {
+        } else if (platform === 'threads') {
           await loadThreadsEmbed();
-          
-          // Threads SDK auto-processes blockquotes on first load but has
-          // no public process() API for re-processing in SPAs.
-          // If the script was already cached, new blockquotes won't render.
-          const retryThreads = (attempt: number) => {
-            if (!containerRef.current || attempt > 2) return;
-            if (containerRef.current.querySelector('iframe')) return;
-            
-            // Remove old script, clear cache, re-inject with cache-bust
-            document.querySelectorAll('script[src*="threads.net/embed"]').forEach(s => s.remove());
-            clearScriptCache('https://www.threads.net/embed.js');
-            
-            const script = document.createElement('script');
-            script.src = `https://www.threads.net/embed.js?t=${Date.now()}`;
-            script.async = true;
-            document.body.appendChild(script);
-          };
-          
-          setTimeout(() => retryThreads(0), 2000);
-          setTimeout(() => retryThreads(1), 5000);
-          setTimeout(() => retryThreads(2), 8000);
-          
-          // Final check: if no iframe after all retries, trigger error fallback
+
+          // The Threads SDK is page-global. Never remove/reinsert it from a
+          // single post: that reloads unrelated embeds during grid scrolling.
           setTimeout(() => {
             if (containerRef.current && !containerRef.current.querySelector('iframe')) {
-              console.warn('[RawEmbedRenderer] Threads embed failed after all retries');
               setEmbedFailed(true);
               onError?.();
             }
-          }, 11000);
+          }, 6000);
         }
       } catch (error) {
         console.error('[RawEmbedRenderer] Failed to load embed script:', error);
