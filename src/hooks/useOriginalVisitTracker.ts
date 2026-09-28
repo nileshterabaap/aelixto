@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { trackOriginalVisit, trackView } from '@/hooks/useViewTracking';
+import { markPostPlayed } from '@/lib/playedPosts';
 
 // no-op stub kept to minimize diff after removing temporary diagnostic logger
 const traceLog = (..._args: unknown[]) => {};
@@ -58,16 +59,24 @@ export function useOriginalVisitTracker(
 
     const firePlay = () => {
       traceLog('firePlay', 'called', { postId, detail: { alreadyFired: playFiredRef.current, trackPlayableInteraction } });
-      if (trackPlayableInteraction && !playFiredRef.current) {
-        playFiredRef.current = true;
-        traceLog('firePlay', 'dispatch:trackView(video_play)', { postId });
-        trackView({ postId, eventType: 'video_play' }).then((ok) => {
-          traceLog('firePlay', 'trackView:result', { postId, detail: { ok } });
-        }).catch((err) => {
-          traceLog('firePlay', 'trackView:error', { postId, error: err });
-          playFiredRef.current = false;
-        });
-      }
+      if (!trackPlayableInteraction) return;
+
+      // Playback lifecycle and score deduplication are intentionally separate.
+      // A swipe over an iframe may create a play candidate which is correctly
+      // cancelled by playedPosts.ts. It must not consume this component's
+      // one-time score guard, otherwise a later genuine tap can never arm the
+      // post for auto-pause (the A → B → C failure in the profile viewer).
+      markPostPlayed(postId);
+
+      if (playFiredRef.current) return;
+      playFiredRef.current = true;
+      traceLog('firePlay', 'dispatch:trackView(video_play)', { postId });
+      trackView({ postId, eventType: 'video_play' }).then((ok) => {
+        traceLog('firePlay', 'trackView:result', { postId, detail: { ok } });
+      }).catch((err) => {
+        traceLog('firePlay', 'trackView:error', { postId, error: err });
+        playFiredRef.current = false;
+      });
     };
 
     const fireOriginal = () => {
@@ -120,6 +129,10 @@ export function useOriginalVisitTracker(
     const isThreadsPost = (): boolean => !!getThreadsIframe();
 
     const fireThreadsPlayOnce = () => {
+      // Always offer the interaction to the gesture-aware lifecycle detector.
+      // The global set below only deduplicates scoring; it must not suppress a
+      // real play tap after an earlier scroll gesture was rejected.
+      markPostPlayed(postId);
       if (threadsVideoPlayFiredPosts.has(postId)) return;
       lastThreadsCaptureRef.postId = postId;
       lastThreadsCaptureRef.time = Date.now();
