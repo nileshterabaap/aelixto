@@ -329,6 +329,8 @@ interface RegisteredElement {
   awaitingReentry: boolean;
   state: LifecycleState;
   disableHardSuspend: boolean;
+  postId: string;
+  playbackGeneration: number;
   /**
    * One-shot guard: a played video is suspended + pre-warmed exactly ONCE after
    * it leaves the viewport. Until the user taps play again, it then stays
@@ -339,6 +341,7 @@ interface RegisteredElement {
 
 
 const elementStates = new Map<HTMLElement, RegisteredElement>();
+const completedPlaybackCycles = new Map<string, number>();
 
 let sharedNearObserver: IntersectionObserver | null = null;
 let sharedActiveObserver: IntersectionObserver | null = null;
@@ -378,6 +381,7 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
       restoreHardSuspended(el);
       // The single allowed refresh has now been spent.
       reg.cycleUsed = true;
+      completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
     }
     stageAPause(el);
   } else if (target === 'suspended') {
@@ -495,7 +499,12 @@ function destroySharedObservers() {
 
 const replayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
 
-function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
+function registerElement(
+  el: HTMLElement,
+  disableHardSuspend: boolean,
+  postId: string,
+  playbackGeneration: number,
+) {
   ensureSharedObservers();
   observerRefCount++;
 
@@ -504,7 +513,9 @@ function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
     prewarm: false,
     state: 'active',
     disableHardSuspend,
-    cycleUsed: false,
+    postId,
+    playbackGeneration,
+    cycleUsed: (completedPlaybackCycles.get(postId) || 0) >= playbackGeneration,
     awaitingReentry: false,
   };
   elementStates.set(el, reg);
@@ -521,6 +532,23 @@ function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
   // Sync initial state from layout.
   syncElementFromLayout(el, reg);
 
+}
+
+function updateElementPolicy(
+  el: HTMLElement,
+  disableHardSuspend: boolean,
+  playbackGeneration: number,
+) {
+  const reg = elementStates.get(el);
+  if (!reg) return;
+  const newPlayback = playbackGeneration > reg.playbackGeneration;
+  reg.disableHardSuspend = disableHardSuspend;
+  reg.playbackGeneration = playbackGeneration;
+  if (newPlayback) {
+    reg.cycleUsed = false;
+    reg.awaitingReentry = false;
+  }
+  syncElementFromLayout(el, reg);
 }
 
 function unregisterElement(el: HTMLElement) {
@@ -548,6 +576,8 @@ interface MediaLifecycleOptions {
   enabled?: boolean;
   hardSuspendDistanceVh?: number;
   disableHardSuspend?: boolean;
+  postId?: string;
+  playbackGeneration?: number;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────
@@ -557,7 +587,12 @@ export function useMediaPauseOnScroll(
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
-  const { enabled = true, disableHardSuspend = false } = options;
+  const {
+    enabled = true,
+    disableHardSuspend = false,
+    postId = String(observeKey ?? ''),
+    playbackGeneration = 0,
+  } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
 
@@ -570,9 +605,17 @@ export function useMediaPauseOnScroll(
       return;
     }
 
-    registerElement(el, disableHardSuspend);
+    registerElement(el, disableHardSuspend, postId, playbackGeneration);
     return () => unregisterElement(el);
-  }, [containerRef, observeKey, enabled, disableHardSuspend]);
+  }, [containerRef, observeKey, enabled, postId]);
+
+  // Policy changes after a real play update the existing registration instead
+  // of destroying and rebuilding its observer state mid-gesture.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !enabled) return;
+    updateElementPolicy(el, disableHardSuspend, playbackGeneration);
+  }, [containerRef, enabled, disableHardSuspend, playbackGeneration]);
 
   // Route-change pause
   useEffect(() => {
