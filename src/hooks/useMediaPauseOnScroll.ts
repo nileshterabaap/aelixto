@@ -348,6 +348,8 @@ let sharedNearObserver: IntersectionObserver | null = null;
 let sharedActiveObserver: IntersectionObserver | null = null;
 let sharedResizeHandler: (() => void) | null = null;
 let stopPlayedSubscription: (() => void) | null = null;
+let focusedIframePoll = 0;
+let lastFocusedIframe: HTMLIFrameElement | null = null;
 let observerRefCount = 0;
 
 function onConfirmedPlay(postId: string, playbackGeneration: number) {
@@ -497,6 +499,23 @@ function ensureSharedObservers() {
 
   window.addEventListener('resize', sharedResizeHandler);
   stopPlayedSubscription = subscribePostPlayed(onConfirmedPlay);
+  // Mobile browsers do not reliably fire window.blur again when focus moves
+  // directly from iframe A to iframe B. Polling activeElement catches that
+  // handoff, while markPostPlayed still rejects a swipe that caused movement.
+  focusedIframePoll = window.setInterval(() => {
+    const active = document.activeElement;
+    if (!(active instanceof HTMLIFrameElement)) {
+      lastFocusedIframe = null;
+      return;
+    }
+    if (active === lastFocusedIframe) return;
+    lastFocusedIframe = active;
+    elementStates.forEach((reg, el) => {
+      if (el.contains(active)) {
+        markFocusedIframeAsPlayed(reg.postId);
+      }
+    });
+  }, 120);
   // Safety net: IntersectionObserver only fires when a post crosses the whole
   // screen edge, so a playing post that slid under the header — or whose
   // layout shifted inside the grid viewer's own scroll container — could keep
@@ -527,6 +546,9 @@ function destroySharedObservers() {
   if (scrollRaf) cancelAnimationFrame(scrollRaf);
   stopPlayedSubscription?.();
   stopPlayedSubscription = null;
+  if (focusedIframePoll) window.clearInterval(focusedIframePoll);
+  focusedIframePoll = 0;
+  lastFocusedIframe = null;
   scrollRaf = 0;
   sharedNearObserver = null;
   sharedActiveObserver = null;
