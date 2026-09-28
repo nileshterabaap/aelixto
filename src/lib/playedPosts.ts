@@ -8,7 +8,8 @@ import { useEffect, useState } from 'react';
  * wasted network/CPU.
  */
 const playedPostIds = new Set<string>();
-const listeners = new Set<(postId: string) => void>();
+type PlayedListener = (postId: string, generation: number) => void;
+const listeners = new Set<PlayedListener>();
 const pendingConfirmations = new Map<string, ReturnType<typeof setTimeout>>();
 const playbackGenerations = new Map<string, number>();
 
@@ -31,14 +32,21 @@ function ensureMovementTracking() {
 function confirmPostPlayed(postId: string) {
   if (!postId) return;
   playedPostIds.add(postId);
-  playbackGenerations.set(postId, (playbackGenerations.get(postId) || 0) + 1);
+  const generation = (playbackGenerations.get(postId) || 0) + 1;
+  playbackGenerations.set(postId, generation);
   listeners.forEach((fn) => {
     try {
-      fn(postId);
+      fn(postId, generation);
     } catch {
       /* noop */
     }
   });
+}
+
+/** Subscribe to confirmed plays without coupling media control to React renders. */
+export function subscribePostPlayed(listener: PlayedListener): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
 }
 
 export function hasPostBeenPlayed(postId: string): boolean {

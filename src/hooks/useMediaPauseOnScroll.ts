@@ -1,5 +1,6 @@
 import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
+import { subscribePostPlayed } from '@/lib/playedPosts';
 
 /**
  * Two-stage media lifecycle for playable media only.
@@ -346,7 +347,39 @@ const completedPlaybackCycles = new Map<string, number>();
 let sharedNearObserver: IntersectionObserver | null = null;
 let sharedActiveObserver: IntersectionObserver | null = null;
 let sharedResizeHandler: (() => void) | null = null;
+let stopPlayedSubscription: (() => void) | null = null;
 let observerRefCount = 0;
+
+function onConfirmedPlay(postId: string, playbackGeneration: number) {
+  elementStates.forEach((reg, el) => {
+    if (!el.isConnected) return;
+
+    if (reg.postId === postId) {
+      // Arm the post synchronously. Waiting for its React subscription allowed
+      // a quick B → C scroll to happen before B became suspendable.
+      if (playbackGeneration > reg.playbackGeneration) {
+        reg.playbackGeneration = playbackGeneration;
+        reg.cycleUsed = false;
+        reg.awaitingReentry = false;
+      }
+      reg.disableHardSuspend = false;
+      syncElementFromLayout(el, reg);
+      return;
+    }
+
+    // Playback is exclusive: as soon as B is genuinely played, stop A even if
+    // an embed's oversized frame still intersects the viewer.
+    if (!reg.disableHardSuspend && !reg.cycleUsed) {
+      stageAPause(el);
+      hardSuspendIframes(el);
+      reg.state = 'suspended';
+      reg.awaitingReentry = true;
+    } else {
+      stageAPause(el);
+      if (reg.state === 'active') reg.state = 'paused';
+    }
+  });
+}
 
 function isInsideUsableViewport(rect: DOMRect): boolean {
   const viewport = getUsableViewportBounds();
@@ -463,6 +496,7 @@ function ensureSharedObservers() {
   };
 
   window.addEventListener('resize', sharedResizeHandler);
+  stopPlayedSubscription = subscribePostPlayed(onConfirmedPlay);
   // Safety net: IntersectionObserver only fires when a post crosses the whole
   // screen edge, so a playing post that slid under the header — or whose
   // layout shifted inside the grid viewer's own scroll container — could keep
@@ -491,6 +525,8 @@ function destroySharedObservers() {
   if (sharedResizeHandler) window.removeEventListener('resize', sharedResizeHandler);
   document.removeEventListener('scroll', onAnyScroll, { capture: true } as EventListenerOptions);
   if (scrollRaf) cancelAnimationFrame(scrollRaf);
+  stopPlayedSubscription?.();
+  stopPlayedSubscription = null;
   scrollRaf = 0;
   sharedNearObserver = null;
   sharedActiveObserver = null;
