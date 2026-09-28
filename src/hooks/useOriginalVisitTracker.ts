@@ -338,6 +338,11 @@ export function useOriginalVisitTracker(
       }
     };
 
+    const onNativeMediaPlay = (event: Event) => {
+      if (!(event.target instanceof HTMLMediaElement)) return;
+      firePlay();
+    };
+
     // Cleanup list retained for API compatibility with the effect teardown.
     // The Threads play signal now rides on the container-level `touchstart`
     // capture listener wired below (see `el.addEventListener('touchstart',
@@ -373,6 +378,7 @@ export function useOriginalVisitTracker(
 
     el.addEventListener('pointerdown', onPointerDown, true);
     el.addEventListener('touchstart', onPointerDown, { capture: true, passive: true });
+    el.addEventListener('play', onNativeMediaPlay, true);
     window.addEventListener('blur', onWindowBlur);
     document.addEventListener('visibilitychange', onVisibilityChange);
     el.addEventListener('click', onClick, true);
@@ -380,6 +386,7 @@ export function useOriginalVisitTracker(
     return () => {
       el.removeEventListener('pointerdown', onPointerDown, true);
       el.removeEventListener('touchstart', onPointerDown, true);
+      el.removeEventListener('play', onNativeMediaPlay, true);
       window.removeEventListener('blur', onWindowBlur);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       el.removeEventListener('click', onClick, true);
