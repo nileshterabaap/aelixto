@@ -1,6 +1,6 @@
 import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
-import { subscribePostPlayed } from '@/lib/playedPosts';
+import { markPostPlayed, subscribePostPlayed } from '@/lib/playedPosts';
 
 /**
  * Two-stage media lifecycle for playable media only.
@@ -512,7 +512,7 @@ function ensureSharedObservers() {
     lastFocusedIframe = active;
     elementStates.forEach((reg, el) => {
       if (el.contains(active)) {
-        markFocusedIframeAsPlayed(reg.postId);
+        markPostPlayed(reg.postId);
       }
     });
   }, 120);
