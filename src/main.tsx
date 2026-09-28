@@ -4,6 +4,7 @@ import "./index.css";
 import { initCapacitorPlugins } from "./capacitor-init";
 import { initKeyboardInsets } from "./lib/keyboardInsets";
 import { supabase } from "./integrations/supabase/client";
+import { Capacitor } from "@capacitor/core";
 
 const unregisterAppServiceWorkers = async () => {
   if (!("serviceWorker" in navigator)) return;
@@ -30,7 +31,9 @@ const unregisterAppServiceWorkers = async () => {
   await Promise.all(cacheKeys.map((cacheKey) => window.caches.delete(cacheKey)));
 };
 
-// Dismiss splash screen once React is ready
+const splashStartedAt = performance.now();
+
+// Dismiss the HTML splash once React and the local session are ready.
 const dismissSplash = () => {
   const splash = document.getElementById('splash-screen');
   if (splash) {
@@ -39,10 +42,27 @@ const dismissSplash = () => {
   }
 };
 
+// The Android/iOS launch screen cannot animate. Remove it as soon as React has
+// painted so the matching animated HTML splash is visible during startup.
+const handOffNativeSplash = async () => {
+  if (!Capacitor.isNativePlatform()) return;
+
+  try {
+    const { SplashScreen } = await import("@capacitor/splash-screen");
+    await SplashScreen.hide({ fadeOutDuration: 180 });
+  } catch (error) {
+    console.warn("SplashScreen plugin not available", error);
+  }
+};
+
 void unregisterAppServiceWorkers();
 initKeyboardInsets();
 
-createRoot(document.getElementById("root")!).render(<App />);
+const root = document.getElementById("root");
+if (root) {
+  createRoot(root).render(<App />);
+  requestAnimationFrame(() => void handOffNativeSplash());
+}
 
 // Keep the splash screen visible until Supabase has probed the local
 // session. Otherwise React commits with `user=null`, `Index` bounces to
@@ -58,6 +78,14 @@ const dismissSplashAfterSessionProbe = async () => {
   } catch {
     /* ignore — splash still dismisses below */
   }
+
+  // On native, guarantee enough visible time for the animated handoff. The
+  // website keeps its existing fast dismissal behavior.
+  if (Capacitor.isNativePlatform()) {
+    const remaining = Math.max(0, 1000 - (performance.now() - splashStartedAt));
+    await new Promise((resolve) => setTimeout(resolve, remaining));
+  }
+
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       dismissSplash();

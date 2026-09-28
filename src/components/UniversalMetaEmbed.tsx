@@ -214,11 +214,13 @@ const InstagramIframeEmbed = ({
 }) => {
   const isReel = /\/reel\//i.test(src);
   const estimateVisibleHeight = useCallback((width?: number | null) => {
-    if (!width || width < 240) return isReel ? 640 : IG_DEFAULT_VISIBLE;
-    // Use a conservative media-only estimate for the first paint. Instagram's
-    // real MEASURE height will correct this, but starting below the footer line
-    // guarantees their native actions never flash before trimming settles.
-    const mediaEstimate = isReel ? width * 1.72 + 56 : width * 1.25 + 58;
+    if (!width || width < 240) return isReel ? 600 : IG_DEFAULT_VISIBLE;
+    // Deliberately UNDER-estimate before Instagram's MEASURE arrives. A too-tall
+    // pre-measure box is what let their footer ("View more on Instagram" +
+    // duplicate actions + like count) flash for a moment on slower loads.
+    // Cropping a few px of media briefly is always preferable; MEASURE corrects
+    // within a frame or two.
+    const mediaEstimate = isReel ? width * 1.6 + 40 : width * 1.0 + 44;
     return clampIgVisible(mediaEstimate);
   }, [isReel]);
 

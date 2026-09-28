@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    package="com.aelixto.gamnative">
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Advertising ID. Play Console's release check reads the MERGED manifest;
+         declaring it here guarantees it is present so the advertising ID is not
+         zeroed out (which would break ad serving/measurement). -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
 
     <application>
         <!-- Google Ad Manager (AdX) APPLICATION ID.
+             GameAdZone's app ID (2026-09-24 email) — "use these details only
+             for live ads from Google."
              MobileAdsInitProvider crashes at process start with
              "Missing application ID" if this meta-data is absent from the
              MERGED manifest. Declaring it in the plugin's library manifest
@@ -14,6 +20,6 @@
              SAME value (or add tools:replace="android:value" there). -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-4944388830758437~6705238632" />
+            android:value="ca-app-pub-7664893030317051~4883442346" />
     </application>
 </manifest>

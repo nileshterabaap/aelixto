@@ -57,12 +57,14 @@ export const useUserPlatformTabs = (userId: string | undefined) => {
     refetchOnMount: "always",
     refetchOnReconnect: false,
     queryFn: async (): Promise<PlatformTab[]> => {
-      const { data, error } = await supabase.rpc("get_user_platform_counts", {
-        target_user: userId!,
-      });
-      if (error) throw error;
-
-      const [{ data: recentPosts }, { data: recentReposts }] = await Promise.all([
+      // The counts RPC and the recency lookups are independent — fire them
+      // together instead of waiting for the RPC first.
+      const [
+        { data, error },
+        { data: recentPosts },
+        { data: recentReposts },
+      ] = await Promise.all([
+        supabase.rpc("get_user_platform_counts", { target_user: userId! }),
         supabase
           .from("posts")
           .select("platform, created_at")
@@ -76,6 +78,8 @@ export const useUserPlatformTabs = (userId: string | undefined) => {
           .order("created_at", { ascending: false })
           .limit(200),
       ]);
+      if (error) throw error;
+
 
       const latestByPlatform: Record<string, string> = {};
       (recentPosts || []).forEach((p: any) => {

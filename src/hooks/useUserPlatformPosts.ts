@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo } from "react";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface PlatformPost {
@@ -143,56 +143,47 @@ async function persistExistingThumbnail(post: PlatformPost) {
   }
 }
 
+const PAGE_SIZE = 50;
+
 export const useUserPlatformPosts = (userId: string | undefined, platform: string | undefined) => {
   const queryClient = useQueryClient();
-  const [visibleCount, setVisibleCount] = useState(50);
 
-  useEffect(() => {
-    setVisibleCount(50);
-  }, [userId, platform]);
-
-  const { data: items = [], isLoading: loading } = useQuery({
+  const {
+    data,
+    isLoading: loading,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useInfiniteQuery({
     queryKey: ["platform-posts", userId, platform],
-    queryFn: async () => {
-      if (!userId || !platform) return [];
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage: { items: PlatformPost[]; nextCursor: string | null }) =>
+      lastPage.nextCursor,
+    // Fetch ONE page at a time. Previously the grid pulled up to 20 sequential
+    // pages (1000 posts) before rendering anything, which is what made busy
+    // profiles take several seconds to open.
+    queryFn: async ({ pageParam }) => {
+      if (!userId || !platform) return { items: [] as PlatformPost[], nextCursor: null };
 
-      const all: PlatformPost[] = [];
-      let cursor: string | null = null;
-
-      for (let page = 0; page < 20; page += 1) {
-        const { data, error } = await supabase.rpc("get_user_platform_posts", {
-          target_user: userId,
-          platform_name: platform,
-          limit_count: 50,
-          cursor,
-        });
-
-        if (error) throw error;
-
-        const pageItems = (data || []) as PlatformPost[];
-        all.push(...pageItems.map((post) => ({
-          ...post,
-          profile_owner_id: userId,
-          preview_text: (post as any).preview_text ?? null,
-          preview_title: (post as any).preview_title ?? null,
-          preview_image_url: (post as any).preview_image_url ?? null,
-        })));
-        if (pageItems.length < 50) break;
-        cursor = pageItems[pageItems.length - 1]?.created_at || null;
-        if (!cursor) break;
-      }
-
-      // Pinned posts are returned first by the RPC, which breaks the
-      // created_at cursor ordering and can re-emit the same post on a later
-      // page. Keep only the first occurrence of each post id.
-      const seenIds = new Set<string>();
-      const deduped = all.filter((post) => {
-        if (!post.id || seenIds.has(post.id)) return false;
-        seenIds.add(post.id);
-        return true;
+      const { data: rpcData, error } = await supabase.rpc("get_user_platform_posts", {
+        target_user: userId,
+        platform_name: platform,
+        limit_count: PAGE_SIZE,
+        cursor: pageParam,
       });
-      all.length = 0;
-      all.push(...deduped);
+
+      if (error) throw error;
+
+      const all: PlatformPost[] = ((rpcData || []) as PlatformPost[]).map((post) => ({
+        ...post,
+        profile_owner_id: userId,
+        preview_text: (post as any).preview_text ?? null,
+        preview_title: (post as any).preview_title ?? null,
+        preview_image_url: (post as any).preview_image_url ?? null,
+      }));
+
+      const nextCursor =
+        all.length < PAGE_SIZE ? null : all[all.length - 1]?.created_at || null;
 
       const postIds = all.map((post) => post.id).filter(Boolean);
       const { data: postDetails } = postIds.length
@@ -209,7 +200,8 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       }));
 
       const userIds = [...new Set(enrichedPosts.map((post) => post.user_id).filter(Boolean))];
-      if (userIds.length === 0) return enrichedPosts;
+      if (userIds.length === 0) return { items: enrichedPosts as PlatformPost[], nextCursor };
+
 
       const { data: profiles } = await supabase
         .from("profiles")
@@ -220,23 +212,42 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
         (profiles || []).map((profile) => [profile.user_id, profile])
       );
 
-      return enrichedPosts.map((post) => {
-        const profile = profileByUserId.get(post.user_id);
-        return {
-          ...post,
-          profile_username: profile?.username || null,
-          profile_display_name: profile?.display_name || null,
-          profile_avatar_url: profile?.avatar_url || null,
-        };
-      });
+      return {
+        items: enrichedPosts.map((post) => {
+          const profile = profileByUserId.get(post.user_id);
+          return {
+            ...post,
+            profile_username: profile?.username || null,
+            profile_display_name: profile?.display_name || null,
+            profile_avatar_url: profile?.avatar_url || null,
+          };
+        }) as PlatformPost[],
+        nextCursor,
+      };
     },
     enabled: !!userId && !!platform,
     staleTime: 30 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: "always",
+    refetchOnMount: true,
     refetchOnReconnect: false,
   });
+
+  // Pinned posts come back first from the RPC, which can re-emit the same post
+  // on a later page — keep the first occurrence only.
+  const items = useMemo(() => {
+    const seen = new Set<string>();
+    const flat: PlatformPost[] = [];
+    (data?.pages || []).forEach((page) => {
+      page.items.forEach((post) => {
+        if (!post.id || seen.has(post.id)) return;
+        seen.add(post.id);
+        flat.push(post);
+      });
+    });
+    return flat;
+  }, [data]);
+
 
   // Background thumbnail backfill for platforms that can expose media previews after creation.
   useEffect(() => {
@@ -291,11 +302,10 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
     };
   }, [items, platform, queryClient, userId]);
 
-  const visibleItems = useMemo(() => items.slice(0, visibleCount), [items, visibleCount]);
-  const hasMore = visibleCount < items.length;
+  const hasMore = !!hasNextPage;
   const loadMore = useCallback(() => {
-    setVisibleCount((current) => Math.min(current + 50, items.length));
-  }, [items.length]);
+    if (hasNextPage && !isFetchingNextPage) fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  return { items: visibleItems, loading, error: null, hasMore, loadMore };
+  return { items, loading, error: null, hasMore, loadMore };
 };

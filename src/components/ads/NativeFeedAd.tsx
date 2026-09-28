@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { AD_MIN_REQUEST_INTERVAL_MS, getNativeFeedAdUnitId, isAdTestMode, isInstallAgeBypassed } from '@/config/ads';
+import { AD_MIN_REQUEST_INTERVAL_MS, getNativeFeedAdUnitId, isAdTestMode } from '@/config/ads';
 import { adsReady } from '@/lib/adConsent';
 import { GamNative, type NativeAdCreative } from 'aelixto-gam-native';
 
@@ -30,7 +30,7 @@ async function requestNativeAd(tag: string): Promise<NativeAdCreative | null> {
   console.log(`[ads]${tag} step 2 adUnitId =`, adUnitId,
     '| kind =', testMode ? 'TEST (Google sample unit)' : 'LIVE (Ad Manager unit)',
     '| platform =', platform,
-    '| testMode =', testMode, '| installAgeBypass =', isInstallAgeBypassed());
+    '| testMode =', testMode);
   if (!adUnitId) {
     console.log(`[ads]${tag} step 3 request ABORTED: empty adUnitId`);
     return null;
