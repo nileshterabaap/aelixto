@@ -349,8 +349,10 @@ let sharedResizeHandler: (() => void) | null = null;
 let focusedIframePoll = 0;
 let lastFocusedIframe: HTMLIFrameElement | null = null;
 let observerRefCount = 0;
+let activePlaybackPostId = '';
 
 function onConfirmedPlay(postId: string, playbackGeneration: number) {
+  activePlaybackPostId = postId;
   elementStates.forEach((reg, el) => {
     if (!el.isConnected) return;
 
@@ -432,6 +434,16 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
 }
 
 function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
+  // Visibility may prepare a post, but it must never make an older post active
+  // again after playback has handed off to a newer post.
+  if (activePlaybackPostId && reg.postId !== activePlaybackPostId) {
+    if (reg.state !== 'suspended') {
+      stageAPause(el);
+      reg.state = 'paused';
+    }
+    return;
+  }
+
   if (reg.visible) {
     transitionElement(el, reg, 'active');
     return;
@@ -545,6 +557,7 @@ function destroySharedObservers() {
   if (focusedIframePoll) window.clearInterval(focusedIframePoll);
   focusedIframePoll = 0;
   lastFocusedIframe = null;
+  activePlaybackPostId = '';
   scrollRaf = 0;
   sharedNearObserver = null;
   sharedActiveObserver = null;
