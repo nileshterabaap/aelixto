@@ -329,8 +329,6 @@ interface RegisteredElement {
   awaitingReentry: boolean;
   state: LifecycleState;
   disableHardSuspend: boolean;
-  postId: string;
-  playbackGeneration: number;
   /**
    * One-shot guard: a played video is suspended + pre-warmed exactly ONCE after
    * it leaves the viewport. Until the user taps play again, it then stays
@@ -341,7 +339,6 @@ interface RegisteredElement {
 
 
 const elementStates = new Map<HTMLElement, RegisteredElement>();
-const completedPlaybackCycles = new Map<string, number>();
 
 let sharedNearObserver: IntersectionObserver | null = null;
 let sharedActiveObserver: IntersectionObserver | null = null;
@@ -381,7 +378,6 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
       restoreHardSuspended(el);
       // The single allowed refresh has now been spent.
       reg.cycleUsed = true;
-      completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
     }
     stageAPause(el);
   } else if (target === 'suspended') {
@@ -463,35 +459,12 @@ function ensureSharedObservers() {
   };
 
   window.addEventListener('resize', sharedResizeHandler);
-  // Safety net: IntersectionObserver only fires when a post crosses the whole
-  // screen edge, so a playing post that slid under the header — or whose
-  // layout shifted inside the grid viewer's own scroll container — could keep
-  // playing. On any scroll (captured from every scroll container), re-check
-  // only the posts currently 'active'. Usually 0–2 elements → negligible cost.
-  document.addEventListener('scroll', onAnyScroll, { capture: true, passive: true });
-}
-
-let scrollRaf = 0;
-function onAnyScroll() {
-  if (scrollRaf) return;
-  scrollRaf = requestAnimationFrame(() => {
-    scrollRaf = 0;
-    elementStates.forEach((reg, el) => {
-      if (reg.state !== 'active' || !el.isConnected) return;
-      if (!isInsideUsableViewport(el.getBoundingClientRect())) {
-        syncElementFromLayout(el, reg);
-      }
-    });
-  });
 }
 
 function destroySharedObservers() {
   sharedNearObserver?.disconnect();
   sharedActiveObserver?.disconnect();
   if (sharedResizeHandler) window.removeEventListener('resize', sharedResizeHandler);
-  document.removeEventListener('scroll', onAnyScroll, { capture: true } as EventListenerOptions);
-  if (scrollRaf) cancelAnimationFrame(scrollRaf);
-  scrollRaf = 0;
   sharedNearObserver = null;
   sharedActiveObserver = null;
   sharedResizeHandler = null;
@@ -499,12 +472,7 @@ function destroySharedObservers() {
 
 const replayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
 
-function registerElement(
-  el: HTMLElement,
-  disableHardSuspend: boolean,
-  postId: string,
-  playbackGeneration: number,
-) {
+function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
   ensureSharedObservers();
   observerRefCount++;
 
@@ -513,9 +481,7 @@ function registerElement(
     prewarm: false,
     state: 'active',
     disableHardSuspend,
-    postId,
-    playbackGeneration,
-    cycleUsed: (completedPlaybackCycles.get(postId) || 0) >= playbackGeneration,
+    cycleUsed: false,
     awaitingReentry: false,
   };
   elementStates.set(el, reg);
@@ -532,23 +498,6 @@ function registerElement(
   // Sync initial state from layout.
   syncElementFromLayout(el, reg);
 
-}
-
-function updateElementPolicy(
-  el: HTMLElement,
-  disableHardSuspend: boolean,
-  playbackGeneration: number,
-) {
-  const reg = elementStates.get(el);
-  if (!reg) return;
-  const newPlayback = playbackGeneration > reg.playbackGeneration;
-  reg.disableHardSuspend = disableHardSuspend;
-  reg.playbackGeneration = playbackGeneration;
-  if (newPlayback) {
-    reg.cycleUsed = false;
-    reg.awaitingReentry = false;
-  }
-  syncElementFromLayout(el, reg);
 }
 
 function unregisterElement(el: HTMLElement) {
@@ -576,8 +525,6 @@ interface MediaLifecycleOptions {
   enabled?: boolean;
   hardSuspendDistanceVh?: number;
   disableHardSuspend?: boolean;
-  postId?: string;
-  playbackGeneration?: number;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────
@@ -587,12 +534,7 @@ export function useMediaPauseOnScroll(
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
-  const {
-    enabled = true,
-    disableHardSuspend = false,
-    postId = String(observeKey ?? ''),
-    playbackGeneration = 0,
-  } = options;
+  const { enabled = true, disableHardSuspend = false } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
 
@@ -605,17 +547,9 @@ export function useMediaPauseOnScroll(
       return;
     }
 
-    registerElement(el, disableHardSuspend, postId, playbackGeneration);
+    registerElement(el, disableHardSuspend);
     return () => unregisterElement(el);
-  }, [containerRef, observeKey, enabled, postId]);
-
-  // Policy changes after a real play update the existing registration instead
-  // of destroying and rebuilding its observer state mid-gesture.
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el || !enabled) return;
-    updateElementPolicy(el, disableHardSuspend, playbackGeneration);
-  }, [containerRef, enabled, disableHardSuspend, playbackGeneration]);
+  }, [containerRef, observeKey, enabled, disableHardSuspend]);
 
   // Route-change pause
   useEffect(() => {

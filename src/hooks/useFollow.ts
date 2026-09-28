@@ -36,58 +36,47 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
     if (!targetUserId) return;
 
     try {
-      // Local session read (no network round-trip) — getUser() hits the
-      // auth server and used to serialise ahead of every query below.
-      const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user ?? null;
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Get follower count (people following this user)
+      const { count: followersCount } = await supabase
+        .from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("following_id", targetUserId);
 
-      // All follow lookups are independent — run them in one round-trip
-      // batch instead of six sequential ones.
-      const [
-        { count: followersCount },
-        { count: followingCount },
-        myFollowRes,
-        myRequestRes,
-        theirFollowRes,
-      ] = await Promise.all([
-        supabase
+      // Get following count (people this user follows)
+      const { count: followingCount } = await supabase
+        .from("follows")
+        .select("*", { count: "exact", head: true })
+        .eq("follower_id", targetUserId);
+
+      // Check if current user follows this profile
+      let myFollow = null;
+      let myRequest = null;
+      let theirFollow = null;
+      if (user) {
+        const { data } = await supabase
           .from("follows")
-          .select("*", { count: "exact", head: true })
-          .eq("following_id", targetUserId),
-        supabase
+          .select("follower_id")
+          .eq("follower_id", user.id)
+          .eq("following_id", targetUserId)
+          .maybeSingle();
+        myFollow = data;
+        const { data: reqRow } = await supabase
+          .from("follow_requests")
+          .select("id")
+          .eq("requester_id", user.id)
+          .eq("target_id", targetUserId)
+          .maybeSingle();
+        myRequest = reqRow;
+        const { data: backRow } = await supabase
           .from("follows")
-          .select("*", { count: "exact", head: true })
-          .eq("follower_id", targetUserId),
-        user
-          ? supabase
-              .from("follows")
-              .select("follower_id")
-              .eq("follower_id", user.id)
-              .eq("following_id", targetUserId)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
-        user
-          ? supabase
-              .from("follow_requests")
-              .select("id")
-              .eq("requester_id", user.id)
-              .eq("target_id", targetUserId)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
-        user
-          ? supabase
-              .from("follows")
-              .select("id")
-              .eq("follower_id", targetUserId)
-              .eq("following_id", user.id)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
-      ]);
-
-      const myFollow = myFollowRes.data;
-      const myRequest = myRequestRes.data;
-      const theirFollow = theirFollowRes.data;
-
+          .select("id")
+          .eq("follower_id", targetUserId)
+          .eq("following_id", user.id)
+          .maybeSingle();
+        theirFollow = backRow;
+      }
 
       setCounts({
         followers: followersCount ?? 0,

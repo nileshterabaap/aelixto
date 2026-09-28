@@ -10,28 +10,18 @@ import { useEffect, useState } from 'react';
 const playedPostIds = new Set<string>();
 const listeners = new Set<(postId: string) => void>();
 const pendingConfirmations = new Map<string, ReturnType<typeof setTimeout>>();
-const playbackGenerations = new Map<string, number>();
 
 const PLAY_CONFIRM_DELAY_MS = 180;
-let movementVersion = 0;
-let movementTrackingReady = false;
+const SCROLL_CANCEL_DISTANCE_PX = 12;
 
-function ensureMovementTracking() {
-  if (movementTrackingReady || typeof document === 'undefined') return;
-  movementTrackingReady = true;
-  const markMovement = () => { movementVersion += 1; };
-  // Capture scrolls from every scroll container, including the profile viewer.
-  document.addEventListener('scroll', markMovement, { capture: true, passive: true });
-  document.addEventListener('touchmove', markMovement, { capture: true, passive: true });
-  document.addEventListener('pointermove', (event) => {
-    if (event.buttons !== 0) markMovement();
-  }, { capture: true, passive: true });
+function getScrollTop(): number {
+  if (typeof window === 'undefined') return 0;
+  return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
 }
 
 function confirmPostPlayed(postId: string) {
-  if (!postId) return;
+  if (!postId || playedPostIds.has(postId)) return;
   playedPostIds.add(postId);
-  playbackGenerations.set(postId, (playbackGenerations.get(postId) || 0) + 1);
   listeners.forEach((fn) => {
     try {
       fn(postId);
@@ -45,12 +35,8 @@ export function hasPostBeenPlayed(postId: string): boolean {
   return playedPostIds.has(postId);
 }
 
-export function getPostPlaybackGeneration(postId: string): number {
-  return playbackGenerations.get(postId) || 0;
-}
-
 export function markPostPlayed(postId: string) {
-  if (!postId || pendingConfirmations.has(postId)) return;
+  if (!postId || playedPostIds.has(postId) || pendingConfirmations.has(postId)) return;
 
   // Cross-origin embeds can report a play intent from the same touchstart that
   // begins a feed scroll. Defer arming hard-suspend briefly; if the page moved,
@@ -61,11 +47,11 @@ export function markPostPlayed(postId: string) {
     return;
   }
 
-  ensureMovementTracking();
-  const startMovementVersion = movementVersion;
+  const startY = getScrollTop();
   const timer = setTimeout(() => {
     pendingConfirmations.delete(postId);
-    if (movementVersion !== startMovementVersion) return;
+    const moved = Math.abs(getScrollTop() - startY);
+    if (moved > SCROLL_CANCEL_DISTANCE_PX) return;
     confirmPostPlayed(postId);
   }, PLAY_CONFIRM_DELAY_MS);
 
@@ -90,21 +76,4 @@ export function useHasPostBeenPlayed(postId: string): boolean {
   }, [postId]);
 
   return played;
-}
-
-/** Reactive playback epoch; increments after each genuine, non-scroll play tap. */
-export function usePostPlaybackGeneration(postId: string): number {
-  const [generation, setGeneration] = useState(() => getPostPlaybackGeneration(postId));
-
-  useEffect(() => {
-    ensureMovementTracking();
-    setGeneration(getPostPlaybackGeneration(postId));
-    const onPlayed = (id: string) => {
-      if (id === postId) setGeneration(getPostPlaybackGeneration(postId));
-    };
-    listeners.add(onPlayed);
-    return () => { listeners.delete(onPlayed); };
-  }, [postId]);
-
-  return generation;
 }
