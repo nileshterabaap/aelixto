@@ -1,6 +1,5 @@
 import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
-import { markPostPlayed, subscribePostPlayed } from '@/lib/playedPosts';
 
 /**
  * Two-stage media lifecycle for playable media only.
@@ -347,7 +346,6 @@ const completedPlaybackCycles = new Map<string, number>();
 let sharedNearObserver: IntersectionObserver | null = null;
 let sharedActiveObserver: IntersectionObserver | null = null;
 let sharedResizeHandler: (() => void) | null = null;
-let stopPlayedSubscription: (() => void) | null = null;
 let focusedIframePoll = 0;
 let lastFocusedIframe: HTMLIFrameElement | null = null;
 let observerRefCount = 0;
@@ -498,10 +496,10 @@ function ensureSharedObservers() {
   };
 
   window.addEventListener('resize', sharedResizeHandler);
-  stopPlayedSubscription = subscribePostPlayed(onConfirmedPlay);
   // Mobile browsers do not reliably fire window.blur again when focus moves
   // directly from iframe A to iframe B. Polling activeElement catches that
-  // handoff, while markPostPlayed still rejects a swipe that caused movement.
+  // handoff. Focus cannot move into an iframe from a scroll-only gesture, so
+  // this is a direct playback signal rather than another touch heuristic.
   focusedIframePoll = window.setInterval(() => {
     const active = document.activeElement;
     if (!(active instanceof HTMLIFrameElement)) {
@@ -512,7 +510,7 @@ function ensureSharedObservers() {
     lastFocusedIframe = active;
     elementStates.forEach((reg, el) => {
       if (el.contains(active)) {
-        markPostPlayed(reg.postId);
+        onConfirmedPlay(reg.postId, reg.playbackGeneration + 1);
       }
     });
   }, 120);
@@ -544,8 +542,6 @@ function destroySharedObservers() {
   if (sharedResizeHandler) window.removeEventListener('resize', sharedResizeHandler);
   document.removeEventListener('scroll', onAnyScroll, { capture: true } as EventListenerOptions);
   if (scrollRaf) cancelAnimationFrame(scrollRaf);
-  stopPlayedSubscription?.();
-  stopPlayedSubscription = null;
   if (focusedIframePoll) window.clearInterval(focusedIframePoll);
   focusedIframePoll = 0;
   lastFocusedIframe = null;
@@ -556,6 +552,7 @@ function destroySharedObservers() {
 }
 
 const replayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
+const nativePlayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
 
 function registerElement(
   el: HTMLElement,
@@ -579,6 +576,15 @@ function registerElement(
   elementStates.set(el, reg);
   sharedNearObserver!.observe(el);
   sharedActiveObserver!.observe(el);
+
+  const onNativePlay = (event: Event) => {
+    if (!(event.target instanceof HTMLMediaElement)) return;
+    const current = elementStates.get(el);
+    if (!current) return;
+    onConfirmedPlay(current.postId, current.playbackGeneration + 1);
+  };
+  nativePlayListeners.set(el, onNativePlay);
+  el.addEventListener('play', onNativePlay, true);
 
   // NOTE: we deliberately do NOT re-arm the suspend/pre-warm cycle on taps.
   // Any touch that merely starts a scroll over the embed used to count as a
@@ -618,6 +624,11 @@ function unregisterElement(el: HTMLElement) {
     el.removeEventListener('pointerdown', onReplayIntent, true);
     el.removeEventListener('touchstart', onReplayIntent, true);
     replayListeners.delete(el);
+  }
+  const onNativePlay = nativePlayListeners.get(el);
+  if (onNativePlay) {
+    el.removeEventListener('play', onNativePlay, true);
+    nativePlayListeners.delete(el);
   }
   observerRefCount--;
 
