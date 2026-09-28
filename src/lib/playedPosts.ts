@@ -9,19 +9,6 @@ import { useEffect, useState } from 'react';
  */
 const playedPostIds = new Set<string>();
 const listeners = new Set<(postId: string) => void>();
-const replayListeners = new Set<(postId: string) => void>();
-
-/** Fires on every confirmed play tap (including repeat plays). */
-export function onPostPlayConfirmed(fn: (postId: string) => void) {
-  replayListeners.add(fn);
-  return () => { replayListeners.delete(fn); };
-}
-
-// Any scroll container (window OR the grid viewer's own scroller) moving.
-let lastAnyScrollAt = 0;
-if (typeof document !== 'undefined') {
-  document.addEventListener('scroll', () => { lastAnyScrollAt = performance.now(); }, { capture: true, passive: true });
-}
 const pendingConfirmations = new Map<string, ReturnType<typeof setTimeout>>();
 
 const PLAY_CONFIRM_DELAY_MS = 180;
@@ -33,9 +20,7 @@ function getScrollTop(): number {
 }
 
 function confirmPostPlayed(postId: string) {
-  if (!postId) return;
-  replayListeners.forEach((fn) => { try { fn(postId); } catch { /* noop */ } });
-  if (playedPostIds.has(postId)) return;
+  if (!postId || playedPostIds.has(postId)) return;
   playedPostIds.add(postId);
   listeners.forEach((fn) => {
     try {
@@ -51,7 +36,7 @@ export function hasPostBeenPlayed(postId: string): boolean {
 }
 
 export function markPostPlayed(postId: string) {
-  if (!postId || pendingConfirmations.has(postId)) return;
+  if (!postId || playedPostIds.has(postId) || pendingConfirmations.has(postId)) return;
 
   // Cross-origin embeds can report a play intent from the same touchstart that
   // begins a feed scroll. Defer arming hard-suspend briefly; if the page moved,
@@ -63,13 +48,10 @@ export function markPostPlayed(postId: string) {
   }
 
   const startY = getScrollTop();
-  const startedAt = performance.now();
   const timer = setTimeout(() => {
     pendingConfirmations.delete(postId);
     const moved = Math.abs(getScrollTop() - startY);
     if (moved > SCROLL_CANCEL_DISTANCE_PX) return;
-    // Inner scroll containers (profile grid viewer) don't move window.scrollY.
-    if (lastAnyScrollAt >= startedAt - 50) return;
     confirmPostPlayed(postId);
   }, PLAY_CONFIRM_DELAY_MS);
 
