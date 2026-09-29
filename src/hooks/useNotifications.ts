@@ -35,7 +35,6 @@ export const useNotificationCount = () => {
         .from("notifications")
         .select("*", { count: "exact", head: true })
         .eq("recipient_id", user.id)
-        .neq("type", "message")
         .eq("is_read", false);
       
       if (error) {
@@ -64,7 +63,7 @@ export const useNotifications = () => {
       const raw = window.localStorage.getItem(cacheKey);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.filter((n: any) => n?.type !== 'message') : [];
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -82,7 +81,6 @@ export const useNotifications = () => {
         .from("notifications")
         .select("*")
         .eq("recipient_id", user.id)
-        .neq("type", "message")
         .order("created_at", { ascending: false })
         .limit(50);
       

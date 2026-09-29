@@ -211,19 +211,6 @@ function stageAResume(root: HTMLElement) {
   unfreezeIframes(root);
 }
 
-/** Re-enable taps on a post's iframes without resuming/altering playback. */
-function makeIframesInteractive(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.dataset[MUTE_FLAG] === '1') {
-      iframe.style.pointerEvents = '';
-      iframe.removeAttribute('aria-hidden');
-      iframe.removeAttribute('tabindex');
-      delete iframe.dataset[MUTE_FLAG];
-    }
-  });
-  unfreezeIframes(root);
-}
-
 // ── Stage B helpers (hard-suspend + pre-warmed restore) ───────────────
 
 const WARMING_FLAG = 'aelixWarming';
@@ -342,8 +329,6 @@ interface RegisteredElement {
   awaitingReentry: boolean;
   state: LifecycleState;
   disableHardSuspend: boolean;
-  postId: string;
-  playbackGeneration: number;
   /**
    * One-shot guard: a played video is suspended + pre-warmed exactly ONCE after
    * it leaves the viewport. Until the user taps play again, it then stays
@@ -354,47 +339,11 @@ interface RegisteredElement {
 
 
 const elementStates = new Map<HTMLElement, RegisteredElement>();
-const completedPlaybackCycles = new Map<string, number>();
 
 let sharedNearObserver: IntersectionObserver | null = null;
 let sharedActiveObserver: IntersectionObserver | null = null;
 let sharedResizeHandler: (() => void) | null = null;
-let focusedIframePoll = 0;
-let lastFocusedIframe: HTMLIFrameElement | null = null;
 let observerRefCount = 0;
-let activePlaybackPostId = '';
-
-function onConfirmedPlay(postId: string, playbackGeneration: number) {
-  activePlaybackPostId = postId;
-  elementStates.forEach((reg, el) => {
-    if (!el.isConnected) return;
-
-    if (reg.postId === postId) {
-      // Arm the post synchronously. Waiting for its React subscription allowed
-      // a quick B → C scroll to happen before B became suspendable.
-      if (playbackGeneration > reg.playbackGeneration) {
-        reg.playbackGeneration = playbackGeneration;
-        reg.cycleUsed = false;
-        reg.awaitingReentry = false;
-      }
-      reg.disableHardSuspend = false;
-      syncElementFromLayout(el, reg);
-      return;
-    }
-
-    // Playback is exclusive: as soon as B is genuinely played, stop A even if
-    // an embed's oversized frame still intersects the viewer.
-    if (!reg.disableHardSuspend && !reg.cycleUsed) {
-      stageAPause(el);
-      hardSuspendIframes(el);
-      reg.state = 'suspended';
-      reg.awaitingReentry = true;
-    } else {
-      stageAPause(el);
-      if (reg.state === 'active') reg.state = 'paused';
-    }
-  });
-}
 
 function isInsideUsableViewport(rect: DOMRect): boolean {
   const viewport = getUsableViewportBounds();
@@ -429,7 +378,6 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
       restoreHardSuspended(el);
       // The single allowed refresh has now been spent.
       reg.cycleUsed = true;
-      completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
     }
     stageAPause(el);
   } else if (target === 'suspended') {
@@ -447,25 +395,6 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
 }
 
 function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
-  // Visibility may prepare a post, but it must never make an older post active
-  // again after playback has handed off to a newer post.
-  if (activePlaybackPostId && reg.postId !== activePlaybackPostId) {
-    if (reg.visible) {
-      // Visible but not the playing post: it must stay TAPPABLE so the user
-      // can start it (which then pauses the current one). Freezing it here
-      // left pointer-events:none on the iframe and the play button dead.
-      if (reg.state === 'suspended') restoreHardSuspended(el);
-      makeIframesInteractive(el);
-      reg.state = 'paused';
-      return;
-    }
-    if (reg.state !== 'suspended') {
-      stageAPause(el);
-      reg.state = 'paused';
-    }
-    return;
-  }
-
   if (reg.visible) {
     transitionElement(el, reg, 'active');
     return;
@@ -530,71 +459,20 @@ function ensureSharedObservers() {
   };
 
   window.addEventListener('resize', sharedResizeHandler);
-  // Mobile browsers do not reliably fire window.blur again when focus moves
-  // directly from iframe A to iframe B. Polling activeElement catches that
-  // handoff. Focus cannot move into an iframe from a scroll-only gesture, so
-  // this is a direct playback signal rather than another touch heuristic.
-  focusedIframePoll = window.setInterval(() => {
-    const active = document.activeElement;
-    if (!(active instanceof HTMLIFrameElement)) {
-      lastFocusedIframe = null;
-      return;
-    }
-    if (active === lastFocusedIframe) return;
-    lastFocusedIframe = active;
-    elementStates.forEach((reg, el) => {
-      if (el.contains(active)) {
-        onConfirmedPlay(reg.postId, reg.playbackGeneration + 1);
-      }
-    });
-  }, 120);
-  // Safety net: IntersectionObserver only fires when a post crosses the whole
-  // screen edge, so a playing post that slid under the header — or whose
-  // layout shifted inside the grid viewer's own scroll container — could keep
-  // playing. On any scroll (captured from every scroll container), re-check
-  // only the posts currently 'active'. Usually 0–2 elements → negligible cost.
-  document.addEventListener('scroll', onAnyScroll, { capture: true, passive: true });
-}
-
-let scrollRaf = 0;
-function onAnyScroll() {
-  if (scrollRaf) return;
-  scrollRaf = requestAnimationFrame(() => {
-    scrollRaf = 0;
-    elementStates.forEach((reg, el) => {
-      if (reg.state !== 'active' || !el.isConnected) return;
-      if (!isInsideUsableViewport(el.getBoundingClientRect())) {
-        syncElementFromLayout(el, reg);
-      }
-    });
-  });
 }
 
 function destroySharedObservers() {
   sharedNearObserver?.disconnect();
   sharedActiveObserver?.disconnect();
   if (sharedResizeHandler) window.removeEventListener('resize', sharedResizeHandler);
-  document.removeEventListener('scroll', onAnyScroll, { capture: true } as EventListenerOptions);
-  if (scrollRaf) cancelAnimationFrame(scrollRaf);
-  if (focusedIframePoll) window.clearInterval(focusedIframePoll);
-  focusedIframePoll = 0;
-  lastFocusedIframe = null;
-  activePlaybackPostId = '';
-  scrollRaf = 0;
   sharedNearObserver = null;
   sharedActiveObserver = null;
   sharedResizeHandler = null;
 }
 
 const replayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
-const nativePlayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
 
-function registerElement(
-  el: HTMLElement,
-  disableHardSuspend: boolean,
-  postId: string,
-  playbackGeneration: number,
-) {
+function registerElement(el: HTMLElement, disableHardSuspend: boolean) {
   ensureSharedObservers();
   observerRefCount++;
 
@@ -603,23 +481,12 @@ function registerElement(
     prewarm: false,
     state: 'active',
     disableHardSuspend,
-    postId,
-    playbackGeneration,
-    cycleUsed: (completedPlaybackCycles.get(postId) || 0) >= playbackGeneration,
+    cycleUsed: false,
     awaitingReentry: false,
   };
   elementStates.set(el, reg);
   sharedNearObserver!.observe(el);
   sharedActiveObserver!.observe(el);
-
-  const onNativePlay = (event: Event) => {
-    if (!(event.target instanceof HTMLMediaElement)) return;
-    const current = elementStates.get(el);
-    if (!current) return;
-    onConfirmedPlay(current.postId, current.playbackGeneration + 1);
-  };
-  nativePlayListeners.set(el, onNativePlay);
-  el.addEventListener('play', onNativePlay, true);
 
   // NOTE: we deliberately do NOT re-arm the suspend/pre-warm cycle on taps.
   // Any touch that merely starts a scroll over the embed used to count as a
@@ -633,23 +500,6 @@ function registerElement(
 
 }
 
-function updateElementPolicy(
-  el: HTMLElement,
-  disableHardSuspend: boolean,
-  playbackGeneration: number,
-) {
-  const reg = elementStates.get(el);
-  if (!reg) return;
-  const newPlayback = playbackGeneration > reg.playbackGeneration;
-  reg.disableHardSuspend = disableHardSuspend;
-  reg.playbackGeneration = playbackGeneration;
-  if (newPlayback) {
-    reg.cycleUsed = false;
-    reg.awaitingReentry = false;
-  }
-  syncElementFromLayout(el, reg);
-}
-
 function unregisterElement(el: HTMLElement) {
   elementStates.delete(el);
   sharedNearObserver?.unobserve(el);
@@ -659,11 +509,6 @@ function unregisterElement(el: HTMLElement) {
     el.removeEventListener('pointerdown', onReplayIntent, true);
     el.removeEventListener('touchstart', onReplayIntent, true);
     replayListeners.delete(el);
-  }
-  const onNativePlay = nativePlayListeners.get(el);
-  if (onNativePlay) {
-    el.removeEventListener('play', onNativePlay, true);
-    nativePlayListeners.delete(el);
   }
   observerRefCount--;
 
@@ -680,8 +525,6 @@ interface MediaLifecycleOptions {
   enabled?: boolean;
   hardSuspendDistanceVh?: number;
   disableHardSuspend?: boolean;
-  postId?: string;
-  playbackGeneration?: number;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────
@@ -691,12 +534,7 @@ export function useMediaPauseOnScroll(
   observeKey?: string | number | boolean,
   options: MediaLifecycleOptions = {}
 ) {
-  const {
-    enabled = true,
-    disableHardSuspend = false,
-    postId = String(observeKey ?? ''),
-    playbackGeneration = 0,
-  } = options;
+  const { enabled = true, disableHardSuspend = false } = options;
   const location = useLocation();
   const prevPathRef = useRef(location.pathname);
 
@@ -709,17 +547,9 @@ export function useMediaPauseOnScroll(
       return;
     }
 
-    registerElement(el, disableHardSuspend, postId, playbackGeneration);
+    registerElement(el, disableHardSuspend);
     return () => unregisterElement(el);
-  }, [containerRef, observeKey, enabled, postId]);
-
-  // Policy changes after a real play update the existing registration instead
-  // of destroying and rebuilding its observer state mid-gesture.
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el || !enabled) return;
-    updateElementPolicy(el, disableHardSuspend, playbackGeneration);
-  }, [containerRef, enabled, disableHardSuspend, playbackGeneration]);
+  }, [containerRef, observeKey, enabled, disableHardSuspend]);
 
   // Route-change pause
   useEffect(() => {

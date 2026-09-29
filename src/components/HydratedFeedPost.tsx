@@ -383,13 +383,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
   }, [embedState, alreadyRevealed, post.id]);
 
   // Resolve the embed type for rendering — must be before effects that use isTextOnly
-  const r = useMemo(() => resolveRenderer(post), [
-    post.id,
-    post.mediaUrl,
-    post.mediaType,
-    post.platform,
-    post.embed_html,
-  ]);
+  const r = resolveRenderer(post);
   const isTextOnly = r.kind === 'none';
 
   // Measure card height and sync to skeleton wrapper to prevent layout shift
