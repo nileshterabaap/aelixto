@@ -364,6 +364,11 @@ let lastFocusedIframe: HTMLIFrameElement | null = null;
 let observerRefCount = 0;
 let activePlaybackPostId = '';
 
+/** True once any video has been genuinely played in this session's viewer. */
+export function hasActivePlayback(): boolean {
+  return activePlaybackPostId !== '';
+}
+
 function onConfirmedPlay(postId: string, playbackGeneration: number) {
   activePlaybackPostId = postId;
   elementStates.forEach((reg, el) => {
