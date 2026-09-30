@@ -404,7 +404,9 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
       // The video that was playing before and has no pause API (Facebook, X,
       // Threads, TikTok…) is reloaded in place: that is the only way to stop
       // it, and it comes back as a fresh, paused, tappable player.
-      if (reg.postId === previousPostId && reg.state !== 'suspended') {
+      const hasNonApiPlayer = Array.from(el.querySelectorAll<HTMLIFrameElement>('iframe'))
+        .some((f) => isPlayableIframe(f) && !f.matches(API_PAUSABLE_SELECTOR));
+      if (reg.postId === previousPostId && reg.state !== 'suspended' && hasNonApiPlayer) {
         hardSuspendIframes(el);
         restoreHardSuspended(el);
       } else if (reg.state === 'suspended') {
