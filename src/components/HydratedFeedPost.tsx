@@ -1,3 +1,4 @@
+import { hasActivePlayback } from '@/hooks/useMediaPauseOnScroll';
 import { Heart, MessageCircle, Repeat2, Share, Bookmark, MoreVertical, Trash2, Play, RefreshCw, Pin, PinOff, EyeOff, Eye, MessageCircleOff, MessageCircle as MessageCircleOn, Pencil } from "lucide-react";
 import { motion, useAnimation } from "framer-motion";
 import { Card } from "@/components/ui/card";
@@ -162,11 +163,7 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          if (inMediaViewer && hasActivePlayback()) {
-            const r = entry.boundingClientRect;
-            const vh = window.innerHeight;
-            if (r.bottom < -NEAR_PLAYBACK_MARGIN_PX || r.top > vh + NEAR_PLAYBACK_MARGIN_PX) return;
-          }
+          if (inMediaViewer && hasActivePlayback()) return;
           setIsNearViewport(true);
           observer.disconnect(); // One-shot: never fires again, no re-renders during scroll
         }
@@ -174,7 +171,20 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
       { rootMargin: HYDRATION_ROOT_MARGIN, threshold: 0 }
     );
     observer.observe(el);
-    return () => observer.disconnect();
+    // Tight observer: always hydrates a post that is about to be visible.
+    const nearObserver = inMediaViewer
+      ? new IntersectionObserver(
+          ([entry]) => {
+            if (entry.isIntersecting) setIsNearViewport(true);
+          },
+          { rootMargin: `${NEAR_PLAYBACK_MARGIN_PX}px 0px`, threshold: 0 }
+        )
+      : null;
+    nearObserver?.observe(el);
+    return () => {
+      observer.disconnect();
+      nearObserver?.disconnect();
+    };
   }, [startHydrated, alreadyRevealed, isNearViewport]);
 
   // Hydrate immediately when near viewport — no velocity gating.
