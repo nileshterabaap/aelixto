@@ -369,7 +369,15 @@ export function hasActivePlayback(): boolean {
   return activePlaybackPostId !== '';
 }
 
+function pauseViaApis(root: HTMLElement) {
+  pauseNativeMedia(root);
+  pauseYouTubeIframes(root);
+  pauseSpotifyIframes(root);
+  pauseVimeoIframes(root);
+}
+
 function onConfirmedPlay(postId: string, playbackGeneration: number) {
+  const previousPostId = activePlaybackPostId;
   activePlaybackPostId = postId;
   elementStates.forEach((reg, el) => {
     if (!el.isConnected) return;
@@ -387,8 +395,28 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
       return;
     }
 
-    // Playback is exclusive: as soon as B is genuinely played, stop A even if
-    // an embed's oversized frame still intersects the viewer.
+    // Posts still on screen must stay TAPPABLE. Previously every other post was
+    // frozen (pointer-events:none) here, and because a post that stays on
+    // screen never triggers another visibility event, it stayed dead to taps.
+    reg.visible = isInsideUsableViewport(el.getBoundingClientRect());
+    if (reg.visible) {
+      pauseViaApis(el);
+      // The video that was playing before and has no pause API (Facebook, X,
+      // Threads, TikTok…) is reloaded in place: that is the only way to stop
+      // it, and it comes back as a fresh, paused, tappable player.
+      if (reg.postId === previousPostId && reg.state !== 'suspended') {
+        hardSuspendIframes(el);
+        restoreHardSuspended(el);
+      } else if (reg.state === 'suspended') {
+        restoreHardSuspended(el);
+      }
+      makeIframesInteractive(el);
+      reg.awaitingReentry = false;
+      reg.state = 'paused';
+      return;
+    }
+
+    // Off-screen: playback is exclusive, stop it for real.
     if (!reg.disableHardSuspend && !reg.cycleUsed) {
       stageAPause(el);
       hardSuspendIframes(el);
