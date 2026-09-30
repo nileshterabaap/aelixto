@@ -13,7 +13,7 @@ import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
 import { markOriginalVisit } from '@/hooks/useOriginalVisitTracker';
 import { openExternalUrl } from '@/lib/openExternalUrl';
-import { useHasPostBeenPlayed } from '@/lib/playedPosts';
+import { usePostPlaybackGeneration } from '@/lib/playedPosts';
 
 interface RendererResult {
   kind: 'raw' | 'reddit' | 'twitter' | 'pinterest' | 'article' | 'universal' | 'image' | 'video' | 'none';
@@ -132,7 +132,8 @@ export const HydratedEmbed = memo(({
     lowerUrl.includes('/shorts/') ||
     lowerUrl.includes('/video/');
 
-  const hasBeenPlayedEarly = useHasPostBeenPlayed(post.id);
+  const playbackGeneration = usePostPlaybackGeneration(post.id);
+  const hasBeenPlayedEarly = playbackGeneration > 0;
 
   const mediaLifecycleEnabled =
     shouldHydrate &&
@@ -188,6 +189,8 @@ export const HydratedEmbed = memo(({
       enabled: mediaLifecycleEnabled,
       hardSuspendDistanceVh: 6,
       disableHardSuspend: !(hasBeenPlayed && isVideoPost),
+      postId: post.id,
+      playbackGeneration,
     }
   );
 

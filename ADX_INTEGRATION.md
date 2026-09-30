@@ -39,9 +39,9 @@ Live IDs are baked in:
 
 ```ts
 // Network code 23362049225
-LIVE_NATIVE_ANDROID = '/23362049225/aelixto_feed_native_android';
-LIVE_NATIVE_IOS     = '/23362049225/aelixto_feed_native_ios';
-GAM_APP_ID_ANDROID  = 'ca-app-pub-4944388830758437~6705238632';
+LIVE_NATIVE_ANDROID = '/21753324030,23362049225/com.aelixto.app10_Native';
+...
+GAM_APP_ID_ANDROID  = 'ca-app-pub-7664893030317051~4883442346';
 GAM_APP_ID_IOS      = 'ca-app-pub-4944388830758437~4837623196';
 ```
 
@@ -59,8 +59,8 @@ declares:
 
 ```xml
 <meta-data
-  android:name="com.google.android.gms.ads.APPLICATION_ID"
-  android:value="ca-app-pub-4944388830758437~6705238632"/>
+android:name="com.google.android.gms.ads.APPLICATION_ID"
+  android:value="ca-app-pub-7664893030317051~4883442346"/>
 ```
 
 The manifest merger folds this into `android/app/build/intermediates/merged_manifests/.../AndroidManifest.xml`,

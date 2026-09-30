@@ -344,7 +344,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                 if (followersVis === "no_one") {
                   return `Followed by ${total} mutual${total !== 1 ? "s" : ""}`;
                 }
-                const names = mutualsData.slice(0, 2).map((m) => m.display_name || m.username);
+                const names = mutualsData.slice(0, 2).map((m) => m.username || m.display_name);
                 if (total === 1) {
                   return `Followed by ${names[0]}`;
                 }
