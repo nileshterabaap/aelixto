@@ -395,6 +395,17 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
       return;
     }
 
+    // An untouched player has no playback to stop. Do not freeze, mute, or
+    // reload it just because a different post started playing; doing so made
+    // later play attempts provider-dependent after scrolling.
+    if (reg.disableHardSuspend) {
+      if (reg.state === 'suspended') restoreHardSuspended(el);
+      makeIframesInteractive(el);
+      reg.awaitingReentry = false;
+      reg.state = reg.visible ? 'active' : 'paused';
+      return;
+    }
+
     // Posts still on screen must stay TAPPABLE. Previously every other post was
     // frozen (pointer-events:none) here, and because a post that stays on
     // screen never triggers another visibility event, it stayed dead to taps.
@@ -482,6 +493,16 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
 }
 
 function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
+  // Never-played posts stay fully loaded and interactive. The lifecycle only
+  // owns a player after a confirmed play arms it in onConfirmedPlay().
+  if (reg.disableHardSuspend) {
+    if (reg.state === 'suspended') restoreHardSuspended(el);
+    makeIframesInteractive(el);
+    reg.awaitingReentry = false;
+    reg.state = reg.visible ? 'active' : 'paused';
+    return;
+  }
+
   // Visibility may prepare a post, but it must never make an older post active
   // again after playback has handed off to a newer post.
   if (activePlaybackPostId && reg.postId !== activePlaybackPostId) {
@@ -506,10 +527,9 @@ function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
     return;
   }
 
-  // Never-played posts (and played posts that already spent their one refresh)
-  // still receive cheap API/native pause commands, but their iframe is not
-  // destroyed or reloaded again.
-  if (reg.disableHardSuspend || reg.cycleUsed) {
+  // Played posts that already spent their one refresh still receive cheap
+  // API/native pause commands, but their iframe is not destroyed again.
+  if (reg.cycleUsed) {
     transitionElement(el, reg, 'suspended');
     return;
   }
@@ -765,7 +785,7 @@ export function useMediaPauseOnScroll(
 
     if (location.pathname !== prevPathRef.current) {
       const el = containerRef.current;
-      if (el && hasPlayableMedia(el)) {
+      if (el && hasPlayableMedia(el) && !disableHardSuspend) {
         stageAPause(el);
         if (!disableHardSuspend) hardSuspendIframes(el);
         const reg = elementStates.get(el);
