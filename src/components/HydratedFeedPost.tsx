@@ -58,6 +58,7 @@ const revealedPostsCache = new Set<string>();
 // Hydrate posts well ahead of the viewport so the next ~6–7 posts in the
 // feed are always ready to display the moment the user scrolls to them.
 const HYDRATION_ROOT_MARGIN = '4500px 0px';
+const NEAR_PLAYBACK_MARGIN_PX = 700;
 const captionHydrationRequested = new Set<string>();
 
 interface HydratedFeedPostProps {
@@ -153,9 +154,19 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
     const el = embedRef.current;
     if (!el) return;
 
+    // Inside the grid/saved viewer every neighbour is usually another video
+    // player. Hydrating them 4500px ahead while one is playing floods the
+    // network/renderer and makes the playing video stutter. Once playback
+    // has started there, only hydrate posts that are about to be visible.
+    const inMediaViewer = !!el.closest('[data-media-viewer]');
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
+          if (inMediaViewer && hasActivePlayback()) {
+            const r = entry.boundingClientRect;
+            const vh = window.innerHeight;
+            if (r.bottom < -NEAR_PLAYBACK_MARGIN_PX || r.top > vh + NEAR_PLAYBACK_MARGIN_PX) return;
+          }
           setIsNearViewport(true);
           observer.disconnect(); // One-shot: never fires again, no re-renders during scroll
         }
