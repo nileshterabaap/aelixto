@@ -305,8 +305,11 @@ a:active:not(:disabled),
    Pull-to-Refresh can capture touchstart from anywhere on the feed
    (including over YouTube/Instagram/Twitter embeds). Once the user
    scrolls down at all, this class is removed and iframes become
-   interactive again. */
-body.at-scroll-top iframe:not([src*="threads."]) {
+   interactive again.
+   Full-screen post viewers (profile grid, saved) have their own scroller and
+   no Pull-to-Refresh, so this lock must never reach iframes inside them —
+   otherwise Facebook/TikTok/Instagram/etc. play buttons are dead there. */
+body.at-scroll-top iframe:not([src*="threads."]):not([data-media-viewer] iframe) {
   pointer-events: none !important;
 }
 
