@@ -211,6 +211,19 @@ function stageAResume(root: HTMLElement) {
   unfreezeIframes(root);
 }
 
+/** Re-enable taps on a post's iframes without resuming/altering playback. */
+function makeIframesInteractive(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (iframe.dataset[MUTE_FLAG] === '1') {
+      iframe.style.pointerEvents = '';
+      iframe.removeAttribute('aria-hidden');
+      iframe.removeAttribute('tabindex');
+      delete iframe.dataset[MUTE_FLAG];
+    }
+  });
+  unfreezeIframes(root);
+}
+
 // ── Stage B helpers (hard-suspend + pre-warmed restore) ───────────────
 
 const WARMING_FLAG = 'aelixWarming';
@@ -437,6 +450,15 @@ function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
   // Visibility may prepare a post, but it must never make an older post active
   // again after playback has handed off to a newer post.
   if (activePlaybackPostId && reg.postId !== activePlaybackPostId) {
+    if (reg.visible) {
+      // Visible but not the playing post: it must stay TAPPABLE so the user
+      // can start it (which then pauses the current one). Freezing it here
+      // left pointer-events:none on the iframe and the play button dead.
+      if (reg.state === 'suspended') restoreHardSuspended(el);
+      makeIframesInteractive(el);
+      reg.state = 'paused';
+      return;
+    }
     if (reg.state !== 'suspended') {
       stageAPause(el);
       reg.state = 'paused';
