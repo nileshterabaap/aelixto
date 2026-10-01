@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
 import { onMessageThreadRead } from '@/lib/messageReadEvents';
@@ -39,9 +39,6 @@ export const useConversations = () => {
 
   const [conversations, setConversations] = useState<ConversationWithDetails[]>(readCache);
   const [loading, setLoading] = useState(conversations.length === 0);
-  const [lastReadRef] = useState(() => new Map<string, string | null>());
-  const inFlightRef = useRef(false);
-  const queuedRef = useRef(false);
 
   useEffect(() => {
     if (!user) {
@@ -109,10 +106,7 @@ export const useConversations = () => {
           table: 'conversation_participants',
           filter: `user_id=eq.${user.id}`,
         },
-        (payload) => {
-          // Ignore our own "delivered" bumps — they caused an endless refetch loop.
-          const row = payload.new as { conversation_id?: string; last_read_at?: string | null } | null;
-          if (row?.conversation_id && lastReadRef.get(row.conversation_id) === (row.last_read_at ?? null)) return;
+        () => {
           fetchConversations();
         }
       )
@@ -132,17 +126,6 @@ export const useConversations = () => {
 
   const fetchConversations = async () => {
     if (!user) return;
-    // Collapse bursts: one request at a time, at most one queued follow-up.
-    if (inFlightRef.current) { queuedRef.current = true; return; }
-    inFlightRef.current = true;
-    try { await doFetch(); } finally {
-      inFlightRef.current = false;
-      if (queuedRef.current) { queuedRef.current = false; window.setTimeout(fetchConversations, 1000); }
-    }
-  };
-
-  const doFetch = async () => {
-    if (!user) return;
 
     try {
       // Get all conversations for current user
@@ -160,7 +143,6 @@ export const useConversations = () => {
       }
 
       const conversationIds = participantData.map(p => p.conversation_id);
-      participantData.forEach(p => lastReadRef.set(p.conversation_id, p.last_read_at ?? null));
 
       // Bump delivered-at for all my participant rows so senders see 2 ticks
       // once I've been online.
