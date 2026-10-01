@@ -183,7 +183,7 @@ export const SavedPostViewer = ({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-50 bg-background">
+    <div className="fixed inset-0 z-50 bg-background" data-media-viewer="">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
         <div className="mx-auto max-w-2xl px-4 py-3 flex items-center justify-between">
