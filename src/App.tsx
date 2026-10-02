@@ -38,6 +38,7 @@ import ChildSafety from "./pages/ChildSafety";
 import AuthBridge from "./pages/AuthBridge";
 import Unsubscribe from "./pages/Unsubscribe";
 import ShortLinkRedirect from "./pages/ShortLinkRedirect";
+import MediaLog from "./pages/MediaLog";
 
 // Configure QueryClient with aggressive caching for instant navigation
 const queryClient = new QueryClient({
@@ -118,6 +119,7 @@ const AnimatedRoutes = () => {
             <Route path="/s/:code" element={<ShortLinkRedirect />} />
             {/* Native OAuth bridge — converts web redirect into a custom-scheme deep link */}
             <Route path="/~auth-bridge" element={<AuthBridge />} />
+            <Route path="/media-log" element={<MediaLog />} />
             {/* Username vanity route — must stay just above the catch-all */}
             <Route path="/:username" element={<PageTransition><UserProfile /></PageTransition>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
