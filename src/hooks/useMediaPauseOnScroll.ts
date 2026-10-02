@@ -195,6 +195,10 @@ function mediaLog(ev: string, root: HTMLElement | null, detail?: string) {
     const platform = src ? (src.match(/https?:\/\/(?:www\.)?([^/]+)/)?.[1] ?? '?') : (root?.querySelector('video') ? 'video' : '-');
     log.push({ t: Math.round(performance.now()), ev, post: reg?.postId ?? '?', platform, detail: detail ?? (reg ? `state=${reg.state} vis=${reg.visible}` : undefined) });
     if (log.length > 3000) log.splice(0, log.length - 3000);
+    // Persist so the record survives reloads and can be read from /media-log.
+    try {
+      localStorage.setItem('aelix-media-log', JSON.stringify(log.slice(-1500)));
+    } catch { /* storage full/blocked */ }
   } catch { /* noop */ }
 }
 if (typeof window !== 'undefined') {
