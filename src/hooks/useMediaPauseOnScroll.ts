@@ -184,38 +184,7 @@ function unfreezeIframes(root: HTMLElement) {
   });
 }
 
-// ── TEMP diagnostic record (remove after buffering investigation) ─────
-type MediaLogEntry = { t: number; ev: string; post: string; platform: string; detail?: string };
-function mediaLog(ev: string, root: HTMLElement | null, detail?: string) {
-  try {
-    const w = window as unknown as { __aelixMediaLog?: MediaLogEntry[] };
-    const log = (w.__aelixMediaLog ||= []);
-    const reg = root ? elementStates.get(root) : undefined;
-    const src = root?.querySelector('iframe')?.getAttribute('src') || root?.querySelector('iframe')?.dataset.aelixSuspendedSrc || '';
-    const platform = src ? (src.match(/https?:\/\/(?:www\.)?([^/]+)/)?.[1] ?? '?') : (root?.querySelector('video') ? 'video' : '-');
-    log.push({ t: Math.round(performance.now()), ev, post: reg?.postId ?? '?', platform, detail: detail ?? (reg ? `state=${reg.state} vis=${reg.visible}` : undefined) });
-    if (log.length > 3000) log.splice(0, log.length - 3000);
-    // Persist so the record survives reloads and can be read from /media-log.
-    try {
-      localStorage.setItem('aelix-media-log', JSON.stringify(log.slice(-1500)));
-    } catch { /* storage full/blocked */ }
-  } catch { /* noop */ }
-}
-if (typeof window !== 'undefined') {
-  window.addEventListener('blur', () => {
-    setTimeout(() => {
-      const a = document.activeElement;
-      if (a instanceof HTMLIFrameElement) {
-        let n: HTMLElement | null = a;
-        while (n && !elementStates.has(n)) n = n.parentElement;
-        mediaLog('TAP-REACHED-IFRAME', n, `pe=${getComputedStyle(a).pointerEvents} active=${activePlaybackPostId}`);
-      }
-    }, 0);
-  });
-}
-
 function stageAPause(root: HTMLElement) {
-  mediaLog('pause+freeze', root);
   pauseNativeMedia(root);
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
@@ -227,7 +196,6 @@ function stageAPause(root: HTMLElement) {
 }
 
 function stageAResume(root: HTMLElement) {
-  mediaLog('resume', root);
   restoreHardSuspended(root);
   root.dataset.aelixHasBeenActive = 'true';
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
@@ -239,20 +207,6 @@ function stageAResume(root: HTMLElement) {
       iframe.removeAttribute('tabindex');
     }
     delete iframe.dataset[MUTE_FLAG];
-  });
-  unfreezeIframes(root);
-}
-
-/** Re-enable taps on a post's iframes without resuming/altering playback. */
-function makeIframesInteractive(root: HTMLElement) {
-  mediaLog('make-tappable', root);
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.dataset[MUTE_FLAG] === '1') {
-      iframe.style.pointerEvents = '';
-      iframe.removeAttribute('aria-hidden');
-      iframe.removeAttribute('tabindex');
-      delete iframe.dataset[MUTE_FLAG];
-    }
   });
   unfreezeIframes(root);
 }
@@ -313,7 +267,6 @@ function hardSuspendIframes(root: HTMLElement) {
     iframe.dataset[SUSPENDED_SRC] = src;
     iframe.dataset[SUSPENDED_FLAG] = '1';
     delete iframe.dataset[WARMING_FLAG];
-    mediaLog('HARD-UNLOAD', root);
     iframe.setAttribute('src', 'about:blank');
     iframe.style.visibility = 'hidden';
     // Keep the slot visually filled so the user never sees a blank frame.
@@ -329,7 +282,6 @@ function hardSuspendIframes(root: HTMLElement) {
 function restoreHardSuspended(root: HTMLElement) {
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (iframe.dataset[SUSPENDED_FLAG] !== '1') return;
-    mediaLog('RELOAD', root);
     const storedSrc = iframe.dataset[SUSPENDED_SRC];
     delete iframe.dataset[SUSPENDED_FLAG];
     delete iframe.dataset[SUSPENDED_SRC];
@@ -400,7 +352,6 @@ let observerRefCount = 0;
 let activePlaybackPostId = '';
 
 function onConfirmedPlay(postId: string, playbackGeneration: number) {
-  mediaLog('CONFIRMED-PLAY', null, `post=${postId} prev=${activePlaybackPostId} gen=${playbackGeneration}`);
   activePlaybackPostId = postId;
   elementStates.forEach((reg, el) => {
     if (!el.isConnected) return;
@@ -457,7 +408,6 @@ function syncAllElementsFromLayout() {
 function transitionElement(el: HTMLElement, reg: RegisteredElement, target: LifecycleState) {
   const current = reg.state;
   if (current === target) return;
-  mediaLog(`transition ${current}->${target}`, el);
 
   if (target === 'active') {
     stageAResume(el);
@@ -487,15 +437,6 @@ function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
   // Visibility may prepare a post, but it must never make an older post active
   // again after playback has handed off to a newer post.
   if (activePlaybackPostId && reg.postId !== activePlaybackPostId) {
-    if (reg.visible) {
-      // Visible but not the playing post: it must stay TAPPABLE so the user
-      // can start it (which then pauses the current one). Freezing it here
-      // left pointer-events:none on the iframe and the play button dead.
-      if (reg.state === 'suspended') restoreHardSuspended(el);
-      makeIframesInteractive(el);
-      reg.state = 'paused';
-      return;
-    }
     if (reg.state !== 'suspended') {
       stageAPause(el);
       reg.state = 'paused';
@@ -517,11 +458,12 @@ function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
   }
 
   // A played iframe is killed immediately after leaving the visible feed.
-  // It is NOT reloaded off-screen any more: background reloads competed for
-  // bandwidth with the newly playing video and caused stutter. It reloads
-  // only once it becomes visible again (see the visible branches above).
+  // Once it has travelled outside the prewarm envelope, the observer restores
+  // it on re-entry while it is still well off-screen.
   if (reg.state !== 'suspended') {
     transitionElement(el, reg, 'suspended');
+  } else if (reg.prewarm && !reg.awaitingReentry) {
+    transitionElement(el, reg, 'paused');
   }
 }
 
