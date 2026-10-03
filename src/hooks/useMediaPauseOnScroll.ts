@@ -517,12 +517,11 @@ function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
   }
 
   // A played iframe is killed immediately after leaving the visible feed.
-  // Once it has travelled outside the prewarm envelope, the observer restores
-  // it on re-entry while it is still well off-screen.
+  // It is NOT reloaded off-screen any more: background reloads competed for
+  // bandwidth with the newly playing video and caused stutter. It reloads
+  // only once it becomes visible again (see the visible branches above).
   if (reg.state !== 'suspended') {
     transitionElement(el, reg, 'suspended');
-  } else if (reg.prewarm && !reg.awaitingReentry) {
-    transitionElement(el, reg, 'paused');
   }
 }
 
