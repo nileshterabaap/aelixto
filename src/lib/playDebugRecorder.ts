@@ -7,12 +7,14 @@ import { getPostPlaybackGeneration } from '@/lib/playedPosts';
  * player messages and confirmed-play generations, tagged with grid rank.
  */
 export interface DebugEvent { t: number; type: string; p: string; rank?: number; postId?: string; d?: Record<string, unknown> }
-export type DebugVerdict = 'worked' | 'not_worked' | 'not_loaded';
-export interface DebugLabel { t: number; p: string; rank: number; postId?: string; verdict: DebugVerdict; loads?: number; mounts?: number }
+export type DebugVerdict = 'worked' | 'not_worked' | 'not_loaded' | 'frozen' | 'buffered';
+export interface DebugLabel { t: number; p: string; rank: number; postId?: string; verdict: DebugVerdict; loads?: number; mounts?: number; liveIframes?: number; longTasks5s?: number; fps?: number }
 // Per-post counters (persist across platform switches) to tell first load from reloads.
 const loadCount = new Map<string, number>();
 const mountCount = new Map<string, number>();
 const platformsSeen = new Set<string>();
+const recentLong: number[] = [];
+let lastFps = 0;
 
 const MAX_EVENTS = 8000;
 let events: DebugEvent[] = [];
@@ -155,6 +157,28 @@ export function startPlayDebug(scroller: HTMLElement, platformKey: string) {
   window.addEventListener('message', onMsg);
   subs.push(() => window.removeEventListener('message', onMsg));
 
+  // Main-thread stalls + frame rate: a frozen/buffering player inside an iframe
+  // often coincides with the page hogging the CPU or many live players decoding.
+  try {
+    const po = new PerformanceObserver((list) => {
+      list.getEntries().forEach((en) => {
+        recentLong.push(Date.now());
+        logDebug('long_task', currentRank(), undefined, { ms: Math.round(en.duration) });
+      });
+    });
+    po.observe({ type: 'longtask', buffered: false } as any);
+    subs.push(() => po.disconnect());
+  } catch { /* unsupported */ }
+  let frames = 0; let raf = 0; let alive = true;
+  const loop = () => { frames++; if (alive) raf = requestAnimationFrame(loop); };
+  raf = requestAnimationFrame(loop);
+  const fpsTick = setInterval(() => {
+    lastFps = frames; frames = 0;
+    const live = scroller.querySelectorAll('iframe[src]:not([src=""]),video').length;
+    logDebug('perf', currentRank(), undefined, { fps: lastFps, liveMedia: live });
+  }, 1000);
+  subs.push(() => { alive = false; cancelAnimationFrame(raf); clearInterval(fpsTick); });
+
   const onVis = () => logDebug('visibility', undefined, undefined, { state: document.visibilityState });
   document.addEventListener('visibilitychange', onVis);
   subs.push(() => document.removeEventListener('visibilitychange', onVis));
@@ -188,7 +212,7 @@ export function currentRank(): number | undefined {
 export function addDebugLabel(rank: number, verdict: DebugVerdict) {
   const host = root?.querySelector<HTMLElement>(`[data-debug-rank="${rank}"]`);
   const postId = host?.dataset.debugPostId;
-  const label: DebugLabel = { t: now(), p: platform, rank, postId, verdict, loads: postId ? loadCount.get(postId) ?? 0 : undefined, mounts: postId ? mountCount.get(postId) ?? 0 : undefined };
+  const label: DebugLabel = { t: now(), p: platform, rank, postId, verdict, loads: postId ? loadCount.get(postId) ?? 0 : undefined, mounts: postId ? mountCount.get(postId) ?? 0 : undefined, liveIframes: root?.querySelectorAll('iframe[src]:not([src=""])').length, longTasks5s: recentLong.filter((x) => Date.now() - x < 5000).length, fps: lastFps };
   labels.push(label);
   logDebug('user_label', rank, label.postId, { verdict });
 }

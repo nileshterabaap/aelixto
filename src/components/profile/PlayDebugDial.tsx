@@ -34,11 +34,11 @@ export function PlayDebugDial({ scrollRef, platform, ready }: Props) {
     if (open) setCounts(getDebugCounts());
   }, [open]);
 
-  const label = (verdict: "worked" | "not_worked" | "not_loaded") => {
+  const label = (verdict: "worked" | "not_worked" | "not_loaded" | "frozen" | "buffered") => {
     if (rank == null) return;
     addDebugLabel(rank, verdict);
     setCounts(getDebugCounts());
-    toast(`#${rank} marked: ${verdict === "worked" ? "Play worked" : verdict === "not_loaded" ? "Didn't load" : "Not worked"}`);
+    toast(`#${rank} marked: ${verdict === "worked" ? "Play worked" : verdict === "not_loaded" ? "Didn't load" : verdict === "frozen" ? "Stuck (icon only)" : verdict === "buffered" ? "Buffered then played" : "Not worked"}`);
     setOpen(false);
   };
 
@@ -65,6 +65,12 @@ export function PlayDebugDial({ scrollRef, platform, ready }: Props) {
           </button>
           <button onClick={() => label("not_worked")} className="w-full rounded-xl bg-destructive text-destructive-foreground text-sm py-2">
             Not worked
+          </button>
+          <button onClick={() => label("frozen")} className="w-full rounded-xl border border-destructive text-destructive text-sm py-2">
+            Stuck (icon only)
+          </button>
+          <button onClick={() => label("buffered")} className="w-full rounded-xl border border-border text-foreground text-sm py-2">
+            Buffered then played
           </button>
           <button onClick={() => label("not_loaded")} className="w-full rounded-xl border border-border bg-muted text-foreground text-sm py-2">
             Didn't load
