@@ -1,5 +1,6 @@
 import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
+import { flagOn } from '@/lib/lifecycleFlags';
 
 /**
  * Two-stage media lifecycle for playable media only.

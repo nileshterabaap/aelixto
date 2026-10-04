@@ -1,14 +1,16 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getPostPlaybackGeneration } from '@/lib/playedPosts';
+import { flagsSignature } from '@/lib/lifecycleFlags';
 
 /**
  * Hidden diagnostic recorder for the profile grid viewer. Watches (never
  * changes) taps, iframe focus, scroll, iframe mounts/loads, media events,
  * player messages and confirmed-play generations, tagged with grid rank.
+ * Every event/label carries `f` = active lifecycle test-switch signature.
  */
-export interface DebugEvent { t: number; type: string; p: string; rank?: number; postId?: string; d?: Record<string, unknown> }
+export interface DebugEvent { t: number; type: string; p: string; rank?: number; postId?: string; d?: Record<string, unknown>; f?: string }
 export type DebugVerdict = 'worked' | 'not_worked' | 'not_loaded' | 'frozen' | 'buffered';
-export interface DebugLabel { t: number; p: string; rank: number; postId?: string; verdict: DebugVerdict; loads?: number; mounts?: number; liveIframes?: number; longTasks5s?: number; fps?: number }
+export interface DebugLabel { t: number; p: string; rank: number; postId?: string; verdict: DebugVerdict; loads?: number; mounts?: number; liveIframes?: number; longTasks5s?: number; fps?: number; f?: string }
 // Per-post counters (persist across platform switches) to tell first load from reloads.
 const loadCount = new Map<string, number>();
 const mountCount = new Map<string, number>();
@@ -28,7 +30,7 @@ const now = () => Date.now() - t0;
 
 export function logDebug(type: string, rank?: number, postId?: string, d?: Record<string, unknown>) {
   if (!cleanup) return;
-  events.push({ t: now(), type, p: platform, rank, postId, d });
+  events.push({ t: now(), type, p: platform, rank, postId, d, f: flagsSignature() });
   if (events.length > MAX_EVENTS) events.splice(0, events.length - MAX_EVENTS);
 }
 
