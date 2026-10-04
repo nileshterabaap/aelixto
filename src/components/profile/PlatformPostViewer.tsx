@@ -13,7 +13,6 @@ import type { Post } from "@/data/demoData";
 import type { PlatformPost } from "@/hooks/useUserPlatformPosts";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 import { getEmbedStatus, subscribeEmbedReadiness } from "@/lib/embedReadiness";
-import { PlayDebugDial } from "./PlayDebugDial";
 
 interface PlatformPostViewerProps {
   userId: string;
@@ -465,8 +464,6 @@ export const PlatformPostViewer = ({
               return (
               <motion.div
                 key={post.id}
-                data-debug-rank={absoluteIdx + 1}
-                data-debug-post-id={post.id}
                 ref={(el) => {
                   if (el) postRefs.current.set(post.id, el);
                   else postRefs.current.delete(post.id);
@@ -529,12 +526,6 @@ export const PlatformPostViewer = ({
           )}
         </div>
       </div>
-
-      <PlayDebugDial
-        scrollRef={scrollContainerRef}
-        platform={activeTab}
-        ready={profileReady && posts.length > 0}
-      />
 
       {/* Swipe indicators */}
       <div className="fixed bottom-4 left-0 right-0 flex justify-center gap-2 pointer-events-none">
