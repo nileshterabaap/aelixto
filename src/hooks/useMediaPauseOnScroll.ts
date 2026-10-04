@@ -337,6 +337,8 @@ interface RegisteredElement {
    * loaded and is never reloaded on subsequent scroll passes.
    */
   cycleUsed: boolean;
+  /** Last measured distance (px) between the post and the usable viewport. */
+  lastGap?: number;
 }
 
 
@@ -546,10 +548,25 @@ function onAnyScroll() {
     scrollRaf = 0;
     elementStates.forEach((reg, el) => {
       if (!el.isConnected) return;
-      const inside = isInsideUsableViewport(el.getBoundingClientRect());
+      const rect = el.getBoundingClientRect();
+      const inside = isInsideUsableViewport(rect);
       // Re-sync posts whose visibility changed inside the grid viewer's own
       // scroller (IntersectionObserver can miss these), both directions.
-      if ((reg.state === 'active') !== inside) syncElementFromLayout(el, reg);
+      if ((reg.state === 'active') !== inside) { syncElementFromLayout(el, reg); return; }
+      // Direction-aware pre-warm. Records showed X/Threads buffering or
+      // freezing because a suspended played post was only reloaded once it
+      // was already on screen (user turned back before it left the envelope),
+      // so the play tap hit a half-loaded player. As soon as a suspended post
+      // starts approaching again, reload it while still off-screen.
+      const vp = getUsableViewportBounds();
+      const gap = rect.top >= vp.bottom ? rect.top - vp.bottom : rect.bottom <= vp.top ? vp.top - rect.bottom : 0;
+      const prev = reg.lastGap;
+      reg.lastGap = gap;
+      if (reg.state === 'suspended' && reg.awaitingReentry && prev !== undefined && gap > 0 && gap < prev - 4) {
+        reg.awaitingReentry = false;
+        reg.prewarm = gap < getPrewarmDistancePx();
+        reconcileElement(el, reg);
+      }
     });
   });
 }
