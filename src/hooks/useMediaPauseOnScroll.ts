@@ -371,17 +371,26 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
 
     // Playback is exclusive: as soon as B is genuinely played, stop A even if
     // an embed's oversized frame still intersects the viewer.
+    // Records showed Threads/X players freezing ("stuck, icon only") when a
+    // sibling iframe was blanked within ~100ms of the play tap. Pause at once,
+    // but defer the src→about:blank swap until the new player has started.
+    stageAPause(el);
     if (!reg.disableHardSuspend && !reg.cycleUsed) {
-      stageAPause(el);
-      hardSuspendIframes(el);
-      reg.state = 'suspended';
-      reg.awaitingReentry = true;
-    } else {
-      stageAPause(el);
       if (reg.state === 'active') reg.state = 'paused';
+      setTimeout(() => {
+        if (!el.isConnected || activePlaybackPostId !== postId) return;
+        if (reg.state === 'active') return;
+        hardSuspendIframes(el);
+        reg.state = 'suspended';
+        reg.awaitingReentry = true;
+      }, DEFERRED_SUSPEND_MS);
+    } else if (reg.state === 'active') {
+      reg.state = 'paused';
     }
   });
 }
+
+const DEFERRED_SUSPEND_MS = 1500;
 
 function isInsideUsableViewport(rect: DOMRect): boolean {
   const viewport = getUsableViewportBounds();
