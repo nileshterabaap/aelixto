@@ -6,8 +6,13 @@ import { getPostPlaybackGeneration } from '@/lib/playedPosts';
  * changes) taps, iframe focus, scroll, iframe mounts/loads, media events,
  * player messages and confirmed-play generations, tagged with grid rank.
  */
-export interface DebugEvent { t: number; type: string; rank?: number; postId?: string; d?: Record<string, unknown> }
-export interface DebugLabel { t: number; rank: number; postId?: string; verdict: 'worked' | 'not_worked' }
+export interface DebugEvent { t: number; type: string; p: string; rank?: number; postId?: string; d?: Record<string, unknown> }
+export type DebugVerdict = 'worked' | 'not_worked' | 'not_loaded';
+export interface DebugLabel { t: number; p: string; rank: number; postId?: string; verdict: DebugVerdict; loads?: number; mounts?: number }
+// Per-post counters (persist across platform switches) to tell first load from reloads.
+const loadCount = new Map<string, number>();
+const mountCount = new Map<string, number>();
+const platformsSeen = new Set<string>();
 
 const MAX_EVENTS = 8000;
 let events: DebugEvent[] = [];
@@ -21,7 +26,7 @@ const now = () => Date.now() - t0;
 
 export function logDebug(type: string, rank?: number, postId?: string, d?: Record<string, unknown>) {
   if (!cleanup) return;
-  events.push({ t: now(), type, rank, postId, d });
+  events.push({ t: now(), type, p: platform, rank, postId, d });
   if (events.length > MAX_EVENTS) events.splice(0, events.length - MAX_EVENTS);
 }
 
@@ -43,11 +48,12 @@ function iframeHost(f: HTMLIFrameElement) {
 }
 
 export function startPlayDebug(scroller: HTMLElement, platformKey: string) {
+  // Keep one session across platform switches; every event is tagged with its platform.
   stopPlayDebug();
-  events = []; labels = []; t0 = Date.now(); platform = platformKey; root = scroller;
+  platform = platformKey; root = scroller; platformsSeen.add(platformKey);
   const subs: Array<() => void> = [];
   cleanup = () => subs.forEach((f) => f());
-  logDebug('session_start', undefined, undefined, { platform, ua: navigator.userAgent, vw: innerWidth, vh: innerHeight });
+  logDebug('platform_open', undefined, undefined, { platform, ua: navigator.userAgent, vw: innerWidth, vh: innerHeight });
 
   const onPointer = (e: Event) => {
     const target = e.target as Element;
@@ -114,7 +120,9 @@ export function startPlayDebug(scroller: HTMLElement, platformKey: string) {
   const onLoad = (e: Event) => {
     if (!(e.target instanceof HTMLIFrameElement)) return;
     const { rank, postId } = rankOf(e.target);
-    logDebug('iframe_load', rank, postId, { host: iframeHost(e.target) });
+    const n = postId ? (loadCount.get(postId) ?? 0) + 1 : 0;
+    if (postId) loadCount.set(postId, n);
+    logDebug(n <= 1 ? 'iframe_first_load' : 'iframe_reload', rank, postId, { host: iframeHost(e.target), loadNo: n });
   };
   scroller.addEventListener('load', onLoad, true);
   subs.push(() => scroller.removeEventListener('load', onLoad, true));
@@ -157,7 +165,9 @@ function scanIframes(node: Node, type: string, parent: Element) {
   const frames = node instanceof HTMLIFrameElement ? [node] : Array.from(node.querySelectorAll('iframe'));
   frames.forEach((f) => {
     const { rank, postId } = rankOf(type === 'iframe_removed' ? parent : f);
-    logDebug(type, rank, postId, { host: iframeHost(f) });
+    let mountNo: number | undefined;
+    if (type === 'iframe_added' && postId) { mountNo = (mountCount.get(postId) ?? 0) + 1; mountCount.set(postId, mountNo); }
+    logDebug(mountNo && mountNo > 1 ? 'iframe_remount' : type, rank, postId, { host: iframeHost(f), mountNo });
   });
 }
 
@@ -175,9 +185,10 @@ export function currentRank(): number | undefined {
   return (best as { rank: number } | null)?.rank;
 }
 
-export function addDebugLabel(rank: number, verdict: DebugLabel['verdict']) {
+export function addDebugLabel(rank: number, verdict: DebugVerdict) {
   const host = root?.querySelector<HTMLElement>(`[data-debug-rank="${rank}"]`);
-  const label = { t: now(), rank, postId: host?.dataset.debugPostId, verdict };
+  const postId = host?.dataset.debugPostId;
+  const label: DebugLabel = { t: now(), p: platform, rank, postId, verdict, loads: postId ? loadCount.get(postId) ?? 0 : undefined, mounts: postId ? mountCount.get(postId) ?? 0 : undefined };
   labels.push(label);
   logDebug('user_label', rank, label.postId, { verdict });
 }
@@ -189,12 +200,13 @@ export async function saveDebugSession(): Promise<{ ok: boolean; error?: string 
   if (!session?.user) return { ok: false, error: 'Sign in to save' };
   const { error } = await supabase.from('play_debug_sessions').insert({
     user_id: session.user.id,
-    platform,
+    platform: Array.from(platformsSeen).join(','),
     user_agent: navigator.userAgent,
     labels: labels as any,
     events: events as any,
   });
   if (error) return { ok: false, error: error.message };
+  events = []; labels = []; t0 = Date.now(); loadCount.clear(); mountCount.clear(); platformsSeen.clear(); platformsSeen.add(platform);
   return { ok: true };
 }
 

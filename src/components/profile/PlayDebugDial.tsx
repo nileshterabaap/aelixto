@@ -34,11 +34,11 @@ export function PlayDebugDial({ scrollRef, platform, ready }: Props) {
     if (open) setCounts(getDebugCounts());
   }, [open]);
 
-  const label = (verdict: "worked" | "not_worked") => {
+  const label = (verdict: "worked" | "not_worked" | "not_loaded") => {
     if (rank == null) return;
     addDebugLabel(rank, verdict);
     setCounts(getDebugCounts());
-    toast(`#${rank} marked: ${verdict === "worked" ? "Play worked" : "Not worked"}`);
+    toast(`#${rank} marked: ${verdict === "worked" ? "Play worked" : verdict === "not_loaded" ? "Didn't load" : "Not worked"}`);
     setOpen(false);
   };
 
@@ -65,6 +65,9 @@ export function PlayDebugDial({ scrollRef, platform, ready }: Props) {
           </button>
           <button onClick={() => label("not_worked")} className="w-full rounded-xl bg-destructive text-destructive-foreground text-sm py-2">
             Not worked
+          </button>
+          <button onClick={() => label("not_loaded")} className="w-full rounded-xl border border-border bg-muted text-foreground text-sm py-2">
+            Didn't load
           </button>
           <button onClick={save} disabled={saving} className="w-full rounded-xl bg-secondary text-secondary-foreground text-sm py-2">
             {saving ? "Saving…" : "Save records"}
