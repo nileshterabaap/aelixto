@@ -8,6 +8,7 @@ import {
   startPlayDebug,
   stopPlayDebug,
 } from "@/lib/playDebugRecorder";
+import { allLifecycleFlags, getLifecycleFlags, setLifecycleFlags, type LifecycleFlag } from "@/lib/lifecycleFlags";
 
 interface Props {
   scrollRef: RefObject<HTMLDivElement>;
@@ -16,11 +17,22 @@ interface Props {
 }
 
 /** Side dial showing the grid rank in view; tap to label + save diagnostics. */
+const FLAG_LABELS: Array<[LifecycleFlag, string]> = [
+  ["mute", "Mute off-screen"],
+  ["freezePointer", "Freeze taps off-screen"],
+  ["hardSuspend", "Sleep & reload"],
+  ["exclusivePause", "Pause previous on play"],
+  ["scrollFreeze", "Freeze taps while scrolling"],
+];
+
 export function PlayDebugDial({ scrollRef, platform, ready }: Props) {
   const [rank, setRank] = useState<number | undefined>();
   const [open, setOpen] = useState(false);
   const [counts, setCounts] = useState({ events: 0, labels: 0 });
   const [saving, setSaving] = useState(false);
+  const [flags, setFlags] = useState(() => ({ ...getLifecycleFlags() }));
+  const toggle = (k: LifecycleFlag, v: boolean) => { setLifecycleFlags({ [k]: v }); setFlags({ ...getLifecycleFlags() }); };
+  const preset = (on: boolean) => { allLifecycleFlags(on); setFlags({ ...getLifecycleFlags() }); toast(on ? "All switches on" : "Pre-auto-pause mode"); };
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -78,6 +90,19 @@ export function PlayDebugDial({ scrollRef, platform, ready }: Props) {
           <button onClick={save} disabled={saving} className="w-full rounded-xl bg-secondary text-secondary-foreground text-sm py-2">
             {saving ? "Saving…" : "Save records"}
           </button>
+          <div className="pt-1 border-t border-border space-y-1">
+            <div className="text-xs text-muted-foreground px-1">Test mode</div>
+            {FLAG_LABELS.map(([key, text]) => (
+              <label key={key} className="flex items-center justify-between text-xs px-1">
+                <span>{text}</span>
+                <input type="checkbox" checked={flags[key]} onChange={(e) => toggle(key, e.target.checked)} />
+              </label>
+            ))}
+            <div className="flex gap-1">
+              <button onClick={() => preset(false)} className="flex-1 rounded-lg border border-border text-xs py-1">Pre-auto-pause</button>
+              <button onClick={() => preset(true)} className="flex-1 rounded-lg border border-border text-xs py-1">All on</button>
+            </div>
+          </div>
         </div>
       )}
       <button

@@ -1,5 +1,6 @@
 import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
+import { flagOn } from '@/lib/lifecycleFlags';
 
 /**
  * Two-stage media lifecycle for playable media only.
@@ -189,10 +190,10 @@ function stageAPause(root: HTMLElement) {
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
   pauseVimeoIframes(root);
-  if (root.dataset.aelixHasBeenActive) {
+  if (root.dataset.aelixHasBeenActive && flagOn('mute')) {
     muteNonApiIframes(root);
   }
-  freezeIframes(root);
+  if (flagOn('freezePointer')) freezeIframes(root);
 }
 
 function stageAResume(root: HTMLElement) {
@@ -259,6 +260,7 @@ function revealWarmedIframe(iframe: HTMLIFrameElement) {
 }
 
 function hardSuspendIframes(root: HTMLElement) {
+  if (!flagOn('hardSuspend')) return;
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (!shouldHardSuspend(iframe)) return;
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
@@ -376,6 +378,7 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
     // Records showed Threads/X players freezing ("stuck, icon only") when a
     // sibling iframe was blanked within ~100ms of the play tap. Pause at once,
     // but defer the src→about:blank swap until the new player has started.
+    if (!flagOn('exclusivePause')) return;
     stageAPause(el);
     if (!reg.disableHardSuspend && !reg.cycleUsed) {
       if (reg.state === 'active') reg.state = 'paused';
