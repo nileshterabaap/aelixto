@@ -385,9 +385,7 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
       setTimeout(() => {
         if (!el.isConnected || activePlaybackPostId !== postId) return;
         if (reg.state === 'active') return;
-        hardSuspendIframes(el);
-        reg.state = 'suspended';
-        reg.awaitingReentry = true;
+        stopAndRewarm(el, reg);
       }, DEFERRED_SUSPEND_MS);
     } else if (reg.state === 'active') {
       reg.state = 'paused';
@@ -396,6 +394,26 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
 }
 
 const DEFERRED_SUSPEND_MS = 1500;
+const REWARM_DELAY_MS = 400;
+
+/**
+ * Records: the reload is the only thing that silences X/Threads, but a player
+ * reloaded at the moment the user scrolls back freezes/buffers on tap. So blank
+ * it (audio dies) and immediately reload it while still off-screen — by the
+ * time the user returns, the player is fully idle and ready. One cycle per play.
+ */
+function stopAndRewarm(el: HTMLElement, reg: RegisteredElement) {
+  hardSuspendIframes(el);
+  reg.state = 'paused';
+  reg.awaitingReentry = false;
+  reg.cycleUsed = true;
+  completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
+  setTimeout(() => {
+    if (!el.isConnected) return;
+    restoreHardSuspended(el);
+    stageAPause(el);
+  }, REWARM_DELAY_MS);
+}
 
 function isInsideUsableViewport(rect: DOMRect): boolean {
   const viewport = getUsableViewportBounds();
@@ -440,8 +458,8 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
       return;
     }
     if (current === 'active') stageAPause(el);
-    hardSuspendIframes(el);
-    reg.awaitingReentry = true;
+    stopAndRewarm(el, reg);
+    return;
   }
 
   reg.state = target;
