@@ -10,7 +10,7 @@ import { flagsSignature } from '@/lib/lifecycleFlags';
  */
 export interface DebugEvent { t: number; type: string; p: string; rank?: number; postId?: string; d?: Record<string, unknown>; f?: string }
 export type DebugVerdict = 'worked' | 'not_worked' | 'not_loaded' | 'frozen' | 'buffered';
-export interface DebugLabel { t: number; p: string; rank: number; postId?: string; verdict: DebugVerdict; loads?: number; mounts?: number; liveIframes?: number; longTasks5s?: number; fps?: number; f?: string }
+export interface DebugLabel { t: number; p: string; rank: number; postId?: string; verdict: DebugVerdict; loads?: number; mounts?: number; liveIframes?: number; longTasks5s?: number; fps?: number; f?: string; lastAttemptConfirmed?: boolean | null; lastTapToConfirmMs?: number | null }
 // Per-post counters (persist across platform switches) to tell first load from reloads.
 const loadCount = new Map<string, number>();
 const mountCount = new Map<string, number>();
@@ -127,6 +127,7 @@ export function startPlayDebug(scroller: HTMLElement, platformKey: string) {
     const n = postId ? (loadCount.get(postId) ?? 0) + 1 : 0;
     if (postId) loadCount.set(postId, n);
     logDebug(n <= 1 ? 'iframe_first_load' : 'iframe_reload', rank, postId, { host: iframeHost(e.target), loadNo: n });
+    logDebug('iframe_config', rank, postId, { reason: 'load', ...iframeConfig(e.target) });
   };
   scroller.addEventListener('load', onLoad, true);
   subs.push(() => scroller.removeEventListener('load', onLoad, true));
@@ -141,6 +142,7 @@ export function startPlayDebug(scroller: HTMLElement, platformKey: string) {
         const { rank, postId } = rankOf(m.target);
         const f = m.target;
         logDebug('iframe_attr', rank, postId, { attr: m.attributeName, host: iframeHost(f), style: f.getAttribute('style')?.slice(0, 120), pe: getComputedStyle(f).pointerEvents });
+        logDebug('iframe_config', rank, postId, { reason: 'attr_' + m.attributeName, ...iframeConfig(f) });
       }
     }
   });
@@ -184,6 +186,205 @@ export function startPlayDebug(scroller: HTMLElement, platformKey: string) {
   const onVis = () => logDebug('visibility', undefined, undefined, { state: document.visibilityState });
   document.addEventListener('visibilitychange', onVis);
   subs.push(() => document.removeEventListener('visibilitychange', onVis));
+
+  // ===== Extended capture (read-only additions) =====
+  // Snapshot full config of iframes already mounted when the session starts.
+  scroller.querySelectorAll('iframe').forEach((f) => { const r = rankOf(f); logDebug('iframe_config', r.rank, r.postId, { reason: 'session_start', ...iframeConfig(f) }); });
+
+  // Play attempts: started by a tap on the post (parent document) OR by focus
+  // moving into the post's iframe (taps inside cross-origin iframes never reach
+  // the parent document, so window blur is the only observable tap signal).
+  const onTapDown = (e: Event) => {
+    const { rank, postId } = rankOf(e.target as Element);
+    if (postId) startAttempt(rank, postId, e.type);
+  };
+  document.addEventListener('pointerdown', onTapDown, { capture: true, passive: true });
+  subs.push(() => document.removeEventListener('pointerdown', onTapDown, { capture: true } as any));
+  const onBlurAttempt = () => setTimeout(() => {
+    const a = document.activeElement;
+    if (!(a instanceof HTMLIFrameElement)) return;
+    const { rank, postId } = rankOf(a);
+    if (postId) startAttempt(rank, postId, 'iframe_focus');
+  }, 0);
+  window.addEventListener('blur', onBlurAttempt);
+  subs.push(() => window.removeEventListener('blur', onBlurAttempt));
+
+  // First player message after a tap, per attempt.
+  const onMsgAttempt = (e: MessageEvent) => {
+    let postId: string | undefined;
+    scroller.querySelectorAll('iframe').forEach((f) => { if (f.contentWindow === e.source) postId = rankOf(f).postId; });
+    if (!postId) return;
+    const a = attempts.get(postId);
+    if (a && a.firstMessageT == null) {
+      a.firstMessageT = now();
+      let data = ''; try { data = typeof e.data === 'string' ? e.data : JSON.stringify(e.data); } catch { data = '[unserializable]'; }
+      a.firstMessageData = data.slice(0, 120);
+    }
+  };
+  window.addEventListener('message', onMsgAttempt);
+  subs.push(() => window.removeEventListener('message', onMsgAttempt));
+
+  // Owned <video> 'playing' event counts as observable playback for that attempt.
+  const onPlaying = (e: Event) => {
+    const { postId } = rankOf(e.target as Element);
+    const a = postId ? attempts.get(postId) : undefined;
+    if (a && a.firstMediaPlayingT == null) a.firstMediaPlayingT = now();
+  };
+  document.addEventListener('playing', onPlaying, true);
+  subs.push(() => document.removeEventListener('playing', onPlaying, true));
+
+  // Generation change watcher dedicated to attempts (separate from the
+  // existing play_confirmed poll, which is left untouched).
+  const attemptGenPoll = setInterval(() => {
+    attempts.forEach((a) => {
+      if (a.done) return;
+      const g = getPostPlaybackGeneration(a.postId);
+      if (g !== a.genAtTap && a.firstGenChangeT == null) {
+        a.firstGenChangeT = now();
+        a.genAfter = g;
+        finishAttempt(a, true);
+      }
+    });
+  }, 50);
+  subs.push(() => clearInterval(attemptGenPoll));
+
+  // Resource timing exposed to the page. Cross-origin resources loaded INSIDE
+  // embeds (video segments, player JS) are NOT visible to the parent page;
+  // only resources the parent itself loads (iframe document, SDK scripts).
+  try {
+    const ro = new PerformanceObserver((list) => {
+      list.getEntries().forEach((en) => {
+        const r = en as PerformanceResourceTiming;
+        if (!isEmbedUrl(r.name)) return;
+        logDebug('resource', currentRank(), undefined, {
+          url: r.name.slice(0, 300),
+          initiator: r.initiatorType,
+          start: Math.round(r.startTime),
+          duration: Math.round(r.duration),
+          transferSize: r.transferSize,
+          encodedBodySize: r.encodedBodySize,
+          decodedBodySize: r.decodedBodySize,
+          responseStatus: (r as any).responseStatus ?? null,
+          ttfb: r.responseStart > 0 ? Math.round(r.responseStart - r.startTime) : null,
+          timingRestricted: r.responseStart === 0,
+        });
+      });
+    });
+    ro.observe({ type: 'resource', buffered: false } as any);
+    subs.push(() => ro.disconnect());
+  } catch { /* unsupported */ }
+
+  // Runtime errors / rejections, filtered to embed/player-related ones.
+  const onErr = (e: ErrorEvent) => {
+    const text = `${e.message} ${e.filename ?? ''} ${(e.error as Error)?.stack ?? ''}`;
+    const crossOrigin = e.message === 'Script error.' || (!e.filename && !e.lineno);
+    if (!crossOrigin && !isEmbedRelated(text)) return;
+    logDebug('runtime_error', currentRank(), undefined, { message: e.message?.slice(0, 200), file: e.filename?.slice(0, 200), line: e.lineno, col: e.colno, crossOriginOpaque: crossOrigin });
+  };
+  const onRej = (e: PromiseRejectionEvent) => {
+    const r = e.reason as any;
+    const text = `${r?.message ?? String(r)} ${r?.stack ?? ''}`;
+    if (!isEmbedRelated(text)) return;
+    logDebug('unhandled_rejection', currentRank(), undefined, { message: String(r?.message ?? r).slice(0, 200), stack: String(r?.stack ?? '').slice(0, 300) });
+  };
+  window.addEventListener('error', onErr);
+  window.addEventListener('unhandledrejection', onRej);
+  subs.push(() => { window.removeEventListener('error', onErr); window.removeEventListener('unhandledrejection', onRej); });
+
+  subs.push(() => { attempts.forEach((a) => a.timers.forEach(clearTimeout)); attempts.clear(); });
+}
+
+// ===== Extended capture helpers =====
+const EMBED_HOSTS = /(twitter\.com|x\.com|twimg\.com|threads\.net|threads\.com|instagram\.com|cdninstagram\.com|facebook\.com|fbcdn\.net|fbsbx\.com|tiktok|youtube|ytimg|googlevideo|reddit|redd\.it|linkedin|licdn|pinterest|pinimg|spotify|scdn\.co|quora|vimeo)/i;
+function isEmbedUrl(u: string) { try { return EMBED_HOSTS.test(new URL(u).host); } catch { return false; } }
+function isEmbedRelated(text: string) { return EMBED_HOSTS.test(text) || /\b(iframe|embed|player|video|media)\b/i.test(text); }
+
+export function iframeConfig(f: HTMLIFrameElement) {
+  const src = f.getAttribute('src') ?? '';
+  let query: Record<string, string> | null = null;
+  try { const u = new URL(src, location.href); query = {}; u.searchParams.forEach((v, k) => { query![k] = v.slice(0, 200); }); } catch { /* no src */ }
+  return {
+    src: src.slice(0, 1000),
+    srcdoc: f.hasAttribute('srcdoc'),
+    sandbox: f.getAttribute('sandbox'),
+    allow: f.getAttribute('allow'),
+    loading: f.getAttribute('loading'),
+    referrerpolicy: f.getAttribute('referrerpolicy'),
+    allowfullscreen: f.hasAttribute('allowfullscreen'),
+    widthAttr: f.getAttribute('width'),
+    heightAttr: f.getAttribute('height'),
+    query,
+  };
+}
+
+function iframeGeometry(f: HTMLIFrameElement) {
+  const b = f.getBoundingClientRect();
+  const cs = getComputedStyle(f);
+  const inView = b.bottom > 0 && b.right > 0 && b.top < innerHeight && b.left < innerWidth && b.width > 0 && b.height > 0;
+  const visH = Math.max(0, Math.min(b.bottom, innerHeight) - Math.max(b.top, 0));
+  return {
+    x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height),
+    display: cs.display, visibility: cs.visibility, opacity: cs.opacity, pointerEvents: cs.pointerEvents,
+    position: cs.position, zIndex: cs.zIndex, transform: cs.transform,
+    intersectsViewport: inView, visibleRatio: b.height ? +(visH / b.height).toFixed(2) : 0,
+  };
+}
+
+function concurrency() {
+  const scope = root ?? document.body;
+  const vids = Array.from(scope.querySelectorAll('video'));
+  return {
+    liveIframes: scope.querySelectorAll('iframe[src]:not([src=""])').length,
+    totalIframes: scope.querySelectorAll('iframe').length,
+    ownedVideos: vids.length,
+    ownedVideosPlaying: vids.filter((v) => !v.paused && !v.ended).length,
+    ownedVideosAudible: vids.filter((v) => !v.paused && !v.ended && !v.muted && v.volume > 0).length,
+    iframePlaybackObservable: false, // cross-origin players do not expose play/audio state
+  };
+}
+
+interface Attempt {
+  postId: string; rank?: number; trigger: string; tapT: number; genAtTap: number; genAfter?: number;
+  firstMessageT?: number; firstMessageData?: string; firstMediaPlayingT?: number; firstGenChangeT?: number;
+  done: boolean; timers: ReturnType<typeof setTimeout>[];
+}
+const attempts = new Map<string, Attempt>();
+const lastAttemptResult = new Map<string, { confirmed: boolean; tapToConfirmMs: number | null }>();
+const ATTEMPT_TIMEOUT_MS = 10000;
+
+function startAttempt(rank: number | undefined, postId: string, trigger: string) {
+  const prev = attempts.get(postId);
+  if (prev && !prev.done && now() - prev.tapT < 600) return; // same physical tap (pointerdown + blur)
+  if (prev && !prev.done) finishAttempt(prev, false, 'superseded');
+  const host = root?.querySelector<HTMLElement>(`[data-debug-post-id="${postId}"]`);
+  const frames = host ? Array.from(host.querySelectorAll('iframe')) : [];
+  const a: Attempt = { postId, rank, trigger, tapT: now(), genAtTap: getPostPlaybackGeneration(postId), done: false, timers: [] };
+  attempts.set(postId, a);
+  logDebug('play_attempt_start', rank, postId, {
+    trigger, genAtTap: a.genAtTap,
+    iframes: frames.map((f) => ({ ...iframeConfig(f), ...iframeGeometry(f) })),
+    concurrency: concurrency(),
+  });
+  [1000, 3000].forEach((ms) => a.timers.push(setTimeout(() => {
+    if (!a.done) logDebug('play_attempt_sample', rank, postId, { msSinceTap: ms, concurrency: concurrency() });
+  }, ms)));
+  a.timers.push(setTimeout(() => { if (!a.done) finishAttempt(a, false, 'timeout'); }, ATTEMPT_TIMEOUT_MS));
+}
+
+function finishAttempt(a: Attempt, confirmed: boolean, reason = 'generation_change') {
+  a.done = true;
+  a.timers.forEach(clearTimeout);
+  const rel = (t?: number) => (t == null ? null : t - a.tapT);
+  const tapToConfirmMs = confirmed ? rel(a.firstGenChangeT) : null;
+  lastAttemptResult.set(a.postId, { confirmed, tapToConfirmMs });
+  logDebug('play_attempt_result', a.rank, a.postId, {
+    trigger: a.trigger, confirmed, reason, tapT: a.tapT,
+    tapToFirstMessageMs: rel(a.firstMessageT), firstMessageData: a.firstMessageData ?? null,
+    tapToMediaPlayingMs: rel(a.firstMediaPlayingT),
+    tapToPlayConfirmedMs: tapToConfirmMs, tapToGenerationChangeMs: tapToConfirmMs,
+    genAtTap: a.genAtTap, genAfter: a.genAfter ?? null,
+    concurrency: concurrency(),
+  });
 }
 
 function scanIframes(node: Node, type: string, parent: Element) {
@@ -194,6 +395,7 @@ function scanIframes(node: Node, type: string, parent: Element) {
     let mountNo: number | undefined;
     if (type === 'iframe_added' && postId) { mountNo = (mountCount.get(postId) ?? 0) + 1; mountCount.set(postId, mountNo); }
     logDebug(mountNo && mountNo > 1 ? 'iframe_remount' : type, rank, postId, { host: iframeHost(f), mountNo });
+    if (type === 'iframe_added') logDebug('iframe_config', rank, postId, { reason: 'mount', ...iframeConfig(f) });
   });
 }
 
@@ -214,7 +416,7 @@ export function currentRank(): number | undefined {
 export function addDebugLabel(rank: number, verdict: DebugVerdict) {
   const host = root?.querySelector<HTMLElement>(`[data-debug-rank="${rank}"]`);
   const postId = host?.dataset.debugPostId;
-  const label: DebugLabel = { t: now(), p: platform, rank, postId, verdict, loads: postId ? loadCount.get(postId) ?? 0 : undefined, mounts: postId ? mountCount.get(postId) ?? 0 : undefined, liveIframes: root?.querySelectorAll('iframe[src]:not([src=""])').length, longTasks5s: recentLong.filter((x) => Date.now() - x < 5000).length, fps: lastFps };
+  const label: DebugLabel = { t: now(), p: platform, rank, postId, verdict, loads: postId ? loadCount.get(postId) ?? 0 : undefined, mounts: postId ? mountCount.get(postId) ?? 0 : undefined, liveIframes: root?.querySelectorAll('iframe[src]:not([src=""])').length, longTasks5s: recentLong.filter((x) => Date.now() - x < 5000).length, fps: lastFps, lastAttemptConfirmed: postId ? lastAttemptResult.get(postId)?.confirmed ?? null : null, lastTapToConfirmMs: postId ? lastAttemptResult.get(postId)?.tapToConfirmMs ?? null : null };
   labels.push(label);
   logDebug('user_label', rank, label.postId, { verdict });
 }
