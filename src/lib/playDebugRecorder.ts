@@ -127,6 +127,7 @@ export function startPlayDebug(scroller: HTMLElement, platformKey: string) {
     const n = postId ? (loadCount.get(postId) ?? 0) + 1 : 0;
     if (postId) loadCount.set(postId, n);
     logDebug(n <= 1 ? 'iframe_first_load' : 'iframe_reload', rank, postId, { host: iframeHost(e.target), loadNo: n });
+    logDebug('iframe_config', rank, postId, { reason: 'load', ...iframeConfig(e.target) });
   };
   scroller.addEventListener('load', onLoad, true);
   subs.push(() => scroller.removeEventListener('load', onLoad, true));
@@ -141,6 +142,7 @@ export function startPlayDebug(scroller: HTMLElement, platformKey: string) {
         const { rank, postId } = rankOf(m.target);
         const f = m.target;
         logDebug('iframe_attr', rank, postId, { attr: m.attributeName, host: iframeHost(f), style: f.getAttribute('style')?.slice(0, 120), pe: getComputedStyle(f).pointerEvents });
+        logDebug('iframe_config', rank, postId, { reason: 'attr_' + m.attributeName, ...iframeConfig(f) });
       }
     }
   });
@@ -393,6 +395,7 @@ function scanIframes(node: Node, type: string, parent: Element) {
     let mountNo: number | undefined;
     if (type === 'iframe_added' && postId) { mountNo = (mountCount.get(postId) ?? 0) + 1; mountCount.set(postId, mountNo); }
     logDebug(mountNo && mountNo > 1 ? 'iframe_remount' : type, rank, postId, { host: iframeHost(f), mountNo });
+    if (type === 'iframe_added') logDebug('iframe_config', rank, postId, { reason: 'mount', ...iframeConfig(f) });
   });
 }
 
@@ -413,7 +416,7 @@ export function currentRank(): number | undefined {
 export function addDebugLabel(rank: number, verdict: DebugVerdict) {
   const host = root?.querySelector<HTMLElement>(`[data-debug-rank="${rank}"]`);
   const postId = host?.dataset.debugPostId;
-  const label: DebugLabel = { t: now(), p: platform, rank, postId, verdict, loads: postId ? loadCount.get(postId) ?? 0 : undefined, mounts: postId ? mountCount.get(postId) ?? 0 : undefined, liveIframes: root?.querySelectorAll('iframe[src]:not([src=""])').length, longTasks5s: recentLong.filter((x) => Date.now() - x < 5000).length, fps: lastFps };
+  const label: DebugLabel = { t: now(), p: platform, rank, postId, verdict, loads: postId ? loadCount.get(postId) ?? 0 : undefined, mounts: postId ? mountCount.get(postId) ?? 0 : undefined, liveIframes: root?.querySelectorAll('iframe[src]:not([src=""])').length, longTasks5s: recentLong.filter((x) => Date.now() - x < 5000).length, fps: lastFps, lastAttemptConfirmed: postId ? lastAttemptResult.get(postId)?.confirmed ?? null : null, lastTapToConfirmMs: postId ? lastAttemptResult.get(postId)?.tapToConfirmMs ?? null : null };
   labels.push(label);
   logDebug('user_label', rank, label.postId, { verdict });
 }
