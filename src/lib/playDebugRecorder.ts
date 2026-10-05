@@ -87,6 +87,8 @@ export function startPlayDebug(scroller: HTMLElement, platformKey: string) {
       lastActive = a;
       const { rank, postId } = rankOf(a);
       logDebug('active_element', rank, postId, { active: describe(a), iframe: a instanceof HTMLIFrameElement ? iframeHost(a) : null });
+      // Focus moving iframe→iframe fires no window blur; catch those taps here.
+      if (a instanceof HTMLIFrameElement && postId) startAttempt(rank, postId, 'iframe_focus_switch');
     }
   }, 100);
   subs.push(() => clearInterval(focusPoll));
