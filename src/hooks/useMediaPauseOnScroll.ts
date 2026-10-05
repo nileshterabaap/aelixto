@@ -614,6 +614,10 @@ function destroySharedObservers() {
 
 const replayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
 const nativePlayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
+const settleListeners = new WeakMap<HTMLElement, (event: Event) => void>();
+/** Posts whose first load has been checked for the one-time settle reload. */
+const settledPosts = new Set<string>();
+const SETTLE_RELOAD_DELAY_MS = 600;
 
 function registerElement(
   el: HTMLElement,
@@ -654,6 +658,31 @@ function registerElement(
   // cycle per post per session is enough to guarantee audio stops.
 
 
+  // One-time settle reload: records showed embeds first loaded while
+  // OFF-SCREEN (preloaded ahead of the user) buffer/freeze on first play,
+  // while the same embed after one reload — or the post opened directly
+  // (loaded on-screen) — plays instantly. So an off-screen first load gets
+  // exactly one quiet reload, still off-screen, before the user reaches it.
+  const onSettle = (event: Event) => {
+    const iframe = event.target;
+    if (!(iframe instanceof HTMLIFrameElement)) return;
+    const current = elementStates.get(el);
+    if (!current || settledPosts.has(current.postId)) return;
+    const src = iframe.getAttribute('src');
+    if (!src || src === 'about:blank' || iframe.dataset[WARMING_FLAG] === '1') return;
+    settledPosts.add(current.postId);
+    if (current.visible || current.disableHardSuspend) return; // loaded on-screen: fine as is
+    setTimeout(() => {
+      const r = elementStates.get(el);
+      if (!r || !el.isConnected || r.visible || r.state === 'suspended') return;
+      if (activePlaybackPostId === r.postId) return;
+      hardSuspendIframes(el);
+      restoreHardSuspended(el);
+    }, SETTLE_RELOAD_DELAY_MS);
+  };
+  settleListeners.set(el, onSettle);
+  el.addEventListener('load', onSettle, true);
+
   // Sync initial state from layout.
   syncElementFromLayout(el, reg);
 
@@ -690,6 +719,11 @@ function unregisterElement(el: HTMLElement) {
   if (onNativePlay) {
     el.removeEventListener('play', onNativePlay, true);
     nativePlayListeners.delete(el);
+  }
+  const onSettle = settleListeners.get(el);
+  if (onSettle) {
+    el.removeEventListener('load', onSettle, true);
+    settleListeners.delete(el);
   }
   observerRefCount--;
 
