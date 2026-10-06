@@ -354,9 +354,24 @@ let focusedIframePoll = 0;
 let lastFocusedIframe: HTMLIFrameElement | null = null;
 let observerRefCount = 0;
 let activePlaybackPostId = '';
+/**
+ * Quiet window: records showed neighbouring embeds still being reloaded
+ * (settle reload / off-screen restore) right while a newly tapped video was
+ * starting, freezing/buffering it. Any OFF-SCREEN reload is pushed until the
+ * new playback has had QUIET_WINDOW_MS to start. On-screen restores are never
+ * delayed.
+ */
+const QUIET_WINDOW_MS = 5000;
+let lastPlayStartAt = 0;
+function runWhenQuiet(fn: () => void) {
+  const wait = lastPlayStartAt + QUIET_WINDOW_MS - Date.now();
+  if (wait <= 0) { fn(); return; }
+  setTimeout(() => runWhenQuiet(fn), wait);
+}
 
 function onConfirmedPlay(postId: string, playbackGeneration: number) {
   activePlaybackPostId = postId;
+  lastPlayStartAt = Date.now();
   elementStates.forEach((reg, el) => {
     if (!el.isConnected) return;
 
@@ -412,11 +427,11 @@ function stopAndRewarm(el: HTMLElement, reg: RegisteredElement) {
   reg.awaitingReentry = false;
   reg.cycleUsed = true;
   completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
-  setTimeout(() => {
+  setTimeout(() => runWhenQuiet(() => {
     if (!el.isConnected || reg.visible) return;
     restoreHardSuspended(el);
     stageAPause(el);
-  }, REWARM_DELAY_MS);
+  }), REWARM_DELAY_MS);
 }
 
 function isInsideUsableViewport(rect: DOMRect): boolean {
@@ -449,10 +464,19 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
     stageAResume(el);
   } else if (target === 'paused') {
     if (current === 'suspended') {
-      restoreHardSuspended(el);
       // The single allowed refresh has now been spent.
       reg.cycleUsed = true;
       completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
+      if (!reg.visible) {
+        reg.state = 'paused';
+        runWhenQuiet(() => {
+          if (!el.isConnected || reg.state === 'active') return;
+          restoreHardSuspended(el);
+          stageAPause(el);
+        });
+        return;
+      }
+      restoreHardSuspended(el);
     }
     stageAPause(el);
   } else if (target === 'suspended') {
@@ -672,13 +696,13 @@ function registerElement(
     if (!src || src === 'about:blank' || iframe.dataset[WARMING_FLAG] === '1') return;
     settledPosts.add(current.postId);
     if (current.visible || current.disableHardSuspend) return; // loaded on-screen: fine as is
-    setTimeout(() => {
+    setTimeout(() => runWhenQuiet(() => {
       const r = elementStates.get(el);
       if (!r || !el.isConnected || r.visible || r.state === 'suspended') return;
       if (activePlaybackPostId === r.postId) return;
       hardSuspendIframes(el);
       restoreHardSuspended(el);
-    }, SETTLE_RELOAD_DELAY_MS);
+    }), SETTLE_RELOAD_DELAY_MS);
   };
   settleListeners.set(el, onSettle);
   el.addEventListener('load', onSettle, true);
