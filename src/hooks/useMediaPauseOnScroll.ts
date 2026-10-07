@@ -419,6 +419,7 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
         reg.awaitingReentry = false;
       }
       reg.disableHardSuspend = false;
+      pendingSleep.delete(el);
       syncElementFromLayout(el, reg);
       return;
     }
@@ -430,20 +431,56 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
     // but defer the src→about:blank swap until the new player has started.
     if (!flagOn('exclusivePause')) return;
     stageAPause(el);
+    if (reg.state === 'active') reg.state = 'paused';
     if (!reg.disableHardSuspend && !reg.cycleUsed) {
-      if (reg.state === 'active') reg.state = 'paused';
-      setTimeout(() => {
-        if (!el.isConnected || activePlaybackPostId !== postId) return;
-        if (reg.state === 'active') return;
-        putToSleep(el, reg);
-      }, DEFERRED_SUSPEND_MS);
-    } else if (reg.state === 'active') {
-      reg.state = 'paused';
+      scheduleSleep(el, reg, true);
     }
   });
+  // Every genuine play pushes ALL pending teardowns to ≥4s after this tap,
+  // so the new player gets a quiet window to start.
+  extendSleepDeadline();
 }
 
-const DEFERRED_SUSPEND_MS = 1500;
+/**
+ * Delayed teardown. Records: every X/Threads freeze/buffer tap came ~0.5–1.6s
+ * after the previous played video was blanked; taps ≥4s after a teardown
+ * worked. So the old video is only muted/frozen at first and blanked once
+ * ≥4s have passed since BOTH it left/was replaced AND the latest play tap.
+ */
+const TEARDOWN_DELAY_MS = 4000;
+const pendingSleep = new Map<HTMLElement, RegisteredElement>();
+let sleepDeadline = 0;
+let sleepTimer: ReturnType<typeof setTimeout> | null = null;
+
+function armSleepTimer() {
+  if (sleepTimer !== null) clearTimeout(sleepTimer);
+  sleepTimer = setTimeout(flushPendingSleep, Math.max(0, sleepDeadline - Date.now()));
+}
+
+function extendSleepDeadline() {
+  if (pendingSleep.size === 0) return;
+  sleepDeadline = Math.max(sleepDeadline, Date.now() + TEARDOWN_DELAY_MS);
+  armSleepTimer();
+}
+
+function scheduleSleep(el: HTMLElement, reg: RegisteredElement, deferArm = false) {
+  if (pendingSleep.has(el)) return;
+  pendingSleep.set(el, reg);
+  if (!deferArm) extendSleepDeadline();
+}
+
+function flushPendingSleep() {
+  sleepTimer = null;
+  if (Date.now() < sleepDeadline - 20) { armSleepTimer(); return; }
+  const batch = Array.from(pendingSleep.entries());
+  pendingSleep.clear();
+  batch.forEach(([el, reg]) => {
+    if (!el.isConnected || elementStates.get(el) !== reg) return;
+    if (reg.state === 'active' || reg.state === 'suspended') return;
+    if (reg.disableHardSuspend || reg.cycleUsed) return;
+    putToSleep(el, reg);
+  });
+}
 
 /**
  * Records: the reload is the only thing that silences X/Threads, but a player
@@ -491,18 +528,20 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
 
   if (target === 'active') {
     // Unfreezes/unmutes only. A sleeping embed stays asleep until the user
-    // taps its "Tap to load" button.
+    // taps its "Tap to load" button. Back on screen → cancel pending teardown.
+    pendingSleep.delete(el);
     stageAResume(el);
   } else if (target === 'paused') {
     stageAPause(el);
   } else if (target === 'suspended') {
-    if (reg.disableHardSuspend || reg.cycleUsed) {
-      stageAPause(el);
-      reg.state = 'paused';
-      return;
-    }
     if (current === 'active') stageAPause(el);
-    putToSleep(el, reg);
+    reg.state = 'paused';
+    if (!reg.disableHardSuspend && !reg.cycleUsed) {
+      // Delayed teardown: never blank the frame at the moment it leaves the
+      // screen — a teardown right before/after the next play tap is what
+      // froze/buffered X and Threads in the records.
+      scheduleSleep(el, reg);
+    }
     return;
   }
 
@@ -693,6 +732,7 @@ function updateElementPolicy(
 
 function unregisterElement(el: HTMLElement) {
   elementStates.delete(el);
+  pendingSleep.delete(el);
   sharedNearObserver?.unobserve(el);
   sharedActiveObserver?.unobserve(el);
   const onReplayIntent = replayListeners.get(el);
