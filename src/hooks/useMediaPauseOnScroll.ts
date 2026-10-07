@@ -435,7 +435,7 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
       setTimeout(() => {
         if (!el.isConnected || activePlaybackPostId !== postId) return;
         if (reg.state === 'active') return;
-        stopAndRewarm(el, reg);
+        putToSleep(el, reg);
       }, DEFERRED_SUSPEND_MS);
     } else if (reg.state === 'active') {
       reg.state = 'paused';
@@ -444,7 +444,6 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
 }
 
 const DEFERRED_SUSPEND_MS = 1500;
-const REWARM_DELAY_MS = 5000;
 
 /**
  * Records: the reload is the only thing that silences X/Threads, but a player
@@ -627,9 +626,6 @@ function destroySharedObservers() {
 const replayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
 const nativePlayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
 const settleListeners = new WeakMap<HTMLElement, (event: Event) => void>();
-/** Posts whose first load has been checked for the one-time settle reload. */
-const settledPosts = new Set<string>();
-const SETTLE_RELOAD_DELAY_MS = 600;
 
 function registerElement(
   el: HTMLElement,
