@@ -447,7 +447,7 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
  * worked. So the old video is only muted/frozen at first and blanked once
  * ≥4s have passed since BOTH it left/was replaced AND the latest play tap.
  */
-const TEARDOWN_DELAY_MS = 4000;
+const TEARDOWN_DELAY_MS = 0; // user request: stop the previous video immediately on the next play
 const pendingSleep = new Map<HTMLElement, RegisteredElement>();
 let sleepDeadline = 0;
 let sleepTimer: ReturnType<typeof setTimeout> | null = null;
