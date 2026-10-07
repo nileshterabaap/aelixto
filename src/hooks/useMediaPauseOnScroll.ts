@@ -419,6 +419,7 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
         reg.awaitingReentry = false;
       }
       reg.disableHardSuspend = false;
+      pendingSleep.delete(el);
       syncElementFromLayout(el, reg);
       return;
     }
@@ -476,7 +477,6 @@ function flushPendingSleep() {
   batch.forEach(([el, reg]) => {
     if (!el.isConnected || elementStates.get(el) !== reg) return;
     if (reg.state === 'active' || reg.state === 'suspended') return;
-    if (reg.postId === activePlaybackPostId) return;
     if (reg.disableHardSuspend || reg.cycleUsed) return;
     putToSleep(el, reg);
   });
