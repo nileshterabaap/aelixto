@@ -197,7 +197,6 @@ function stageAPause(root: HTMLElement) {
 }
 
 function stageAResume(root: HTMLElement) {
-  restoreHardSuspended(root);
   root.dataset.aelixHasBeenActive = 'true';
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (iframe.dataset[MUTE_FLAG] === '1') {
@@ -457,17 +456,12 @@ const REWARM_DELAY_MS = 5000;
  * user scrolls back within the window, reconcileElement's visible path restores
  * it directly, so the delayed reload is skipped. One cycle per play.
  */
-function stopAndRewarm(el: HTMLElement, reg: RegisteredElement) {
+function putToSleep(el: HTMLElement, reg: RegisteredElement) {
   hardSuspendIframes(el);
-  reg.state = 'paused';
+  reg.state = 'suspended';
   reg.awaitingReentry = false;
   reg.cycleUsed = true;
   completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
-  setTimeout(() => {
-    if (!el.isConnected || reg.visible) return;
-    restoreHardSuspended(el);
-    stageAPause(el);
-  }, REWARM_DELAY_MS);
 }
 
 function isInsideUsableViewport(rect: DOMRect): boolean {
@@ -497,14 +491,10 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
   if (current === target) return;
 
   if (target === 'active') {
+    // Unfreezes/unmutes only. A sleeping embed stays asleep until the user
+    // taps its "Tap to load" button.
     stageAResume(el);
   } else if (target === 'paused') {
-    if (current === 'suspended') {
-      restoreHardSuspended(el);
-      // The single allowed refresh has now been spent.
-      reg.cycleUsed = true;
-      completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
-    }
     stageAPause(el);
   } else if (target === 'suspended') {
     if (reg.disableHardSuspend || reg.cycleUsed) {
@@ -513,7 +503,7 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
       return;
     }
     if (current === 'active') stageAPause(el);
-    stopAndRewarm(el, reg);
+    putToSleep(el, reg);
     return;
   }
 
@@ -521,33 +511,18 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
 }
 
 function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
-  // A visible post must always be tappable and loaded. Making it 'active'
-  // only unfreezes/restores the frame — it never starts playback — so
-  // exclusivity is still enforced by onConfirmedPlay pausing the others.
-  // (Records showed older posts staying pointer-events:none / about:blank
-  // forever: "play doesn't work" and "didn't load".)
+  // A visible post must always be tappable. Making it 'active' only
+  // unfreezes the frame — it never starts playback or reloads a sleeping
+  // embed — so exclusivity is still enforced by onConfirmedPlay.
   if (reg.visible) {
     transitionElement(el, reg, 'active');
     return;
   }
 
-
-  // Never-played posts (and played posts that already spent their one refresh)
-  // still receive cheap API/native pause commands, but their iframe is not
-  // destroyed or reloaded again.
-  if (reg.disableHardSuspend || reg.cycleUsed) {
-    transitionElement(el, reg, 'suspended');
-    return;
-  }
-
-  // A played iframe is killed immediately after leaving the visible feed.
-  // Once it has travelled outside the prewarm envelope, the observer restores
-  // it on re-entry while it is still well off-screen.
-  if (reg.state !== 'suspended') {
-    transitionElement(el, reg, 'suspended');
-  } else if (reg.prewarm && !reg.awaitingReentry) {
-    transitionElement(el, reg, 'paused');
-  }
+  // Off-screen: never-played posts (and already-slept ones) only get cheap
+  // pause commands; a freshly played post is put to sleep once. A sleeping
+  // post is never restored in the background.
+  if (reg.state !== 'suspended') transitionElement(el, reg, 'suspended');
 }
 
 
@@ -628,21 +603,7 @@ function onAnyScroll() {
       const inside = isInsideUsableViewport(rect);
       // Re-sync posts whose visibility changed inside the grid viewer's own
       // scroller (IntersectionObserver can miss these), both directions.
-      if ((reg.state === 'active') !== inside) { syncElementFromLayout(el, reg); return; }
-      // Direction-aware pre-warm. Records showed X/Threads buffering or
-      // freezing because a suspended played post was only reloaded once it
-      // was already on screen (user turned back before it left the envelope),
-      // so the play tap hit a half-loaded player. As soon as a suspended post
-      // starts approaching again, reload it while still off-screen.
-      const vp = getUsableViewportBounds();
-      const gap = rect.top >= vp.bottom ? rect.top - vp.bottom : rect.bottom <= vp.top ? vp.top - rect.bottom : 0;
-      const prev = reg.lastGap;
-      reg.lastGap = gap;
-      if (reg.state === 'suspended' && reg.awaitingReentry && prev !== undefined && gap > 0 && gap < prev - 4) {
-        reg.awaitingReentry = false;
-        reg.prewarm = gap < getPrewarmDistancePx();
-        reconcileElement(el, reg);
-      }
+      if ((reg.state === 'active') !== inside) syncElementFromLayout(el, reg);
     });
   });
 }
@@ -709,30 +670,8 @@ function registerElement(
   // cycle per post per session is enough to guarantee audio stops.
 
 
-  // One-time settle reload: records showed embeds first loaded while
-  // OFF-SCREEN (preloaded ahead of the user) buffer/freeze on first play,
-  // while the same embed after one reload — or the post opened directly
-  // (loaded on-screen) — plays instantly. So an off-screen first load gets
-  // exactly one quiet reload, still off-screen, before the user reaches it.
-  const onSettle = (event: Event) => {
-    const iframe = event.target;
-    if (!(iframe instanceof HTMLIFrameElement)) return;
-    const current = elementStates.get(el);
-    if (!current || settledPosts.has(current.postId)) return;
-    const src = iframe.getAttribute('src');
-    if (!src || src === 'about:blank' || iframe.dataset[WARMING_FLAG] === '1') return;
-    settledPosts.add(current.postId);
-    if (current.visible || current.disableHardSuspend) return; // loaded on-screen: fine as is
-    setTimeout(() => {
-      const r = elementStates.get(el);
-      if (!r || !el.isConnected || r.visible || r.state === 'suspended') return;
-      if (activePlaybackPostId === r.postId) return;
-      hardSuspendIframes(el);
-      restoreHardSuspended(el);
-    }, SETTLE_RELOAD_DELAY_MS);
-  };
-  settleListeners.set(el, onSettle);
-  el.addEventListener('load', onSettle, true);
+  // The former one-time off-screen "settle reload" was removed: no embed is
+  // ever restarted in the background (sleep-and-stay-asleep model).
 
   // Sync initial state from layout.
   syncElementFromLayout(el, reg);
