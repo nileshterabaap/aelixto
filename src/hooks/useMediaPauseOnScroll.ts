@@ -259,6 +259,55 @@ function revealWarmedIframe(iframe: HTMLIFrameElement) {
   clearWarmOverlay(iframe);
 }
 
+const SLEEP_OVERLAY_CLASS = 'aelix-sleep-overlay';
+
+/**
+ * "Sleep and stay asleep": a played embed that left the screen is unloaded
+ * (audio guaranteed off) and is NEVER reloaded in the background. Records and
+ * the switch test showed background restarts were what left X/Threads players
+ * stuck or buffering on the next tap. Instead the slot shows a tap-to-load
+ * button; tapping it reloads the embed on-screen — the same path as a post
+ * opened directly from the grid, which always plays cleanly.
+ */
+function ensureSleepOverlay(iframe: HTMLIFrameElement) {
+  const parent = iframe.parentElement;
+  if (!parent) return;
+  if (parent.querySelector(`:scope > .${SLEEP_OVERLAY_CLASS}`)) return;
+  if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
+  const overlay = document.createElement('button');
+  overlay.type = 'button';
+  overlay.className = SLEEP_OVERLAY_CLASS;
+  overlay.setAttribute('aria-label', 'Tap to load video');
+  overlay.style.cssText =
+    'position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;' +
+    'border:0;padding:0;margin:0;cursor:pointer;background:hsl(var(--muted));color:hsl(var(--muted-foreground));' +
+    'font:500 13px/1.2 inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation;';
+  overlay.innerHTML =
+    '<span style="width:56px;height:56px;border-radius:9999px;display:flex;align-items:center;justify-content:center;' +
+    'background:hsl(var(--background));color:hsl(var(--foreground));box-shadow:0 2px 10px hsl(var(--foreground) / 0.15);">' +
+    '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>' +
+    '</span><span>Tap to load</span>';
+  const stop = (e: Event) => e.stopPropagation();
+  overlay.addEventListener('pointerdown', stop);
+  overlay.addEventListener('touchstart', stop, { passive: true });
+  overlay.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    wakeIframe(iframe, overlay);
+  });
+  parent.appendChild(overlay);
+}
+
+function removeSleepOverlay(iframe: HTMLIFrameElement) {
+  iframe.parentElement?.querySelector(`:scope > .${SLEEP_OVERLAY_CLASS}`)?.remove();
+}
+
+/** Explicit user wake: reload the embed on-screen, behind a brief loading veil. */
+function wakeIframe(iframe: HTMLIFrameElement, overlay: HTMLElement) {
+  overlay.remove();
+  restoreIframe(iframe);
+}
+
 function hardSuspendIframes(root: HTMLElement) {
   if (!flagOn('hardSuspend')) return;
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
@@ -271,44 +320,46 @@ function hardSuspendIframes(root: HTMLElement) {
     delete iframe.dataset[WARMING_FLAG];
     iframe.setAttribute('src', 'about:blank');
     iframe.style.visibility = 'hidden';
-    // Keep the slot visually filled so the user never sees a blank frame.
-    ensureWarmOverlay(iframe);
+    clearWarmOverlay(iframe);
+    ensureSleepOverlay(iframe);
   });
 }
 
+function restoreIframe(iframe: HTMLIFrameElement) {
+  if (iframe.dataset[SUSPENDED_FLAG] !== '1') return;
+  const storedSrc = iframe.dataset[SUSPENDED_SRC];
+  delete iframe.dataset[SUSPENDED_FLAG];
+  delete iframe.dataset[SUSPENDED_SRC];
+  removeSleepOverlay(iframe);
+
+  if (!storedSrc) {
+    iframe.style.visibility = '';
+    clearWarmOverlay(iframe);
+    return;
+  }
+
+  iframe.dataset[WARMING_FLAG] = '1';
+  iframe.style.visibility = 'hidden';
+  ensureWarmOverlay(iframe);
+
+  const onLoad = () => {
+    iframe.removeEventListener('load', onLoad);
+    // Give the embed SDK a frame to paint before revealing.
+    requestAnimationFrame(() => revealWarmedIframe(iframe));
+  };
+  iframe.addEventListener('load', onLoad);
+  // Cross-origin frames don't always fire load — reveal anyway.
+  setTimeout(() => revealWarmedIframe(iframe), WARM_REVEAL_TIMEOUT_MS);
+
+  iframe.setAttribute('src', storedSrc);
+}
+
 /**
- * Pre-warm: bring the real src back while the post is still off-screen, but
- * keep the frame hidden behind the placeholder overlay until it finishes
- * loading. By the time the post scrolls into view the embed is already live.
+ * Wake every sleeping embed in root. Only used when lifecycle management is
+ * switched off for a post — normal scrolling never wakes a sleeping embed.
  */
 function restoreHardSuspended(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.dataset[SUSPENDED_FLAG] !== '1') return;
-    const storedSrc = iframe.dataset[SUSPENDED_SRC];
-    delete iframe.dataset[SUSPENDED_FLAG];
-    delete iframe.dataset[SUSPENDED_SRC];
-
-    if (!storedSrc) {
-      iframe.style.visibility = '';
-      clearWarmOverlay(iframe);
-      return;
-    }
-
-    iframe.dataset[WARMING_FLAG] = '1';
-    iframe.style.visibility = 'hidden';
-    ensureWarmOverlay(iframe);
-
-    const onLoad = () => {
-      iframe.removeEventListener('load', onLoad);
-      // Give the embed SDK a frame to paint before revealing.
-      requestAnimationFrame(() => revealWarmedIframe(iframe));
-    };
-    iframe.addEventListener('load', onLoad);
-    // Cross-origin frames don't always fire load — reveal anyway.
-    setTimeout(() => revealWarmedIframe(iframe), WARM_REVEAL_TIMEOUT_MS);
-
-    iframe.setAttribute('src', storedSrc);
-  });
+  root.querySelectorAll<HTMLIFrameElement>(SUSPENDED_IFRAME_SELECTOR).forEach(restoreIframe);
 }
 
 
