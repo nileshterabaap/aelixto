@@ -320,7 +320,6 @@ function hardSuspendIframes(root: HTMLElement) {
     iframe.setAttribute('src', 'about:blank');
     iframe.style.visibility = 'hidden';
     clearWarmOverlay(iframe);
-    ensureSleepOverlay(iframe);
   });
 }
 
@@ -527,10 +526,11 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
   if (current === target) return;
 
   if (target === 'active') {
-    // Unfreezes/unmutes only. A sleeping embed stays asleep until the user
-    // taps its "Tap to load" button. Back on screen → cancel pending teardown.
+    // Back on screen → cancel pending teardown and reload any sleeping embed
+    // on-screen (never in the background). No "Tap to load" step.
     pendingSleep.delete(el);
     stageAResume(el);
+    restoreHardSuspended(el);
   } else if (target === 'paused') {
     stageAPause(el);
   } else if (target === 'suspended') {
