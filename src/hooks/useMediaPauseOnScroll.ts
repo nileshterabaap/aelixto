@@ -778,6 +778,8 @@ function updateElementPolicy(
 function unregisterElement(el: HTMLElement) {
   elementStates.delete(el);
   pendingSleep.delete(el);
+  const recheck = wakeRecheck.get(el);
+  if (recheck) { clearTimeout(recheck); wakeRecheck.delete(el); }
   sharedNearObserver?.unobserve(el);
   sharedActiveObserver?.unobserve(el);
   const onReplayIntent = replayListeners.get(el);
