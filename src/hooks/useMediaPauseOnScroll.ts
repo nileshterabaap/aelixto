@@ -536,7 +536,12 @@ function syncAllElementsFromLayout() {
 const WAKE_MIN_VISIBLE_PX = 120;
 const WAKE_MIN_VISIBLE_RATIO = 0.3;
 const WAKE_MIN_ASLEEP_MS = 600;
+// A slept embed must stay genuinely visible this long before it may reload.
+// A just-blanked post flickering behind the top bar never survives a full
+// second of real visibility; a post the user scrolls back to does.
+const WAKE_DWELL_MS = 1000;
 const sleptAt = new WeakMap<HTMLElement, number>();
+const wakeVisibleSince = new WeakMap<HTMLElement, number>();
 const wakeRecheck = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
 
 function isGenuinelyOnScreen(el: HTMLElement): boolean {
