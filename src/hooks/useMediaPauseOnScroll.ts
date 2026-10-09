@@ -536,7 +536,12 @@ function syncAllElementsFromLayout() {
 const WAKE_MIN_VISIBLE_PX = 120;
 const WAKE_MIN_VISIBLE_RATIO = 0.3;
 const WAKE_MIN_ASLEEP_MS = 600;
+// A slept embed must stay genuinely visible this long before it may reload.
+// A just-blanked post flickering behind the top bar never survives a full
+// second of real visibility; a post the user scrolls back to does.
+const WAKE_DWELL_MS = 1000;
 const sleptAt = new WeakMap<HTMLElement, number>();
+const wakeVisibleSince = new WeakMap<HTMLElement, number>();
 const wakeRecheck = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
 
 function isGenuinelyOnScreen(el: HTMLElement): boolean {
@@ -564,12 +569,19 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
   if (target === 'active') {
     const sleeping = el.querySelector(SUSPENDED_IFRAME_SELECTOR) !== null;
     if (sleeping) {
-      const asleepFor = Date.now() - (sleptAt.get(el) ?? 0);
-      if (asleepFor < WAKE_MIN_ASLEEP_MS || !isGenuinelyOnScreen(el)) {
-        // Not really back yet — stay asleep, look again shortly.
-        scheduleWakeRecheck(el, asleepFor < WAKE_MIN_ASLEEP_MS ? WAKE_MIN_ASLEEP_MS - asleepFor + 20 : 200);
+      const nowMs = Date.now();
+      const asleepFor = nowMs - (sleptAt.get(el) ?? 0);
+      const onScreen = isGenuinelyOnScreen(el);
+      if (!onScreen) wakeVisibleSince.delete(el);
+      const since = onScreen ? (wakeVisibleSince.get(el) ?? (wakeVisibleSince.set(el, nowMs), nowMs)) : 0;
+      const dwellLeft = WAKE_DWELL_MS - (nowMs - since);
+      if (asleepFor < WAKE_MIN_ASLEEP_MS || !onScreen || dwellLeft > 0) {
+        // Not really back yet (or not back long enough) — stay asleep, look again shortly.
+        const asleepLeft = WAKE_MIN_ASLEEP_MS - asleepFor;
+        scheduleWakeRecheck(el, Math.max(asleepLeft > 0 ? asleepLeft + 20 : 0, !onScreen ? 200 : 0, dwellLeft > 0 ? dwellLeft + 20 : 0, 60));
         return;
       }
+      wakeVisibleSince.delete(el);
     }
     // Back on screen → cancel pending teardown and reload any sleeping embed
     // on-screen (never in the background). No "Tap to load" step.
@@ -780,6 +792,7 @@ function unregisterElement(el: HTMLElement) {
   pendingSleep.delete(el);
   const recheck = wakeRecheck.get(el);
   if (recheck) { clearTimeout(recheck); wakeRecheck.delete(el); }
+  wakeVisibleSince.delete(el);
   sharedNearObserver?.unobserve(el);
   sharedActiveObserver?.unobserve(el);
   const onReplayIntent = replayListeners.get(el);
