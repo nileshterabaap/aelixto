@@ -493,6 +493,7 @@ function flushPendingSleep() {
  */
 function putToSleep(el: HTMLElement, reg: RegisteredElement) {
   hardSuspendIframes(el);
+  sleptAt.set(el, Date.now());
   reg.state = 'suspended';
   reg.awaitingReentry = false;
   reg.cycleUsed = true;
@@ -521,11 +522,55 @@ function syncAllElementsFromLayout() {
   elementStates.forEach((reg, el) => syncElementFromLayout(el, reg));
 }
 
+/**
+ * Wake hysteresis. Records (Oct 9, X + Threads, #1→#9 then #9→#1): scrolling
+ * DOWN, the post that just slid up behind the header was blanked and then
+ * reloaded ~10ms later while still off-screen (its blanked frame changed
+ * layout above the viewport, scroll anchoring nudged it back across the edge).
+ * That background player boot landed 0.5–1.8s before every tap on the next
+ * post, and every one of those taps froze/buffered. Scrolling UP never
+ * triggered the flip (layout below the viewport doesn't move anything) and
+ * every tap worked. So a sleeping embed only reloads when it is genuinely back
+ * on screen: a real visible overlap, and not within moments of being slept.
+ */
+const WAKE_MIN_VISIBLE_PX = 120;
+const WAKE_MIN_VISIBLE_RATIO = 0.3;
+const WAKE_MIN_ASLEEP_MS = 600;
+const sleptAt = new WeakMap<HTMLElement, number>();
+const wakeRecheck = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
+
+function isGenuinelyOnScreen(el: HTMLElement): boolean {
+  const rect = el.getBoundingClientRect();
+  const viewport = getUsableViewportBounds();
+  const overlap = Math.min(rect.bottom, viewport.bottom) - Math.max(rect.top, viewport.top);
+  const needed = Math.min(WAKE_MIN_VISIBLE_PX, rect.height * WAKE_MIN_VISIBLE_RATIO);
+  return overlap >= Math.max(1, needed);
+}
+
+function scheduleWakeRecheck(el: HTMLElement, delay: number) {
+  if (wakeRecheck.has(el)) return;
+  wakeRecheck.set(el, setTimeout(() => {
+    wakeRecheck.delete(el);
+    const reg = elementStates.get(el);
+    if (!reg || !el.isConnected) return;
+    syncElementFromLayout(el, reg);
+  }, delay));
+}
+
 function transitionElement(el: HTMLElement, reg: RegisteredElement, target: LifecycleState) {
   const current = reg.state;
   if (current === target) return;
 
   if (target === 'active') {
+    const sleeping = el.querySelector(SUSPENDED_IFRAME_SELECTOR) !== null;
+    if (sleeping) {
+      const asleepFor = Date.now() - (sleptAt.get(el) ?? 0);
+      if (asleepFor < WAKE_MIN_ASLEEP_MS || !isGenuinelyOnScreen(el)) {
+        // Not really back yet — stay asleep, look again shortly.
+        scheduleWakeRecheck(el, asleepFor < WAKE_MIN_ASLEEP_MS ? WAKE_MIN_ASLEEP_MS - asleepFor + 20 : 200);
+        return;
+      }
+    }
     // Back on screen → cancel pending teardown and reload any sleeping embed
     // on-screen (never in the background). No "Tap to load" step.
     pendingSleep.delete(el);
