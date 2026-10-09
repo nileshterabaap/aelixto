@@ -792,6 +792,7 @@ function unregisterElement(el: HTMLElement) {
   pendingSleep.delete(el);
   const recheck = wakeRecheck.get(el);
   if (recheck) { clearTimeout(recheck); wakeRecheck.delete(el); }
+  wakeVisibleSince.delete(el);
   sharedNearObserver?.unobserve(el);
   sharedActiveObserver?.unobserve(el);
   const onReplayIntent = replayListeners.get(el);
