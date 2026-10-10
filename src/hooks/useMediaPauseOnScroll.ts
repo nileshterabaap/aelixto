@@ -317,6 +317,7 @@ function hardSuspendIframes(root: HTMLElement) {
     iframe.dataset[SUSPENDED_SRC] = src;
     iframe.dataset[SUSPENDED_FLAG] = '1';
     delete iframe.dataset[WARMING_FLAG];
+    staleEmbeds.delete(iframe);
     iframe.setAttribute('src', 'about:blank');
     iframe.style.visibility = 'hidden';
     clearWarmOverlay(iframe);
@@ -329,6 +330,9 @@ function restoreIframe(iframe: HTMLIFrameElement) {
   delete iframe.dataset[SUSPENDED_FLAG];
   delete iframe.dataset[SUSPENDED_SRC];
   removeSleepOverlay(iframe);
+  // A fresh load; it becomes stale again (via the load listener) only if a
+  // video is playing when it finishes loading.
+  staleEmbeds.delete(iframe);
 
   if (!storedSrc) {
     iframe.style.visibility = '';
@@ -404,12 +408,83 @@ let lastFocusedIframe: HTMLIFrameElement | null = null;
 let observerRefCount = 0;
 let activePlaybackPostId = '';
 
+// ── Stale-embed refresh ───────────────────────────────────────────────
+// Records (Oct 10, X + Threads, #1→#9 then #9→#1, 34 labelled taps): an X or
+// Threads embed that was loaded while ANOTHER video was playing froze/buffered
+// on tap every time; an embed loaded while nothing was playing started cleanly
+// every time (the grid-opened post, fresh loads after the previous video was
+// stopped, wakes that landed after the previous one was blanked). So such an
+// embed is marked stale and reloaded on-screen once nothing is playing.
+const STALE_REFRESH_HOSTS = ['platform.twitter.com', 'threads.net', 'threads.com'];
+const staleEmbeds = new Set<HTMLIFrameElement>();
+let playingEl: HTMLElement | null = null;
+
+function isRefreshableEmbed(iframe: HTMLIFrameElement): boolean {
+  if (iframe.dataset[SUSPENDED_FLAG] === '1') return false;
+  const src = (iframe.getAttribute('src') || '').toLowerCase();
+  if (!src || src === 'about:blank') return false;
+  return STALE_REFRESH_HOSTS.some((h) => src.includes(h));
+}
+
+function somethingPlaying(): boolean {
+  if (playingEl && (!playingEl.isConnected || !elementStates.has(playingEl))) playingEl = null;
+  return playingEl !== null;
+}
+
+function markStale(el: HTMLElement) {
+  el.querySelectorAll<HTMLIFrameElement>('iframe').forEach((f) => {
+    if (isRefreshableEmbed(f)) staleEmbeds.add(f);
+  });
+}
+
+function clearStale(el: HTMLElement) {
+  el.querySelectorAll<HTMLIFrameElement>('iframe').forEach((f) => staleEmbeds.delete(f));
+}
+
+function refreshIframe(iframe: HTMLIFrameElement) {
+  staleEmbeds.delete(iframe);
+  const src = iframe.getAttribute('src');
+  if (!src || src === 'about:blank') return;
+  iframe.dataset[WARMING_FLAG] = '1';
+  iframe.style.visibility = 'hidden';
+  ensureWarmOverlay(iframe);
+  const onLoad = () => {
+    iframe.removeEventListener('load', onLoad);
+    requestAnimationFrame(() => revealWarmedIframe(iframe));
+  };
+  iframe.addEventListener('load', onLoad);
+  setTimeout(() => revealWarmedIframe(iframe), WARM_REVEAL_TIMEOUT_MS);
+  iframe.setAttribute('src', src);
+}
+
+/** Reload stale X/Threads embeds that are genuinely on screen, only while nothing plays. */
+function refreshStaleOnScreen() {
+  if (staleEmbeds.size === 0 || !flagOn('hardSuspend') || somethingPlaying()) return;
+  staleEmbeds.forEach((f) => { if (!f.isConnected || !isRefreshableEmbed(f)) staleEmbeds.delete(f); });
+  if (staleEmbeds.size === 0) return;
+  elementStates.forEach((reg, el) => {
+    if (!el.isConnected || reg.disableHardSuspend || !reg.visible) return;
+    if (!isGenuinelyOnScreen(el)) return;
+    el.querySelectorAll<HTMLIFrameElement>('iframe').forEach((f) => {
+      if (staleEmbeds.has(f)) refreshIframe(f);
+    });
+  });
+}
+
+function releasePlaying(el: HTMLElement) {
+  if (playingEl !== el) return;
+  playingEl = null;
+  setTimeout(refreshStaleOnScreen, 0);
+}
+
 function onConfirmedPlay(postId: string, playbackGeneration: number) {
   activePlaybackPostId = postId;
   elementStates.forEach((reg, el) => {
     if (!el.isConnected) return;
 
     if (reg.postId === postId) {
+      playingEl = el;
+      clearStale(el);
       // Arm the post synchronously. Waiting for its React subscription allowed
       // a quick B → C scroll to happen before B became suspendable.
       if (playbackGeneration > reg.playbackGeneration) {
@@ -422,6 +497,9 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
       syncElementFromLayout(el, reg);
       return;
     }
+
+    // Every other loaded X/Threads embed now exists while a video plays → stale.
+    markStale(el);
 
     // Playback is exclusive: as soon as B is genuinely played, stop A even if
     // an embed's oversized frame still intersects the viewer.
@@ -498,6 +576,7 @@ function putToSleep(el: HTMLElement, reg: RegisteredElement) {
   reg.awaitingReentry = false;
   reg.cycleUsed = true;
   completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
+  releasePlaying(el);
 }
 
 function isInsideUsableViewport(rect: DOMRect): boolean {
@@ -598,6 +677,8 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
       // screen — a teardown right before/after the next play tap is what
       // froze/buffered X and Threads in the records.
       scheduleSleep(el, reg);
+    } else {
+      releasePlaying(el);
     }
     return;
   }
@@ -700,6 +781,8 @@ function onAnyScroll() {
       // scroller (IntersectionObserver can miss these), both directions.
       if ((reg.state === 'active') !== inside) syncElementFromLayout(el, reg);
     });
+    // A stale embed scrolled onto the screen while nothing plays → refresh it.
+    refreshStaleOnScreen();
   });
 }
 
@@ -765,6 +848,16 @@ function registerElement(
   // The former one-time off-screen "settle reload" was removed: no embed is
   // ever restarted in the background (sleep-and-stay-asleep model).
 
+  // An X/Threads embed that finishes loading while another post's video is
+  // playing is stale (it will freeze/buffer on tap) → refreshed on-screen later.
+  const onEmbedLoad = (event: Event) => {
+    const t = event.target;
+    if (!(t instanceof HTMLIFrameElement) || !isRefreshableEmbed(t)) return;
+    if (somethingPlaying() && playingEl !== el) staleEmbeds.add(t);
+  };
+  settleListeners.set(el, onEmbedLoad);
+  el.addEventListener('load', onEmbedLoad, true);
+
   // Sync initial state from layout.
   syncElementFromLayout(el, reg);
 
@@ -788,6 +881,8 @@ function updateElementPolicy(
 }
 
 function unregisterElement(el: HTMLElement) {
+  if (playingEl === el) playingEl = null;
+  clearStale(el);
   elementStates.delete(el);
   pendingSleep.delete(el);
   const recheck = wakeRecheck.get(el);
