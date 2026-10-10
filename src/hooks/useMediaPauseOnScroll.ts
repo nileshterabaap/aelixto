@@ -781,6 +781,8 @@ function onAnyScroll() {
       // scroller (IntersectionObserver can miss these), both directions.
       if ((reg.state === 'active') !== inside) syncElementFromLayout(el, reg);
     });
+    // A stale embed scrolled onto the screen while nothing plays → refresh it.
+    refreshStaleOnScreen();
   });
 }
 
@@ -846,6 +848,16 @@ function registerElement(
   // The former one-time off-screen "settle reload" was removed: no embed is
   // ever restarted in the background (sleep-and-stay-asleep model).
 
+  // An X/Threads embed that finishes loading while another post's video is
+  // playing is stale (it will freeze/buffer on tap) → refreshed on-screen later.
+  const onEmbedLoad = (event: Event) => {
+    const t = event.target;
+    if (!(t instanceof HTMLIFrameElement) || !isRefreshableEmbed(t)) return;
+    if (somethingPlaying() && playingEl !== el) staleEmbeds.add(t);
+  };
+  settleListeners.set(el, onEmbedLoad);
+  el.addEventListener('load', onEmbedLoad, true);
+
   // Sync initial state from layout.
   syncElementFromLayout(el, reg);
 
@@ -869,6 +881,8 @@ function updateElementPolicy(
 }
 
 function unregisterElement(el: HTMLElement) {
+  if (playingEl === el) playingEl = null;
+  clearStale(el);
   elementStates.delete(el);
   pendingSleep.delete(el);
   const recheck = wakeRecheck.get(el);
