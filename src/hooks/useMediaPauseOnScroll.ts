@@ -576,6 +576,7 @@ function putToSleep(el: HTMLElement, reg: RegisteredElement) {
   reg.awaitingReentry = false;
   reg.cycleUsed = true;
   completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
+  releasePlaying(el);
 }
 
 function isInsideUsableViewport(rect: DOMRect): boolean {
@@ -676,6 +677,8 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
       // screen — a teardown right before/after the next play tap is what
       // froze/buffered X and Threads in the records.
       scheduleSleep(el, reg);
+    } else {
+      releasePlaying(el);
     }
     return;
   }
