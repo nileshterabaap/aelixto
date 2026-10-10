@@ -491,6 +491,27 @@ export const PlatformPostViewer = ({
             <div className="text-center py-8">
               <p className="text-muted-foreground">No posts in this section</p>
             </div>
+          ) : isBlockMode && blockPost ? (
+            <div
+              key={blockPost.id}
+              data-debug-rank={Math.min(blockIdx, posts.length - 1) + 1}
+              data-debug-post-id={blockPost.id}
+              className="min-h-[calc(100dvh-56px-var(--safe-top)-4rem)]"
+            >
+              <HydratedFeedPost
+                post={transformPost(blockPost, profileData)}
+                onDeleted={() => {
+                  if (posts.length <= 1) onClose();
+                  else setBlockIdx((i) => Math.max(0, Math.min(i, posts.length - 2)));
+                }}
+                userId={user?.id}
+                startHydrated
+                fastReveal
+              />
+              <p className="text-center text-xs text-muted-foreground pt-4">
+                {Math.min(blockIdx, posts.length - 1) + 1} / {posts.length}
+              </p>
+            </div>
           ) : (
             posts.map((post, idx) => {
               const absoluteIdx = idx;
