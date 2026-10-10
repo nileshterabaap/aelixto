@@ -164,10 +164,6 @@ export const PlatformPostViewer = ({
     postRefs.current.clear();
   }, [initialPostId, activeTab]);
 
-  
-  // Touch handling for swipe
-  const touchStartX = useRef<number>(0);
-  const touchEndX = useRef<number>(0);
 
   useEffect(() => {
     setPortalReady(true);
@@ -350,27 +346,6 @@ export const PlatformPostViewer = ({
   const currentTabIndex = tabs.findIndex(t => t.key === activeTab);
   const prevTab = currentTabIndex > 0 ? tabs[currentTabIndex - 1] : null;
   const nextTab = currentTabIndex < tabs.length - 1 ? tabs[currentTabIndex + 1] : null;
-
-  // Touch handlers for swipe
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    touchEndX.current = e.changedTouches[0].clientX;
-    const diff = touchStartX.current - touchEndX.current;
-    const threshold = 80;
-
-    if (Math.abs(diff) > threshold) {
-      if (diff > 0 && nextTab) {
-        // Swiped left - go to next platform
-        onTabChange(nextTab.key);
-      } else if (diff < 0 && prevTab) {
-        // Swiped right - go to previous platform
-        onTabChange(prevTab.key);
-      }
-    }
-  }, [nextTab, prevTab, onTabChange]);
 
   const currentTab = tabs.find(t => t.key === activeTab);
 
