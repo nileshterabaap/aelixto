@@ -317,6 +317,7 @@ function hardSuspendIframes(root: HTMLElement) {
     iframe.dataset[SUSPENDED_SRC] = src;
     iframe.dataset[SUSPENDED_FLAG] = '1';
     delete iframe.dataset[WARMING_FLAG];
+    staleEmbeds.delete(iframe);
     iframe.setAttribute('src', 'about:blank');
     iframe.style.visibility = 'hidden';
     clearWarmOverlay(iframe);
@@ -329,6 +330,9 @@ function restoreIframe(iframe: HTMLIFrameElement) {
   delete iframe.dataset[SUSPENDED_FLAG];
   delete iframe.dataset[SUSPENDED_SRC];
   removeSleepOverlay(iframe);
+  // A fresh load; it becomes stale again (via the load listener) only if a
+  // video is playing when it finishes loading.
+  staleEmbeds.delete(iframe);
 
   if (!storedSrc) {
     iframe.style.visibility = '';
