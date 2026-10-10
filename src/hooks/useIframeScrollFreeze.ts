@@ -15,6 +15,7 @@
  */
 
 import { useEffect } from 'react';
+import { flagOn } from '@/lib/lifecycleFlags';
 
 const SETTLE_MS = 200;
 
@@ -22,7 +23,7 @@ let frozen = false;
 let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
 function freezeAll() {
-  if (frozen) return;
+  if (frozen || !flagOn('scrollFreeze')) return;
   frozen = true;
   document.documentElement.classList.add('scroll-freezing-iframes');
 }

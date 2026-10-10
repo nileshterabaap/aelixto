@@ -1,5 +1,6 @@
 import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
+import { flagOn } from '@/lib/lifecycleFlags';
 
 /**
  * Two-stage media lifecycle for playable media only.
@@ -189,14 +190,13 @@ function stageAPause(root: HTMLElement) {
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
   pauseVimeoIframes(root);
-  if (root.dataset.aelixHasBeenActive) {
+  if (root.dataset.aelixHasBeenActive && flagOn('mute')) {
     muteNonApiIframes(root);
   }
-  freezeIframes(root);
+  if (flagOn('freezePointer')) freezeIframes(root);
 }
 
 function stageAResume(root: HTMLElement) {
-  restoreHardSuspended(root);
   root.dataset.aelixHasBeenActive = 'true';
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (iframe.dataset[MUTE_FLAG] === '1') {
@@ -258,7 +258,57 @@ function revealWarmedIframe(iframe: HTMLIFrameElement) {
   clearWarmOverlay(iframe);
 }
 
+const SLEEP_OVERLAY_CLASS = 'aelix-sleep-overlay';
+
+/**
+ * "Sleep and stay asleep": a played embed that left the screen is unloaded
+ * (audio guaranteed off) and is NEVER reloaded in the background. Records and
+ * the switch test showed background restarts were what left X/Threads players
+ * stuck or buffering on the next tap. Instead the slot shows a tap-to-load
+ * button; tapping it reloads the embed on-screen — the same path as a post
+ * opened directly from the grid, which always plays cleanly.
+ */
+function ensureSleepOverlay(iframe: HTMLIFrameElement) {
+  const parent = iframe.parentElement;
+  if (!parent) return;
+  if (parent.querySelector(`:scope > .${SLEEP_OVERLAY_CLASS}`)) return;
+  if (getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
+  const overlay = document.createElement('button');
+  overlay.type = 'button';
+  overlay.className = SLEEP_OVERLAY_CLASS;
+  overlay.setAttribute('aria-label', 'Tap to load video');
+  overlay.style.cssText =
+    'position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;' +
+    'border:0;padding:0;margin:0;cursor:pointer;background:hsl(var(--muted));color:hsl(var(--muted-foreground));' +
+    'font:500 13px/1.2 inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation;';
+  overlay.innerHTML =
+    '<span style="width:56px;height:56px;border-radius:9999px;display:flex;align-items:center;justify-content:center;' +
+    'background:hsl(var(--background));color:hsl(var(--foreground));box-shadow:0 2px 10px hsl(var(--foreground) / 0.15);">' +
+    '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>' +
+    '</span><span>Tap to load</span>';
+  const stop = (e: Event) => e.stopPropagation();
+  overlay.addEventListener('pointerdown', stop);
+  overlay.addEventListener('touchstart', stop, { passive: true });
+  overlay.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    wakeIframe(iframe, overlay);
+  });
+  parent.appendChild(overlay);
+}
+
+function removeSleepOverlay(iframe: HTMLIFrameElement) {
+  iframe.parentElement?.querySelector(`:scope > .${SLEEP_OVERLAY_CLASS}`)?.remove();
+}
+
+/** Explicit user wake: reload the embed on-screen, behind a brief loading veil. */
+function wakeIframe(iframe: HTMLIFrameElement, overlay: HTMLElement) {
+  overlay.remove();
+  restoreIframe(iframe);
+}
+
 function hardSuspendIframes(root: HTMLElement) {
+  if (!flagOn('hardSuspend')) return;
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (!shouldHardSuspend(iframe)) return;
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
@@ -269,44 +319,45 @@ function hardSuspendIframes(root: HTMLElement) {
     delete iframe.dataset[WARMING_FLAG];
     iframe.setAttribute('src', 'about:blank');
     iframe.style.visibility = 'hidden';
-    // Keep the slot visually filled so the user never sees a blank frame.
-    ensureWarmOverlay(iframe);
+    clearWarmOverlay(iframe);
   });
 }
 
+function restoreIframe(iframe: HTMLIFrameElement) {
+  if (iframe.dataset[SUSPENDED_FLAG] !== '1') return;
+  const storedSrc = iframe.dataset[SUSPENDED_SRC];
+  delete iframe.dataset[SUSPENDED_FLAG];
+  delete iframe.dataset[SUSPENDED_SRC];
+  removeSleepOverlay(iframe);
+
+  if (!storedSrc) {
+    iframe.style.visibility = '';
+    clearWarmOverlay(iframe);
+    return;
+  }
+
+  iframe.dataset[WARMING_FLAG] = '1';
+  iframe.style.visibility = 'hidden';
+  ensureWarmOverlay(iframe);
+
+  const onLoad = () => {
+    iframe.removeEventListener('load', onLoad);
+    // Give the embed SDK a frame to paint before revealing.
+    requestAnimationFrame(() => revealWarmedIframe(iframe));
+  };
+  iframe.addEventListener('load', onLoad);
+  // Cross-origin frames don't always fire load — reveal anyway.
+  setTimeout(() => revealWarmedIframe(iframe), WARM_REVEAL_TIMEOUT_MS);
+
+  iframe.setAttribute('src', storedSrc);
+}
+
 /**
- * Pre-warm: bring the real src back while the post is still off-screen, but
- * keep the frame hidden behind the placeholder overlay until it finishes
- * loading. By the time the post scrolls into view the embed is already live.
+ * Wake every sleeping embed in root. Only used when lifecycle management is
+ * switched off for a post — normal scrolling never wakes a sleeping embed.
  */
 function restoreHardSuspended(root: HTMLElement) {
-  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
-    if (iframe.dataset[SUSPENDED_FLAG] !== '1') return;
-    const storedSrc = iframe.dataset[SUSPENDED_SRC];
-    delete iframe.dataset[SUSPENDED_FLAG];
-    delete iframe.dataset[SUSPENDED_SRC];
-
-    if (!storedSrc) {
-      iframe.style.visibility = '';
-      clearWarmOverlay(iframe);
-      return;
-    }
-
-    iframe.dataset[WARMING_FLAG] = '1';
-    iframe.style.visibility = 'hidden';
-    ensureWarmOverlay(iframe);
-
-    const onLoad = () => {
-      iframe.removeEventListener('load', onLoad);
-      // Give the embed SDK a frame to paint before revealing.
-      requestAnimationFrame(() => revealWarmedIframe(iframe));
-    };
-    iframe.addEventListener('load', onLoad);
-    // Cross-origin frames don't always fire load — reveal anyway.
-    setTimeout(() => revealWarmedIframe(iframe), WARM_REVEAL_TIMEOUT_MS);
-
-    iframe.setAttribute('src', storedSrc);
-  });
+  root.querySelectorAll<HTMLIFrameElement>(SUSPENDED_IFRAME_SELECTOR).forEach(restoreIframe);
 }
 
 
@@ -337,6 +388,8 @@ interface RegisteredElement {
    * loaded and is never reloaded on subsequent scroll passes.
    */
   cycleUsed: boolean;
+  /** Last measured distance (px) between the post and the usable viewport. */
+  lastGap?: number;
 }
 
 
@@ -365,22 +418,86 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
         reg.awaitingReentry = false;
       }
       reg.disableHardSuspend = false;
+      pendingSleep.delete(el);
       syncElementFromLayout(el, reg);
       return;
     }
 
     // Playback is exclusive: as soon as B is genuinely played, stop A even if
     // an embed's oversized frame still intersects the viewer.
+    // Records showed Threads/X players freezing ("stuck, icon only") when a
+    // sibling iframe was blanked within ~100ms of the play tap. Pause at once,
+    // but defer the src→about:blank swap until the new player has started.
+    if (!flagOn('exclusivePause')) return;
+    stageAPause(el);
+    if (reg.state === 'active') reg.state = 'paused';
     if (!reg.disableHardSuspend && !reg.cycleUsed) {
-      stageAPause(el);
-      hardSuspendIframes(el);
-      reg.state = 'suspended';
-      reg.awaitingReentry = true;
-    } else {
-      stageAPause(el);
-      if (reg.state === 'active') reg.state = 'paused';
+      scheduleSleep(el, reg, true);
     }
   });
+  // Every genuine play pushes ALL pending teardowns to ≥4s after this tap,
+  // so the new player gets a quiet window to start.
+  extendSleepDeadline();
+}
+
+/**
+ * Delayed teardown. Records: every X/Threads freeze/buffer tap came ~0.5–1.6s
+ * after the previous played video was blanked; taps ≥4s after a teardown
+ * worked. So the old video is only muted/frozen at first and blanked once
+ * ≥4s have passed since BOTH it left/was replaced AND the latest play tap.
+ */
+const TEARDOWN_DELAY_MS = 0; // user request: stop the previous video immediately on the next play
+const pendingSleep = new Map<HTMLElement, RegisteredElement>();
+let sleepDeadline = 0;
+let sleepTimer: ReturnType<typeof setTimeout> | null = null;
+
+function armSleepTimer() {
+  if (sleepTimer !== null) clearTimeout(sleepTimer);
+  sleepTimer = setTimeout(flushPendingSleep, Math.max(0, sleepDeadline - Date.now()));
+}
+
+function extendSleepDeadline() {
+  if (pendingSleep.size === 0) return;
+  sleepDeadline = Math.max(sleepDeadline, Date.now() + TEARDOWN_DELAY_MS);
+  armSleepTimer();
+}
+
+function scheduleSleep(el: HTMLElement, reg: RegisteredElement, deferArm = false) {
+  if (pendingSleep.has(el)) return;
+  pendingSleep.set(el, reg);
+  if (!deferArm) extendSleepDeadline();
+}
+
+function flushPendingSleep() {
+  sleepTimer = null;
+  if (Date.now() < sleepDeadline - 20) { armSleepTimer(); return; }
+  const batch = Array.from(pendingSleep.entries());
+  pendingSleep.clear();
+  batch.forEach(([el, reg]) => {
+    if (!el.isConnected || elementStates.get(el) !== reg) return;
+    if (reg.state === 'active' || reg.state === 'suspended') return;
+    if (reg.disableHardSuspend || reg.cycleUsed) return;
+    putToSleep(el, reg);
+  });
+}
+
+/**
+ * Records: the reload is the only thing that silences X/Threads, but a player
+ * reloaded at the moment the user scrolls back freezes/buffers on tap — and a
+ * reload firing while the NEWLY tapped video is starting (Threads scroll-down
+ * pattern) freezes that new player too. So blank the old one instantly (audio
+ * dies), but wait ~5s before reloading it: the newly played video gets a quiet
+ * window to start, and the old one is reloaded while still off-screen. If the
+ * user scrolls back within the window, reconcileElement's visible path restores
+ * it directly, so the delayed reload is skipped. One cycle per play.
+ */
+function putToSleep(el: HTMLElement, reg: RegisteredElement) {
+  hardSuspendIframes(el);
+  sleptAt.set(el, Date.now());
+  reg.state = 'suspended';
+  reg.awaitingReentry = false;
+  reg.cycleUsed = true;
+  completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
 }
 
 function isInsideUsableViewport(rect: DOMRect): boolean {
@@ -405,62 +522,102 @@ function syncAllElementsFromLayout() {
   elementStates.forEach((reg, el) => syncElementFromLayout(el, reg));
 }
 
+/**
+ * Wake hysteresis. Records (Oct 9, X + Threads, #1→#9 then #9→#1): scrolling
+ * DOWN, the post that just slid up behind the header was blanked and then
+ * reloaded ~10ms later while still off-screen (its blanked frame changed
+ * layout above the viewport, scroll anchoring nudged it back across the edge).
+ * That background player boot landed 0.5–1.8s before every tap on the next
+ * post, and every one of those taps froze/buffered. Scrolling UP never
+ * triggered the flip (layout below the viewport doesn't move anything) and
+ * every tap worked. So a sleeping embed only reloads when it is genuinely back
+ * on screen: a real visible overlap, and not within moments of being slept.
+ */
+const WAKE_MIN_VISIBLE_PX = 120;
+const WAKE_MIN_VISIBLE_RATIO = 0.3;
+const WAKE_MIN_ASLEEP_MS = 600;
+// A slept embed must stay genuinely visible this long before it may reload.
+// A just-blanked post flickering behind the top bar never survives a full
+// second of real visibility; a post the user scrolls back to does.
+const WAKE_DWELL_MS = 1000;
+const sleptAt = new WeakMap<HTMLElement, number>();
+const wakeVisibleSince = new WeakMap<HTMLElement, number>();
+const wakeRecheck = new Map<HTMLElement, ReturnType<typeof setTimeout>>();
+
+function isGenuinelyOnScreen(el: HTMLElement): boolean {
+  const rect = el.getBoundingClientRect();
+  const viewport = getUsableViewportBounds();
+  const overlap = Math.min(rect.bottom, viewport.bottom) - Math.max(rect.top, viewport.top);
+  const needed = Math.min(WAKE_MIN_VISIBLE_PX, rect.height * WAKE_MIN_VISIBLE_RATIO);
+  return overlap >= Math.max(1, needed);
+}
+
+function scheduleWakeRecheck(el: HTMLElement, delay: number) {
+  if (wakeRecheck.has(el)) return;
+  wakeRecheck.set(el, setTimeout(() => {
+    wakeRecheck.delete(el);
+    const reg = elementStates.get(el);
+    if (!reg || !el.isConnected) return;
+    syncElementFromLayout(el, reg);
+  }, delay));
+}
+
 function transitionElement(el: HTMLElement, reg: RegisteredElement, target: LifecycleState) {
   const current = reg.state;
   if (current === target) return;
 
   if (target === 'active') {
-    stageAResume(el);
-  } else if (target === 'paused') {
-    if (current === 'suspended') {
-      restoreHardSuspended(el);
-      // The single allowed refresh has now been spent.
-      reg.cycleUsed = true;
-      completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
+    const sleeping = el.querySelector(SUSPENDED_IFRAME_SELECTOR) !== null;
+    if (sleeping) {
+      const nowMs = Date.now();
+      const asleepFor = nowMs - (sleptAt.get(el) ?? 0);
+      const onScreen = isGenuinelyOnScreen(el);
+      if (!onScreen) wakeVisibleSince.delete(el);
+      const since = onScreen ? (wakeVisibleSince.get(el) ?? (wakeVisibleSince.set(el, nowMs), nowMs)) : 0;
+      const dwellLeft = WAKE_DWELL_MS - (nowMs - since);
+      if (asleepFor < WAKE_MIN_ASLEEP_MS || !onScreen || dwellLeft > 0) {
+        // Not really back yet (or not back long enough) — stay asleep, look again shortly.
+        const asleepLeft = WAKE_MIN_ASLEEP_MS - asleepFor;
+        scheduleWakeRecheck(el, Math.max(asleepLeft > 0 ? asleepLeft + 20 : 0, !onScreen ? 200 : 0, dwellLeft > 0 ? dwellLeft + 20 : 0, 60));
+        return;
+      }
+      wakeVisibleSince.delete(el);
     }
+    // Back on screen → cancel pending teardown and reload any sleeping embed
+    // on-screen (never in the background). No "Tap to load" step.
+    pendingSleep.delete(el);
+    stageAResume(el);
+    restoreHardSuspended(el);
+  } else if (target === 'paused') {
     stageAPause(el);
   } else if (target === 'suspended') {
-    if (reg.disableHardSuspend || reg.cycleUsed) {
-      stageAPause(el);
-      reg.state = 'paused';
-      return;
-    }
     if (current === 'active') stageAPause(el);
-    hardSuspendIframes(el);
-    reg.awaitingReentry = true;
+    reg.state = 'paused';
+    if (!reg.disableHardSuspend && !reg.cycleUsed) {
+      // Delayed teardown: never blank the frame at the moment it leaves the
+      // screen — a teardown right before/after the next play tap is what
+      // froze/buffered X and Threads in the records.
+      scheduleSleep(el, reg);
+    }
+    return;
   }
 
   reg.state = target;
 }
 
 function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
-  // A visible post must always be tappable and loaded. Making it 'active'
-  // only unfreezes/restores the frame — it never starts playback — so
-  // exclusivity is still enforced by onConfirmedPlay pausing the others.
-  // (Records showed older posts staying pointer-events:none / about:blank
-  // forever: "play doesn't work" and "didn't load".)
+  // A visible post must always be tappable. Making it 'active' only
+  // unfreezes the frame — it never starts playback or reloads a sleeping
+  // embed — so exclusivity is still enforced by onConfirmedPlay.
   if (reg.visible) {
     transitionElement(el, reg, 'active');
     return;
   }
 
-
-  // Never-played posts (and played posts that already spent their one refresh)
-  // still receive cheap API/native pause commands, but their iframe is not
-  // destroyed or reloaded again.
-  if (reg.disableHardSuspend || reg.cycleUsed) {
-    transitionElement(el, reg, 'suspended');
-    return;
-  }
-
-  // A played iframe is killed immediately after leaving the visible feed.
-  // Once it has travelled outside the prewarm envelope, the observer restores
-  // it on re-entry while it is still well off-screen.
-  if (reg.state !== 'suspended') {
-    transitionElement(el, reg, 'suspended');
-  } else if (reg.prewarm && !reg.awaitingReentry) {
-    transitionElement(el, reg, 'paused');
-  }
+  // Off-screen: never-played posts (and already-slept ones) only get cheap
+  // pause commands; a freshly played post is put to sleep once. A sleeping
+  // post is never restored in the background.
+  if (reg.state !== 'suspended') transitionElement(el, reg, 'suspended');
 }
 
 
@@ -537,7 +694,8 @@ function onAnyScroll() {
     scrollRaf = 0;
     elementStates.forEach((reg, el) => {
       if (!el.isConnected) return;
-      const inside = isInsideUsableViewport(el.getBoundingClientRect());
+      const rect = el.getBoundingClientRect();
+      const inside = isInsideUsableViewport(rect);
       // Re-sync posts whose visibility changed inside the grid viewer's own
       // scroller (IntersectionObserver can miss these), both directions.
       if ((reg.state === 'active') !== inside) syncElementFromLayout(el, reg);
@@ -563,6 +721,7 @@ function destroySharedObservers() {
 
 const replayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
 const nativePlayListeners = new WeakMap<HTMLElement, (event: Event) => void>();
+const settleListeners = new WeakMap<HTMLElement, (event: Event) => void>();
 
 function registerElement(
   el: HTMLElement,
@@ -603,6 +762,9 @@ function registerElement(
   // cycle per post per session is enough to guarantee audio stops.
 
 
+  // The former one-time off-screen "settle reload" was removed: no embed is
+  // ever restarted in the background (sleep-and-stay-asleep model).
+
   // Sync initial state from layout.
   syncElementFromLayout(el, reg);
 
@@ -627,6 +789,10 @@ function updateElementPolicy(
 
 function unregisterElement(el: HTMLElement) {
   elementStates.delete(el);
+  pendingSleep.delete(el);
+  const recheck = wakeRecheck.get(el);
+  if (recheck) { clearTimeout(recheck); wakeRecheck.delete(el); }
+  wakeVisibleSince.delete(el);
   sharedNearObserver?.unobserve(el);
   sharedActiveObserver?.unobserve(el);
   const onReplayIntent = replayListeners.get(el);
@@ -639,6 +805,11 @@ function unregisterElement(el: HTMLElement) {
   if (onNativePlay) {
     el.removeEventListener('play', onNativePlay, true);
     nativePlayListeners.delete(el);
+  }
+  const onSettle = settleListeners.get(el);
+  if (onSettle) {
+    el.removeEventListener('load', onSettle, true);
+    settleListeners.delete(el);
   }
   observerRefCount--;
 
