@@ -19,7 +19,7 @@ export function PlatformBlockPosts({ postIds, initialIndex, scrollRef, renderPos
   const busyUntil = useRef(0);
   const programmaticTarget = useRef<number | null>(null);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
     const measure = () => setViewportHeight(container.clientHeight);
