@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -156,65 +156,6 @@ export const PlatformPostViewer = ({
     [posts, initialPostId, initialPostIndex]
   );
   const targetPostId = initialIdx >= 0 ? posts[initialIdx]?.id : undefined;
-
-  // BLOCK MODE (X + Threads only): show one post at a time. Each swipe
-  // unmounts the current post and mounts the next one from scratch — the
-  // exact same conditions as opening that post from the grid (fresh viewer,
-  // nothing else playing or loading), which is the only path that has
-  // always started X/Threads videos cleanly.
-  const isBlockMode = ["x", "twitter", "threads"].includes((activeTab || "").toLowerCase());
-  const [blockIdx, setBlockIdx] = useState(Math.max(0, initialIdx));
-  useEffect(() => {
-    setBlockIdx(Math.max(0, initialIdx));
-  }, [initialPostId, activeTab, initialIdx]);
-  useEffect(() => {
-    if (!isBlockMode || !portalReady) return;
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    let startY = 0;
-    let atTop = false;
-    let atBottom = false;
-    let lastSwitch = 0;
-    const SWIPE_PX = 70;
-    const go = (dir: 1 | -1) => {
-      const now = Date.now();
-      if (now - lastSwitch < 450) return;
-      lastSwitch = now;
-      setBlockIdx((i) => {
-        const next = Math.min(posts.length - 1, Math.max(0, i + dir));
-        if (next !== i) container.scrollTop = 0;
-        return next;
-      });
-    };
-    const edges = () => {
-      atTop = container.scrollTop <= 4;
-      atBottom = container.scrollTop + container.clientHeight >= container.scrollHeight - 4;
-    };
-    const onStart = (e: TouchEvent) => {
-      startY = e.touches[0]?.clientY ?? 0;
-      edges();
-    };
-    const onEnd = (e: TouchEvent) => {
-      const endY = e.changedTouches[0]?.clientY ?? startY;
-      const dy = startY - endY;
-      if (dy > SWIPE_PX && atBottom) go(1);
-      else if (dy < -SWIPE_PX && atTop) go(-1);
-    };
-    const onWheel = (e: WheelEvent) => {
-      edges();
-      if (e.deltaY > 30 && atBottom) go(1);
-      else if (e.deltaY < -30 && atTop) go(-1);
-    };
-    container.addEventListener("touchstart", onStart, { passive: true });
-    container.addEventListener("touchend", onEnd, { passive: true });
-    container.addEventListener("wheel", onWheel, { passive: true });
-    return () => {
-      container.removeEventListener("touchstart", onStart);
-      container.removeEventListener("touchend", onEnd);
-      container.removeEventListener("wheel", onWheel);
-    };
-  }, [isBlockMode, portalReady, posts.length]);
-  const blockPost = isBlockMode ? posts[Math.min(blockIdx, posts.length - 1)] : undefined;
   // Render the full list (June-10 architecture). Windowed rendering around
   // the tapped post kept mounting/unmounting neighbours while scrolling,
   // which produced the "treadmill" feel and reloaded images/embeds that
@@ -223,6 +164,10 @@ export const PlatformPostViewer = ({
     postRefs.current.clear();
   }, [initialPostId, activeTab]);
 
+  
+  // Touch handling for swipe
+  const touchStartX = useRef<number>(0);
+  const touchEndX = useRef<number>(0);
 
   useEffect(() => {
     setPortalReady(true);
@@ -406,6 +351,27 @@ export const PlatformPostViewer = ({
   const prevTab = currentTabIndex > 0 ? tabs[currentTabIndex - 1] : null;
   const nextTab = currentTabIndex < tabs.length - 1 ? tabs[currentTabIndex + 1] : null;
 
+  // Touch handlers for swipe
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    touchEndX.current = e.changedTouches[0].clientX;
+    const diff = touchStartX.current - touchEndX.current;
+    const threshold = 80;
+
+    if (Math.abs(diff) > threshold) {
+      if (diff > 0 && nextTab) {
+        // Swiped left - go to next platform
+        onTabChange(nextTab.key);
+      } else if (diff < 0 && prevTab) {
+        // Swiped right - go to previous platform
+        onTabChange(prevTab.key);
+      }
+    }
+  }, [nextTab, prevTab, onTabChange]);
+
   const currentTab = tabs.find(t => t.key === activeTab);
 
   // Render immediately — the profile header hydrates async without gating
@@ -420,6 +386,8 @@ export const PlatformPostViewer = ({
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       className="fixed inset-0 z-[70] bg-background"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pt-safe">
@@ -490,27 +458,6 @@ export const PlatformPostViewer = ({
           ) : posts.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground">No posts in this section</p>
-            </div>
-          ) : isBlockMode && blockPost ? (
-            <div
-              key={blockPost.id}
-              data-debug-rank={Math.min(blockIdx, posts.length - 1) + 1}
-              data-debug-post-id={blockPost.id}
-              className="min-h-[calc(100dvh-56px-var(--safe-top)-4rem)]"
-            >
-              <HydratedFeedPost
-                post={transformPost(blockPost, profileData)}
-                onDeleted={() => {
-                  if (posts.length <= 1) onClose();
-                  else setBlockIdx((i) => Math.max(0, Math.min(i, posts.length - 2)));
-                }}
-                userId={user?.id}
-                startHydrated
-                fastReveal
-              />
-              <p className="text-center text-xs text-muted-foreground pt-4">
-                {Math.min(blockIdx, posts.length - 1) + 1} / {posts.length}
-              </p>
             </div>
           ) : (
             posts.map((post, idx) => {
