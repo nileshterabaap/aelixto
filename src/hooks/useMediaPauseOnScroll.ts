@@ -394,14 +394,15 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
 }
 
 const DEFERRED_SUSPEND_MS = 1500;
-const REWARM_DELAY_MS = 400;
-
 /**
- * Records: the reload is the only thing that silences X/Threads, but a player
- * reloaded at the moment the user scrolls back freezes/buffers on tap. So blank
- * it (audio dies) and immediately reload it while still off-screen — by the
- * time the user returns, the player is fully idle and ready. One cycle per play.
+ * Records: scrolling DOWN through Threads, every stuck video had a sibling
+ * iframe reloading at the same moment the new player tried to start; scrolling
+ * UP (no reload in flight) everything played. So after blanking the old player
+ * (audio dies instantly), wait ~5s before reloading it — the newly tapped
+ * player gets a quiet window to start first. Skipped if the post is visible.
  */
+const REWARM_DELAY_MS = 5000;
+
 function stopAndRewarm(el: HTMLElement, reg: RegisteredElement) {
   hardSuspendIframes(el);
   reg.state = 'paused';
@@ -410,6 +411,9 @@ function stopAndRewarm(el: HTMLElement, reg: RegisteredElement) {
   completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
   setTimeout(() => {
     if (!el.isConnected) return;
+    // User scrolled back before the delay elapsed — the visible-post path
+    // already restored the frame; don't reload it again under their finger.
+    if (isInsideUsableViewport(el.getBoundingClientRect())) return;
     restoreHardSuspended(el);
     stageAPause(el);
   }, REWARM_DELAY_MS);
