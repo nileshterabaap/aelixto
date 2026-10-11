@@ -1,6 +1,5 @@
 import { useEffect, useRef, RefObject } from 'react';
 import { useLocation } from 'react-router-dom';
-import { flagOn } from '@/lib/lifecycleFlags';
 
 /**
  * Two-stage media lifecycle for playable media only.
@@ -190,10 +189,10 @@ function stageAPause(root: HTMLElement) {
   pauseYouTubeIframes(root);
   pauseSpotifyIframes(root);
   pauseVimeoIframes(root);
-  if (root.dataset.aelixHasBeenActive && flagOn('mute')) {
+  if (root.dataset.aelixHasBeenActive) {
     muteNonApiIframes(root);
   }
-  if (flagOn('freezePointer')) freezeIframes(root);
+  freezeIframes(root);
 }
 
 function stageAResume(root: HTMLElement) {
@@ -260,7 +259,6 @@ function revealWarmedIframe(iframe: HTMLIFrameElement) {
 }
 
 function hardSuspendIframes(root: HTMLElement) {
-  if (!flagOn('hardSuspend')) return;
   root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
     if (!shouldHardSuspend(iframe)) return;
     if (iframe.dataset[SUSPENDED_FLAG] === '1') return;
@@ -339,8 +337,6 @@ interface RegisteredElement {
    * loaded and is never reloaded on subsequent scroll passes.
    */
   cycleUsed: boolean;
-  /** Last measured distance (px) between the post and the usable viewport. */
-  lastGap?: number;
 }
 
 
@@ -375,48 +371,16 @@ function onConfirmedPlay(postId: string, playbackGeneration: number) {
 
     // Playback is exclusive: as soon as B is genuinely played, stop A even if
     // an embed's oversized frame still intersects the viewer.
-    // Records showed Threads/X players freezing ("stuck, icon only") when a
-    // sibling iframe was blanked within ~100ms of the play tap. Pause at once,
-    // but defer the src→about:blank swap until the new player has started.
-    if (!flagOn('exclusivePause')) return;
-    stageAPause(el);
     if (!reg.disableHardSuspend && !reg.cycleUsed) {
+      stageAPause(el);
+      hardSuspendIframes(el);
+      reg.state = 'suspended';
+      reg.awaitingReentry = true;
+    } else {
+      stageAPause(el);
       if (reg.state === 'active') reg.state = 'paused';
-      setTimeout(() => {
-        if (!el.isConnected || activePlaybackPostId !== postId) return;
-        if (reg.state === 'active') return;
-        stopAndRewarm(el, reg);
-      }, DEFERRED_SUSPEND_MS);
-    } else if (reg.state === 'active') {
-      reg.state = 'paused';
     }
   });
-}
-
-const DEFERRED_SUSPEND_MS = 1500;
-/**
- * Records: scrolling DOWN through Threads, every stuck video had a sibling
- * iframe reloading at the same moment the new player tried to start; scrolling
- * UP (no reload in flight) everything played. So after blanking the old player
- * (audio dies instantly), wait ~5s before reloading it — the newly tapped
- * player gets a quiet window to start first. Skipped if the post is visible.
- */
-const REWARM_DELAY_MS = 5000;
-
-function stopAndRewarm(el: HTMLElement, reg: RegisteredElement) {
-  hardSuspendIframes(el);
-  reg.state = 'paused';
-  reg.awaitingReentry = false;
-  reg.cycleUsed = true;
-  completedPlaybackCycles.set(reg.postId, reg.playbackGeneration);
-  setTimeout(() => {
-    if (!el.isConnected) return;
-    // User scrolled back before the delay elapsed — the visible-post path
-    // already restored the frame; don't reload it again under their finger.
-    if (isInsideUsableViewport(el.getBoundingClientRect())) return;
-    restoreHardSuspended(el);
-    stageAPause(el);
-  }, REWARM_DELAY_MS);
 }
 
 function isInsideUsableViewport(rect: DOMRect): boolean {
@@ -462,8 +426,8 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
       return;
     }
     if (current === 'active') stageAPause(el);
-    stopAndRewarm(el, reg);
-    return;
+    hardSuspendIframes(el);
+    reg.awaitingReentry = true;
   }
 
   reg.state = target;
@@ -573,25 +537,10 @@ function onAnyScroll() {
     scrollRaf = 0;
     elementStates.forEach((reg, el) => {
       if (!el.isConnected) return;
-      const rect = el.getBoundingClientRect();
-      const inside = isInsideUsableViewport(rect);
+      const inside = isInsideUsableViewport(el.getBoundingClientRect());
       // Re-sync posts whose visibility changed inside the grid viewer's own
       // scroller (IntersectionObserver can miss these), both directions.
-      if ((reg.state === 'active') !== inside) { syncElementFromLayout(el, reg); return; }
-      // Direction-aware pre-warm. Records showed X/Threads buffering or
-      // freezing because a suspended played post was only reloaded once it
-      // was already on screen (user turned back before it left the envelope),
-      // so the play tap hit a half-loaded player. As soon as a suspended post
-      // starts approaching again, reload it while still off-screen.
-      const vp = getUsableViewportBounds();
-      const gap = rect.top >= vp.bottom ? rect.top - vp.bottom : rect.bottom <= vp.top ? vp.top - rect.bottom : 0;
-      const prev = reg.lastGap;
-      reg.lastGap = gap;
-      if (reg.state === 'suspended' && reg.awaitingReentry && prev !== undefined && gap > 0 && gap < prev - 4) {
-        reg.awaitingReentry = false;
-        reg.prewarm = gap < getPrewarmDistancePx();
-        reconcileElement(el, reg);
-      }
+      if ((reg.state === 'active') !== inside) syncElementFromLayout(el, reg);
     });
   });
 }
