@@ -89,14 +89,31 @@ export function PlatformBlockPosts({ postIds, initialIndex, scrollRef, renderPos
       event.preventDefault();
       move(direction);
     };
+    let touchStart: { x: number; y: number } | undefined;
+    const onTouchStart = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      touchStart = touch ? { x: touch.clientX, y: touch.clientY } : undefined;
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      const touch = event.changedTouches[0];
+      if (!touch || !touchStart) return;
+      const dy = touchStart.y - touch.clientY;
+      const dx = touchStart.x - touch.clientX;
+      touchStart = undefined;
+      if (Math.abs(dy) >= 55 && Math.abs(dy) > Math.abs(dx)) move(dy);
+    };
     container.addEventListener("scroll", onScroll, { passive: true });
     container.addEventListener("wheel", onWheel, { passive: false });
     container.addEventListener("keydown", onKey);
+    container.addEventListener("touchstart", onTouchStart, { passive: true });
+    container.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
       if (settleTimer) clearTimeout(settleTimer);
       container.removeEventListener("scroll", onScroll);
       container.removeEventListener("wheel", onWheel);
       container.removeEventListener("keydown", onKey);
+      container.removeEventListener("touchstart", onTouchStart);
+      container.removeEventListener("touchend", onTouchEnd);
     };
   }, [postIds, scrollRef]);
 
