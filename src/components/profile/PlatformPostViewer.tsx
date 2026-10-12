@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -347,7 +347,7 @@ export const PlatformPostViewer = ({
     }
   }, [user?.id, posts]);
 
-  // Get adjacent tabs for swipe navigation
+  // Adjacent sections for the header arrows
   const currentTabIndex = tabs.findIndex(t => t.key === activeTab);
   const prevTab = currentTabIndex > 0 ? tabs[currentTabIndex - 1] : null;
   const nextTab = currentTabIndex < tabs.length - 1 ? tabs[currentTabIndex + 1] : null;
