@@ -169,9 +169,6 @@ export const PlatformPostViewer = ({
   }, [initialPostId, activeTab]);
 
   
-  // Touch handling for swipe
-  const touchStartX = useRef<number>(0);
-  const touchEndX = useRef<number>(0);
 
   useEffect(() => {
     setPortalReady(true);
@@ -355,26 +352,6 @@ export const PlatformPostViewer = ({
   const prevTab = currentTabIndex > 0 ? tabs[currentTabIndex - 1] : null;
   const nextTab = currentTabIndex < tabs.length - 1 ? tabs[currentTabIndex + 1] : null;
 
-  // Touch handlers for swipe
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    touchEndX.current = e.changedTouches[0].clientX;
-    const diff = touchStartX.current - touchEndX.current;
-    const threshold = 80;
-
-    if (Math.abs(diff) > threshold) {
-      if (diff > 0 && nextTab) {
-        // Swiped left - go to next platform
-        onTabChange(nextTab.key);
-      } else if (diff < 0 && prevTab) {
-        // Swiped right - go to previous platform
-        onTabChange(prevTab.key);
-      }
-    }
-  }, [nextTab, prevTab, onTabChange]);
 
   const currentTab = tabs.find(t => t.key === activeTab);
 
@@ -390,8 +367,6 @@ export const PlatformPostViewer = ({
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       className="fixed inset-0 z-[70] bg-background"
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
     >
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pt-safe">
@@ -559,17 +534,6 @@ export const PlatformPostViewer = ({
         ready={profileReady && posts.length > 0}
       />
 
-      {/* Swipe indicators */}
-      <div className="fixed bottom-4 left-0 right-0 flex justify-center gap-2 pointer-events-none">
-        {tabs.map((tab, index) => (
-          <div
-            key={tab.key}
-            className={`w-2 h-2 rounded-full transition-colors ${
-              tab.key === activeTab ? "bg-foreground" : "bg-muted-foreground/30"
-            }`}
-          />
-        ))}
-      </div>
     </motion.div>
   );
 
