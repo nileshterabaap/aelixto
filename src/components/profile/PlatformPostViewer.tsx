@@ -445,10 +445,6 @@ export const PlatformPostViewer = ({
               postIds={blockPostIds}
               initialIndex={initialIdx}
               scrollRef={scrollContainerRef}
-              isVideo={(index) => {
-                const p = posts[index];
-                return p?.media_type === "video" || p?.media_kind === "video";
-              }}
               renderPost={(index) => {
                 const post = posts[index];
                 if (!post) return null;
