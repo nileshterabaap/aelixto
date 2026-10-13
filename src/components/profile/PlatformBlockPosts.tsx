@@ -10,7 +10,7 @@ interface Props {
   renderPost: (index: number) => ReactNode;
 }
 
-/** The landed post plus its direct neighbours are mounted (pre-warmed); farther slots stay empty. */
+/** Empty neighbours carry scroll motion; only the landed post owns a player. */
 export function PlatformBlockPosts({ postIds, initialIndex, scrollRef, renderPost }: Props) {
   const [selected, setSelected] = useState(Math.max(0, initialIndex));
   const selectedRef = useRef(selected);
@@ -124,8 +124,7 @@ export function PlatformBlockPosts({ postIds, initialIndex, scrollRef, renderPos
       className="snap-start snap-always px-4 py-4"
       style={{ minHeight: viewportHeight || "100%", overflowAnchor: "none" }}
     >
-      {/* Pre-warm direct neighbours so landing is near-instant; stable keys keep them mounted on arrival. */}
-      {Math.abs(index - selected) <= 1 ? (
+      {index === selected ? (
         <div key={id} data-debug-rank={index + 1} data-debug-post-id={id}>
           {renderPost(index)}
         </div>
