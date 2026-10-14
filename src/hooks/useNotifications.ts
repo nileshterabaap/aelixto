@@ -143,6 +143,9 @@ export const useNotifications = () => {
     refetchOnMount: 'always',
   });
 
+  const notifications: Notification[] = data ?? [];
+  const isLoading = queryLoading || data === undefined;
+
   // Mark all as read mutation
   const markAllReadMutation = useMutation({
     mutationFn: async () => {
