@@ -58,24 +58,27 @@ export const useNotifications = () => {
   const queryClient = useQueryClient();
   const cacheKey = user?.id ? `aelixto-notifications-${user.id}` : null;
 
-  const readCache = (): Notification[] => {
-    if (!cacheKey || typeof window === 'undefined') return [];
+  // undefined (not []) when nothing is cached, so we show a loader rather
+  // than a false "no notifications" screen while sign-in is still restoring.
+  const readCache = (): Notification[] | undefined => {
+    if (!cacheKey || typeof window === 'undefined') return undefined;
     try {
       const raw = window.localStorage.getItem(cacheKey);
-      if (!raw) return [];
+      if (!raw) return undefined;
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.filter((n: any) => n?.type !== 'message') : [];
+      return Array.isArray(parsed) ? parsed.filter((n: any) => n?.type !== 'message') : undefined;
     } catch {
-      return [];
+      return undefined;
     }
   };
 
-  const { data: notifications = [], isLoading } = useQuery({
+  const { data, isLoading: queryLoading } = useQuery({
     queryKey: ["notifications", user?.id],
     initialData: readCache,
     initialDataUpdatedAt: 0,
+    retry: 3,
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.id) throw new Error("Not signed in yet");
       
       // Fetch notifications
       const { data, error } = await supabase
@@ -86,10 +89,8 @@ export const useNotifications = () => {
         .order("created_at", { ascending: false })
         .limit(50);
       
-      if (error) {
-        console.error("Error fetching notifications:", error);
-        return [];
-      }
+      // Throw so React Query keeps the previous list instead of showing empty.
+      if (error) throw error;
       
       if (!data || data.length === 0) return [];
       
@@ -100,10 +101,11 @@ export const useNotifications = () => {
       const postIds = [...new Set(data.map(n => n.post_id).filter(Boolean))];
       
       // Fetch actor profiles
-      const { data: profiles } = await supabase
+      const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("user_id, username, display_name, avatar_url")
         .in("user_id", actorIds);
+      if (profilesError) throw profilesError;
       
       // Fetch posts
       const { data: posts } = postIds.length > 0 
@@ -140,6 +142,9 @@ export const useNotifications = () => {
     staleTime: 0,
     refetchOnMount: 'always',
   });
+
+  const notifications: Notification[] = data ?? [];
+  const isLoading = queryLoading || data === undefined;
 
   // Mark all as read mutation
   const markAllReadMutation = useMutation({
