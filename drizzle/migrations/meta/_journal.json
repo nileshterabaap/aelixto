@@ -22,6 +22,13 @@
       "when": 1791991681359,
       "tag": "0002_remote_flags",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792011513841,
+      "tag": "0003_aelix_score_default_on",
+      "breakpoints": true
     }
   ]
 }

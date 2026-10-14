@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ALTER COLUMN settings SET DEFAULT '{"aelix_score_enabled": true}'::jsonb;
