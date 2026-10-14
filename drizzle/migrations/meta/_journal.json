@@ -8,13 +8,6 @@
       "when": 1788028863186,
       "tag": "0000_push_notifications_use_username",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1791058720616,
-      "tag": "0001_play_debug_sessions",
-      "breakpoints": true
     }
   ]
 }

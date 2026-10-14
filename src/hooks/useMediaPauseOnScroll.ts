@@ -211,6 +211,19 @@ function stageAResume(root: HTMLElement) {
   unfreezeIframes(root);
 }
 
+/** Re-enable taps on a post's iframes without resuming/altering playback. */
+function makeIframesInteractive(root: HTMLElement) {
+  root.querySelectorAll<HTMLIFrameElement>('iframe').forEach((iframe) => {
+    if (iframe.dataset[MUTE_FLAG] === '1') {
+      iframe.style.pointerEvents = '';
+      iframe.removeAttribute('aria-hidden');
+      iframe.removeAttribute('tabindex');
+      delete iframe.dataset[MUTE_FLAG];
+    }
+  });
+  unfreezeIframes(root);
+}
+
 // ── Stage B helpers (hard-suspend + pre-warmed restore) ───────────────
 
 const WARMING_FLAG = 'aelixWarming';
@@ -434,16 +447,29 @@ function transitionElement(el: HTMLElement, reg: RegisteredElement, target: Life
 }
 
 function reconcileElement(el: HTMLElement, reg: RegisteredElement) {
-  // A visible post must always be tappable and loaded. Making it 'active'
-  // only unfreezes/restores the frame — it never starts playback — so
-  // exclusivity is still enforced by onConfirmedPlay pausing the others.
-  // (Records showed older posts staying pointer-events:none / about:blank
-  // forever: "play doesn't work" and "didn't load".)
+  // Visibility may prepare a post, but it must never make an older post active
+  // again after playback has handed off to a newer post.
+  if (activePlaybackPostId && reg.postId !== activePlaybackPostId) {
+    if (reg.visible) {
+      // Visible but not the playing post: it must stay TAPPABLE so the user
+      // can start it (which then pauses the current one). Freezing it here
+      // left pointer-events:none on the iframe and the play button dead.
+      if (reg.state === 'suspended') restoreHardSuspended(el);
+      makeIframesInteractive(el);
+      reg.state = 'paused';
+      return;
+    }
+    if (reg.state !== 'suspended') {
+      stageAPause(el);
+      reg.state = 'paused';
+    }
+    return;
+  }
+
   if (reg.visible) {
     transitionElement(el, reg, 'active');
     return;
   }
-
 
   // Never-played posts (and played posts that already spent their one refresh)
   // still receive cheap API/native pause commands, but their iframe is not
@@ -536,11 +562,10 @@ function onAnyScroll() {
   scrollRaf = requestAnimationFrame(() => {
     scrollRaf = 0;
     elementStates.forEach((reg, el) => {
-      if (!el.isConnected) return;
-      const inside = isInsideUsableViewport(el.getBoundingClientRect());
-      // Re-sync posts whose visibility changed inside the grid viewer's own
-      // scroller (IntersectionObserver can miss these), both directions.
-      if ((reg.state === 'active') !== inside) syncElementFromLayout(el, reg);
+      if (reg.state !== 'active' || !el.isConnected) return;
+      if (!isInsideUsableViewport(el.getBoundingClientRect())) {
+        syncElementFromLayout(el, reg);
+      }
     });
   });
 }
