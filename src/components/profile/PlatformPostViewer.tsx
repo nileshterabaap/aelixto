@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -13,6 +13,9 @@ import type { Post } from "@/data/demoData";
 import type { PlatformPost } from "@/hooks/useUserPlatformPosts";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 import { getEmbedStatus, subscribeEmbedReadiness } from "@/lib/embedReadiness";
+import { PlayDebugDial } from "./PlayDebugDial";
+import { PlatformBlockPosts } from "./PlatformBlockPosts";
+import { usesBlockNavigation } from "./blockNavigation";
 
 interface PlatformPostViewerProps {
   userId: string;
@@ -87,6 +90,8 @@ export const PlatformPostViewer = ({
   onTabChange,
 }: PlatformPostViewerProps) => {
   const { user } = useSession();
+  const blockNavigation = usesBlockNavigation(activeTab);
+  const blockPostIds = useMemo(() => posts.map(post => post.id), [posts]);
   // Use react-query so the profile is cached across viewer opens — instant after first load.
   const { data: profileData = null } = useQuery({
     queryKey: ["viewer-profile", userId],
@@ -164,9 +169,6 @@ export const PlatformPostViewer = ({
   }, [initialPostId, activeTab]);
 
   
-  // Touch handling for swipe
-  const touchStartX = useRef<number>(0);
-  const touchEndX = useRef<number>(0);
 
   useEffect(() => {
     setPortalReady(true);
@@ -180,7 +182,7 @@ export const PlatformPostViewer = ({
   // Anchor scroll to the tapped post and keep it anchored while posts above
   // hydrate. Stops anchoring once the user scrolls.
   useLayoutEffect(() => {
-    if (!portalReady || !targetPostId) return;
+    if (!portalReady || !targetPostId || blockNavigation) return;
     const container = scrollContainerRef.current;
     if (!container) return;
 
@@ -287,7 +289,7 @@ export const PlatformPostViewer = ({
       container.removeEventListener("scroll", onScroll);
       container.removeEventListener("load", onAnyLoad, true);
     };
-  }, [portalReady, targetPostId, posts, initialIdx, activeTab]);
+  }, [portalReady, targetPostId, posts, initialIdx, activeTab, blockNavigation]);
 
   // Keep whatever the user is looking at perfectly still when a post ABOVE
   // the viewport changes height late. X / Quora / Pinterest / article cards
@@ -297,7 +299,7 @@ export const PlatformPostViewer = ({
   // which is why they never showed the issue. Native CSS scroll anchoring is
   // unreliable in Android WebView / iOS, so we compensate manually.
   useEffect(() => {
-    if (!portalReady) return;
+    if (!portalReady || blockNavigation) return;
     const container = scrollContainerRef.current;
     if (!container) return;
     const heights = new WeakMap<Element, number>();
@@ -334,7 +336,7 @@ export const PlatformPostViewer = ({
       ro.disconnect();
       mo.disconnect();
     };
-  }, [portalReady, posts, activeTab]);
+  }, [portalReady, posts, activeTab, blockNavigation]);
 
 
 
@@ -345,31 +347,11 @@ export const PlatformPostViewer = ({
     }
   }, [user?.id, posts]);
 
-  // Get adjacent tabs for swipe navigation
+  // Adjacent sections for the header arrows
   const currentTabIndex = tabs.findIndex(t => t.key === activeTab);
   const prevTab = currentTabIndex > 0 ? tabs[currentTabIndex - 1] : null;
   const nextTab = currentTabIndex < tabs.length - 1 ? tabs[currentTabIndex + 1] : null;
 
-  // Touch handlers for swipe
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  }, []);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    touchEndX.current = e.changedTouches[0].clientX;
-    const diff = touchStartX.current - touchEndX.current;
-    const threshold = 80;
-
-    if (Math.abs(diff) > threshold) {
-      if (diff > 0 && nextTab) {
-        // Swiped left - go to next platform
-        onTabChange(nextTab.key);
-      } else if (diff < 0 && prevTab) {
-        // Swiped right - go to previous platform
-        onTabChange(prevTab.key);
-      }
-    }
-  }, [nextTab, prevTab, onTabChange]);
 
   const currentTab = tabs.find(t => t.key === activeTab);
 
@@ -385,9 +367,6 @@ export const PlatformPostViewer = ({
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       className="fixed inset-0 z-[70] bg-background"
-      data-media-viewer=""
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
     >
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pt-safe">
@@ -439,9 +418,10 @@ export const PlatformPostViewer = ({
       {/* Scrollable posts */}
       <div 
         ref={scrollContainerRef}
-        className="h-[calc(100dvh-56px-var(--safe-top))] overflow-y-auto overscroll-contain pb-8"
+        tabIndex={blockNavigation ? 0 : undefined}
+        className={`h-[calc(100dvh-56px-var(--safe-top))] overflow-y-auto overscroll-contain ${blockNavigation ? "snap-y snap-mandatory" : "pb-8"}`}
       >
-        <div className="mx-auto max-w-2xl px-4 py-4 space-y-6">
+        <div className={`mx-auto max-w-2xl ${blockNavigation ? "" : "px-4 py-4 space-y-6"}`}>
           {(loading && posts.length === 0) || !profileReady ? (
             <>
               {Array.from({ length: 3 }).map((_, i) => (
@@ -459,12 +439,32 @@ export const PlatformPostViewer = ({
             <div className="text-center py-8">
               <p className="text-muted-foreground">No posts in this section</p>
             </div>
+          ) : blockNavigation ? (
+            <PlatformBlockPosts
+              key={`${activeTab}-${initialPostId}`}
+              postIds={blockPostIds}
+              initialIndex={initialIdx}
+              scrollRef={scrollContainerRef}
+              renderPost={(index) => {
+                const post = posts[index];
+                if (!post) return null;
+                return <HydratedFeedPost
+                  post={transformPost(post, profileData)}
+                  userId={user?.id}
+                  startHydrated
+                  fastReveal
+                  onDeleted={() => { if (posts.length <= 1) onClose(); }}
+                />;
+              }}
+            />
           ) : (
             posts.map((post, idx) => {
               const absoluteIdx = idx;
               return (
               <motion.div
                 key={post.id}
+                data-debug-rank={absoluteIdx + 1}
+                data-debug-post-id={post.id}
                 ref={(el) => {
                   if (el) postRefs.current.set(post.id, el);
                   else postRefs.current.delete(post.id);
@@ -528,17 +528,12 @@ export const PlatformPostViewer = ({
         </div>
       </div>
 
-      {/* Swipe indicators */}
-      <div className="fixed bottom-4 left-0 right-0 flex justify-center gap-2 pointer-events-none">
-        {tabs.map((tab, index) => (
-          <div
-            key={tab.key}
-            className={`w-2 h-2 rounded-full transition-colors ${
-              tab.key === activeTab ? "bg-foreground" : "bg-muted-foreground/30"
-            }`}
-          />
-        ))}
-      </div>
+      <PlayDebugDial
+        scrollRef={scrollContainerRef}
+        platform={activeTab}
+        ready={profileReady && posts.length > 0}
+      />
+
     </motion.div>
   );
 

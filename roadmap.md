@@ -1,0 +1,2 @@
+- [x] Implement fresh one-block navigation only for X and Threads.
+- [x] Check navigation rules, platform protections, and signed-in grid behavior.
