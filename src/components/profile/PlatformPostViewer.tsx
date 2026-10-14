@@ -385,6 +385,7 @@ export const PlatformPostViewer = ({
       exit={{ opacity: 0, scale: 0.98 }}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       className="fixed inset-0 z-[70] bg-background"
+      data-media-viewer=""
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
