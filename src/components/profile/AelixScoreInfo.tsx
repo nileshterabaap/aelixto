@@ -35,7 +35,12 @@ export const AelixScoreInfo = () => {
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-64 text-sm" side="bottom">
-        Your Aelix Score grows when people view, play, and visit the original of your posts. You can hide it anytime in Edit Profile.
+        <p>Aelix Score represents the total engagement earned by your shared posts.</p>
+        <ul className="list-disc pl-4 space-y-0.5 mt-1">
+          <li>Viewed a shared post (+1)</li>
+          <li>Played shared content (+1)</li>
+          <li>Visited the original source (+1)</li>
+        </ul>
       </PopoverContent>
     </Popover>
   );
