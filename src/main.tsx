@@ -5,9 +5,6 @@ import { initCapacitorPlugins } from "./capacitor-init";
 import { initKeyboardInsets } from "./lib/keyboardInsets";
 import { supabase } from "./integrations/supabase/client";
 import { Capacitor } from "@capacitor/core";
-import { installXEmbedSandbox } from "./lib/sandboxXEmbeds";
-
-installXEmbedSandbox();
 
 const unregisterAppServiceWorkers = async () => {
   if (!("serviceWorker" in navigator)) return;
