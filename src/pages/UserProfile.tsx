@@ -25,6 +25,7 @@ import { useIsBlocked } from "@/hooks/useIsBlocked";
 import { useAmIBlockedBy } from "@/hooks/useAmIBlockedBy";
 import { AelixtoLoader } from "@/components/AelixtoLoader";
 import { Ban } from "lucide-react";
+import { AelixScoreInfo } from "@/components/profile/AelixScoreInfo";
 
 interface UserProfileProps {
   usernameOverride?: string;
@@ -318,9 +319,10 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
           {/* Aelix Score - only show if user enabled it */}
           {(profile.settings as { aelix_score_enabled?: boolean })?.aelix_score_enabled && (
             <div className="flex justify-center mt-4 mb-4">
-              <div className="border-2 border-foreground rounded-[16px] px-10 py-2">
+              <div className="relative border-2 border-foreground rounded-[16px] px-10 py-2">
                 <div className="text-2xl font-bold text-center leading-none mb-0.5">{formatCompactCount(profile.aelix_score)}</div>
                 <div className="text-[9px] font-bold text-center tracking-[0.15em] uppercase">Aelix Score</div>
+                {isMe && <AelixScoreInfo />}
               </div>
             </div>
           )}
