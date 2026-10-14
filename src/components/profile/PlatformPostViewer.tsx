@@ -13,7 +13,7 @@ import type { Post } from "@/data/demoData";
 import type { PlatformPost } from "@/hooks/useUserPlatformPosts";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
 import { getEmbedStatus, subscribeEmbedReadiness } from "@/lib/embedReadiness";
-import { PlayDebugDial } from "./PlayDebugDial";
+import { PostRankDial } from "./PostRankDial";
 import { PlatformBlockPosts } from "./PlatformBlockPosts";
 import { usesBlockNavigation } from "./blockNavigation";
 
@@ -463,8 +463,7 @@ export const PlatformPostViewer = ({
               return (
               <motion.div
                 key={post.id}
-                data-debug-rank={absoluteIdx + 1}
-                data-debug-post-id={post.id}
+                data-grid-rank={absoluteIdx + 1}
                 ref={(el) => {
                   if (el) postRefs.current.set(post.id, el);
                   else postRefs.current.delete(post.id);
@@ -528,7 +527,7 @@ export const PlatformPostViewer = ({
         </div>
       </div>
 
-      <PlayDebugDial
+      <PostRankDial
         scrollRef={scrollContainerRef}
         platform={activeTab}
         ready={profileReady && posts.length > 0}

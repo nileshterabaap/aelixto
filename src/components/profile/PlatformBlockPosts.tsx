@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { PostSkeleton } from "@/components/PostSkeleton";
 import { nextBlockIndex } from "./blockNavigation";
-import { logDebug } from "@/lib/playDebugRecorder";
 
 interface Props {
   postIds: string[];
@@ -48,7 +47,6 @@ export function PlatformBlockPosts({ postIds, initialIndex, scrollRef, renderPos
       if (index === selectedRef.current) return;
       selectedRef.current = index;
       setSelected(index);
-      logDebug("block_open", index + 1, postIds[index], { freshMount: true });
     };
     const settle = () => {
       let nearest = selectedRef.current;
@@ -125,7 +123,7 @@ export function PlatformBlockPosts({ postIds, initialIndex, scrollRef, renderPos
       style={{ minHeight: viewportHeight || "100%", overflowAnchor: "none" }}
     >
       {index === selected ? (
-        <div key={id} data-debug-rank={index + 1} data-debug-post-id={id}>
+        <div key={id} data-grid-rank={index + 1}>
           {renderPost(index)}
         </div>
       ) : <PostSkeleton />}
