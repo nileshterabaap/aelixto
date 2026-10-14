@@ -86,10 +86,8 @@ export const useNotifications = () => {
         .order("created_at", { ascending: false })
         .limit(50);
       
-      if (error) {
-        console.error("Error fetching notifications:", error);
-        return [];
-      }
+      // Throw so React Query keeps the previous list instead of showing empty.
+      if (error) throw error;
       
       if (!data || data.length === 0) return [];
       
@@ -100,10 +98,11 @@ export const useNotifications = () => {
       const postIds = [...new Set(data.map(n => n.post_id).filter(Boolean))];
       
       // Fetch actor profiles
-      const { data: profiles } = await supabase
+      const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("user_id, username, display_name, avatar_url")
         .in("user_id", actorIds);
+      if (profilesError) throw profilesError;
       
       // Fetch posts
       const { data: posts } = postIds.length > 0 
