@@ -58,24 +58,27 @@ export const useNotifications = () => {
   const queryClient = useQueryClient();
   const cacheKey = user?.id ? `aelixto-notifications-${user.id}` : null;
 
-  const readCache = (): Notification[] => {
-    if (!cacheKey || typeof window === 'undefined') return [];
+  // undefined (not []) when nothing is cached, so we show a loader rather
+  // than a false "no notifications" screen while sign-in is still restoring.
+  const readCache = (): Notification[] | undefined => {
+    if (!cacheKey || typeof window === 'undefined') return undefined;
     try {
       const raw = window.localStorage.getItem(cacheKey);
-      if (!raw) return [];
+      if (!raw) return undefined;
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed.filter((n: any) => n?.type !== 'message') : [];
+      return Array.isArray(parsed) ? parsed.filter((n: any) => n?.type !== 'message') : undefined;
     } catch {
-      return [];
+      return undefined;
     }
   };
 
-  const { data: notifications = [], isLoading } = useQuery({
+  const { data, isLoading: queryLoading } = useQuery({
     queryKey: ["notifications", user?.id],
     initialData: readCache,
     initialDataUpdatedAt: 0,
+    retry: 3,
     queryFn: async () => {
-      if (!user?.id) return [];
+      if (!user?.id) throw new Error("Not signed in yet");
       
       // Fetch notifications
       const { data, error } = await supabase
