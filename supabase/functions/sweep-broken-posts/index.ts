@@ -201,6 +201,17 @@ async function validate(platform: string | null, url: string | null): Promise<Ch
         return { verdict: "unknown" };
       }
     }
+    // X blocks anonymous page fetches (false "removed"). Only trust X's official
+    // oEmbed: 200 = live, 404 = gone, anything else = unknown.
+    if (p === "x" || p === "twitter" || /(^|\/\/|\.)(x|twitter)\.com\//i.test(url)) {
+      const r = await fetchWithTimeout(`https://publish.twitter.com/oembed?omit_script=1&url=${encodeURIComponent(url)}`);
+      if (r.ok) {
+        try { const j = await r.json(); return { verdict: "ok", author: j?.author_name ?? null }; }
+        catch { return { verdict: "ok" }; }
+      }
+      if (r.status === 404) return { verdict: "removed" };
+      return { verdict: "unknown" };
+    }
     if (
       p === "threads" || p === "x" || p === "twitter" || p === "linkedin" ||
       p === "pinterest" || p === "quora" || p === "medium" || p === "article" || p === "external" ||
