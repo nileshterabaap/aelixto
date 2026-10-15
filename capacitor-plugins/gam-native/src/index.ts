@@ -62,6 +62,8 @@ export interface NativeAdCreative {
   callToAction?: string;
   iconUrl?: string;
   imageUrl?: string;
+  /** width / height of the main media (poster or video). */
+  mediaAspectRatio?: number;
   starRating?: number;
   price?: string;
   store?: string;

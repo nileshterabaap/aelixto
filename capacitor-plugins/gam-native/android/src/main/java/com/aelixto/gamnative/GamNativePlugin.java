@@ -260,6 +260,11 @@ public class GamNativePlugin extends Plugin {
                                 && nativeAd.getImages().get(0).getUri() != null) {
                             payload.put("imageUrl", nativeAd.getImages().get(0).getUri().toString());
                         }
+                        try {
+                            if (nativeAd.getMediaContent() != null && nativeAd.getMediaContent().getAspectRatio() > 0) {
+                                payload.put("mediaAspectRatio", (double) nativeAd.getMediaContent().getAspectRatio());
+                            }
+                        } catch (Exception ignored) {}
                         if (nativeAd.getStarRating() != null) payload.put("starRating", nativeAd.getStarRating());
                         if (nativeAd.getPrice() != null) payload.put("price", nativeAd.getPrice());
                         if (nativeAd.getStore() != null) payload.put("store", nativeAd.getStore());
@@ -595,6 +600,8 @@ public class GamNativePlugin extends Plugin {
         // Media — edge-to-edge like the feed embeds
         MediaView mediaView = new MediaView(activity);
         mediaView.setBackgroundColor(Color.parseColor("#F5F5F5")); // --muted
+        // Never crop or stretch the poster; the JS card is sized to its ratio.
+        mediaView.setImageScaleType(ImageView.ScaleType.FIT_CENTER);
         LinearLayout.LayoutParams mediaLp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f);
         container.addView(mediaView, mediaLp);
