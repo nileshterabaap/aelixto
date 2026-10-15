@@ -20,6 +20,7 @@ import { SwipeableView } from "@/components/SwipeableView";
 import { markScrolledPast, reorderBySlowness, subscribeEmbedReadiness } from "@/lib/embedReadiness";
 import { useFeedWithAds } from "@/hooks/useFeedWithAds";
 import { NativeFeedAd } from "@/components/ads/NativeFeedAd";
+import { observeFeedPostForAds } from "@/lib/adCadence";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -371,6 +372,7 @@ const Index = () => {
                     ref={(el) => {
                       registerItem(post.id)(el);
                       if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
+                      if (!showDemoFeed && el) observeFeedPostForAds(el, post.id);
                       if (el) observeForPast(el);
                       if (index === prefetchTriggerIndex) {
                         prefetchSentinelRef.current = el;
