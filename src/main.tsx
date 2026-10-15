@@ -34,8 +34,6 @@ const unregisterAppServiceWorkers = async () => {
   await Promise.all(cacheKeys.map((cacheKey) => window.caches.delete(cacheKey)));
 };
 
-const splashStartedAt = performance.now();
-
 // Dismiss the HTML splash once React and the local session are ready.
 const dismissSplash = () => {
   const splash = document.getElementById('splash-screen');
@@ -52,11 +50,19 @@ const handOffNativeSplash = async () => {
 
   try {
     const { SplashScreen } = await import("@capacitor/splash-screen");
-    await SplashScreen.hide({ fadeOutDuration: 180 });
+    // Bound the bridge call so a missing/unresponsive plugin cannot hold boot.
+    await Promise.race([
+      SplashScreen.hide({ fadeOutDuration: 180 }),
+      new Promise((resolve) => setTimeout(resolve, 1500)),
+    ]);
+    // Some native implementations resolve hide before the fade finishes.
+    await new Promise((resolve) => setTimeout(resolve, 180));
   } catch (error) {
     console.warn("SplashScreen plugin not available", error);
   }
 };
+
+let nativeSplashHandOff: Promise<void> = Promise.resolve();
 
 void unregisterAppServiceWorkers();
 initKeyboardInsets();
@@ -64,7 +70,11 @@ initKeyboardInsets();
 const root = document.getElementById("root");
 if (root) {
   createRoot(root).render(<App />);
-  requestAnimationFrame(() => void handOffNativeSplash());
+  nativeSplashHandOff = new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      void handOffNativeSplash().then(resolve);
+    });
+  });
 }
 
 // Keep the splash screen visible until Supabase has probed the local
@@ -82,11 +92,12 @@ const dismissSplashAfterSessionProbe = async () => {
     /* ignore — splash still dismisses below */
   }
 
-  // On native, guarantee enough visible time for the animated handoff. The
-  // website keeps its existing fast dismissal behavior.
+  // Count the animation's visible time AFTER the native splash has gone, not
+  // from JS startup while it may still be hidden underneath the OS screen.
+  // The website keeps its existing fast dismissal behavior.
   if (Capacitor.isNativePlatform()) {
-    const remaining = Math.max(0, 1000 - (performance.now() - splashStartedAt));
-    await new Promise((resolve) => setTimeout(resolve, remaining));
+    await nativeSplashHandOff;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
   requestAnimationFrame(() => {
