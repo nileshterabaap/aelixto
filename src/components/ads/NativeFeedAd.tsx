@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { AD_MIN_REQUEST_INTERVAL_MS, getNativeFeedAdUnitId, isAdTestMode } from '@/config/ads';
 import { adsReady } from '@/lib/adConsent';
+import { noteAdShown } from '@/lib/adCadence';
 import { GamNative, type NativeAdCreative } from 'aelixto-gam-native';
 
 let lastRequestAt = 0;
@@ -73,6 +74,7 @@ export function NativeFeedAd() {
   const rafRef = useRef<number | null>(null);
   const presentedRef = useRef(false);
   const tagRef = useRef(`[slot#${++slotSeq}]`);
+  const [aspect, setAspect] = useState<number>(16 / 9);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -88,6 +90,19 @@ export function NativeFeedAd() {
       const creative = await requestNativeAd(tag);
       if (!mountedRef.current) return;
       console.log(`[ads]${tag} step 6 render decision:`, creative ? 'RENDER overlay' : 'RENDER NOTHING (no creative)');
+      let ratio = Number((creative as any)?.mediaAspectRatio) || 0;
+      if (!ratio && creative?.imageUrl) {
+        ratio = await new Promise<number>((res) => {
+          const img = new Image();
+          img.onload = () => res(img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 0);
+          img.onerror = () => res(0);
+          img.src = creative.imageUrl!;
+          setTimeout(() => res(0), 3000);
+        });
+      }
+      if (!mountedRef.current) return;
+      if (ratio > 0) setAspect(ratio);
+      console.log(`[ads]${tag} media aspect =`, ratio || 'unknown (16:9 fallback)');
       setAd(creative);
       setReady(true);
     })();
@@ -160,18 +175,51 @@ function measureClip() {
     };
   }, [ad?.adId]);
 
+  // Count the ad as shown once half of it is on screen; restarts the
+  // seen-posts counter that decides where the next ad goes.
+  useEffect(() => {
+    if (!ad?.adId || !slotRef.current) return;
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && e.intersectionRatio >= 0.5) {
+        noteAdShown();
+        obs.disconnect();
+      }
+    }, { threshold: 0.5 });
+    obs.observe(slotRef.current);
+    return () => obs.disconnect();
+  }, [ad?.adId]);
+
   if (!ready || !ad) return null;
 
-  // Reserved-height placeholder. The real ad UI lives in the native overlay
-  // (NativeAdView on Android, GADNativeAdView on iOS) positioned exactly on
-  // top of this box. Height matches the feed post rhythm.
+  // Invisible placeholder laid out exactly like the native card (header,
+  // headline, media at the poster's own proportions, caption, CTA bar), so the
+  // card height follows each ad's artwork instead of a fixed box. The real ad
+  // UI is the native overlay positioned on top of this element.
+  // Very tall posters are capped at 4:5 (like feed media) and shown uncropped.
+  const mediaRatio = Math.max(aspect, 0.8);
   return (
     <div
       ref={slotRef}
       aria-hidden
       data-native-ad="1"
-      style={{ height: 340, width: '100%' }}
-    />
+      style={{ width: '100%', visibility: 'hidden' }}
+    >
+      <div style={{ height: 76 }} />
+      {ad.headline ? (
+        <div style={{ padding: '0 20px 14px', fontSize: 20, fontWeight: 700, lineHeight: 1.2,
+          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          {ad.headline}
+        </div>
+      ) : (
+        <div style={{ height: 14 }} />
+      )}
+      <div style={{ width: '100%', aspectRatio: String(mediaRatio) }} />
+      <div style={{ padding: '14px 20px', fontSize: 15, lineHeight: 1.4,
+        display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+        {ad.body ?? ''}
+      </div>
+      <div style={{ height: 56 }} />
+    </div>
   );
 }
 

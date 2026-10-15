@@ -158,6 +158,7 @@ public class GamNativePlugin: CAPPlugin, GADNativeAdLoaderDelegate, GADAdLoaderD
         if let c = nativeAd.callToAction { payload["callToAction"] = c }
         if let icon = nativeAd.icon?.imageURL?.absoluteString { payload["iconUrl"] = icon }
         if let firstImage = nativeAd.images?.first?.imageURL?.absoluteString { payload["imageUrl"] = firstImage }
+        if nativeAd.mediaContent.aspectRatio > 0 { payload["mediaAspectRatio"] = Double(nativeAd.mediaContent.aspectRatio) }
         if let s = nativeAd.starRating?.doubleValue { payload["starRating"] = s }
         if let p = nativeAd.price { payload["price"] = p }
         if let store = nativeAd.store { payload["store"] = store }
@@ -219,6 +220,7 @@ public class GamNativePlugin: CAPPlugin, GADNativeAdLoaderDelegate, GADAdLoaderD
 
         // Media (auto-sized in layoutSubviews)
         let mediaView = GADMediaView()
+        mediaView.contentMode = .scaleAspectFit
         adView.addSubview(mediaView)
         adView.mediaView = mediaView
 
