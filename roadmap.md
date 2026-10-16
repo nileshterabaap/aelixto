@@ -4,3 +4,5 @@
 - [x] Verify removed assets are unreferenced and remaining startup assets load.
 - [x] Add followed-first liked-by summaries with hidden-count support and live updates.
 - [x] Test summary rules and verify the likes-list flow signed in.
+- [x] Make source-deletion checks conservative across platforms and remove only deletion alerts when a source is confirmed restored.
+- [x] Test detection/recovery rules and verify existing-alert rechecks in Lovable Cloud.

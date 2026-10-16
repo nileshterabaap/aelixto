@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
+import { checkInstagramSource, clearRestoredSourceAlerts } from "../_shared/sourceAvailability.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -104,14 +106,15 @@ async function checkViaHtml(url: string): Promise<CheckResult> {
     try {
       head = await fetchWithTimeout(url, { method: "HEAD", headers: { "User-Agent": UA } });
     } catch { /* some hosts reject HEAD */ }
-    if (head && (head.status === 404 || head.status === 410)) return { verdict: "removed" };
+    if (head && (head.status === 404 || head.status === 410)) return { verdict: "unknown" };
 
     const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } });
-    if (r.status === 404 || r.status === 410) return { verdict: "removed" };
+    if (r.status === 404 || r.status === 410) return { verdict: "unknown" };
     if (!r.ok) return { verdict: "unknown" };
     const html = await r.text();
-    if (looksRemoved(html)) return { verdict: "removed", author: extractAuthor(html) };
-    return { verdict: "ok", author: extractAuthor(html) };
+    if (looksRemoved(html)) return { verdict: "unknown" };
+    return metaContent(html, "og:title") && metaContent(html, "og:url") === url
+      ? { verdict: "ok", author: extractAuthor(html) } : { verdict: "unknown" };
   } catch {
     return { verdict: "unknown" };
   }
@@ -123,30 +126,7 @@ async function validate(platform: string | null, url: string | null): Promise<Ch
   const meta = Deno.env.get("META_APP_TOKEN");
   try {
     if (p === "instagram" || /instagram\.com\//i.test(url)) {
-      if (meta) {
-        const r = await fetchWithTimeout(`https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${meta}`);
-        if (r.ok) {
-          try {
-            const j = await r.json();
-            return { verdict: "ok", author: j?.author_name ?? null };
-          } catch { return { verdict: "ok" }; }
-        }
-        if (r.status === 404 || r.status === 400) {
-          const text = await r.text();
-          if (/not found|unsupported|invalid|removed|unavailable|object/i.test(text)) return { verdict: "removed" };
-        }
-      }
-      // Fallback: IG /embed/ endpoint. Removed/private posts render "Sorry, this content isn't available right now".
-      const embedUrl = url.replace(/\/?(\?.*)?$/, "/embed/$1");
-      const r2 = await fetchWithTimeout(embedUrl, { headers: { "User-Agent": UA } });
-      if (r2.ok) {
-        const html = await r2.text();
-        if (/content isn'?t available|Sorry, this page|Page Not Found|may be broken/i.test(html)) return { verdict: "removed" };
-        const m = html.match(/"username":"([^"]+)"/);
-        return { verdict: "ok", author: m?.[1] ?? null };
-      }
-      if (r2.status === 404 || r2.status === 410) return { verdict: "removed" };
-      return { verdict: "unknown" };
+      return { verdict: await checkInstagramSource(url, meta, fetchWithTimeout) };
     }
     if (p === "facebook" || /facebook\.com\/|fb\.watch\//i.test(url)) {
       if (!meta) return { verdict: "unknown" };
@@ -157,7 +137,7 @@ async function validate(platform: string | null, url: string | null): Promise<Ch
       }
       if (r.status === 404 || r.status === 400) {
         const text = await r.text();
-        if (/not found|unsupported|invalid|removed|unavailable|object/i.test(text)) return { verdict: "removed" };
+        if (/not found|unsupported|invalid|removed|unavailable|object/i.test(text)) return { verdict: "unknown" };
       }
       return { verdict: "unknown" };
     }
@@ -168,7 +148,7 @@ async function validate(platform: string | null, url: string | null): Promise<Ch
       if (r.ok) {
         try { const j = await r.json(); return { verdict: "ok", author: j?.author_name ?? null }; } catch { return { verdict: "ok" }; }
       }
-      if (r.status === 401 || r.status === 404 || r.status === 403) return { verdict: "removed" };
+      if (r.status === 404) return { verdict: "removed" };
       return { verdict: "unknown" };
     }
     if (p === "tiktok" || /tiktok\.com\//i.test(url)) {
@@ -191,9 +171,9 @@ async function validate(platform: string | null, url: string | null): Promise<Ch
       try {
         const j = await r.json();
         const post = j?.[0]?.data?.children?.[0]?.data;
-        if (!post) return { verdict: "removed" };
+        if (!post) return { verdict: "unknown" };
         const author = post.author && post.author !== "[deleted]" ? post.author : null;
-        if (post.removed_by_category || post.removed || post.selftext === "[removed]" || post.selftext === "[deleted]" || post.author === "[deleted]") {
+        if (post.removed_by_category || post.removed || post.selftext === "[removed]" || post.selftext === "[deleted]") {
           return { verdict: "removed", author };
         }
         return { verdict: "ok", author };
@@ -254,9 +234,20 @@ serve(async (req) => {
     });
   }
 
-  let ok = 0, removed = 0, unknown = 0, deleted = 0;
+  // Recheck outstanding alerts as well as the normal oldest-post rotation.
+  // Oldest first gives every unresolved alert a turn without increasing batch size.
+  const { data: alerts, error: alertsError } = await supabase.from("notifications")
+    .select("post_id,posts(id,user_id,platform,media_url,thumbnail_url,title,content,broken_check_count,broken_first_seen_at,last_validated_at)")
+    .eq("type", "report_outcome").eq("metadata->>kind", "source_removed")
+    .not("post_id", "is", null).order("posts(last_validated_at)", { ascending: true, nullsFirst: true }).limit(10);
+  if (alertsError) throw alertsError;
+  const priorityPosts = (alerts ?? []).flatMap((alert: any) => alert.posts ? [alert.posts] : []);
+  const batch = [...new Map([...priorityPosts, ...(posts ?? [])].map(post => [post.id, post])).values()].slice(0, 60);
+  let ok = 0, removed = 0, unknown = 0, deleted = 0, restored = 0;
 
-  for (const post of posts ?? []) {
+  // Bounded parallel requests keep external timeouts from blocking the full rotation.
+  for (let offset = 0; offset < batch.length; offset += 5) {
+    await Promise.all(batch.slice(offset, offset + 5).map(async (post) => {
     const result = await validate(post.platform, post.media_url);
     const verdict = result.verdict;
     const now = new Date().toISOString();
@@ -268,13 +259,14 @@ serve(async (req) => {
         broken_check_count: 0,
         broken_first_seen_at: null,
       }).eq("id", post.id);
-      continue;
+      restored += await clearRestoredSourceAlerts(supabase, post, verdict);
+      return;
     }
 
     if (verdict === "unknown") {
       unknown++;
       await supabase.from("posts").update({ last_validated_at: now }).eq("id", post.id);
-      continue;
+      return;
     }
 
     removed++;
@@ -288,7 +280,7 @@ serve(async (req) => {
     }).eq("id", post.id);
 
     // Notify on first detection only — avoid spamming on every sweep.
-    if (newCount > 1) continue;
+    if (newCount > 1) return;
 
     // Belt-and-braces dedupe in case the column was reset.
     const { data: existing } = await supabase
@@ -297,9 +289,10 @@ serve(async (req) => {
       .eq("recipient_id", post.user_id)
       .eq("type", "report_outcome")
       .eq("post_id", post.id)
+      .eq("metadata->>kind", "source_removed")
       .limit(1)
       .maybeSingle();
-    if (existing) continue;
+    if (existing) return;
 
     await supabase.from("notifications").insert({
       recipient_id: post.user_id,
@@ -320,9 +313,10 @@ serve(async (req) => {
       },
     });
     deleted++;
+    }));
   }
 
-  return new Response(JSON.stringify({ scanned: posts?.length ?? 0, ok, removed, unknown, deleted }), {
+  return new Response(JSON.stringify({ scanned: batch.length, ok, removed, unknown, deleted, restored }), {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
