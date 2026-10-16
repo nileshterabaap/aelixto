@@ -48,6 +48,7 @@ export const useNotificationCount = () => {
     enabled: !!user?.id,
     staleTime: 0,
     refetchOnMount: 'always',
+    refetchInterval: 30_000,
   });
 
   return { count, isLoading };
@@ -92,7 +93,12 @@ export const useNotifications = () => {
       // Throw so React Query keeps the previous list instead of showing empty.
       if (error) throw error;
       
-      if (!data || data.length === 0) return [];
+      if (!data || data.length === 0) {
+        if (cacheKey) {
+          try { window.localStorage.setItem(cacheKey, "[]"); } catch { /* Storage unavailable. */ }
+        }
+        return [];
+      }
       
       // Get unique actor IDs
       const actorIds = [...new Set(data.map(n => n.actor_id))];
@@ -141,6 +147,8 @@ export const useNotifications = () => {
     enabled: !!user?.id,
     staleTime: 0,
     refetchOnMount: 'always',
+    // DELETE events may lack recipient_id, so don't rely on filtered realtime alone.
+    refetchInterval: 30_000,
   });
 
   const notifications: Notification[] = data ?? [];

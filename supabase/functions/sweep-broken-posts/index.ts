@@ -245,7 +245,9 @@ serve(async (req) => {
   const batch = [...new Map([...priorityPosts, ...(posts ?? [])].map(post => [post.id, post])).values()].slice(0, 60);
   let ok = 0, removed = 0, unknown = 0, deleted = 0, restored = 0;
 
-  for (const post of batch) {
+  // Bounded parallel requests keep external timeouts from blocking the full rotation.
+  for (let offset = 0; offset < batch.length; offset += 5) {
+    await Promise.all(batch.slice(offset, offset + 5).map(async (post) => {
     const result = await validate(post.platform, post.media_url);
     const verdict = result.verdict;
     const now = new Date().toISOString();
@@ -258,13 +260,13 @@ serve(async (req) => {
         broken_first_seen_at: null,
       }).eq("id", post.id);
       restored += await clearRestoredSourceAlerts(supabase, post, verdict);
-      continue;
+      return;
     }
 
     if (verdict === "unknown") {
       unknown++;
       await supabase.from("posts").update({ last_validated_at: now }).eq("id", post.id);
-      continue;
+      return;
     }
 
     removed++;
@@ -278,7 +280,7 @@ serve(async (req) => {
     }).eq("id", post.id);
 
     // Notify on first detection only — avoid spamming on every sweep.
-    if (newCount > 1) continue;
+    if (newCount > 1) return;
 
     // Belt-and-braces dedupe in case the column was reset.
     const { data: existing } = await supabase
@@ -290,7 +292,7 @@ serve(async (req) => {
       .eq("metadata->>kind", "source_removed")
       .limit(1)
       .maybeSingle();
-    if (existing) continue;
+    if (existing) return;
 
     await supabase.from("notifications").insert({
       recipient_id: post.user_id,
@@ -311,6 +313,7 @@ serve(async (req) => {
       },
     });
     deleted++;
+    }));
   }
 
   return new Response(JSON.stringify({ scanned: batch.length, ok, removed, unknown, deleted, restored }), {

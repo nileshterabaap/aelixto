@@ -136,7 +136,13 @@ export async function validate(platform: string | null, url: string | null): Pro
       }
     }
 
-    // ===== Generic (Threads, X, LinkedIn, Pinterest, Quora, articles) =====
+    if (p === "x" || p === "twitter" || /(^|\/\/|\.)(x|twitter)\.com\//i.test(url)) {
+      const r = await fetchWithTimeout(`https://publish.twitter.com/oembed?omit_script=1&url=${encodeURIComponent(url)}`);
+      if (r.ok) return "ok";
+      return r.status === 404 ? "removed" : "unknown";
+    }
+
+    // ===== Generic (Threads, LinkedIn, Pinterest, Quora, articles) =====
     // These platforms aggressively block non-browser User-Agents and frequently
     // return 404/403/410 to anonymous server fetches even when the post is
     // public and embeddable. We cannot reliably distinguish "removed" from
