@@ -33,11 +33,8 @@ const config: CapacitorConfig = {
       // frame, so the handoff from the static OS splash is invisible.
       androidScaleType: "CENTER",
       showSpinner: false,
-      // Must stay false: a fullscreen/immersive splash hides the system bars
-      // at launch, so the WebView measures 0px safe-area insets and keeps them
-      // until the app is resumed (header under the notch, nav under buttons).
-      splashFullScreen: false,
-      splashImmersive: false,
+      splashFullScreen: true,
+      splashImmersive: true,
     },
     // NOTE: no `StatusBar` block on purpose. @capacitor-community/safe-area
     // owns edge-to-edge and the system bars; @capacitor/status-bar's
