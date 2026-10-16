@@ -1,2 +1,4 @@
 - [x] Implement fresh one-block navigation only for X and Threads.
 - [x] Check navigation rules, platform protections, and signed-in grid behavior.
+- [x] Remove unused packaged artwork without changing active logos, splash, or app features.
+- [x] Verify removed assets are unreferenced and remaining startup assets load.
