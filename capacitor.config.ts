@@ -28,7 +28,10 @@ const config: CapacitorConfig = {
       launchFadeOutDuration: 300,
       backgroundColor: "#FFFFFF",
       androidSplashResourceName: "splash",
-      androidScaleType: "CENTER_CROP",
+      // CENTER (not CENTER_CROP) shows the logo at its natural size, centered
+      // on white — visually identical to the animated HTML splash's first
+      // frame, so the handoff from the static OS splash is invisible.
+      androidScaleType: "CENTER",
       showSpinner: false,
       splashFullScreen: true,
       splashImmersive: true,
