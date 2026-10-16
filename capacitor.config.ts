@@ -24,7 +24,10 @@ const config: CapacitorConfig = {
       // Android's system splash is necessarily static. Keep it only until the
       // WebView paints, then hand off to the animated HTML splash immediately.
       launchShowDuration: 0,
-      launchAutoHide: false,
+      // autoHide: the plugin must NOT show its own splash after the OS launch
+      // screen — that second still splash is the white blink between the
+      // native icon and the animated HTML splash.
+      launchAutoHide: true,
       launchFadeOutDuration: 300,
       backgroundColor: "#FFFFFF",
       androidSplashResourceName: "splash",
