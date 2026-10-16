@@ -27,14 +27,16 @@ writeFileSync(
 </layer-list>
 `,
 );
-// Android 12+ icon: the system draws it in a 240dp box, so inset 56dp per side
-// to render the logo at exactly 128dp like the HTML splash.
+// Android 12+ icon: the system draws it in a 240dp box. The HTML splash logo
+// is 128 CSS px, which on a typical phone (dpr ~3.5) is only ~37dp — so inset
+// ~102dp per side to render the native icon at the same on-screen size,
+// otherwise the first splash looks smaller than the pulsing one.
 writeFileSync(
   join(res, "drawable", "splash_icon_blank.xml"),
   `<?xml version="1.0" encoding="utf-8"?>
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
     android:drawable="@drawable/splash_logo"
-    android:inset="56dp" />
+    android:inset="102dp" />
 `,
 );
 
