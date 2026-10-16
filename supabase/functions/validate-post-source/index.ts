@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
+import { checkInstagramSource, clearRestoredSourceAlerts } from "../_shared/sourceAvailability.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -58,31 +60,7 @@ export async function validate(platform: string | null, url: string | null): Pro
   try {
     // ===== Instagram =====
     if (p === "instagram" || /instagram\.com\//i.test(url)) {
-      // 1. Meta oEmbed (authoritative when permission granted)
-      if (meta) {
-        const r = await fetchWithTimeout(
-          `https://graph.facebook.com/v18.0/instagram_oembed?url=${encodeURIComponent(url)}&access_token=${meta}`
-        );
-        if (r.ok) return "ok";
-        if (r.status === 404 || r.status === 400) {
-          const text = await r.text();
-          // Any "not found"-style payload → removed/private.
-          // Permission errors (#10, #200) fall through to the redirect check below.
-          if (/not found|does not exist|unsupported|cannot be loaded|object with id|media_id|unavailable/i.test(text)) {
-            return "removed";
-          }
-        }
-      }
-      // 2. Redirect check — private/removed IG posts redirect to /accounts/login/
-      try {
-        const r = await fetchWithTimeout(url, { headers: { "User-Agent": UA } });
-        const finalUrl = r.url || "";
-        if (/\/accounts\/login\//i.test(finalUrl)) return "removed";
-        if (r.status === 404 || r.status === 410) return "removed";
-        // Public posts return 200 with the post HTML
-        if (r.ok) return "ok";
-      } catch (_e) { /* ignore */ }
-      return "unknown";
+      return await checkInstagramSource(url, meta, fetchWithTimeout);
     }
 
     // ===== Facebook =====
@@ -96,7 +74,7 @@ export async function validate(platform: string | null, url: string | null): Pro
         if (r.status === 404 || r.status === 400) {
           const text = await r.text();
           if (/not found|does not exist|unsupported|cannot be loaded|object with id|unavailable/i.test(text)) {
-            return "removed";
+            return "unknown";
           }
         }
       }
@@ -110,9 +88,9 @@ export async function validate(platform: string | null, url: string | null): Pro
           // and embeddable. Treat those as reachable instead of blocking image
           // posts at creation time.
           if (extractFacebookNextUrl(finalUrl)) return "ok";
-          return "removed";
+          return "unknown";
         }
-        if (r.status === 404 || r.status === 410) return "removed";
+        if (r.status === 404 || r.status === 410) return "unknown";
       } catch (_e) { /* ignore */ }
       return "unknown";
     }
@@ -125,7 +103,7 @@ export async function validate(platform: string | null, url: string | null): Pro
         `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${id}&format=json`
       );
       if (r.ok) return "ok";
-      if (r.status === 401 || r.status === 404 || r.status === 403) return "removed";
+      if (r.status === 404) return "removed";
       return "unknown";
     }
 
@@ -148,7 +126,7 @@ export async function validate(platform: string | null, url: string | null): Pro
       try {
         const j = await r.json();
         const post = j?.[0]?.data?.children?.[0]?.data;
-        if (!post) return "removed";
+        if (!post) return "unknown";
         if (post.removed_by_category || post.removed || post.selftext === "[removed]" || post.selftext === "[deleted]") {
           return "removed";
         }
@@ -191,6 +169,7 @@ export async function processPost(
       broken_check_count: 0,
       broken_first_seen_at: null,
     }).eq("id", post.id);
+    await clearRestoredSourceAlerts(supabase, post, verdict);
     return { verdict, deleted: false };
   }
 
@@ -216,6 +195,7 @@ export async function processPost(
     .eq("recipient_id", post.user_id)
     .eq("type", "report_outcome")
     .eq("post_id", post.id)
+    .eq("metadata->>kind", "source_removed")
     .limit(1)
     .maybeSingle();
   if (existing) return { verdict, deleted: false };
