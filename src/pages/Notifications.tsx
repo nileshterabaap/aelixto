@@ -2,8 +2,9 @@ import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { Heart, MessageCircle, Repeat2, Bell, Shield, UserPlus, UserCheck, MessageSquare } from "lucide-react";
-import { useState, useCallback, useEffect } from "react";
+import { Heart, MessageCircle, Repeat2, Bell, Shield, UserPlus, UserCheck, MessageSquare, Trash2 } from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { useSession } from "@/hooks/useSession";
 import { useNotifications, type Notification } from "@/hooks/useNotifications";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
@@ -282,6 +283,86 @@ const NotificationItem = ({
   );
 };
 
+const ACTION_W = 88;
+
+const SwipeToDelete = ({ children, onDelete }: { children: React.ReactNode; onDelete: () => void }) => {
+  const [x, setX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const start = useRef<{ x: number; y: number; base: number; axis: "x" | "y" | null } | null>(null);
+  const moved = useRef(false);
+
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    start.current = { x: t.clientX, y: t.clientY, base: x, axis: null };
+    moved.current = false;
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    const s = start.current;
+    if (!s) return;
+    const t = e.touches[0];
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    if (!s.axis) {
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      s.axis = Math.abs(dx) > Math.abs(dy) ? "x" : "y";
+    }
+    if (s.axis !== "x") return;
+    moved.current = true;
+    setDragging(true);
+    setX(Math.max(-ACTION_W * 1.6, Math.min(0, s.base + dx)));
+  };
+  const onTouchEnd = () => {
+    setDragging(false);
+    if (start.current?.axis === "x") setX(x < -ACTION_W / 2 ? -ACTION_W : 0);
+    start.current = null;
+  };
+
+  const doDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRemoving(true);
+    window.setTimeout(onDelete, 220);
+  };
+
+  return (
+    <div
+      className="relative overflow-hidden rounded-xl transition-all duration-200"
+      style={{ opacity: removing ? 0 : 1, transform: removing ? "translateX(-100%)" : undefined }}
+    >
+      <button
+        onClick={doDelete}
+        aria-label="Delete notification"
+        className="absolute inset-y-0 right-0 flex items-center justify-center gap-1 bg-destructive text-destructive-foreground text-sm font-semibold"
+        style={{ width: ACTION_W }}
+      >
+        <Trash2 className="h-4 w-4" /> Delete
+      </button>
+      <div
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        onTouchCancel={onTouchEnd}
+        onClickCapture={(e) => {
+          if (moved.current || x !== 0) {
+            e.stopPropagation();
+            e.preventDefault();
+            moved.current = false;
+            setX(0);
+          }
+        }}
+        className="relative bg-background rounded-xl"
+        style={{
+          transform: `translateX(${x}px)`,
+          transition: dragging ? "none" : "transform 0.25s cubic-bezier(0.22,1,0.36,1)",
+          touchAction: "pan-y",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+};
+
 const NotificationSkeleton = () => (
   <div className="glass-post-card p-4 rounded-xl">
     <div className="flex gap-3">
@@ -299,6 +380,8 @@ const Notifications = () => {
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const { notifications, isLoading, markAllRead, refetch } = useNotifications();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useSession();
 
   // Auto mark all as read when user opens the notifications page
   useEffect(() => {
@@ -324,6 +407,21 @@ const Notifications = () => {
   const handleRefresh = useCallback(async () => {
     await refetch();
   }, [refetch]);
+
+  const handleDelete = async (id: string) => {
+    const key = ["notifications", user?.id];
+    const prev = queryClient.getQueryData<Notification[]>(key);
+    const next = (prev ?? []).filter((n) => n.id !== id);
+    queryClient.setQueryData(key, next);
+    if (user?.id) {
+      try { localStorage.setItem(`aelixto-notifications-${user.id}`, JSON.stringify(next)); } catch { /* ignore */ }
+    }
+    const { error } = await supabase.from("notifications").delete().eq("id", id);
+    if (error) {
+      queryClient.setQueryData(key, prev);
+      toast.error("Couldn't delete notification");
+    }
+  };
 
   return (
     <div className="screen-nav bg-background">
@@ -352,11 +450,12 @@ const Notifications = () => {
           ) : (
             <div className="space-y-2">
               {notifications.map((notification) => (
-                <NotificationItem
-                  key={notification.id}
-                  notification={notification}
-                  onClick={() => handleNotificationClick(notification)}
-                />
+                <SwipeToDelete key={notification.id} onDelete={() => handleDelete(notification.id)}>
+                  <NotificationItem
+                    notification={notification}
+                    onClick={() => handleNotificationClick(notification)}
+                  />
+                </SwipeToDelete>
               ))}
             </div>
           )}
