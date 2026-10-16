@@ -20,7 +20,8 @@
     "platform:restore": "node scripts/platform-guard.mjs restore",
     "platform:seal": "node scripts/platform-guard.mjs seal",
     "platform:rotate": "node scripts/platform-guard.mjs rotate",
-    "assets:generate": "capacitor-assets generate --assetPath resources --android --ios --iconBackgroundColor '#ffffff' --iconBackgroundColorDark '#ffffff' --splashBackgroundColor '#ffffff' --splashBackgroundColorDark '#ffffff'"
+    "assets:generate": "capacitor-assets generate --assetPath resources --android --ios --iconBackgroundColor '#ffffff' --iconBackgroundColorDark '#ffffff' --splashBackgroundColor '#ffffff' --splashBackgroundColorDark '#ffffff' && node scripts/blank-native-splash.mjs",
+    "splash:blank": "node scripts/blank-native-splash.mjs"
   },
   "dependencies": {
     "@capacitor-community/in-app-review": "^8.0.0",
