@@ -16,6 +16,11 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: true,
+    // Transparent WebView: until the page paints, the window background (the
+    // same 128dp logo on white) shows through instead of the WebView's default
+    // white — that white frame was the blink before the pulsing splash. The
+    // page itself paints an opaque white html/body, so nothing else changes.
+    backgroundColor: "#FFFFFF00",
     overrideUserAgent:
       'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
   },
