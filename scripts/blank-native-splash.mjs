@@ -27,16 +27,24 @@ writeFileSync(
 </layer-list>
 `,
 );
-// Android 12+ icon: the system draws it in a 240dp box. The HTML splash logo
-// is 128 CSS px, which on a typical phone (dpr ~3.5) is only ~37dp — so inset
-// ~102dp per side to render the native icon at the same on-screen size,
-// otherwise the first splash looks smaller than the pulsing one.
+// Android 12+ icon: the system circle-masks EVERY splash icon. Without an icon
+// background color the mask is a 192dp circle inside a 288dp box; a 128dp logo
+// fits fully inside that circle (half-diagonal ≈ 91dp < 96dp), so it renders
+// unclipped. An explicit 128dp layer-list item is independent of the icon box
+// size (240dp/288dp varies by API level), and 128 CSS px = 128dp on Android,
+// so the static logo is the exact same on-screen size as the pulsing HTML one.
+// NOTE: never set windowSplashScreenIconBackgroundColor — it shrinks the mask
+// to a 160dp circle and clips the logo's corners.
 writeFileSync(
   join(res, "drawable", "splash_icon_blank.xml"),
   `<?xml version="1.0" encoding="utf-8"?>
-<inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:drawable="@drawable/splash_logo"
-    android:inset="102dp" />
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="128dp"
+        android:height="128dp"
+        android:gravity="center"
+        android:drawable="@drawable/splash_logo" />
+</layer-list>
 `,
 );
 
@@ -50,7 +58,6 @@ const launchStyle = `<style name="AppTheme.NoActionBarLaunch" parent="Theme.Spla
         <item name="android:background">@drawable/splash_blank</item>
         <item name="windowSplashScreenBackground">#FFFFFF</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon_blank</item>
-        <item name="windowSplashScreenIconBackgroundColor">#FFFFFF</item>
         <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>`;
 
@@ -60,5 +67,26 @@ const next = pattern.test(styles)
   ? styles.replace(pattern, launchStyle)
   : styles.replace("</resources>", `    ${launchStyle}\n</resources>`);
 
-writeFileSync(stylesPath, next);
+// The white blink between the OS splash and the first WebView paint is the
+// main theme's window background. Point it at the same logo frame so the gap
+// is invisible instead of a flash of blank white.
+let finalStyles = next;
+const mainMatch = next.match(/<style\s+name="AppTheme\.NoActionBar"[\s\S]*?<\/style>/);
+if (mainMatch) {
+  let mainStyle = mainMatch[0];
+  if (/<item\s+name="android:windowBackground">/.test(mainStyle)) {
+    mainStyle = mainStyle.replace(
+      /<item\s+name="android:windowBackground">[^<]*<\/item>/,
+      '<item name="android:windowBackground">@drawable/splash_blank</item>',
+    );
+  } else {
+    mainStyle = mainStyle.replace(
+      /(<style\s+name="AppTheme\.NoActionBar"[^>]*>)/,
+      `$1\n        <item name="android:windowBackground">@drawable/splash_blank</item>`,
+    );
+  }
+  finalStyles = next.replace(mainMatch[0], mainStyle);
+}
+
+writeFileSync(stylesPath, finalStyles);
 console.log("[native-splash] Android launch screen set to match the HTML splash first frame");
