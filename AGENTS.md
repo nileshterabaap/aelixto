@@ -5,3 +5,4 @@
 - Platform-specific block viewers keep only the landed post's player mounted and use empty scroll-snap neighbours for motion; fresh selection matches a direct grid opening without changing shared embed/scoring logic, while other viewers retain full-list anchored scrolling.
 - Grid position uses a read-only dial derived from rendered post ranks, isolated from media lifecycle and persistence so displaying position never records activity.
 - Keep only runtime-referenced artwork in `public/`; native icon/splash generation reads `resources/`, so unused public duplicates unnecessarily enlarge every installed app.
+- Both post renderers use the shared visibility-gated liked-by summary with viewer-scoped query caches and existing RLS-protected reads; social context stays separate from media lifecycle and scoring.

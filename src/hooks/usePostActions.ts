@@ -81,6 +81,8 @@ export const usePostActions = (
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["like", postId, userId] });
+      queryClient.invalidateQueries({ queryKey: ["liked-by", postId] });
+      queryClient.invalidateQueries({ queryKey: ["post-likes", postId] });
       queryClient.invalidateQueries({ queryKey: ["posts"] });
     },
   });

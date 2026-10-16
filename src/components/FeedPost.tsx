@@ -14,6 +14,7 @@ import { usePostActions } from "@/hooks/usePostActions";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
 import { LikesSheet } from "@/components/LikesSheet";
+import { LikedBySummary } from "@/components/LikedBySummary";
 import { LazyEmbed } from "@/components/LazyEmbed";
 import { CollapsibleCaption } from "@/components/CollapsibleCaption";
 import { UsernameLink } from "@/components/UsernameLink";
@@ -423,6 +424,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
           </div>
         </div>
         
+        <LikedBySummary postId={post.id} userId={userId} enabled={!!post.isRealPost} hidden={!!(post as any).hide_counts || !!(post as any).hide_likes} />
+
         {post.isRealPost && (
           <CommentsDialog 
             open={commentsOpen} 
@@ -855,6 +858,8 @@ export const FeedPost = ({ post, userId }: FeedPostProps) => {
         </div>
       </div>
       
+      <LikedBySummary postId={post.id} userId={userId} enabled={!!post.isRealPost} hidden={!!(post as any).hide_counts || !!(post as any).hide_likes} />
+
       {post.isRealPost && (
         <CommentsDialog 
           open={commentsOpen} 
@@ -892,6 +897,8 @@ const arePropsEqual = (prev: FeedPostProps, next: FeedPostProps) => {
     p.mediaUrl === n.mediaUrl &&
     p.thumbnailUrl === n.thumbnailUrl &&
     p.platform === n.platform &&
+    (p as any).hide_counts === (n as any).hide_counts &&
+    (p as any).hide_likes === (n as any).hide_likes &&
     p.saves === n.saves &&
     p.isRepost === n.isRepost &&
     p.repostedByUsername === n.repostedByUsername &&
