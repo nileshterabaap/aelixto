@@ -897,6 +897,8 @@ const arePropsEqual = (prev: FeedPostProps, next: FeedPostProps) => {
     p.mediaUrl === n.mediaUrl &&
     p.thumbnailUrl === n.thumbnailUrl &&
     p.platform === n.platform &&
+    (p as any).hide_counts === (n as any).hide_counts &&
+    (p as any).hide_likes === (n as any).hide_likes &&
     p.saves === n.saves &&
     p.isRepost === n.isRepost &&
     p.repostedByUsername === n.repostedByUsername &&
