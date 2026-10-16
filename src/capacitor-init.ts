@@ -144,6 +144,12 @@ export async function initCapacitorPlugins() {
     const { SafeArea, SystemBarsStyle } = await import("@capacitor-community/safe-area");
     // LIGHT = dark icons/content on our white background (both bars).
     await SafeArea.setSystemBarsStyle({ style: SystemBarsStyle.Light });
+    // Re-show both bars after the launch splash so Android re-sends the real
+    // insets immediately (otherwise they only refresh after a resume).
+    const reshow = () => { void SafeArea.showSystemBars({}).catch(() => {}); };
+    reshow();
+    setTimeout(reshow, 1500);
+    setTimeout(reshow, 3000);
   } catch (e) {
     console.warn("SafeArea plugin not available", e);
   }
