@@ -23,6 +23,7 @@ import { useState, useRef, memo, useCallback, useEffect, useMemo } from "react";
 import { EmbedSkeleton } from "@/components/EmbedSkeleton";
 
 import { usePostActions } from "@/hooks/usePostActions";
+import { LikedBySummary } from "@/components/LikedBySummary";
 import { useRepost } from "@/hooks/useReposts";
 import { CommentsDialog } from "@/components/CommentsDialog";
 import { SaveToCollectionSheet } from "@/components/saved/SaveToCollectionSheet";
@@ -878,6 +879,8 @@ export const HydratedFeedPost = ({ post, userId, isActive = true, startHydrated 
         </motion.button>
       </div>
       
+      <LikedBySummary postId={post.id} userId={userId} enabled={!!post.isRealPost} hidden={hideCounts || !!(post as any).hide_likes} />
+
       {post.isRealPost && (
         <CommentsDialog 
           open={commentsOpen} 
