@@ -38,6 +38,12 @@ copyFileSync(
   join(res, "drawable-nodpi", "splash_icon_padded.png"),
 );
 
+const stylesPath = join(res, "values", "styles.xml");
+if (!existsSync(stylesPath)) {
+  console.warn("[native-splash] styles.xml not found — skipped theme patch");
+  process.exit(0);
+}
+
 const launchStyle = `<style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:windowBackground">@drawable/splash_blank</item>
         <item name="windowSplashScreenBackground">#FFFFFF</item>
