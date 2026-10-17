@@ -158,9 +158,10 @@ function measureClip() {
       if (!presentedRef.current) {
         presentedRef.current = true;
         console.log('[ads] presentNativeAd overlay for adId =', adId, 'frame =', JSON.stringify(payload));
-        void GamNative.presentNativeAd({ ...payload,
+        const presentation = { ...payload,
           fadeInDurationMs: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 350,
-        }).then(() => {
+        };
+        void GamNative.presentNativeAd(presentation).then(() => {
           if (mountedRef.current) setPresented(true);
         }).catch(() => {
           presentedRef.current = false;
