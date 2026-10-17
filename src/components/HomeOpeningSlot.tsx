@@ -71,9 +71,15 @@ export function HomeOpeningSlot({ children, revealAllowed, onReady }: {
   }, []);
 
   const revealed = ready && revealAllowed;
+  useEffect(() => {
+    const root = contentRef.current;
+    if (!root) return;
+    if (revealed) root.removeAttribute('inert');
+    else root.setAttribute('inert', '');
+  }, [revealed]);
   return (
     <div className="home-opening-slot" data-revealed={revealed} aria-busy={!revealed}>
-      <div ref={contentRef} className="home-opening-content" aria-hidden={!revealed} inert={!revealed ? '' : undefined}>
+      <div ref={contentRef} className="home-opening-content" aria-hidden={!revealed}>
         {children}
       </div>
       <div className="home-opening-placeholder" aria-hidden><PostSkeleton /></div>
