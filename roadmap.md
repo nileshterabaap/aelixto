@@ -6,4 +6,4 @@
 - [x] Test summary rules and verify the likes-list flow signed in.
 - [x] Make source-deletion checks conservative across platforms and remove only deletion alerts when a source is confirmed restored.
 - [x] Test detection/recovery rules and verify existing-alert rechecks in Lovable Cloud.
-- [ ] Limit Home refreshes to app entry/resume, intentional pull-to-refresh, and Home tap at the top; verify scrolling keeps the feed stable.
+- [x] Limit Home refreshes to app entry/resume, intentional pull-to-refresh, and Home tap at the top; verify scrolling keeps the feed stable.
