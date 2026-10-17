@@ -1,6 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { preloadFeedImages, preloadProfileImages } from "./preloadImages";
+import { followingFeedQueryPolicy } from "./feedRefreshPolicy";
 
 // Centralized prefetch functions for instant navigation
 
@@ -89,9 +90,7 @@ export const prefetchFollowingFeed = async (queryClient: QueryClient) => {
     },
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-      // Match useFollowingFeed's own staleTime so warm returns to "/" render
-      // the cached feed instantly instead of triggering a refetch skeleton.
-      staleTime: 30 * 1000,
+    ...followingFeedQueryPolicy,
   });
 };
 

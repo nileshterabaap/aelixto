@@ -6,7 +6,7 @@ import { useSession } from "@/hooks/useSession";
 const invalidatePosts = (queryClient: ReturnType<typeof useQueryClient>, includeFeed = false) => {
   queryClient.invalidateQueries({ queryKey: ["posts"] });
   if (includeFeed) {
-    queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+    queryClient.invalidateQueries({ queryKey: ["following-feed"], refetchType: "none" });
   }
   queryClient.invalidateQueries({ queryKey: ["platform-posts"] });
   queryClient.invalidateQueries({ queryKey: ["user-platform-tabs"] });

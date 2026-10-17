@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { Loader2 } from "lucide-react";
+import { canStartFeedPull, feedPullDistance } from "@/lib/feedRefreshPolicy";
 
 interface PullToRefreshProps {
   onRefresh: () => Promise<void>;
@@ -32,6 +33,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const [refreshing, setRefreshing] = useState(false);
   const pullY = useMotionValue(0);
   const touchStartY = useRef(0);
+  const touchStartX = useRef(0);
   const pulling = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -54,15 +56,20 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   useEffect(() => {
     const handleTouchStart = (event: TouchEvent) => {
       if (refreshing) return;
-      if (shouldIgnorePullTarget(event.target)) return;
       const touch = event.touches[0];
       if (!touch) return;
 
+      // A normal upward scroll that reaches the top is not a refresh gesture.
+      pulling.current = canStartFeedPull(
+        isAtTop(),
+        Boolean(containerRef.current?.getClientRects().length),
+        Boolean(shouldIgnorePullTarget(event.target)),
+        event.touches.length,
+      );
+      if (!pulling.current) return;
+
       touchStartY.current = touch.clientY;
-      // Allow starting the gesture from any scroll position.
-      // We'll begin the actual pull only once the user reaches the top
-      // while still dragging downward (Instagram-style).
-      pulling.current = true;
+      touchStartX.current = touch.clientX;
     };
 
     // Toggle `body.at-scroll-top` so iframes become pointer-events:none
@@ -88,22 +95,13 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       if (!touch) return;
 
       const diff = touch.clientY - touchStartY.current;
-
-      if (diff > 0 && isAtTop()) {
-        // Re-anchor the start position the moment we hit the top, so the
-        // pull distance is measured from "top reached", not from finger-down.
-        const anchored = touch.clientY - touchStartY.current;
-        const dampened = Math.min(MAX_PULL, anchored * 0.5 * (1 - anchored / (anchored + 300)));
-        pullY.set(dampened);
+      const dx = touch.clientX - touchStartX.current;
+      if (!isAtTop() || event.touches.length !== 1 || diff < -8 || (Math.abs(dx) > 8 && Math.abs(dx) >= Math.abs(diff))) {
+        pulling.current = false;
+        pullY.set(0);
         return;
       }
-
-      if (!isAtTop()) {
-        // User is still scrolling normally — re-anchor so when they hit the
-        // top mid-gesture the pull starts cleanly from 0.
-        touchStartY.current = touch.clientY;
-      }
-      pullY.set(0);
+      pullY.set(feedPullDistance(dx, diff, isAtTop()));
     };
 
     const handleTouchEnd = () => {
@@ -133,6 +131,10 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
 
       animate(pullY, 0, { type: "spring", stiffness: 350, damping: 28 });
     };
+    const handleTouchCancel = () => {
+      pulling.current = false;
+      animate(pullY, 0, { type: "spring", stiffness: 350, damping: 28 });
+    };
 
     // Listen on window (capture phase) so touches over iframes, overlays,
     // and embeds still trigger PTR — matching Instagram's "pull from anywhere".
@@ -140,13 +142,13 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     window.addEventListener("touchstart", handleTouchStart, opts);
     window.addEventListener("touchmove", handleTouchMove, opts);
     window.addEventListener("touchend", handleTouchEnd, opts);
-    window.addEventListener("touchcancel", handleTouchEnd, opts);
+    window.addEventListener("touchcancel", handleTouchCancel, opts);
 
     return () => {
       window.removeEventListener("touchstart", handleTouchStart, opts);
       window.removeEventListener("touchmove", handleTouchMove, opts);
       window.removeEventListener("touchend", handleTouchEnd, opts);
-      window.removeEventListener("touchcancel", handleTouchEnd, opts);
+      window.removeEventListener("touchcancel", handleTouchCancel, opts);
       window.removeEventListener("scroll", updateAtTop);
       document.body.classList.remove("at-scroll-top");
     };
@@ -155,7 +157,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   // Programmatic refresh (Home tab tap at top of feed)
   useEffect(() => {
     const handleExternalRefresh = () => {
-      if (refreshing) return;
+      if (refreshing || !isAtTop() || !containerRef.current?.getClientRects().length) return;
       animate(pullY, LOADING_REST, { type: "spring", stiffness: 200, damping: 25 });
       setRefreshing(true);
       void (async () => {
@@ -172,7 +174,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     };
     window.addEventListener(FEED_REFRESH_EVENT, handleExternalRefresh);
     return () => window.removeEventListener(FEED_REFRESH_EVENT, handleExternalRefresh);
-  }, [onRefresh, pullY, refreshing]);
+  }, [isAtTop, onRefresh, pullY, refreshing]);
 
   return (
     <div

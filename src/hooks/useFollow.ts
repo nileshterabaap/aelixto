@@ -169,7 +169,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
         queryClient.invalidateQueries({ queryKey: ["profile"] });
         queryClient.invalidateQueries({ queryKey: ["user-profile"] });
         queryClient.invalidateQueries({ queryKey: ["user-search"] });
-        queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+        queryClient.invalidateQueries({ queryKey: ["following-feed"], refetchType: "none" });
         refresh();
       } catch (error) {
         console.error("Error following:", error);
@@ -199,7 +199,7 @@ export function useFollow(targetUserId?: string, options: UseFollowOptions = {})
         queryClient.invalidateQueries({ queryKey: ["profile"] });
         queryClient.invalidateQueries({ queryKey: ["user-profile"] });
         queryClient.invalidateQueries({ queryKey: ["user-search"] });
-        queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+        queryClient.invalidateQueries({ queryKey: ["following-feed"], refetchType: "none" });
         refresh();
       } catch (error) {
         console.error("Error unfollowing:", error);

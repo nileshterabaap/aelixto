@@ -17,7 +17,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useIframeScrollFreeze } from "@/hooks/useIframeScrollFreeze";
 import { SwipeableView } from "@/components/SwipeableView";
-import { markScrolledPast, reorderBySlowness, subscribeEmbedReadiness } from "@/lib/embedReadiness";
 import { useFeedWithAds } from "@/hooks/useFeedWithAds";
 import { NativeFeedAd } from "@/components/ads/NativeFeedAd";
 import { observeFeedPostForAds } from "@/lib/adCadence";
@@ -181,44 +180,8 @@ const Index = () => {
 
   const allPosts = showDemoFeed ? mappedDemoPosts : feedPosts;
 
-  // Subscribe to embed readiness so the feed reflows when slow posts time out
-  // or when previously-slow posts finish loading.
-  const [readinessTick, setReadinessTick] = useState(0);
-  useEffect(() => subscribeEmbedReadiness(() => setReadinessTick((t) => t + 1)), []);
-
-  // Reordered feed: posts whose embeds are still loading past the slow threshold
-  // sink below faster ones, but only for posts the user hasn't already committed
-  // to (rendered successfully or scrolled past).
-  const displayPosts = useMemo(
-    () => reorderBySlowness(allPosts as Array<{ id: string } & Record<string, any>>),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allPosts, readinessTick]
-  ) as typeof allPosts;
-
-  // Mark posts as "scrolled past" so they lock in place and never reshuffle
-  // under the user's eyes once they've moved beyond them.
-  const pastObserverRef = useRef<IntersectionObserver | null>(null);
-  useEffect(() => {
-    pastObserverRef.current = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const id = entry.target.getAttribute("data-feed-item-id");
-          if (!id) continue;
-          // boundingClientRect.bottom < 0 means the whole item is above the viewport top.
-          if (!entry.isIntersecting && entry.boundingClientRect.bottom < 0) {
-            markScrolledPast(id);
-          }
-        }
-      },
-      { rootMargin: "0px", threshold: 0 }
-    );
-    return () => pastObserverRef.current?.disconnect();
-  }, []);
-  const observeForPast = useCallback((el: HTMLElement | null) => {
-    const obs = pastObserverRef.current;
-    if (!obs || !el) return;
-    obs.observe(el);
-  }, []);
+  // Keep the fetched order stable regardless of embed loading or scroll direction.
+  const displayPosts = allPosts;
 
   const { registerItem } = useFeedAnchorRestoration(
     "/",
@@ -373,7 +336,6 @@ const Index = () => {
                       registerItem(post.id)(el);
                       if (!showDemoFeed && el) observePost(post.id)(el as HTMLDivElement);
                       if (!showDemoFeed && el) observeFeedPostForAds(el, post.id);
-                      if (el) observeForPast(el);
                       if (index === prefetchTriggerIndex) {
                         prefetchSentinelRef.current = el;
                       }

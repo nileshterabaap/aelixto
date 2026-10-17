@@ -382,7 +382,7 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                   await queryClient.invalidateQueries({ queryKey: ["is-blocked", u.id, profile.user_id] });
                   await queryClient.invalidateQueries({ queryKey: ["user-platform-tabs", profile.user_id] });
                   await queryClient.invalidateQueries({ queryKey: ["platform-posts", profile.user_id] });
-                  await queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+                  await queryClient.invalidateQueries({ queryKey: ["following-feed"], refetchType: "none" });
                   await refetchBlocked();
                   await refreshFollow();
                 }}

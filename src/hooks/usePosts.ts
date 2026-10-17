@@ -124,7 +124,7 @@ export const useCreatePost = () => {
       queryClient.removeQueries({ queryKey: ["user-posts"] });
 
       queryClient.invalidateQueries({ queryKey: ["posts"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["following-feed"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["following-feed"], refetchType: "none" });
       // The profile grid + tabs are powered by separate caches.
       // Without these the new post only appears after a manual refresh.
       queryClient.invalidateQueries({ queryKey: ["platform-posts"], refetchType: "all" });

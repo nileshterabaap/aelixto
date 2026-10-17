@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { preloadAllFeedImages } from '@/lib/preloadImages';
 import { useRef, useEffect, useMemo } from 'react';
 import { useSession } from '@/hooks/useSession';
+import { followingFeedQueryPolicy } from '@/lib/feedRefreshPolicy';
 
 interface FeedPost {
   id: string;
@@ -121,11 +122,8 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
     enabled: authReady,
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: 0, // feed depends on seen-state; always verify fresh data
+    ...followingFeedQueryPolicy,
     gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: 'always',
-    refetchOnReconnect: true,
     structuralSharing: true,
   });
 
