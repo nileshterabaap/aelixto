@@ -5,6 +5,7 @@ import { Header } from "@/components/Header";
 import { useCreatePostTrigger } from "@/hooks/useCreatePostTrigger";
 import { MemoizedHydratedFeedPost as FeedPost } from "@/components/HydratedFeedPost";
 import { PostSkeleton } from "@/components/PostSkeleton";
+import { HomeOpeningSlot } from "@/components/HomeOpeningSlot";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { usePosts } from "@/hooks/usePosts";
@@ -26,6 +27,7 @@ const Index = () => {
   const { user, loading: sessionLoading } = useSession();
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const hasRenderedOnce = useRef(false);
+  const [firstOpeningSlotReady, setFirstOpeningSlotReady] = useState(false);
   const queryClient = useQueryClient();
   useIframeScrollFreeze();
   const { observePost } = useMarkPostSeen(user?.id);
@@ -270,8 +272,8 @@ const Index = () => {
         <div className="screen-nav bg-background">
           <Header onCreatePost={() => setIsCreateDialogOpen(true)} />
           <main className="mx-auto max-w-2xl px-4 py-6">
-            <div className="space-y-4">
-              {[...Array(3)].map((_, i) => (
+            <div className="space-y-6">
+              {[...Array(2)].map((_, i) => (
                 <PostSkeleton key={i} />
               ))}
             </div>
@@ -323,9 +325,10 @@ const Index = () => {
             )
           ) : (
             <div className="space-y-6">
-              {feedWithAds.map((item) => {
+              {feedWithAds.map((item, feedIndex) => {
                 if (item.kind === 'ad') {
-                  return <NativeFeedAd key={`ad-${item.slotIndex}`} />;
+                  return <NativeFeedAd key={`ad-${item.slotIndex}`} openingSlot={feedIndex < 2}
+                    revealAllowed={feedIndex !== 1 || firstOpeningSlotReady} />;
                 }
                 const post = item.post as any;
                 const index = item.slotIndex;
@@ -342,11 +345,16 @@ const Index = () => {
                     }}
                     data-feed-item-id={post.id}
                   >
-                    <FeedPost
-                      post={post}
-                      userId={user?.id}
-                      startHydrated={index < 4}
-                    />
+                    {feedIndex < 2 ? (
+                      <HomeOpeningSlot
+                        revealAllowed={feedIndex === 0 || firstOpeningSlotReady}
+                        onReady={() => { if (feedIndex === 0) setFirstOpeningSlotReady(true); }}
+                      >
+                        <FeedPost post={post} userId={user?.id} startHydrated />
+                      </HomeOpeningSlot>
+                    ) : (
+                      <FeedPost post={post} userId={user?.id} startHydrated={index < 4} />
+                    )}
                   </div>
                 );
               })}

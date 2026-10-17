@@ -176,12 +176,17 @@ public class GamNativePlugin: CAPPlugin, GADNativeAdLoaderDelegate, GADAdLoaderD
         let y = CGFloat(call.getDouble("y") ?? 0)
         let w = CGFloat(call.getDouble("width") ?? 0)
         let h = CGFloat(call.getDouble("height") ?? 0)
+        let fadeDuration = Double(call.getInt("fadeInDurationMs") ?? 0) / 1000
         DispatchQueue.main.async {
             guard let host = self.bridge?.viewController?.view else { call.reject("no view"); return }
             self.adViews[adId]?.removeFromSuperview()
             let adView = self.buildNativeAdView(ad: ad)
             adView.frame = CGRect(x: x, y: y, width: w, height: h)
+            if fadeDuration > 0 { adView.alpha = 0 }
             host.addSubview(adView)
+            if fadeDuration > 0 {
+                UIView.animate(withDuration: fadeDuration) { adView.alpha = 1 }
+            }
             self.adViews[adId] = adView
             call.resolve()
         }

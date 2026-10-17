@@ -43,6 +43,8 @@ export interface GamNativePlugin {
     x: number; y: number; width: number; height: number;
     /** CSS px of chrome at the top/bottom the overlay must be clipped by. */
     clipTop?: number; clipBottom?: number;
+    /** Fade the complete card in once, without affecting later scroll updates. */
+    fadeInDurationMs?: number;
   }): Promise<void>;
   /** Reposition the overlay after scroll/resize. */
   updateNativeAdFrame(options: {
