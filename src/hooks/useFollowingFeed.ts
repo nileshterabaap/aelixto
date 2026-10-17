@@ -161,7 +161,7 @@ export const useFollowingFeed = (): UseFollowingFeedResult => {
   }, [data?.pages?.length]);
 
   const loadMore = () => {
-    if (hasNextPage && !isFetchingNextPage) {
+    if (hasNextPage && !isFetching && !isFetchingNextPage) {
       fetchNextPage();
     }
   };

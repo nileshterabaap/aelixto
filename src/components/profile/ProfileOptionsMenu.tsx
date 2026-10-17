@@ -102,7 +102,16 @@ export const ProfileOptionsMenu = ({
       // Force everything that could be showing this user to refetch — the
       // new RLS policies will now hide them from feed, search, profile,
       // followers/following lists, notifications, and conversations.
-      await queryClient.invalidateQueries();
+      // Remove blocked content locally without replacing the rest of Home.
+      await queryClient.cancelQueries({ queryKey: ["following-feed"] });
+      queryClient.setQueryData(["following-feed"], (old: any) => old?.pages ? {
+        ...old,
+        pages: old.pages.map((page: any) => ({
+          ...page,
+          posts: page.posts.filter((post: any) => post.user_id !== targetUserId && post.reposted_by_user_id !== targetUserId),
+        })),
+      } : old);
+      await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "following-feed" });
       onBlocked?.();
     } catch (error) {
       console.error("Error blocking user:", error);
@@ -128,7 +137,7 @@ export const ProfileOptionsMenu = ({
       if (error) throw error;
 
       toast.success(`Unblocked @${username}`);
-      await queryClient.invalidateQueries();
+      await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== "following-feed" });
       onUnblocked?.();
     } catch (error) {
       console.error("Error unblocking user:", error);
