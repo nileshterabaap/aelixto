@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Capacitor } from "@capacitor/core";
+import type { PluginListenerHandle } from "@capacitor/core";
+import { shouldRecoverQuery } from "@/lib/feedRefreshPolicy";
 
 /**
  * Mobile browsers/WebViews freeze timers while backgrounded, so the auth
@@ -12,10 +15,13 @@ import { supabase } from "@/integrations/supabase/client";
 export function useResumeRecovery(queryClient: QueryClient) {
   useEffect(() => {
     let last = 0;
-    const recover = async () => {
+    let backgrounded = document.visibilityState === "hidden";
+    let disposed = false;
+    let nativeListener: PluginListenerHandle | undefined;
+    const recover = async (appEntry = false) => {
       if (document.visibilityState === "hidden") return;
       const now = Date.now();
-      if (now - last < 3000) return;
+      if (!appEntry && now - last < 3000) return;
       last = now;
       try {
         supabase.auth.startAutoRefresh();
@@ -27,24 +33,58 @@ export function useResumeRecovery(queryClient: QueryClient) {
       } catch {
         /* network may still be waking up; queries retry below */
       }
-      queryClient.refetchQueries({
-        predicate: (q) => q.state.status === "error" || q.isStale(),
+      if (disposed) return;
+      if (appEntry) {
+        // A foreground refresh needs only the newest page, not every page
+        // the person scrolled through before leaving the app.
+        await queryClient.cancelQueries({ queryKey: ["following-feed"] });
+        queryClient.setQueryData(["following-feed"], (old: any) =>
+          old?.pages?.length > 1
+            ? { ...old, pages: old.pages.slice(0, 1), pageParams: old.pageParams.slice(0, 1) }
+            : old,
+        );
+      }
+      void queryClient.refetchQueries({
+        predicate: (q) => shouldRecoverQuery(q.queryKey[0], q.state.status === "error" || q.isStale(), appEntry),
         type: "active",
       });
     };
-    const onVis = () => {
-      if (document.visibilityState === "visible") recover();
-      else supabase.auth.stopAutoRefresh();
+    const onActiveChange = (active: boolean) => {
+      if (!active) {
+        backgrounded = true;
+        supabase.auth.stopAutoRefresh();
+      } else if (backgrounded) {
+        backgrounded = false;
+        void recover(true);
+      }
     };
+    const onVis = () => {
+      onActiveChange(document.visibilityState === "visible");
+    };
+    // Focus commonly changes when interacting with embedded players. It may
+    // recover other data, but is never proof that the user re-entered the app.
+    const onRecoverySignal = () => { void recover(); };
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) void recover(true);
+    };
+    if (Capacitor.isNativePlatform()) {
+      void import("@capacitor/app").then(async ({ App }) => {
+        const listener = await App.addListener("appStateChange", ({ isActive }) => onActiveChange(isActive));
+        if (disposed) await listener.remove();
+        else nativeListener = listener;
+      }).catch(() => { /* visibilitychange remains the fallback */ });
+    }
     document.addEventListener("visibilitychange", onVis);
-    window.addEventListener("online", recover);
-    window.addEventListener("focus", recover);
-    window.addEventListener("pageshow", recover);
+    window.addEventListener("online", onRecoverySignal);
+    window.addEventListener("focus", onRecoverySignal);
+    window.addEventListener("pageshow", onPageShow);
     return () => {
+      disposed = true;
+      void nativeListener?.remove();
       document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("online", recover);
-      window.removeEventListener("focus", recover);
-      window.removeEventListener("pageshow", recover);
+      window.removeEventListener("online", onRecoverySignal);
+      window.removeEventListener("focus", onRecoverySignal);
+      window.removeEventListener("pageshow", onPageShow);
     };
   }, [queryClient]);
 }
