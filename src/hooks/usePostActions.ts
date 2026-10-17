@@ -207,7 +207,7 @@ export const usePostActions = (
 
       // Invalidate every cache that may contain this post so the UI updates immediately
       queryClient.invalidateQueries({ queryKey: ["posts"] });
-      queryClient.invalidateQueries({ queryKey: ["following-feed"] });
+      queryClient.invalidateQueries({ queryKey: ["following-feed"], refetchType: "none" });
       queryClient.invalidateQueries({ queryKey: ["platform-posts"] });
       queryClient.invalidateQueries({ queryKey: ["saved-posts"] });
       queryClient.invalidateQueries({ queryKey: ["user-posts"] });
