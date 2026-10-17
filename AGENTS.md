@@ -1,5 +1,7 @@
 # Project architecture
 
+- Home opening slots use a presentation-only whole-card gate, load mounted children concurrently, and reveal in feed order; native ads reserve their opening slot and fade their complete SDK overlay after presentation, without altering protected playback/scoring or feed refresh rules.
+
 - Home keeps a stable session snapshot: mutation/realtime invalidations never refetch it, loading readiness never reorders it, and foreground recovery distinguishes actual background return from iframe focus/network events so only app entry or explicit top refresh replaces it.
 
 - Native startup keeps the OS launch screen logo-free (patched by `scripts/blank-native-splash.mjs` inside `assets:generate`, since `android/` is local-only) until the WebView paints, then hands off to the animated HTML splash; its visible interval starts after the bounded native hide/fade completes so slow bridges cannot hide the animation.

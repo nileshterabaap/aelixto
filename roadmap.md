@@ -7,3 +7,5 @@
 - [x] Make source-deletion checks conservative across platforms and remove only deletion alerts when a source is confirmed restored.
 - [x] Test detection/recovery rules and verify existing-alert rechecks in Lovable Cloud.
 - [x] Limit Home refreshes to app entry/resume, intentional pull-to-refresh, and Home tap at the top; verify scrolling keeps the feed stable.
+- [ ] Keep the first two Home slots as whole-card placeholders, load concurrently, and reveal in order, including native ads.
+- [ ] Verify opening transitions and unchanged platform protections; native ad rendering requires a phone rebuild.

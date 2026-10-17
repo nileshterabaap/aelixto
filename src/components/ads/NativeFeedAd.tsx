@@ -4,6 +4,7 @@ import { AD_MIN_REQUEST_INTERVAL_MS, getNativeFeedAdUnitId, isAdTestMode } from 
 import { adsReady } from '@/lib/adConsent';
 import { noteAdShown } from '@/lib/adCadence';
 import { GamNative, type NativeAdCreative } from 'aelixto-gam-native';
+import { PostSkeleton } from '@/components/PostSkeleton';
 
 let lastRequestAt = 0;
 let slotSeq = 0;
@@ -66,7 +67,10 @@ async function requestNativeAd(tag: string): Promise<NativeAdCreative | null> {
  *  - consent/SDK not ready
  *  - no-fill from AdX
  */
-export function NativeFeedAd() {
+export function NativeFeedAd({ openingSlot = false, revealAllowed = true }: {
+  openingSlot?: boolean;
+  revealAllowed?: boolean;
+}) {
   const [ad, setAd] = useState<NativeAdCreative | null>(null);
   const [ready, setReady] = useState(false);
   const mountedRef = useRef(true);
@@ -75,6 +79,7 @@ export function NativeFeedAd() {
   const presentedRef = useRef(false);
   const tagRef = useRef(`[slot#${++slotSeq}]`);
   const [aspect, setAspect] = useState<number>(16 / 9);
+  const [presented, setPresented] = useState(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -84,6 +89,7 @@ export function NativeFeedAd() {
       const ok = await adsReady();
       if (!ok || !mountedRef.current) {
         console.log(`[ads]${tag} step 1 BLOCKED: adsReady =`, ok, '| stillMounted =', mountedRef.current);
+        if (mountedRef.current) setReady(true);
         return;
       }
       console.log(`[ads]${tag} step 1 OK: consent resolved + SDK initialized`);
@@ -96,7 +102,7 @@ export function NativeFeedAd() {
           const img = new Image();
           img.onload = () => res(img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 0);
           img.onerror = () => res(0);
-          img.src = creative.imageUrl!;
+          img.src = creative.imageUrl ?? '';
           setTimeout(() => res(0), 3000);
         });
       }
@@ -118,7 +124,7 @@ export function NativeFeedAd() {
   // Mount + reposition the native NativeAdView overlay so Google's SDK
   // auto-tracks impressions and billable clicks.
   useEffect(() => {
-    if (!ad?.adId || !slotRef.current) return;
+    if (!ad?.adId || !slotRef.current || !revealAllowed) return;
     const adId = ad.adId;
     const el = slotRef.current;
 
@@ -152,7 +158,13 @@ function measureClip() {
       if (!presentedRef.current) {
         presentedRef.current = true;
         console.log('[ads] presentNativeAd overlay for adId =', adId, 'frame =', JSON.stringify(payload));
-        void GamNative.presentNativeAd(payload).catch(() => {});
+        void GamNative.presentNativeAd({ ...payload,
+          fadeInDurationMs: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 350,
+        }).then(() => {
+          if (mountedRef.current) setPresented(true);
+        }).catch(() => {
+          presentedRef.current = false;
+        });
       } else {
         void GamNative.updateNativeAdFrame(payload).catch(() => {});
       }
@@ -173,12 +185,12 @@ function measureClip() {
       ro.disconnect();
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [ad?.adId]);
+  }, [ad?.adId, revealAllowed]);
 
   // Count the ad as shown once half of it is on screen; restarts the
   // seen-posts counter that decides where the next ad goes.
   useEffect(() => {
-    if (!ad?.adId || !slotRef.current) return;
+    if (!ad?.adId || !slotRef.current || !presented) return;
     const obs = new IntersectionObserver(([e]) => {
       if (e.isIntersecting && e.intersectionRatio >= 0.5) {
         noteAdShown();
@@ -187,9 +199,10 @@ function measureClip() {
     }, { threshold: 0.5 });
     obs.observe(slotRef.current);
     return () => obs.disconnect();
-  }, [ad?.adId]);
+  }, [ad?.adId, presented]);
 
-  if (!ready || !ad) return null;
+  if (!ready) return openingSlot ? <PostSkeleton /> : null;
+  if (!ad) return null;
 
   // Invisible placeholder laid out exactly like the native card (header,
   // headline, media at the poster's own proportions, caption, CTA bar), so the
@@ -198,6 +211,8 @@ function measureClip() {
   // Very tall posters are capped at 4:5 (like feed media) and shown uncropped.
   const mediaRatio = Math.max(aspect, 0.8);
   return (
+    <div className="relative w-full">
+    {openingSlot && !presented && <div className="absolute inset-0 overflow-hidden rounded-[2rem] bg-muted/70"><PostSkeleton /></div>}
     <div
       ref={slotRef}
       aria-hidden
@@ -219,6 +234,7 @@ function measureClip() {
         {ad.body ?? ''}
       </div>
       <div style={{ height: 56 }} />
+    </div>
     </div>
   );
 }

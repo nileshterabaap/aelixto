@@ -306,6 +306,7 @@ public class GamNativePlugin extends Plugin {
         final int h = call.getInt("height", 0);
         final int clipTop = call.getInt("clipTop", 0);
         final int clipBottom = call.getInt("clipBottom", 0);
+        final int fadeMs = call.getInt("fadeInDurationMs", 0);
         final Activity activity = getActivity();
         if (activity == null) { call.reject("no activity"); return; }
 
@@ -315,6 +316,7 @@ public class GamNativePlugin extends Plugin {
                 ((ViewGroup) existing.getParent()).removeView(existing);
             }
             ScrollForwardingAdFrame adView = buildNativeAdView(activity, ad);
+            if (fadeMs > 0) adView.setAlpha(0f);
             adViews.put(adId, adView);
 
             clipTopPx = dp(clipTop);
@@ -324,6 +326,7 @@ public class GamNativePlugin extends Plugin {
             lp.gravity = Gravity.TOP | Gravity.START;
             host.addView(adView, lp);
             placeAdView(adView, x, y);
+            if (fadeMs > 0) adView.animate().alpha(1f).setDuration(fadeMs).start();
             call.resolve();
         });
     }

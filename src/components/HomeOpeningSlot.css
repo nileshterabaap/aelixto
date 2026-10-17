@@ -1,0 +1,9 @@
+.home-opening-slot { position: relative; width: 100%; min-height: 420px; }
+.home-opening-content { width: 100%; opacity: 0; pointer-events: none; position: absolute; inset: 0 0 auto; }
+.home-opening-placeholder { position: relative; opacity: 1; pointer-events: none; }
+.home-opening-slot[data-revealed="true"] .home-opening-content { position: relative; opacity: 1; pointer-events: auto; transition: opacity 350ms ease-out; }
+.home-opening-slot[data-revealed="true"] .home-opening-placeholder { position: absolute; inset: 0; opacity: 0; transition: opacity 350ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .home-opening-slot[data-revealed="true"] .home-opening-content,
+  .home-opening-slot[data-revealed="true"] .home-opening-placeholder { transition: none; }
+}
