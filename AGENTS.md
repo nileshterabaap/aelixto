@@ -1,5 +1,7 @@
 # Project architecture
 
+- The shared loading mark animates separate HTML compositor layers around static SVG artwork rather than SVG groups, avoiding per-frame SVG painting during native embed loading.
+
 - Home opening slots use a presentation-only whole-card gate, load mounted children concurrently, and reveal in feed order; native ads reserve their opening slot and fade their complete SDK overlay after presentation, without altering protected playback/scoring or feed refresh rules.
 
 - Home keeps a stable session snapshot: mutation/realtime invalidations never refetch it, loading readiness never reorders it, and foreground recovery distinguishes actual background return from iframe focus/network events so only app entry or explicit top refresh replaces it.

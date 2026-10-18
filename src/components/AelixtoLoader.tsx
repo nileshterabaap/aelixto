@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import "./AelixtoLoader.css";
 
 interface AelixtoLoaderProps {
   size?: number;
@@ -17,7 +18,7 @@ export const AelixtoLoader = ({ size = 72, className, done = false }: AelixtoLoa
   return (
     <div
       className={cn(
-        "inline-flex items-center justify-center transition-opacity duration-500 ease-out",
+        "aelixto-loader inline-flex items-center justify-center transition-opacity duration-500 ease-out",
         done ? "opacity-0" : "opacity-100",
         className,
       )}
@@ -25,15 +26,9 @@ export const AelixtoLoader = ({ size = 72, className, done = false }: AelixtoLoa
       aria-label="Loading"
       role="status"
     >
-      <svg
-        viewBox="0 0 100 100"
-        width={size}
-        height={size}
-        className="aelixto-loader-svg"
-        style={{ overflow: "visible" }}
-      >
+      <span className="aelixto-loader-layer aelixto-loader-blue" aria-hidden="true">
+        <svg viewBox="0 0 100 100">
         {/* Blue rounded square — rotates clockwise */}
-        <g className="aelixto-loader-blue" style={{ transformOrigin: "50px 50px" }}>
           <rect
             x="18"
             y="18"
@@ -46,9 +41,11 @@ export const AelixtoLoader = ({ size = 72, className, done = false }: AelixtoLoa
             strokeWidth="6"
             transform="rotate(45 44 44)"
           />
-        </g>
+        </svg>
+      </span>
+      <span className="aelixto-loader-layer aelixto-loader-orange" aria-hidden="true">
+        <svg viewBox="0 0 100 100">
         {/* Orange rounded square — rotates counter-clockwise */}
-        <g className="aelixto-loader-orange" style={{ transformOrigin: "50px 50px" }}>
           <rect
             x="30"
             y="30"
@@ -61,36 +58,8 @@ export const AelixtoLoader = ({ size = 72, className, done = false }: AelixtoLoa
             strokeWidth="4"
             transform="rotate(45 56 56)"
           />
-        </g>
-      </svg>
-
-      <style>{`
-        @keyframes aelixto-spin-cw {
-          0%   { transform: rotate(0deg)   scale(1); }
-          50%  { transform: rotate(180deg) scale(0.9); }
-          100% { transform: rotate(360deg) scale(1); }
-        }
-        @keyframes aelixto-spin-ccw {
-          0%   { transform: rotate(0deg)    scale(1); }
-          50%  { transform: rotate(-180deg) scale(1.1); }
-          100% { transform: rotate(-360deg) scale(1); }
-        }
-        .aelixto-loader-blue {
-          animation: aelixto-spin-cw 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-          transform-box: fill-box;
-          transform-origin: center;
-        }
-        .aelixto-loader-orange {
-          animation: aelixto-spin-ccw 2.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-          transform-box: fill-box;
-          transform-origin: center;
-        }
-        @media (prefers-reduced-motion: reduce) {
-          .aelixto-loader-blue, .aelixto-loader-orange {
-            animation-duration: 6s;
-          }
-        }
-      `}</style>
+        </svg>
+      </span>
     </div>
   );
 };
