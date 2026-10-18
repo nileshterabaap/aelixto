@@ -9,4 +9,6 @@
 - [x] Limit Home refreshes to app entry/resume, intentional pull-to-refresh, and Home tap at the top; verify scrolling keeps the feed stable.
 - [x] Keep the first two Home slots as whole-card placeholders, load concurrently, and reveal in order, including native ads.
 - [x] Verify controlled delayed-content transitions and unchanged platform protections; signed-in Home currently has no unseen posts.
-- [ ] Verify real opening posts and native ad fades on phone — blocked on a rebuilt APK and unseen feed content.
+- [x] Verify real opening posts and native ad fades on phone — user confirmed working in the app.
+- [x] Move spinning loader animation to composited HTML layers while preserving its artwork and timing.
+- [ ] Confirm loader smoothness on phone — requires rebuilt APK and device testing.
