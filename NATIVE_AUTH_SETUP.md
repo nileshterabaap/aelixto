@@ -5,7 +5,7 @@ Aelixto now uses the **fully native** provider flows on device:
 | Platform | Google | Apple |
 |---|---|---|
 | Android | Credential Manager bottom sheet | web flow (Apple has no Android SDK) |
-| iOS | GoogleSignIn SDK sheet | `ASAuthorizationController` sheet |
+| iOS | web flow in SFSafariViewController (see §3) | `ASAuthorizationController` sheet |
 | Web | managed broker popup | managed broker popup |
 
 The native flows return an OIDC **ID token** which is exchanged in-process via
@@ -35,10 +35,17 @@ Create three OAuth client IDs in the **same project**:
 
 Cloud → Users → Authentication Settings → Sign In Methods:
 - **Google** → "use your own credentials" → paste the **web** client ID +
-  secret, and add the **iOS** client ID to the authorized client IDs list.
+  secret. This screen has **one** Client ID field — there is no authorized /
+  allowed client-ID list, so the iOS client ID cannot be registered here.
 - **Apple** → "use your own credentials" → Services ID + generated JWT secret.
 
-Without this the ID tokens are rejected (`audience mismatch`).
+Without the matching client ID the ID tokens are rejected (`audience mismatch`).
+Consequence for Google on iPhone: the GoogleSignIn SDK mints its ID token for
+the *iOS* client ID, which the backend cannot verify, so
+`canUseNativeSocialAuth("google")` deliberately returns false on iOS and the
+app uses the web flow (SFSafariViewController → `/~auth-bridge` deep link).
+Android is unaffected: Credential Manager mints its token for the **web**
+client ID, which is the one the backend holds.
 
 ## 4. Env vars (public identifiers, not secrets)
 
