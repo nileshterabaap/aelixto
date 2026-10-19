@@ -1,0 +1,54 @@
+# Aelixto iOS → TestFlight. Started manually from Codemagic only.
+workflows:
+  ios-testflight:
+    name: Aelixto iOS (TestFlight)
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Aelixto ASC Key   # name of the API key you added in Codemagic
+    environment:
+      node: 20
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.aelixto.app10
+        # Upload signing profiles for BOTH ids in Codemagic → Code signing identities.
+      vars:
+        APP_STORE_APPLE_ID: "" # optional: numeric Apple ID from App Store Connect → App Information
+        XCODE_PROJECT: ios/App/App.xcodeproj
+        XCODE_SCHEME: App
+    triggering:
+      events: []   # never auto-build on push
+    scripts:
+      - name: Install dependencies
+        script: npm ci
+      - name: Build web app
+        script: npm run build
+      - name: Generate icons and launch screen
+        script: npm run assets:generate
+      - name: Sync iOS
+        script: npx cap sync ios
+      - name: Configure Xcode targets (entitlements + Share Extension)
+        script: |
+          gem install xcodeproj --no-document
+          ruby scripts/ios/configure-xcode.rb
+      - name: Signing for app and Share Extension
+        script: |
+          # Profiles for com.aelixto.app10 and com.aelixto.app10.ShareExtension
+          # are fetched automatically by ios_signing above (extensions share the prefix).
+          xcode-project use-profiles --project "$XCODE_PROJECT"
+      - name: Set build number
+        script: |
+          cd ios/App
+          agvtool new-version -all $(($BUILD_NUMBER + 1))
+      - name: Build IPA
+        script: |
+          xcode-project build-ipa --project "$XCODE_PROJECT" --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false

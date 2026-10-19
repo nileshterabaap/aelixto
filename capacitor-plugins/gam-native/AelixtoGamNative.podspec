@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   s.author       = 'Aelixto'
   s.source       = { :git => 'https://aelixto.com', :tag => s.version.to_s }
   s.source_files = 'ios/Plugin/**/*.{swift,h,m}'
-  s.ios.deployment_target = '13.0'
+  s.ios.deployment_target = '15.0'
   s.dependency 'Capacitor'
   s.dependency 'Google-Mobile-Ads-SDK', '~> 11.10'
   s.dependency 'GoogleUserMessagingPlatform', '~> 2.6'

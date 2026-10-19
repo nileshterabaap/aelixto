@@ -12,3 +12,9 @@
 - [x] Verify real opening posts and native ad fades on phone — user confirmed working in the app.
 - [x] Move spinning loader animation to composited HTML layers while preserving its artwork and timing.
 - [ ] Confirm loader smoothness on phone — requires rebuilt APK and device testing.
+## iOS release
+- [x] iPhone project, SPM add-on packaging, settings, Share Extension, push hook, ad card, launch screen, Codemagic workflow
+- [ ] Google iOS OAuth client ID (waits on user, Google Cloud)
+- [ ] Confirm iPhone ad app ID + ad unit with GameAdZone (waits on user)
+- [ ] APNs + Sign in with Apple keys, then backend providers (waits on user)
+- [ ] Codemagic signing for both IDs + first TestFlight build (user)

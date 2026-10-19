@@ -17,6 +17,13 @@ public class SendIntentPlugin: CAPPlugin, CAPBridgedPlugin {
     let store = ShareStore.store
 
     @objc func checkSendIntentReceived(_ call: CAPPluginCall) {
+        // Aelixto Share Extension hands links over through the App Group.
+        let defaults = UserDefaults(suiteName: "group.com.aelixto.app10")
+        if let shared = defaults?.string(forKey: "aelixto.pendingSharedUrl"), !shared.isEmpty {
+            defaults?.removeObject(forKey: "aelixto.pendingSharedUrl")
+            call.resolve(["title": shared, "description": "", "type": "text/plain", "url": shared, "additionalItems": []])
+            return
+        }
         if !store.processed {
             let firstItem: JSObject? = store.shareItems.first
             let additionalItems: Array<JSObject> = store.shareItems.count > 1 ? Array(store.shareItems[1...]) : []
