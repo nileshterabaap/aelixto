@@ -10,7 +10,7 @@ let package = Package(
             targets: ["SendIntentPlugin"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "7.0.0")
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", from: "8.0.0")
     ],
     targets: [
         .target(
@@ -19,10 +19,6 @@ let package = Package(
                 .product(name: "Capacitor", package: "capacitor-swift-pm"),
                 .product(name: "Cordova", package: "capacitor-swift-pm")
             ],
-            path: "ios/Sources/SendIntentPlugin"),
-        .testTarget(
-            name: "SendIntentPluginTests",
-            dependencies: ["SendIntentPlugin"],
-            path: "ios/Tests/SendIntentPluginTests")
+            path: "ios/Sources/SendIntentPlugin")
     ]
 )

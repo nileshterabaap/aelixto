@@ -1,7 +1,7 @@
 {
   "name": "aelixto-gam-native",
   "version": "0.1.0",
-  "description": "Custom Capacitor plugin — Google Ad Manager (AdX) native ads for Android + iOS.",
+  "description": "Custom Capacitor plugin \u2014 Google Ad Manager (AdX) native ads for Android + iOS.",
   "main": "src/index.ts",
   "module": "src/index.ts",
   "types": "src/index.ts",
@@ -10,17 +10,22 @@
     "android/build.gradle",
     "dist/",
     "ios/Plugin/",
-    "AelixtoGamNative.podspec"
+    "AelixtoGamNative.podspec",
+    "Package.swift"
   ],
   "capacitor": {
-    "ios": { "src": "ios" },
-    "android": { "src": "android" }
+    "ios": {
+      "src": "ios"
+    },
+    "android": {
+      "src": "android"
+    }
   },
   "scripts": {
     "build": "tsc"
   },
   "peerDependencies": {
-    "@capacitor/core": "^7.0.0"
+    "@capacitor/core": ">=7.0.0"
   },
   "devDependencies": {
     "@capacitor/core": "^7.0.0",
