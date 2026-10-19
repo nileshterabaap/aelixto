@@ -364,10 +364,12 @@ const Auth = () => {
             description: (res.message || "Unknown reason").slice(0, 180),
             variant: "destructive",
           });
-        } else if (provider === "apple") {
-          // Android has no native Apple SDK — use Apple's web OAuth flow in a
-          // Chrome Custom Tab. Tokens return via the /~auth-bridge deep link.
-          await browserSocialSignIn("apple");
+        } else if (provider === "apple" || Capacitor.getPlatform() === "ios") {
+          // No native surface for this provider/OS: Android has no Apple SDK,
+          // and iOS Google must use the web flow (see canUseNativeSocialAuth).
+          // Both open the provider's OAuth page in a system browser surface and
+          // the tokens return via the /~auth-bridge deep link.
+          await browserSocialSignIn(provider);
           return;
         } else {
           toast({

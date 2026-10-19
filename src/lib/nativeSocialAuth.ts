@@ -85,6 +85,18 @@ export const canUseNativeSocialAuth = (provider: "google" | "apple") => {
   }
   // Sign in with Apple has no native surface on Android; it must use the web flow.
   if (provider === "apple" && Capacitor.getPlatform() !== "ios") return false;
+  // Google's iOS SDK mints its ID token for the *iOS* client ID, but the auth
+  // provider holds exactly one Google client ID — the web one (Lovable Cloud's
+  // Google settings has a single Client ID field, no authorized-client-ID list),
+  // so the exchange would fail audience verification. iOS Google therefore uses
+  // the web flow. Android's Credential Manager mints for the web client ID and
+  // does work natively.
+  if (provider === "google" && Capacitor.getPlatform() === "ios") {
+    console.log(
+      "[auth] native google sign-in disabled on iOS: the backend only knows the web client id — using the web flow.",
+    );
+    return false;
+  }
   console.log(`[auth] native ${provider} sign-in available`);
   return true;
 };
