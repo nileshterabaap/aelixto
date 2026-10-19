@@ -23,7 +23,8 @@ const env = import.meta.env as Record<string, string | undefined>;
  */
 const FALLBACK_GOOGLE_WEB_CLIENT_ID =
   "7514336584-arjbr39ma6f15i891bb7v5ag5h1htjvn.apps.googleusercontent.com";
-const FALLBACK_GOOGLE_IOS_CLIENT_ID = "";
+const FALLBACK_GOOGLE_IOS_CLIENT_ID =
+  "7514336584-gqomjc8oli82892pqucef43t1v702ehl.apps.googleusercontent.com";
 
 /** Only accept a real Google client id; a mistyped/placeholder env value
  *  (e.g. "@secret:GOOGLE_OAUTH_CLIENT_ID git pull") must never reach the
