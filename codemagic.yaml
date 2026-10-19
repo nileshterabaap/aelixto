@@ -12,6 +12,7 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.aelixto.app10
+        # Upload signing profiles for BOTH ids in Codemagic → Code signing identities.
       vars:
         APP_STORE_APPLE_ID: "" # optional: numeric Apple ID from App Store Connect → App Information
         XCODE_PROJECT: ios/App/App.xcodeproj
@@ -33,10 +34,8 @@ workflows:
           ruby scripts/ios/configure-xcode.rb
       - name: Signing for app and Share Extension
         script: |
-          app-store-connect fetch-signing-files com.aelixto.app10 --type IOS_APP_STORE --create
-          app-store-connect fetch-signing-files com.aelixto.app10.ShareExtension --type IOS_APP_STORE --create
-          keychain initialize
-          keychain add-certificates
+          # Profiles for com.aelixto.app10 and com.aelixto.app10.ShareExtension
+          # are fetched automatically by ios_signing above (extensions share the prefix).
           xcode-project use-profiles --project "$XCODE_PROJECT"
       - name: Set build number
         script: |
