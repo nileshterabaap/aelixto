@@ -6,6 +6,18 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
+// iOS: the LaunchScreen storyboard shows Splash.imageset; replace its images
+// with plain white so iOS also goes straight to the animated HTML splash.
+{
+  const { copyFileSync, readdirSync } = await import("node:fs");
+  const set = join(process.cwd(), "ios", "App", "App", "Assets.xcassets", "Splash.imageset");
+  const blank = join(process.cwd(), "resources", "ios-splash-blank.png");
+  if (existsSync(set) && existsSync(blank)) {
+    for (const f of readdirSync(set)) if (f.endsWith(".png")) copyFileSync(blank, join(set, f));
+    console.log("[blank-native-splash] iOS launch screen blanked");
+  }
+}
+
 const res = join(process.cwd(), "android", "app", "src", "main", "res");
 if (!existsSync(res)) {
   console.log("[blank-native-splash] no android/ folder — skipped");
@@ -53,14 +65,3 @@ const next = pattern.test(styles)
 writeFileSync(stylesPath, next);
 console.log("[blank-native-splash] Android launch screen set to plain white");
 
-// iOS: the LaunchScreen storyboard shows Splash.imageset; replace its images
-// with plain white so iOS also goes straight to the animated HTML splash.
-{
-  const { copyFileSync, readdirSync } = await import("node:fs");
-  const set = join(process.cwd(), "ios", "App", "App", "Assets.xcassets", "Splash.imageset");
-  const blank = join(process.cwd(), "resources", "ios-splash-blank.png");
-  if (existsSync(set) && existsSync(blank)) {
-    for (const f of readdirSync(set)) if (f.endsWith(".png")) copyFileSync(blank, join(set, f));
-    console.log("[blank-native-splash] iOS launch screen blanked");
-  }
-}
