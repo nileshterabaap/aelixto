@@ -7,7 +7,7 @@ workflows:
     integrations:
       app_store_connect: Aelixto ASC Key   # name of the API key you added in Codemagic
     environment:
-      node: 20
+      node: 22   # Capacitor 8 CLI requires Node 22+
       xcode: latest
       ios_signing:
         distribution_type: app_store
