@@ -5,7 +5,7 @@ workflows:
     max_build_duration: 90
     instance_type: mac_mini_m2
     integrations:
-      app_store_connect: Aelixto ASC Key   # name of the API key you added in Codemagic
+      app_store_connect: Aelixto Codemagic   # name of the API key you added in Codemagic
     environment:
       node: 22   # Capacitor 8 CLI requires Node 22+
       xcode: latest
