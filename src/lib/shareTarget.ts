@@ -51,6 +51,33 @@ const extractUrl = (raw: string): string => {
   return (match ? match[0] : raw).trim();
 };
 
+let lastNativeLink: string | null = null;
+
+/**
+ * Hands a link read from the native share bridge to the composer.
+ *
+ * Android keeps returning the launch share intent on every app resume, so
+ * the same link would be re-delivered each time the user comes back (and
+ * would close/reopen an open composer, losing their edits). On Android a
+ * link is therefore delivered once per app session. iOS clears its App
+ * Group hand-off after each read, so every iOS read is a genuine new share.
+ */
+export const acceptNativeSharedLink = (
+  url: string,
+  platform: string = Capacitor.getPlatform(),
+  now = Date.now(),
+): boolean => {
+  if (platform === "android" && url === lastNativeLink) return false;
+  lastNativeLink = url;
+  setPendingSharedLink(url, now);
+  return true;
+};
+
+/** Test helper: forget the last native link (simulates a fresh app launch). */
+export const resetNativeSharedLinkMemory = () => {
+  lastNativeLink = null;
+};
+
 const readIntent = async () => {
   try {
     const result = await SendIntent.checkSendIntentReceived();
@@ -67,7 +94,7 @@ const readIntent = async () => {
       /* keep raw */
     }
     const url = extractUrl(decoded);
-    if (/^https?:\/\//i.test(url)) setPendingSharedLink(url);
+    if (/^https?:\/\//i.test(url)) acceptNativeSharedLink(url);
   } catch {
     // No intent waiting — normal cold start.
   }
