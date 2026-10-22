@@ -176,7 +176,8 @@ public class GamNativePlugin: CAPPlugin, CAPBridgedPlugin, GADNativeAdLoaderDele
         if let s = nativeAd.starRating?.doubleValue { payload["starRating"] = s }
         if let p = nativeAd.price { payload["price"] = p }
         if let store = nativeAd.store { payload["store"] = store }
-        if let info = nativeAd.responseInfo?.responseIdentifier { payload["responseInfo"] = info }
+        // responseInfo is non-optional in Google Mobile Ads 11.x; only its identifier may be nil.
+        if let info = nativeAd.responseInfo.responseIdentifier { payload["responseInfo"] = info }
         call.resolve(payload)
     }
 
