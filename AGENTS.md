@@ -16,3 +16,4 @@
 
 - Native ID-token sign-in only works for a provider whose client ID the backend holds; Lovable Cloud stores a single Google client ID (the web one), so iOS Google sign-in must use the browser OAuth flow while Android keeps Credential Manager.
 - Incoming shared links are routed only by `useShareTarget`/`shareTarget.ts` (the composer itself is protected): links wait for a signed-in session off the sign-in page, expire after a short TTL, and an already-open composer is closed and reopened so it consumes the new link; the iOS Share Extension opens the app only when it finds an http(s) link.
+- Codemagic installs with `npm ci` and falls back to `npm install`, because Lovable manages dependencies with bun and `package-lock.json` can drift; refresh it with `npm install --package-lock-only` after dependency changes.

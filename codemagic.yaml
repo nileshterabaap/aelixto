@@ -20,7 +20,10 @@ workflows:
       events: []   # never auto-build on push
     scripts:
       - name: Install dependencies
-        script: npm ci
+        script: |
+          # package-lock.json can drift because Lovable edits deps with bun;
+          # fall back to a normal install instead of failing the build.
+          npm ci --no-audit --no-fund || npm install --no-audit --no-fund
       - name: Build web app
         script: npm run build
       - name: Generate icons and launch screen
