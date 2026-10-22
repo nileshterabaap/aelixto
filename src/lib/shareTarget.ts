@@ -9,18 +9,33 @@ import { App } from "@capacitor/app";
  *
  * The shared payload is stashed here; <CreatePostDialog> consumes it the
  * moment it opens so the user lands straight on the preview step.
+ *
+ * A pending link expires after a few minutes so a share that could not be
+ * shown (e.g. while signed out) never pops up unexpectedly much later.
  */
+export const SHARED_LINK_TTL_MS = 10 * 60 * 1000;
+
 let pendingSharedLink: string | null = null;
+let pendingSharedAt = 0;
 const subscribers = new Set<() => void>();
 
-export const setPendingSharedLink = (url: string) => {
+const isExpired = (now = Date.now()) => now - pendingSharedAt > SHARED_LINK_TTL_MS;
+
+export const setPendingSharedLink = (url: string, now = Date.now()) => {
   pendingSharedLink = url;
+  pendingSharedAt = now;
   subscribers.forEach((cb) => cb());
 };
 
+/** True while a shared link is waiting and has not expired. */
+export const hasPendingSharedLink = (now = Date.now()): boolean => {
+  if (pendingSharedLink && isExpired(now)) pendingSharedLink = null;
+  return pendingSharedLink !== null;
+};
+
 /** Reads and clears the pending shared link (single consumer). */
-export const consumePendingSharedLink = (): string | null => {
-  const url = pendingSharedLink;
+export const consumePendingSharedLink = (now = Date.now()): string | null => {
+  const url = hasPendingSharedLink(now) ? pendingSharedLink : null;
   pendingSharedLink = null;
   return url;
 };
