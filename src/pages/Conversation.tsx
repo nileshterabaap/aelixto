@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2, Check, CheckCheck, ImagePlus, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2, Check, CheckCheck, ImagePlus, Loader2, Clock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SharedPostCard } from "@/components/messages/SharedPostCard";
 import { Input } from "@/components/ui/input";
@@ -78,7 +78,7 @@ const Conversation = () => {
   const navigate = useNavigate();
   const { user } = useSession();
   const { toast } = useToast();
-  const { messages, loading, loadFailed, retry, sendMessage, otherStatus } = useMessages(conversationId || null);
+  const { messages, loading, loadFailed, retry, sendMessage, retrySend, discardPending, otherStatus } = useMessages(conversationId || null);
   const [newMessage, setNewMessage] = useState("");
   const [otherUser, setOtherUser] = useState<ConversationUser | null>(() => readCachedOtherUser(conversationId, user?.id));
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -91,8 +91,7 @@ const Conversation = () => {
   const [editText, setEditText] = useState("");
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const sendingRef = useRef(false);
-  const [isSending, setIsSending] = useState(false);
+  const distanceFromBottom = useRef(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -138,6 +137,32 @@ const Conversation = () => {
   useEffect(() => {
     didInitialScroll.current = false;
   }, [conversationId]);
+
+  // When the keyboard opens (or the reply bar appears) the message area gets
+  // shorter. Keep the same distance from the bottom so the latest messages
+  // move up above the text box instead of hiding behind it.
+  const threadVisible = !((loading || loadFailed) && messages.length === 0);
+  useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const onScroll = () => {
+      distanceFromBottom.current = Math.max(0, el.scrollHeight - el.clientHeight - el.scrollTop);
+    };
+    let lastHeight = el.clientHeight;
+    const ro = new ResizeObserver(() => {
+      const h = el.clientHeight;
+      if (h === lastHeight) return;
+      lastHeight = h;
+      el.scrollTop = el.scrollHeight - h - distanceFromBottom.current;
+    });
+    onScroll();
+    el.addEventListener('scroll', onScroll, { passive: true });
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      ro.disconnect();
+    };
+  }, [threadVisible, conversationId]);
 
   // When user triggers reply (via swipe or menu), scroll to bottom so the
   // reply banner + input remain visible above the keyboard.
@@ -222,12 +247,11 @@ const Conversation = () => {
     );
   };
 
-  const handleSend = async () => {
+  // The message shows in the chat immediately (with a clock) and is delivered
+  // in the background, so the next one can be typed right away.
+  const handleSend = () => {
     const body = newMessage.trim();
-    if (!body || sendingRef.current) return;
-
-    sendingRef.current = true;
-    setIsSending(true);
+    if (!body) return;
 
     const activeReply = replyTo;
     setNewMessage("");
@@ -235,10 +259,7 @@ const Conversation = () => {
 
     const content = activeReply ? `↪️__REPLY__:${activeReply.id}\n${body}` : body;
 
-    await sendMessage(content);
-
-    sendingRef.current = false;
-    setIsSending(false);
+    sendMessage(content);
   };
 
   const formatTime = (dateString: string) => {
@@ -426,11 +447,12 @@ const Conversation = () => {
   };
 
   const canEdit = (msg: Message) => {
-    if (msg.sender_id !== user?.id) return false;
+    if (msg.sender_id !== user?.id || msg.status) return false;
     return Date.now() - new Date(msg.created_at).getTime() < EDIT_TIME_LIMIT_MS;
   };
 
-  const canUnsend = (msg: Message) => msg.sender_id === user?.id;
+  // Messages still on their way aren't on the server yet, so they can't be unsent.
+  const canUnsend = (msg: Message) => msg.sender_id === user?.id && !msg.status;
 
   // Compute WhatsApp-style tick state for one of my messages
   const getTickState = (msg: Message): 'sent' | 'delivered' | 'seen' => {
@@ -689,6 +711,13 @@ const Conversation = () => {
                         >
                           {formatTime(message.created_at)}
                           {isOwn && (() => {
+                            if (message.status === 'sending') {
+                              // On its way (like WhatsApp's clock).
+                              return <Clock aria-label="Sending" className="inline-block ml-1 h-3 w-3 align-[-2px] text-primary-foreground/60" />;
+                            }
+                            if (message.status === 'failed') {
+                              return <AlertCircle aria-label="Not sent" className="inline-block ml-1 h-3 w-3 align-[-2px] text-primary-foreground" />;
+                            }
                             const state = getTickState(message);
                             if (state === 'seen') {
                               // 2 solid ticks — full opacity (reads as "black/dark" on own bubble)
@@ -703,6 +732,15 @@ const Conversation = () => {
                       </p>
                     </div>
                     ); })()}
+                    {isOwn && message.status === 'failed' && (
+                      <button
+                        type="button"
+                        onClick={() => retrySend(message.id)}
+                        className="mt-1 px-1 flex items-center gap-1 text-[11px] text-destructive"
+                      >
+                        <AlertCircle className="h-3 w-3" /> Not sent. Tap to retry
+                      </button>
+                    )}
                   </div>
                 )}
                   </div>
@@ -750,6 +788,17 @@ const Conversation = () => {
               className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
             >
               <Trash2 className="h-4 w-4" /> Unsend
+            </button>
+          )}
+          {menu.message.status === 'failed' && (
+            <button
+              onClick={() => {
+                if (menu.message) discardPending(menu.message.id);
+                setMenu({ message: null, x: 0, y: 0 });
+              }}
+              className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              <Trash2 className="h-4 w-4" /> Delete
             </button>
           )}
         </div>
@@ -808,6 +857,15 @@ const Conversation = () => {
               placeholder="Type a message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
+              onFocus={() => {
+                // Backup for the keyboard opening: if the latest messages were
+                // on screen, keep them just above the text box.
+                if (distanceFromBottom.current > 120) return;
+                window.setTimeout(() => {
+                  const el = scrollAreaRef.current;
+                  if (el) el.scrollTop = el.scrollHeight;
+                }, 320);
+              }}
               className="flex-1"
               // type="search" + autocomplete off suppresses Chrome Android's
               // key/location/card autofill toolbar above the keyboard.
@@ -826,7 +884,10 @@ const Conversation = () => {
             <Button
               type="submit"
               size="icon"
-              disabled={!newMessage.trim() || isSending}
+              disabled={!newMessage.trim()}
+              // Keep the keyboard open after sending, like WhatsApp.
+              onPointerDown={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
             >
               <Send className="h-5 w-5" />
             </Button>
