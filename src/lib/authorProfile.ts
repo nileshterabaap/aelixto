@@ -9,7 +9,19 @@ export interface AuthorProfile {
 }
 
 const RETRY_DELAYS_MS = [400, 1200];
-const known = new Map<string, AuthorProfile>();
+/** Short-lived, so a renamed account or new photo shows up within minutes. */
+const KNOWN_TTL_MS = 5 * 60 * 1000;
+const known = new Map<string, { profile: AuthorProfile; at: number }>();
+
+const lookup = (userId: string) => {
+  const hit = known.get(userId);
+  if (!hit) return undefined;
+  if (Date.now() - hit.at > KNOWN_TTL_MS) {
+    known.delete(userId);
+    return undefined;
+  }
+  return hit.profile;
+};
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -28,11 +40,11 @@ export async function withRetry<T>(run: () => Promise<T>): Promise<T> {
 }
 
 export const rememberAuthorProfile = (profile: AuthorProfile | null | undefined) => {
-  if (profile?.user_id && profile.username) known.set(profile.user_id, profile);
+  if (profile?.user_id && profile.username) known.set(profile.user_id, { profile, at: Date.now() });
 };
 
 export const knownAuthorProfile = (userId: string | null | undefined) =>
-  (userId ? known.get(userId) : undefined) ?? null;
+  (userId ? lookup(userId) : undefined) ?? null;
 
 /**
  * Looks up post authors. A failed lookup throws (after retries) instead of
@@ -43,7 +55,7 @@ export async function fetchAuthorProfiles(userIds: string[]): Promise<Map<string
   const ids = [...new Set(userIds.filter(Boolean))];
   const result = new Map<string, AuthorProfile>();
   const missing = ids.filter((id) => {
-    const hit = known.get(id);
+    const hit = lookup(id);
     if (hit) result.set(id, hit);
     return !hit;
   });
