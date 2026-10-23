@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Link2, Search, Check, Loader2 } from "lucide-react";
 import { buildShortUrl, buildPostPath } from "@/lib/shortUrl";
 import { supabase } from "@/integrations/supabase/client";
+import { instantSearchRows, normalizeSearchQuery, searchProfiles, type ProfileSearchRow } from "@/lib/profileSearch";
 import { useSession } from "@/hooks/useSession";
 import { useToast } from "@/hooks/use-toast";
 
@@ -239,6 +240,10 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 rounded-xl bg-muted/50 border-none h-10"
               autoFocus={false}
+              autoCapitalize="none"
+              autoCorrect="off"
+              autoComplete="off"
+              spellCheck={false}
             />
           </div>
         </div>
