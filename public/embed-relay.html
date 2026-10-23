@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Aelixto player</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+    iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  </style>
+</head>
+<body>
+<script>
+  // iPhone app relay for YouTube players.
+  // The iOS app runs on capacitor://localhost, which never sends a Referer,
+  // and YouTube now refuses such players with "Error 153". Hosting the player
+  // inside this https page gives YouTube a normal website referrer. Messages
+  // are forwarded both ways so pause/mute commands keep working.
+  (function () {
+    var ALLOWED = {
+      "www.youtube.com": 1,
+      "youtube.com": 1,
+      "m.youtube.com": 1,
+      "www.youtube-nocookie.com": 1
+    };
+    var raw = new URLSearchParams(location.search).get("src");
+    var u;
+    try { u = new URL(raw); } catch (e) { return; }
+    if (u.protocol !== "https:" || !ALLOWED[u.hostname] || u.pathname.indexOf("/embed/") !== 0) return;
+    // YouTube posts its player events to the `origin` it was given; that has
+    // to be this page now, which forwards them to the app.
+    if (u.searchParams.has("enablejsapi") || u.searchParams.has("origin")) {
+      u.searchParams.set("origin", location.origin);
+    }
+    var frame = document.createElement("iframe");
+    frame.src = u.toString();
+    frame.title = "YouTube video player";
+    frame.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen; web-share";
+    frame.allowFullscreen = true;
+    frame.referrerPolicy = "strict-origin-when-cross-origin";
+    document.body.appendChild(frame);
+
+    window.addEventListener("message", function (e) {
+      try {
+        if (e.source === window.parent) frame.contentWindow.postMessage(e.data, "*");
+        else if (e.source === frame.contentWindow) window.parent.postMessage(e.data, "*");
+      } catch (err) { /* frame not ready */ }
+    });
+  })();
+</script>
+</body>
+</html>
