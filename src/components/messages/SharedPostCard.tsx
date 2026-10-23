@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAuthorProfile, withRetry } from "@/lib/authorProfile";
 import { markPostSeenImmediate } from "@/hooks/useMarkPostSeen";
 import { deriveThumbnailFromUrl } from "@/lib/deriveThumbnail";
 import { getThumbnailText } from "@/lib/getThumbnailText";
@@ -47,26 +48,26 @@ export const SharedPostCard = ({ postId, isOwn }: SharedPostCardProps) => {
 
   const fetchPost = async () => {
     try {
-      const { data, error } = await supabase
-        .from("posts")
-        .select("id, media_url, thumbnail_url, preview_image_url, platform, user_id, title, content, embed_html, preview_title, preview_text")
-        .eq("id", postId)
-        .single();
+      const data = await withRetry(async () => {
+        const { data, error } = await supabase
+          .from("posts")
+          .select("id, media_url, thumbnail_url, preview_image_url, platform, user_id, title, content, embed_html, preview_title, preview_text")
+          .eq("id", postId)
+          .maybeSingle();
+        if (error) throw error;
+        return data;
+      });
 
-      if (error || !data) {
+      if (!data) {
         setLoading(false);
         return;
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("username, display_name, avatar_url")
-        .eq("user_id", data.user_id)
-        .single();
+      const profile = await fetchAuthorProfile(data.user_id).catch(() => null);
 
       setPost({
         ...data,
-        profile_username: profile?.username || "unknown",
+        profile_username: profile?.username || "",
         profile_display_name: profile?.display_name || null,
         profile_avatar_url: profile?.avatar_url || null,
       });

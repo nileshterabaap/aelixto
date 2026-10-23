@@ -1,6 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAuthorProfile, knownAuthorProfile, withRetry } from "@/lib/authorProfile";
 import { markPostSeenImmediate } from "@/hooks/useMarkPostSeen";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
@@ -62,22 +63,31 @@ const PostDetail = () => {
 
   const fetchPost = async () => {
     try {
-      const { data, error } = await supabase
-        .from("posts")
-        .select(`
-          *,
-          profiles!posts_user_id_fkey (
-            username,
-            display_name,
-            avatar_url
-          )
-        `)
-        .eq("id", postId)
-        .single();
+      // Retry passing connection drops (common right after the phone wakes
+      // the app) instead of showing "Post not found" or a nameless author.
+      const data = await withRetry(async () => {
+        const { data, error } = await supabase
+          .from("posts")
+          .select(`
+            *,
+            profiles!posts_user_id_fkey (
+              username,
+              display_name,
+              avatar_url
+            )
+          `)
+          .eq("id", postId)
+          .maybeSingle();
+        if (error) throw error;
+        return data;
+      });
+      if (!data) return;
 
-      if (error) throw error;
-      
       const supabasePost = data as unknown as SupabasePost;
+      const author =
+        supabasePost.profiles ??
+        knownAuthorProfile(supabasePost.user_id) ??
+        (await fetchAuthorProfile(supabasePost.user_id).catch(() => null));
       
       // Transform Supabase post to match FeedPost expected format
       // Spread ALL raw DB columns so renderers can access fields like
@@ -87,9 +97,9 @@ const PostDetail = () => {
         id: supabasePost.id,
         user_id: supabasePost.user_id,
         author: {
-          name: supabasePost.profiles.display_name || supabasePost.profiles.username,
-          username: supabasePost.profiles.username,
-          avatar: supabasePost.profiles.avatar_url || '',
+          name: author?.display_name || author?.username || "",
+          username: author?.username || "",
+          avatar: author?.avatar_url || '',
         },
         title: supabasePost.title || '',
         content: supabasePost.content,
