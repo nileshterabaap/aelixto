@@ -359,14 +359,19 @@ const Auth = () => {
           if (res.ok) return;
           if (res.cancelled) return;
           console.warn(`Native ${label} sign-in failed:`, res.message);
+          if (provider === "google" && Capacitor.getPlatform() === "ios") {
+            // iPhone safety net: if the in-app Google sheet's token is ever
+            // refused, finish sign-in through the browser sheet instead.
+            await browserSocialSignIn(provider);
+            return;
+          }
           toast({
             title: "Native sign-in failed",
             description: (res.message || "Unknown reason").slice(0, 180),
             variant: "destructive",
           });
         } else if (provider === "apple" || Capacitor.getPlatform() === "ios") {
-          // No native surface for this provider/OS: Android has no Apple SDK,
-          // and iOS Google must use the web flow (see canUseNativeSocialAuth).
+          // No native surface for this provider/OS: Android has no Apple SDK.
           // Both open the provider's OAuth page in a system browser surface and
           // the tokens return via the /~auth-bridge deep link.
           await browserSocialSignIn(provider);
@@ -425,8 +430,14 @@ const Auth = () => {
 
   return (
     <div
-      className="relative flex items-start justify-center overflow-y-auto bg-background p-5 py-10"
-      style={{ minHeight: 'calc(100dvh - var(--kb))', maxHeight: 'calc(100dvh - var(--kb))' }}
+      className="relative flex items-start justify-center overflow-y-auto bg-background p-5"
+      style={{
+        minHeight: 'calc(100dvh - var(--kb))',
+        maxHeight: 'calc(100dvh - var(--kb))',
+        // Keep the logo clear of the iPhone notch/Dynamic Island and status bar.
+        paddingTop: 'calc(var(--safe-top) + 2.5rem)',
+        paddingBottom: 'calc(var(--safe-bottom) + 2.5rem)',
+      }}
     >
       <div className="relative w-full max-w-md">
         <div className="text-center mb-8">
