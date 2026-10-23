@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
 import { useToast } from './use-toast';
 import { emitMessageThreadRead } from '@/lib/messageReadEvents';
+
+const MAX_FETCH_RETRIES = 4;
 
 export interface Message {
   id: string;
@@ -37,7 +39,10 @@ export const useMessages = (conversationId: string | null) => {
 
   const [messages, setMessages] = useState<Message[]>(readCache);
   const [loading, setLoading] = useState(messages.length === 0);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [otherStatus, setOtherStatus] = useState<OtherParticipantStatus | null>(null);
+  const fetchGeneration = useRef(0);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!conversationId || !user) {
@@ -53,9 +58,11 @@ export const useMessages = (conversationId: string | null) => {
       setLoading(false);
     } else {
       setMessages([]);
+      setLoading(true);
     }
 
-    fetchMessages();
+    fetchGeneration.current += 1;
+    void fetchMessages(0, fetchGeneration.current);
 
     // Mark messages as read
     markAsRead();
@@ -161,7 +168,23 @@ export const useMessages = (conversationId: string | null) => {
       )
       .subscribe();
 
+    // Coming back to the app or regaining signal: refresh the thread silently
+    // so anything missed while away appears without an error.
+    const refreshSilently = () => {
+      if (document.visibilityState !== 'visible') return;
+      fetchGeneration.current += 1;
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+      void fetchMessages(0, fetchGeneration.current);
+      fetchOtherStatus();
+    };
+    document.addEventListener('visibilitychange', refreshSilently);
+    window.addEventListener('online', refreshSilently);
+
     return () => {
+      fetchGeneration.current += 1;
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+      document.removeEventListener('visibilitychange', refreshSilently);
+      window.removeEventListener('online', refreshSilently);
       supabase.removeChannel(channel);
       supabase.removeChannel(partsChannel);
     };
@@ -189,8 +212,13 @@ export const useMessages = (conversationId: string | null) => {
     }
   };
 
-  const fetchMessages = async () => {
+  // Loads the thread quietly. A dropped connection (common right after the app
+  // returns from the background) is retried with backoff instead of flashing
+  // an error; only if every attempt fails AND nothing is on screen do we show
+  // an inline "try again" state.
+  const fetchMessages = async (attempt = 0, generation = fetchGeneration.current) => {
     if (!conversationId) return;
+    if (attempt === 0) setLoadFailed(false);
 
     try {
       const { data, error } = await supabase
@@ -200,6 +228,7 @@ export const useMessages = (conversationId: string | null) => {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
+      if (generation !== fetchGeneration.current) return;
       const seen = new Set<string>();
       const list = (data || []).filter(m => {
         if (seen.has(m.id)) return false;
@@ -207,21 +236,35 @@ export const useMessages = (conversationId: string | null) => {
         return true;
       });
       setMessages(list);
+      setLoadFailed(false);
+      setLoading(false);
       if (cacheKey) {
         try {
           window.localStorage.setItem(cacheKey, JSON.stringify(list.slice(-100)));
         } catch { /* ignore */ }
       }
     } catch (error) {
-      console.error('Error fetching messages:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load messages',
-        variant: 'destructive',
-      });
-    } finally {
+      if (generation !== fetchGeneration.current) return;
+      if (attempt < MAX_FETCH_RETRIES) {
+        const delay = 600 * 2 ** attempt;
+        if (retryTimer.current) clearTimeout(retryTimer.current);
+        retryTimer.current = setTimeout(() => {
+          void fetchMessages(attempt + 1, generation);
+        }, delay);
+        return;
+      }
+      console.warn('Messages could not be loaded after retries:', error);
+      setLoadFailed(true);
       setLoading(false);
     }
+  };
+
+  const retry = () => {
+    fetchGeneration.current += 1;
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    setLoadFailed(false);
+    setLoading(prev => prev || messages.length === 0);
+    void fetchMessages(0, fetchGeneration.current);
   };
 
   const markAsRead = async () => {
@@ -264,5 +307,5 @@ export const useMessages = (conversationId: string | null) => {
     }
   };
 
-  return { messages, loading, sendMessage, otherStatus };
+  return { messages, loading, loadFailed, retry, sendMessage, otherStatus };
 };

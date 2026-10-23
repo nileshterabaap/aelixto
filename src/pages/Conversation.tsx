@@ -10,6 +10,7 @@ import { useSession } from "@/hooks/useSession";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { AelixtoLoader } from "@/components/AelixtoLoader";
 
 interface ConversationUser {
   username: string;
@@ -51,14 +52,35 @@ const parseMediaContent = (
   return null;
 };
 
+// Instant header: the person saved for this chat, else the Messages list cache.
+const readCachedOtherUser = (conversationId: string | undefined, userId: string | undefined): ConversationUser | null => {
+  if (!conversationId || typeof window === "undefined") return null;
+  try {
+    const own = window.localStorage.getItem(`aelixto-conv-user-${conversationId}`);
+    if (own) {
+      const parsed = JSON.parse(own);
+      if (parsed?.username) return parsed;
+    }
+    if (userId) {
+      const list = JSON.parse(window.localStorage.getItem(`aelixto-conversations-${userId}`) || "[]");
+      const match = Array.isArray(list) ? list.find((c: { id?: string }) => c?.id === conversationId) : null;
+      const other = match?.other_user;
+      if (other?.username) {
+        return { username: other.username, display_name: other.display_name ?? null, avatar_url: other.avatar_url ?? null };
+      }
+    }
+  } catch { /* ignore */ }
+  return null;
+};
+
 const Conversation = () => {
   const { conversationId } = useParams();
   const navigate = useNavigate();
   const { user } = useSession();
   const { toast } = useToast();
-  const { messages, loading, sendMessage, otherStatus } = useMessages(conversationId || null);
+  const { messages, loading, loadFailed, retry, sendMessage, otherStatus } = useMessages(conversationId || null);
   const [newMessage, setNewMessage] = useState("");
-  const [otherUser, setOtherUser] = useState<ConversationUser | null>(null);
+  const [otherUser, setOtherUser] = useState<ConversationUser | null>(() => readCachedOtherUser(conversationId, user?.id));
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollAreaRef = useRef<HTMLElement>(null);
   const didInitialScroll = useRef(false);
@@ -89,6 +111,7 @@ const Conversation = () => {
 
   useEffect(() => {
     if (conversationId && user) {
+      setOtherUser((cur) => cur ?? readCachedOtherUser(conversationId, user.id));
       fetchOtherUser();
     }
   }, [conversationId, user]);
@@ -143,7 +166,9 @@ const Conversation = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const fetchOtherUser = async () => {
+  // Retries quietly (the name used to vanish when one request dropped) and
+  // remembers the person per chat so the header is filled instantly next time.
+  const fetchOtherUser = async (attempt = 0): Promise<void> => {
     if (!conversationId || !user) return;
 
     try {
@@ -152,21 +177,30 @@ const Conversation = () => {
         .select('user_id')
         .eq('conversation_id', conversationId)
         .neq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (participantError) throw participantError;
+      if (!participants) return;
 
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('username, display_name, avatar_url')
         .eq('user_id', participants.user_id)
-        .single();
+        .maybeSingle();
 
       if (profileError) throw profileError;
+      if (!profile) return;
 
       setOtherUser(profile);
+      try {
+        window.localStorage.setItem(`aelixto-conv-user-${conversationId}`, JSON.stringify(profile));
+      } catch { /* ignore */ }
     } catch (error) {
-      console.error('Error fetching other user:', error);
+      if (attempt < 4) {
+        window.setTimeout(() => { void fetchOtherUser(attempt + 1); }, 600 * 2 ** attempt);
+        return;
+      }
+      console.warn('Chat partner could not be loaded after retries:', error);
     }
   };
 
@@ -409,10 +443,19 @@ const Conversation = () => {
     return 'sent';
   };
 
-  if (loading) {
+  if (loading && messages.length === 0) {
     return (
       <div className="screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
+        <AelixtoLoader size={96} />
+      </div>
+    );
+  }
+
+  if (loadFailed && messages.length === 0) {
+    return (
+      <div className="screen bg-background flex flex-col items-center justify-center gap-3 px-6 text-center">
+        <p className="text-muted-foreground">Couldn't load this chat. Check your connection.</p>
+        <Button variant="outline" onClick={retry}>Try again</Button>
       </div>
     );
   }
