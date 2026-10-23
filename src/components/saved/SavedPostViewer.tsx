@@ -185,7 +185,7 @@ export const SavedPostViewer = ({
   return (
     <div className="fixed inset-0 z-50 bg-background">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b pt-safe">
         <div className="mx-auto max-w-2xl px-4 py-3 flex items-center justify-between">
           <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
             <X className="h-5 w-5" />

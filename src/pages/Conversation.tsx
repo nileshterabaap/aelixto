@@ -270,6 +270,8 @@ const Conversation = () => {
       cancelled: false,
     };
     longPressTimer.current = setTimeout(() => {
+      // Drop any text selection the phone started during the hold.
+      try { window.getSelection()?.removeAllRanges(); } catch { /* noop */ }
       setMenu({ message: msg, x: touch.clientX, y: touch.clientY });
     }, 500);
   }, [user?.id]);
@@ -483,7 +485,7 @@ const Conversation = () => {
                     senderChanged && !showDaySeparator ? 'mt-2' : ''
                   } relative transition-colors duration-500 rounded-lg ${
                     highlightId === message.id ? 'bg-primary/10' : ''
-                  }`}
+                  } ${isEditing ? '' : 'select-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]'}`}
                   onTouchStart={(e) => handleTouchStart(message, e)}
                   onTouchMove={(e) => handleTouchMove(e)}
                   onTouchEnd={handleTouchEnd}
@@ -673,7 +675,7 @@ const Conversation = () => {
       {menu.message && (
         <div
           ref={menuRef}
-          className="fixed z-50 bg-popover border border-border rounded-xl shadow-lg py-1.5 min-w-[160px] animate-in fade-in zoom-in-95"
+          className="fixed z-50 bg-popover border border-border rounded-xl shadow-lg py-1.5 min-w-[160px] animate-in fade-in zoom-in-95 select-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]"
           style={{
             left: Math.min(menu.x, window.innerWidth - 180),
             top: Math.min(menu.y - 10, window.innerHeight - 200),
