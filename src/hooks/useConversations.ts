@@ -204,6 +204,27 @@ export const useConversations = () => {
 
       if (messageError) throw messageError;
 
+      // Mark delivered (senders' second tick) only where someone else's
+      // message is newer than my delivered mark — never as a blanket write.
+      const undelivered = participantData
+        .filter(p => {
+          const newestFromOther = messages?.find(
+            m => m.conversation_id === p.conversation_id && m.sender_id !== user.id,
+          );
+          if (!newestFromOther) return false;
+          const deliveredAt = p.last_delivered_at ? new Date(p.last_delivered_at).getTime() : 0;
+          return new Date(newestFromOther.created_at).getTime() > deliveredAt;
+        })
+        .map(p => p.conversation_id);
+      if (undelivered.length > 0) {
+        supabase
+          .from('conversation_participants')
+          .update({ last_delivered_at: new Date().toISOString() })
+          .eq('user_id', user.id)
+          .in('conversation_id', undelivered)
+          .then(() => { /* fire-and-forget */ });
+      }
+
       // Combine all data
       const conversationsWithDetails: ConversationWithDetails[] = conversationData?.map(conv => {
         const otherParticipant = otherParticipants?.find(p => p.conversation_id === conv.id);
@@ -262,6 +283,11 @@ export const useConversations = () => {
       console.error('Error fetching conversations:', error);
     } finally {
       setLoading(false);
+      inFlight.current = false;
+      if (rerunQueued.current) {
+        rerunQueued.current = false;
+        void fetchConversations();
+      }
     }
   };
 
