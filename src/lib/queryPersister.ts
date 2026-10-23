@@ -15,6 +15,9 @@ export const localStoragePersister = createSyncStoragePersister({
       clientState: {
         ...data.clientState,
         queries: data.clientState.queries.filter((query) => {
+          // A missing result (often a passing network failure) must never be
+          // restored on the next launch as if it were real data.
+          if (query.state.data == null) return false;
           // Only persist feed and profile data, not session
           const key = query.queryKey[0];
           return key === 'profile' || 

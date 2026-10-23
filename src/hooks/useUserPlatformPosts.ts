@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAuthorProfiles } from "@/lib/authorProfile";
 
 export interface PlatformPost {
   id: string;
@@ -203,14 +204,9 @@ export const useUserPlatformPosts = (userId: string | undefined, platform: strin
       if (userIds.length === 0) return { items: enrichedPosts as PlatformPost[], nextCursor };
 
 
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, username, display_name, avatar_url")
-        .in("user_id", userIds);
-
-      const profileByUserId = new Map(
-        (profiles || []).map((profile) => [profile.user_id, profile])
-      );
+      // Throws after retries rather than returning nameless posts, so the
+      // grid query retries instead of caching an "Unknown" author.
+      const profileByUserId = await fetchAuthorProfiles(userIds);
 
       return {
         items: enrichedPosts.map((post) => {

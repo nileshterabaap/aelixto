@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchAuthorProfiles } from "@/lib/authorProfile";
 import { useToast } from "@/hooks/use-toast";
 
 export interface Collection {
@@ -158,14 +159,10 @@ export const useCollectionItems = (collectionId: string | undefined) => {
 
       if (postsError) throw postsError;
 
-      // Step 3: authors
+      // Step 3: authors (throws after retries, so the query retries instead
+      // of caching nameless posts)
       const authorIds = Array.from(new Set((posts || []).map((p: any) => p.user_id)));
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("user_id, username, display_name, avatar_url")
-        .in("user_id", authorIds.length ? authorIds : ["00000000-0000-0000-0000-000000000000"]);
-
-      const profileMap = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+      const profileMap = await fetchAuthorProfiles(authorIds);
       const postMap = new Map((posts || []).map((p: any) => [p.id, p]));
 
       return postIds

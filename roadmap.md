@@ -21,4 +21,6 @@
 - [x] iPhone TestFlight fixes: sign-in page notch spacing, in-app Google sheet (browser fallback), YouTube relay, Reddit preview card, "Not authenticated" on resume
 - [ ] Publish website so the YouTube relay page is live on aelixto.com (user)
 - [ ] Rebuild iPhone (Codemagic) + Android and confirm on phones (user)
-- [ ] iPhone slowness — needs specific screens/moments from user
+- [x] "Unknown" author on posts opened from grid, chats and notifications (both apps)
+- [x] iPhone slowness on profiles/platform switching: lockless auth library + no network round trip for signed-in checks
+- [ ] Confirm iPhone profile speed on device after rebuild (user)
