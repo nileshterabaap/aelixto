@@ -3,6 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 type GetUser = typeof supabase.auth.getUser;
 type GetUserResult = Awaited<ReturnType<GetUser>>;
 
+/** A locally stored session this fresh is trusted without asking the server. */
+const LOCAL_TRUST_MARGIN_MS = 60_000;
+
 /** Errors that mean "couldn't reach the server", not "you are signed out". */
 const isTransient = (error: GetUserResult["error"]) => {
   if (!error) return false;
@@ -19,12 +22,16 @@ const isTransient = (error: GetUserResult["error"]) => {
 let installed = false;
 
 /**
- * `getUser()` asks the server, so right after the phone wakes the app (or on a
- * flaky network) it can return no user even though the person is signed in.
- * Every action that calls it then failed with "Not authenticated" (most
- * visibly "Failed to create post"). This wraps it once, app-wide: when a local
- * session exists, renew it and retry before reporting the person signed out.
- * The database still verifies the session on every write.
+ * `getUser()` asks the auth server every time. Dozens of screens call it just
+ * to learn the signed-in person's id, so each call added a full network round
+ * trip before the real request could start — slow on iPhone networks — and a
+ * flaky moment after resume surfaced as "Not authenticated".
+ *
+ * Wrapped once, app-wide:
+ * - a valid, unexpired local session answers immediately (the database still
+ *   verifies the token on every read and write);
+ * - otherwise ask the server, renewing the session and retrying before
+ *   reporting the person signed out.
  */
 export const installAuthResilience = () => {
   if (installed) return;
@@ -34,10 +41,16 @@ export const installAuthResilience = () => {
   const original: GetUser = supabase.auth.getUser.bind(supabase.auth);
 
   auth.getUser = (async (jwt?: string) => {
-    const first = await original(jwt);
-    if (first.data.user || jwt) return first;
+    if (jwt) return original(jwt);
 
     const { data: local } = await supabase.auth.getSession();
+    const localExpiresAt = (local.session?.expires_at ?? 0) * 1000;
+    if (local.session?.user && localExpiresAt - Date.now() > LOCAL_TRUST_MARGIN_MS) {
+      return { data: { user: local.session.user }, error: null } as GetUserResult;
+    }
+
+    const first = await original();
+    if (first.data.user) return first;
     if (!local.session) return first;
 
     try {
@@ -52,8 +65,7 @@ export const installAuthResilience = () => {
     const retry = await original();
     if (retry.data.user) return retry;
 
-    const expiresAt = (local.session.expires_at ?? 0) * 1000;
-    if (isTransient(first.error) && expiresAt > Date.now()) {
+    if (isTransient(first.error) && localExpiresAt > Date.now()) {
       return { data: { user: local.session.user }, error: null } as GetUserResult;
     }
     return first;
