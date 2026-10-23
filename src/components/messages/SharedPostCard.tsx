@@ -139,11 +139,13 @@ export const SharedPostCard = ({ postId, isOwn }: SharedPostCardProps) => {
           />
         </div>
       )}
-      <div className="px-3 py-2">
-        <p className="text-xs text-muted-foreground truncate">
-          <span className="font-semibold text-foreground">@{post.profile_username}</span>
-        </p>
-      </div>
+      {post.profile_username && (
+        <div className="px-3 py-2">
+          <p className="text-xs text-muted-foreground truncate">
+            <span className="font-semibold text-foreground">@{post.profile_username}</span>
+          </p>
+        </div>
+      )}
     </div>
   );
 };
