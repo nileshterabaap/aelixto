@@ -106,31 +106,35 @@ export const SharePostSheet = ({ open, onOpenChange, postId }: SharePostSheetPro
 
   // Search users
   useEffect(() => {
-    if (!searchQuery.trim() || !user) {
+    const q = normalizeSearchQuery(searchQuery);
+    if (!q || !user) {
       setSearchResults([]);
       return;
     }
+    let cancelled = false;
+    const toShareable = (rows: ProfileSearchRow[]) =>
+      rows
+        .filter((p) => p.user_id !== user.id)
+        .map((p) => ({
+          userId: p.user_id,
+          username: p.username,
+          displayName: p.display_name,
+          avatarUrl: p.avatar_url,
+        }));
+    const instant = instantSearchRows(q, 10);
+    if (instant) setSearchResults(toShareable(instant));
     const timeout = setTimeout(async () => {
       try {
-        const { data } = await supabase.rpc("search_profiles", {
-          q: searchQuery.trim(),
-          limit_count: 10,
-        });
-        setSearchResults(
-          (data || [])
-            .filter((p: any) => p.user_id !== user.id)
-            .map((p: any) => ({
-              userId: p.user_id,
-              username: p.username,
-              displayName: p.display_name,
-              avatarUrl: p.avatar_url,
-            }))
-        );
+        const data = await searchProfiles(q, 10);
+        if (!cancelled) setSearchResults(toShareable(data));
       } catch {
-        // ignore
+        // keep whatever is already shown
       }
-    }, 300);
-    return () => clearTimeout(timeout);
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+    };
   }, [searchQuery, user]);
 
   const sendPostToUser = useCallback(

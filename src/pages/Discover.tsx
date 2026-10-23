@@ -49,7 +49,7 @@ const Discover = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const [searchQuery, setSearchQuery] = useState("");
-  const { results, loading, hasMore, loadMore } = useUserSearch(searchQuery, true);
+  const { results, loading, failed, hasMore, loadMore, retry } = useUserSearch(searchQuery, true);
   const [history, setHistory] = useState<VisitedProfile[]>([]);
 
   // Clean up the legacy shared key so old cross-account history disappears.
@@ -128,19 +128,35 @@ const Discover = () => {
                 className="pl-10 h-12 bg-card"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                autoComplete="off"
+                spellCheck={false}
+                enterKeyHint="search"
               />
             </div>
 
             {/* Search Results */}
-            {searchQuery ? (
+            {searchQuery.trim() ? (
               <section>
                 <h2 className="text-xl font-semibold mb-4">Search Results</h2>
-                {loading && (
+                {loading && results.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     Searching...
                   </p>
                 )}
-                {!loading && results.length === 0 && (
+                {!loading && failed && results.length === 0 && (
+                  <div className="text-center py-4">
+                    <p className="text-sm text-muted-foreground">Couldn't search right now</p>
+                    <button
+                      onClick={retry}
+                      className="mt-2 text-sm font-medium text-primary"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                )}
+                {!loading && !failed && results.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-4">
                     No users found
                   </p>
