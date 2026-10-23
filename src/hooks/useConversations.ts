@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
 import { onMessageThreadRead } from '@/lib/messageReadEvents';
@@ -39,6 +39,11 @@ export const useConversations = () => {
 
   const [conversations, setConversations] = useState<ConversationWithDetails[]>(readCache);
   const [loading, setLoading] = useState(conversations.length === 0);
+  // My last_read_at per conversation, so a realtime UPDATE that only touched
+  // last_delivered_at (written by this very hook) doesn't trigger a refetch.
+  const knownReadAt = useRef(new Map<string, string | null>());
+  const inFlight = useRef(false);
+  const rerunQueued = useRef(false);
 
   useEffect(() => {
     if (!user) {
@@ -106,7 +111,13 @@ export const useConversations = () => {
           table: 'conversation_participants',
           filter: `user_id=eq.${user.id}`,
         },
-        () => {
+        (payload) => {
+          // Only a read-state change (e.g. read on another device) matters
+          // here. Delivered-only updates are written by this hook itself;
+          // refetching on them created an endless request loop.
+          const row = payload.new as { conversation_id?: string; last_read_at?: string | null } | null;
+          if (!row?.conversation_id) return;
+          if (knownReadAt.current.get(row.conversation_id) === (row.last_read_at ?? null)) return;
           fetchConversations();
         }
       )
@@ -124,34 +135,38 @@ export const useConversations = () => {
     };
   }, [user]);
 
-  const fetchConversations = async () => {
+  const fetchConversations = async (): Promise<void> => {
     if (!user) return;
+    // Coalesce bursts (several realtime events at once) into one fetch plus
+    // at most one follow-up, instead of parallel duplicate request chains.
+    if (inFlight.current) {
+      rerunQueued.current = true;
+      return;
+    }
+    inFlight.current = true;
 
     try {
       // Get all conversations for current user
-      const { data: participantData, error: participantError } = await supabase
+      const { data: participantRows, error: participantError } = await supabase
         .from('conversation_participants')
-        .select('conversation_id, last_read_at')
+        .select('conversation_id, last_read_at, last_delivered_at')
         .eq('user_id', user.id);
 
       if (participantError) throw participantError;
+      const participantData = (participantRows || []) as Array<{
+        conversation_id: string;
+        last_read_at: string | null;
+        last_delivered_at: string | null;
+      }>;
+      participantData.forEach(p => knownReadAt.current.set(p.conversation_id, p.last_read_at ?? null));
 
-      if (!participantData || participantData.length === 0) {
+      if (participantData.length === 0) {
         setConversations([]);
         setLoading(false);
         return;
       }
 
       const conversationIds = participantData.map(p => p.conversation_id);
-
-      // Bump delivered-at for all my participant rows so senders see 2 ticks
-      // once I've been online.
-      supabase
-        .from('conversation_participants')
-        .update({ last_delivered_at: new Date().toISOString() })
-        .eq('user_id', user.id)
-        .in('conversation_id', conversationIds)
-        .then(() => { /* fire-and-forget */ });
 
       // Get conversation details
       const { data: conversationData, error: conversationError } = await supabase
@@ -188,6 +203,27 @@ export const useConversations = () => {
         .order('created_at', { ascending: false });
 
       if (messageError) throw messageError;
+
+      // Mark delivered (senders' second tick) only where someone else's
+      // message is newer than my delivered mark — never as a blanket write.
+      const undelivered = participantData
+        .filter(p => {
+          const newestFromOther = messages?.find(
+            m => m.conversation_id === p.conversation_id && m.sender_id !== user.id,
+          );
+          if (!newestFromOther) return false;
+          const deliveredAt = p.last_delivered_at ? new Date(p.last_delivered_at).getTime() : 0;
+          return new Date(newestFromOther.created_at).getTime() > deliveredAt;
+        })
+        .map(p => p.conversation_id);
+      if (undelivered.length > 0) {
+        supabase
+          .from('conversation_participants')
+          .update({ last_delivered_at: new Date().toISOString() })
+          .eq('user_id', user.id)
+          .in('conversation_id', undelivered)
+          .then(() => { /* fire-and-forget */ });
+      }
 
       // Combine all data
       const conversationsWithDetails: ConversationWithDetails[] = conversationData?.map(conv => {
@@ -247,6 +283,11 @@ export const useConversations = () => {
       console.error('Error fetching conversations:', error);
     } finally {
       setLoading(false);
+      inFlight.current = false;
+      if (rerunQueued.current) {
+        rerunQueued.current = false;
+        void fetchConversations();
+      }
     }
   };
 
