@@ -1,8 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
-import { useToast } from './use-toast';
 import { emitMessageThreadRead } from '@/lib/messageReadEvents';
+import {
+  OutboxMessage,
+  OutgoingStatus,
+  SEND_ATTEMPTS,
+  addToOutbox,
+  isAlreadySentError,
+  isPermanentSendError,
+  mergeWithPending,
+  newMessageId,
+  readOutbox,
+  removeFromOutbox,
+  retryDelayMs,
+} from '@/lib/messageOutbox';
 
 const MAX_FETCH_RETRIES = 4;
 
@@ -12,6 +24,8 @@ export interface Message {
   sender_id: string;
   content: string;
   created_at: string;
+  /** Only on my own messages that haven't reached the server yet. */
+  status?: OutgoingStatus;
 }
 
 export interface OtherParticipantStatus {
@@ -22,7 +36,6 @@ export interface OtherParticipantStatus {
 
 export const useMessages = (conversationId: string | null) => {
   const { user } = useSession();
-  const { toast } = useToast();
   const cacheKey = conversationId ? `aelixto-messages-${conversationId}` : null;
 
   const readCache = (): Message[] => {
@@ -31,10 +44,20 @@ export const useMessages = (conversationId: string | null) => {
       const raw = window.localStorage.getItem(cacheKey);
       if (!raw) return [];
       const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      return Array.isArray(parsed) ? parsed.filter((m: Message) => !m.status) : [];
     } catch {
       return [];
     }
+  };
+
+  const writeCache = (list: Message[]) => {
+    if (!cacheKey) return;
+    try {
+      window.localStorage.setItem(
+        cacheKey,
+        JSON.stringify(list.filter(m => !m.status).slice(-100)),
+      );
+    } catch { /* ignore */ }
   };
 
   const [messages, setMessages] = useState<Message[]>(readCache);
@@ -44,17 +67,111 @@ export const useMessages = (conversationId: string | null) => {
   const fetchGeneration = useRef(0);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Messages on their way, keyed by their (final) id.
+  const pendingRef = useRef<Map<string, Message>>(new Map());
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const sendTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  const setStatus = (id: string, status: OutgoingStatus) => {
+    const pending = pendingRef.current.get(id);
+    if (pending) pendingRef.current.set(id, { ...pending, status });
+    setMessages(prev => prev.map(m => (m.id === id && m.status ? { ...m, status } : m)));
+  };
+
+  /** The server has this message: drop the clock and use the server's copy. */
+  const markDelivered = (id: string, convId: string, serverRow?: Message) => {
+    pendingRef.current.delete(id);
+    removeFromOutbox(convId, id);
+    const timer = sendTimersRef.current.get(id);
+    if (timer) clearTimeout(timer);
+    sendTimersRef.current.delete(id);
+    setMessages(prev => {
+      const next = prev.map(m => {
+        if (m.id !== id) return m;
+        const { status: _s, ...rest } = m;
+        return serverRow ? { ...rest, ...serverRow } : rest;
+      });
+      writeCache(next);
+      return next;
+    });
+  };
+
+  const deliver = async (msg: OutboxMessage, attempt = 1) => {
+    if (inFlightRef.current.has(msg.id)) return;
+    inFlightRef.current.add(msg.id);
+    let error: { code?: string | null; message?: string } | null = null;
+    let row: Message | null = null;
+    try {
+      const res = await supabase
+        .from('messages')
+        .insert({
+          id: msg.id,
+          conversation_id: msg.conversation_id,
+          sender_id: msg.sender_id,
+          content: msg.content,
+        })
+        .select('id, conversation_id, sender_id, content, created_at')
+        .maybeSingle();
+      error = res.error;
+      row = (res.data as Message | null) ?? null;
+    } catch (e) {
+      error = { code: '', message: String(e) };
+    } finally {
+      inFlightRef.current.delete(msg.id);
+    }
+
+    if (!pendingRef.current.has(msg.id)) return; // discarded or already confirmed
+
+    if (!error || isAlreadySentError(error)) {
+      markDelivered(msg.id, msg.conversation_id, row ?? undefined);
+      return;
+    }
+
+    if (!isPermanentSendError(error) && attempt < SEND_ATTEMPTS) {
+      const timer = setTimeout(() => {
+        sendTimersRef.current.delete(msg.id);
+        void deliver(msg, attempt + 1);
+      }, retryDelayMs(attempt));
+      sendTimersRef.current.set(msg.id, timer);
+      return;
+    }
+
+    console.warn('Message not sent:', error);
+    setStatus(msg.id, 'failed');
+  };
+
+  /** Try again (quietly) for every message still on its way. */
+  const resendPending = () => {
+    pendingRef.current.forEach(m => {
+      if (inFlightRef.current.has(m.id) || sendTimersRef.current.has(m.id)) return;
+      setStatus(m.id, 'sending');
+      void deliver(m);
+    });
+  };
+
   useEffect(() => {
+    pendingRef.current = new Map();
+    sendTimersRef.current.forEach(t => clearTimeout(t));
+    sendTimersRef.current = new Map();
+
     if (!conversationId || !user) {
       setMessages([]);
       setLoading(false);
       return;
     }
 
+    // Messages left on their way last time (app closed, connection lost).
+    for (const item of readOutbox(conversationId)) {
+      if (item.sender_id !== user.id) continue;
+      pendingRef.current.set(item.id, { ...item, status: 'sending' });
+    }
+    const pendingList = Array.from(pendingRef.current.values());
+
     // Seed from cache for instant render
     const cached = readCache();
-    if (cached.length > 0) {
-      setMessages(cached);
+    const seeded = mergeWithPending(cached, pendingList).list;
+    if (seeded.length > 0) {
+      setMessages(seeded);
       setLoading(false);
     } else {
       setMessages([]);
@@ -63,6 +180,7 @@ export const useMessages = (conversationId: string | null) => {
 
     fetchGeneration.current += 1;
     void fetchMessages(0, fetchGeneration.current);
+    pendingList.forEach(m => { void deliver(m); });
 
     // Mark messages as read
     markAsRead();
@@ -81,19 +199,21 @@ export const useMessages = (conversationId: string | null) => {
           filter: `conversation_id=eq.${conversationId}`
         },
         (payload) => {
+          const incoming = payload.new as Message;
+          if (pendingRef.current.has(incoming.id)) {
+            markDelivered(incoming.id, conversationId, incoming);
+            return;
+          }
           setMessages(prev => {
-            const incoming = payload.new as Message;
             if (prev.some(m => m.id === incoming.id)) return prev;
-            const next = [...prev, incoming];
-            if (cacheKey) {
-              try {
-                window.localStorage.setItem(cacheKey, JSON.stringify(next.slice(-100)));
-              } catch { /* ignore */ }
-            }
+            // Keep my own messages that are still on their way at the bottom.
+            const sent = prev.filter(m => !m.status);
+            const waiting = prev.filter(m => m.status);
+            const next = [...sent, incoming, ...waiting];
+            writeCache(next);
             return next;
           });
-          const message = payload.new as Message;
-          if (message.sender_id !== user.id) {
+          if (incoming.sender_id !== user.id) {
             markAsRead();
           }
         }
@@ -111,11 +231,7 @@ export const useMessages = (conversationId: string | null) => {
           if (!deletedId) return;
           setMessages(prev => {
             const next = prev.filter(m => m.id !== deletedId);
-            if (cacheKey) {
-              try {
-                window.localStorage.setItem(cacheKey, JSON.stringify(next.slice(-100)));
-              } catch { /* ignore */ }
-            }
+            writeCache(next);
             return next;
           });
         }
@@ -133,11 +249,7 @@ export const useMessages = (conversationId: string | null) => {
           if (!updated?.id) return;
           setMessages(prev => {
             const next = prev.map(m => (m.id === updated.id ? { ...m, ...updated } : m));
-            if (cacheKey) {
-              try {
-                window.localStorage.setItem(cacheKey, JSON.stringify(next.slice(-100)));
-              } catch { /* ignore */ }
-            }
+            writeCache(next);
             return next;
           });
         }
@@ -169,13 +281,15 @@ export const useMessages = (conversationId: string | null) => {
       .subscribe();
 
     // Coming back to the app or regaining signal: refresh the thread silently
-    // so anything missed while away appears without an error.
+    // so anything missed while away appears without an error, and send any
+    // message that was still on its way.
     const refreshSilently = () => {
       if (document.visibilityState !== 'visible') return;
       fetchGeneration.current += 1;
       if (retryTimer.current) clearTimeout(retryTimer.current);
       void fetchMessages(0, fetchGeneration.current);
       fetchOtherStatus();
+      resendPending();
     };
     document.addEventListener('visibilitychange', refreshSilently);
     window.addEventListener('online', refreshSilently);
@@ -183,6 +297,8 @@ export const useMessages = (conversationId: string | null) => {
     return () => {
       fetchGeneration.current += 1;
       if (retryTimer.current) clearTimeout(retryTimer.current);
+      sendTimersRef.current.forEach(t => clearTimeout(t));
+      sendTimersRef.current = new Map();
       document.removeEventListener('visibilitychange', refreshSilently);
       window.removeEventListener('online', refreshSilently);
       supabase.removeChannel(channel);
@@ -230,19 +346,23 @@ export const useMessages = (conversationId: string | null) => {
       if (error) throw error;
       if (generation !== fetchGeneration.current) return;
       const seen = new Set<string>();
-      const list = (data || []).filter(m => {
+      const server = (data || []).filter(m => {
         if (seen.has(m.id)) return false;
         seen.add(m.id);
         return true;
+      }) as Message[];
+      const { list, delivered } = mergeWithPending(
+        server,
+        Array.from(pendingRef.current.values()),
+      );
+      delivered.forEach(id => {
+        pendingRef.current.delete(id);
+        removeFromOutbox(conversationId, id);
       });
       setMessages(list);
       setLoadFailed(false);
       setLoading(false);
-      if (cacheKey) {
-        try {
-          window.localStorage.setItem(cacheKey, JSON.stringify(list.slice(-100)));
-        } catch { /* ignore */ }
-      }
+      writeCache(list);
     } catch (error) {
       if (generation !== fetchGeneration.current) return;
       if (attempt < MAX_FETCH_RETRIES) {
@@ -284,28 +404,41 @@ export const useMessages = (conversationId: string | null) => {
     }
   };
 
-  const sendMessage = async (content: string) => {
+  /** Shows the message straight away with a clock, then delivers it in the background. */
+  const sendMessage = (content: string) => {
     if (!conversationId || !user || !content.trim()) return;
 
-    try {
-      const { error } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_id: user.id,
-          content: content.trim(),
-        });
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to send message',
-        variant: 'destructive',
-      });
-    }
+    const item: OutboxMessage = {
+      id: newMessageId(),
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content: content.trim(),
+      created_at: new Date().toISOString(),
+    };
+    addToOutbox(item);
+    pendingRef.current.set(item.id, { ...item, status: 'sending' });
+    setMessages(prev => [...prev, { ...item, status: 'sending' }]);
+    void deliver(item);
   };
 
-  return { messages, loading, loadFailed, retry, sendMessage, otherStatus };
+  /** Tap on a "Not sent" message. */
+  const retrySend = (id: string) => {
+    const pending = pendingRef.current.get(id);
+    if (!pending) return;
+    setStatus(id, 'sending');
+    void deliver(pending);
+  };
+
+  /** Remove a message that could not be sent. */
+  const discardPending = (id: string) => {
+    if (!conversationId) return;
+    pendingRef.current.delete(id);
+    removeFromOutbox(conversationId, id);
+    const timer = sendTimersRef.current.get(id);
+    if (timer) clearTimeout(timer);
+    sendTimersRef.current.delete(id);
+    setMessages(prev => prev.filter(m => m.id !== id));
+  };
+
+  return { messages, loading, loadFailed, retry, sendMessage, retrySend, discardPending, otherStatus };
 };
