@@ -18,3 +18,7 @@
 - [ ] Confirm iPhone ad app ID + ad unit with GameAdZone (waits on user)
 - [ ] APNs + Sign in with Apple keys, then backend providers (waits on user)
 - [ ] Codemagic signing for both IDs + first TestFlight build (user)
+- [x] iPhone TestFlight fixes: sign-in page notch spacing, in-app Google sheet (browser fallback), YouTube relay, Reddit preview card, "Not authenticated" on resume
+- [ ] Publish website so the YouTube relay page is live on aelixto.com (user)
+- [ ] Rebuild iPhone (Codemagic) + Android and confirm on phones (user)
+- [ ] iPhone slowness — needs specific screens/moments from user

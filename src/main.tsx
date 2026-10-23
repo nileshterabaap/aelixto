@@ -6,8 +6,12 @@ import { initKeyboardInsets } from "./lib/keyboardInsets";
 import { supabase } from "./integrations/supabase/client";
 import { Capacitor } from "@capacitor/core";
 import { installXEmbedSandbox } from "./lib/sandboxXEmbeds";
+import { installIosEmbedRelay } from "./lib/iosEmbedRelay";
+import { installAuthResilience } from "./lib/authResilience";
 
 installXEmbedSandbox();
+installIosEmbedRelay();
+installAuthResilience();
 
 const unregisterAppServiceWorkers = async () => {
   if (!("serviceWorker" in navigator)) return;

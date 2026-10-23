@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import { OgCardFallback } from "@/components/OgCardFallback";
 import { supabase } from "@/integrations/supabase/client";
 import redditIcon from "@/assets/platforms/reddit.svg";
@@ -24,6 +25,7 @@ const REDDIT_EMBED_MIN_HEIGHT = 120;
 const REDDIT_EMBED_MAX_HEIGHT = 4000;
 const REDDIT_EMBED_INITIAL_HEIGHT = 380;
 const REDDIT_IFRAME_TIMEOUT = 8500;
+const REDDIT_PLAYER_BLOCKED = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 
 function ensureProtocol(rawUrl: string): string {
   const trimmed = rawUrl.trim().split(/\s+/)[0];
@@ -186,7 +188,13 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   const effectiveThumb = thumbnailUrl || fetchedThumb;
   const validThumb = !!effectiveThumb && !thumbBroken && !sameUrl(effectiveThumb, authorAvatar);
   const fallbackImage = validThumb ? effectiveThumb! : undefined;
-  const embedSrc = useMemo(() => (resolvedUrl ? toRedditEmbedSrc(resolvedUrl) : null), [resolvedUrl]);
+  // Reddit only allows its player inside http(s) pages ("frame-ancestors *"),
+  // so it can never appear inside the iPhone app (capacitor://). There the
+  // post shows as its preview card, which opens the original post.
+  const embedSrc = useMemo(
+    () => (resolvedUrl && !REDDIT_PLAYER_BLOCKED ? toRedditEmbedSrc(resolvedUrl) : null),
+    [resolvedUrl],
+  );
   const persistHeight = usePersistEmbedHeight(postId);
 
   // Previously we ran an `Image()` probe here to mark broken thumbnails, but

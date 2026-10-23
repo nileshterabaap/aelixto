@@ -35,6 +35,9 @@ const ensureInitialized = async () => {
       google: {
         webClientId: NATIVE_AUTH_CONFIG.googleWebClientId,
         iOSClientId: NATIVE_AUTH_CONFIG.googleIosClientId || undefined,
+        // iOS: asking for the *web* client as the server client makes Google
+        // mint the ID token for the web client ID — the one the backend holds.
+        iOSServerClientId: NATIVE_AUTH_CONFIG.googleWebClientId || undefined,
       },
     };
     if (Capacitor.getPlatform() === "ios") {
@@ -85,16 +88,10 @@ export const canUseNativeSocialAuth = (provider: "google" | "apple") => {
   }
   // Sign in with Apple has no native surface on Android; it must use the web flow.
   if (provider === "apple" && Capacitor.getPlatform() !== "ios") return false;
-  // Google's iOS SDK mints its ID token for the *iOS* client ID, but the auth
-  // provider holds exactly one Google client ID — the web one (Lovable Cloud's
-  // Google settings has a single Client ID field, no authorized-client-ID list),
-  // so the exchange would fail audience verification. iOS Google therefore uses
-  // the web flow. Android's Credential Manager mints for the web client ID and
-  // does work natively.
-  if (provider === "google" && Capacitor.getPlatform() === "ios") {
-    console.log(
-      "[auth] native google sign-in disabled on iOS: the backend only knows the web client id — using the web flow.",
-    );
+  // iOS Google uses the GoogleSignIn sheet with the web client ID as its server
+  // client (see ensureInitialized), so the token matches the backend's single
+  // Google client ID. Auth.tsx falls back to the browser sheet if it is refused.
+  if (provider === "google" && Capacitor.getPlatform() === "ios" && !NATIVE_AUTH_CONFIG.googleIosClientId) {
     return false;
   }
   console.log(`[auth] native ${provider} sign-in available`);
@@ -136,9 +133,16 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     // `style: "standard"` opens the full "Sign in with Google" account picker
     // (all accounts on the device) instead of the One Tap "sign back in" sheet,
     // which only ever suggests a single, previously used account.
+    //
+    // iOS Google: the SDK can add its own nonce, so give it the SHA-256 of ours
+    // (exactly like Apple) and hand the raw value to the backend.
+    const isIos = Capacitor.getPlatform() === "ios";
+    const hashNonce = provider === "apple" || isIos;
     const options =
       provider === "apple"
         ? { scopes: ["email", "name"], nonce: await sha256(rawNonce) }
+        : isIos
+        ? { nonce: await sha256(rawNonce) }
         : {
             style: "standard" as const,
             filterByAuthorizedAccounts: false,
@@ -164,7 +168,7 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     const { error } = await supabase.auth.signInWithIdToken({
       provider,
       token: idToken,
-      ...(provider === "apple" ? { nonce: rawNonce } : {}),
+      ...(hashNonce ? { nonce: rawNonce } : {}),
     });
 
     if (error) return { ok: false, cancelled: false, message: error.message };
