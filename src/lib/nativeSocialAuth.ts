@@ -168,7 +168,7 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     const { error } = await supabase.auth.signInWithIdToken({
       provider,
       token: idToken,
-      ...(provider === "apple" ? { nonce: rawNonce } : {}),
+      ...(hashNonce ? { nonce: rawNonce } : {}),
     });
 
     if (error) return { ok: false, cancelled: false, message: error.message };
