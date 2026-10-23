@@ -1,10 +1,14 @@
 /**
  * Keyboard state tracking.
  *
- * Device measurements show Android already resizes the WebView for the IME
- * (innerHeight 716 -> 417). Native layout therefore follows that resized
- * viewport and never subtracts the keyboard height again. Keyboard events only
- * toggle `kb-open`, which hides the tab bar and collapses the bottom safe inset.
+ * Android: device measurements show the WebView is already resized for the
+ * IME (innerHeight 716 -> 417), so `--kb` stays 0 and keyboard events only
+ * toggle `kb-open` (hides the tab bar, collapses the bottom safe inset).
+ *
+ * iPhone: the Keyboard plugin's `resize: "none"` (an iOS-only setting) keeps
+ * the WebView full height, so the keyboard covers the bottom of the page. On
+ * iOS we therefore set `--kb` to the reported keyboard height so composers sit
+ * on top of it, the same way the website does with visualViewport.
  */
 
 import { Capacitor } from '@capacitor/core';
@@ -16,6 +20,14 @@ function set(px: number, open = px > 0) {
   root.classList.toggle('kb-open', open);
 }
 
+/** iOS nudges the whole page up to reveal a focused field; undo it once our own offset applies. */
+function resetIosPageScroll() {
+  requestAnimationFrame(() => {
+    window.scrollTo(0, 0);
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+  });
+}
+
 let started = false;
 
 export function initKeyboardInsets() {
@@ -24,10 +36,18 @@ export function initKeyboardInsets() {
   set(0);
 
   if (Capacitor.isNativePlatform()) {
+    const isIos = Capacitor.getPlatform() === 'ios';
     void (async () => {
       try {
         const { Keyboard } = await import('@capacitor/keyboard');
-        const onShow = () => set(0, true);
+        const onShow = (info?: { keyboardHeight?: number }) => {
+          if (isIos) {
+            set(info?.keyboardHeight ?? 0, true);
+            resetIosPageScroll();
+          } else {
+            set(0, true);
+          }
+        };
         const onHide = () => set(0, false);
         await Keyboard.addListener('keyboardWillShow', onShow);
         await Keyboard.addListener('keyboardDidShow', onShow);

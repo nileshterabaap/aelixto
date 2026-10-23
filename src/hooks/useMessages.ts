@@ -307,5 +307,5 @@ export const useMessages = (conversationId: string | null) => {
     }
   };
 
-  return { messages, loading, sendMessage, otherStatus };
+  return { messages, loading, loadFailed, retry, sendMessage, otherStatus };
 };
