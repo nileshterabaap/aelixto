@@ -8,7 +8,7 @@ import { PostSkeleton } from "@/components/PostSkeleton";
 import { motion } from "framer-motion";
 import { useSession } from "@/hooks/useSession";
 import { markPostsSeenImmediate } from "@/hooks/useMarkPostSeen";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchAuthorProfile, knownAuthorProfile } from "@/lib/authorProfile";
 import type { Post } from "@/data/demoData";
 import type { PlatformPost } from "@/hooks/useUserPlatformPosts";
 import type { PlatformTab } from "@/hooks/useUserPlatformTabs";
@@ -92,24 +92,27 @@ export const PlatformPostViewer = ({
   const { user } = useSession();
   const blockNavigation = usesBlockNavigation(activeTab);
   const blockPostIds = useMemo(() => posts.map(post => post.id), [posts]);
+  // The grid rows already carry the owner's name, so the header never has to
+  // wait for (or depend on) the separate lookup below.
+  const ownerFromGrid = useMemo<ProfileData | null>(() => {
+    const own = posts.find(post => post.user_id === userId && post.profile_username);
+    return own
+      ? { username: own.profile_username!, display_name: own.profile_display_name ?? null, avatar_url: own.profile_avatar_url ?? null }
+      : knownAuthorProfile(userId);
+  }, [posts, userId]);
   // Use react-query so the profile is cached across viewer opens — instant after first load.
-  const { data: profileData = null } = useQuery({
+  // A failed lookup throws and retries; it is never cached as an "Unknown" author.
+  const { data: fetchedProfile = null } = useQuery({
     queryKey: ["viewer-profile", userId],
     enabled: !!userId,
     staleTime: 10 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    queryFn: async (): Promise<ProfileData | null> => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("username, display_name, avatar_url")
-        .eq("user_id", userId)
-        .single();
-      if (error) return null;
-      return data as ProfileData;
-    },
+    refetchOnMount: (query) => query.state.data == null,
+    retry: 3,
+    queryFn: async (): Promise<ProfileData | null> => fetchAuthorProfile(userId),
   });
+  const profileData = fetchedProfile ?? ownerFromGrid;
   const [portalReady, setPortalReady] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const postRefs = useRef<Map<string, HTMLDivElement>>(new Map());
