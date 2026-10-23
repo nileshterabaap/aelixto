@@ -49,14 +49,41 @@ export const useRealtimeInvalidations = () => {
         { event: "*", schema: "public", table: "notifications", filter: `recipient_id=eq.${user.id}` },
         invalidateNotifications,
       )
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, (payload) => {
-        invalidatePosts(queryClient, payload.eventType === "INSERT" || payload.eventType === "DELETE");
+      // Scale rule: every unfiltered listener is delivered to EVERY online
+      // person for EVERY matching change (billed per delivery, and each one
+      // made all screens refetch). Background bookkeeping updates posts
+      // constantly, so global listeners are limited to rare new/removed posts;
+      // edits, likes, comments and reposts are only followed for my own rows.
+      // Others' changes appear on the next normal load; per-post "Liked by"
+      // keeps its own narrowly filtered live listener.
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "posts" }, () => {
+        invalidatePosts(queryClient, true);
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "likes" }, () => invalidatePosts(queryClient))
-      .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, () => invalidatePosts(queryClient))
-      .on("postgres_changes", { event: "*", schema: "public", table: "reposts" }, (payload) => {
-        invalidatePosts(queryClient, payload.eventType === "INSERT" || payload.eventType === "DELETE");
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "posts" }, () => {
+        invalidatePosts(queryClient, true);
       })
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "posts", filter: `user_id=eq.${user.id}` },
+        () => invalidatePosts(queryClient),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "likes", filter: `user_id=eq.${user.id}` },
+        () => invalidatePosts(queryClient),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "comments", filter: `user_id=eq.${user.id}` },
+        () => invalidatePosts(queryClient),
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reposts", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          invalidatePosts(queryClient, payload.eventType === "INSERT" || payload.eventType === "DELETE");
+        },
+      )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "saves", filter: `user_id=eq.${user.id}` },
@@ -71,9 +98,8 @@ export const useRealtimeInvalidations = () => {
         invalidateSaved,
       )
       .on("postgres_changes", { event: "*", schema: "public", table: "collection_items" }, invalidateSaved)
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => {
-        queryClient.invalidateQueries({ queryKey: ["conversations"] });
-      })
+      // (No messages listener here: the conversation list has its own, and
+      // nothing reads a "conversations" query, so it was pure overhead.)
       .subscribe();
 
     return () => {
