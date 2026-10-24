@@ -97,6 +97,20 @@ const Conversation = () => {
   const distanceFromBottom = useRef(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menuTop, setMenuTop] = useState<number | null>(null);
+  // Keep the hold menu fully inside the visible area — above the keyboard
+  // (iPhone reports its height via --kb) — flipping above the finger if needed.
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!menu.message || !el) { setMenuTop(null); return; }
+    const kb = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--kb')) || 0;
+    const visible = Math.min(window.visualViewport?.height ?? window.innerHeight, window.innerHeight - kb);
+    const h = el.offsetHeight;
+    const margin = 8;
+    let top = menu.y - 10;
+    if (top + h > visible - margin) top = menu.y - h - 10; // flip above
+    top = Math.max(margin, Math.min(top, visible - h - margin));
+    setMenuTop(top);
+  }, [menu.message, menu.y]);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [highlightId, setHighlightId] = useState<string | null>(null);
   // Swipe-to-reply state
