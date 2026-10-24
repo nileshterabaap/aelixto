@@ -705,7 +705,7 @@ const Conversation = () => {
                           className="rounded-md max-h-[320px] w-auto max-w-full"
                         />
                       )}
-                      <p className={`text-sm whitespace-pre-wrap break-words ${media ? 'px-2 pb-0.5' : ''}`}>
+                      <p className={`text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${media ? 'px-2 pb-0.5' : ''}`}>
                         {media ? '' : body}
                         <span
                           className={`float-right ml-2 text-[10px] leading-none select-none relative top-[6px] ${
