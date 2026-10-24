@@ -133,6 +133,14 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+
+  /* iOS: stop the system "Share / Save to Photos / Copy" menu on long-press of images & videos */
+  img, video {
+    -webkit-touch-callout: none;
+    -webkit-user-drag: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
 }
 
 /* Hide Pinterest Save button */
