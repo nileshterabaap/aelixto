@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Capacitor } from "@capacitor/core";
+
+const IS_IOS_NATIVE = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2, Check, CheckCheck, ImagePlus, Loader2, Clock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
