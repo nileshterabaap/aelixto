@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import redditIcon from "@/assets/platforms/reddit.svg";
 import { usePersistEmbedHeight } from "@/hooks/usePersistEmbedHeight";
 import { EmbedFadeSkeleton, smoothFadeStyle, useSmoothReveal } from "@/components/embeds/SmoothEmbedFrame";
+import { RedditNativeCard } from "@/components/embeds/RedditNativeCard";
+import { fetchRedditPost, getCachedRedditPost, type RedditPostData } from "@/lib/redditPostData";
 
 type RedditEmbedProps = {
   url: string;
@@ -197,6 +199,31 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
   );
   const persistHeight = usePersistEmbedHeight(postId);
 
+  // iPhone app: the phone reads the post itself and the app draws it as a
+  // Reddit-style card. Falls back to the preview card below if that fails.
+  const [nativeData, setNativeData] = useState<RedditPostData | null>(() =>
+    REDDIT_PLAYER_BLOCKED ? getCachedRedditPost(normalizedUrl) : null,
+  );
+  const [nativeTried, setNativeTried] = useState(() => !!nativeData);
+  useEffect(() => {
+    if (!REDDIT_PLAYER_BLOCKED) return;
+    let cancelled = false;
+    const cached = getCachedRedditPost(normalizedUrl);
+    if (cached) {
+      setNativeData(cached);
+      setNativeTried(true);
+      return;
+    }
+    setNativeData(null);
+    setNativeTried(false);
+    fetchRedditPost(normalizedUrl).then((d) => {
+      if (cancelled) return;
+      setNativeData(d);
+      setNativeTried(true);
+    });
+    return () => { cancelled = true; };
+  }, [normalizedUrl]);
+
   // Previously we ran an `Image()` probe here to mark broken thumbnails, but
   // Reddit's `external-preview.redd.it` CDN sometimes rejects cross-origin
   // probe requests inside the Capacitor WebView even though the actual
@@ -351,6 +378,13 @@ export default function RedditEmbed({ url, title, thumbnailUrl, description, aut
     window.addEventListener('blur', onBlur);
     return () => window.removeEventListener('blur', onBlur);
   }, [embedSrc, mediaKind, userExpanded, postId]);
+
+  if (REDDIT_PLAYER_BLOCKED) {
+    if (nativeData) return <RedditNativeCard data={nativeData} />;
+    if (!nativeTried) {
+      return <div data-embed-status="loading" className="w-full" style={{ minHeight: iframeHeight }} />;
+    }
+  }
 
   if (resolving || (!resolvedUrl && !failed)) {
     return <div data-embed-status="loading" className="w-full" style={{ minHeight: iframeHeight }} />;
