@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Capacitor } from "@capacitor/core";
+
+const IS_IOS_NATIVE = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Send, Copy, Reply, Pencil, Trash2, Check, CheckCheck, ImagePlus, Loader2, Clock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -869,12 +872,14 @@ const Conversation = () => {
               className="flex-1"
               // type="search" + autocomplete off suppresses Chrome Android's
               // key/location/card autofill toolbar above the keyboard.
-              type="search"
+              // iOS has no autofill bar, but autocorrect="off" there removes
+              // the keyboard's word suggestions — so keep them on for iPhone.
+              type={IS_IOS_NATIVE ? "text" : "search"}
               enterKeyHint="send"
               autoComplete="off"
-              autoCorrect="off"
+              autoCorrect={IS_IOS_NATIVE ? "on" : "off"}
               autoCapitalize="sentences"
-              spellCheck={false}
+              spellCheck={IS_IOS_NATIVE}
               name={`msg-${conversationId ?? "new"}`}
               inputMode="text"
               data-form-type="other"
