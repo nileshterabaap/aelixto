@@ -149,17 +149,39 @@ function measureClip() {
   return { clipTop: 0, clipBottom };
 }
 
+    // The native card sits above the whole web page, so it must follow its
+    // slot exactly and get out of the way whenever the slot isn't showing:
+    // Home hidden behind another tab, or a sheet/dialog opened on top.
+    const HIDDEN_Y = -20000;
+    let lastKey = '';
+    let lastSize = { width: 0, height: 0 };
+
+    const slotHidden = (r: DOMRect) =>
+      !el.isConnected ||
+      r.width < 1 ||
+      r.height < 1 ||
+      el.getClientRects().length === 0 ||
+      !!document.querySelector(
+        '[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]',
+      );
+
     const pushFrame = () => {
       const r = el.getBoundingClientRect();
+      const hidden = slotHidden(r);
+      if (!hidden) lastSize = { width: Math.round(r.width), height: Math.round(r.height) };
+      if (hidden && !presentedRef.current) return; // present once it's actually on screen
       const clip = measureClip();
       const payload = {
         adId,
-        x: Math.round(r.left),
-        y: Math.round(r.top),
-        width: Math.round(r.width),
-        height: Math.round(r.height),
+        x: hidden ? 0 : Math.round(r.left),
+        y: hidden ? HIDDEN_Y : Math.round(r.top),
+        width: lastSize.width,
+        height: lastSize.height,
         ...clip,
       };
+      const key = `${payload.x}|${payload.y}|${payload.width}|${payload.height}|${clip.clipBottom}`;
+      if (key === lastKey) return;
+      lastKey = key;
       if (!presentedRef.current) {
         presentedRef.current = true;
         console.log('[ads] presentNativeAd overlay for adId =', adId, 'frame =', JSON.stringify(payload));
@@ -170,25 +192,25 @@ function measureClip() {
           if (mountedRef.current) setPresented(true);
         }).catch(() => {
           presentedRef.current = false;
+          lastKey = '';
         });
       } else {
         void GamNative.updateNativeAdFrame(payload).catch(() => {});
       }
     };
-    const schedule = () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(pushFrame);
-    };
 
-    pushFrame();
-    window.addEventListener('scroll', schedule, { passive: true, capture: true });
-    window.addEventListener('resize', schedule);
-    const ro = new ResizeObserver(schedule);
-    ro.observe(el);
+    // Follow the slot every frame (only talking to the native side when it
+    // actually moved). Scroll events alone missed posts above the ad growing
+    // after they loaded, which left the ad painted over the next post.
+    let stopped = false;
+    const tick = () => {
+      if (stopped) return;
+      pushFrame();
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    tick();
     return () => {
-      window.removeEventListener('scroll', schedule, true);
-      window.removeEventListener('resize', schedule);
-      ro.disconnect();
+      stopped = true;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [ad?.adId, revealAllowed]);
