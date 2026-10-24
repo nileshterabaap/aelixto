@@ -763,7 +763,7 @@ const Conversation = () => {
           className="fixed z-50 bg-popover border border-border rounded-xl shadow-lg py-1.5 min-w-[160px] animate-in fade-in zoom-in-95 select-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]"
           style={{
             left: Math.min(menu.x, window.innerWidth - 180),
-            top: Math.min(menu.y - 10, window.innerHeight - 200),
+            top: menuTop ?? Math.min(menu.y - 10, window.innerHeight - 200),
           }}
         >
           <button
