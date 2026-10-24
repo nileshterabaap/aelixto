@@ -36,6 +36,7 @@ import NotificationSettings from "./pages/NotificationSettings";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import ChildSafety from "./pages/ChildSafety";
+import Support from "./pages/Support";
 import AuthBridge from "./pages/AuthBridge";
 import Unsubscribe from "./pages/Unsubscribe";
 import ShortLinkRedirect from "./pages/ShortLinkRedirect";
@@ -115,6 +116,7 @@ const AnimatedRoutes = () => {
             <Route path="/privacy" element={<PageTransition><PrivacyPolicy /></PageTransition>} />
             <Route path="/terms" element={<PageTransition><TermsOfService /></PageTransition>} />
             <Route path="/child-safety" element={<PageTransition><ChildSafety /></PageTransition>} />
+            <Route path="/support" element={<PageTransition><Support /></PageTransition>} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             {/* Short-link redirect */}
             <Route path="/s/:code" element={<ShortLinkRedirect />} />
