@@ -27,6 +27,8 @@ const getNotificationIcon = (type: string) => {
       return { icon: UserCheck, bgColor: 'bg-violet-100', iconColor: 'text-violet-500' };
     case 'message':
       return { icon: MessageSquare, bgColor: 'bg-sky-100', iconColor: 'text-sky-500' };
+    case 'new_post':
+      return { icon: Bell, bgColor: 'bg-sky-100', iconColor: 'text-sky-500' };
     case 'report_outcome':
       return { icon: Shield, bgColor: 'bg-amber-100', iconColor: 'text-amber-600' };
     default:
@@ -50,6 +52,8 @@ const getNotificationMessage = (type: string) => {
       return 'accepted your follow ask';
     case 'message':
       return 'sent you a message';
+    case 'new_post':
+      return 'shared a new post';
     default:
       return 'interacted with you';
   }

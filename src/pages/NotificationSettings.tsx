@@ -92,6 +92,7 @@ const NotificationSettings = () => {
   const [follows, setFollows] = useState(true);
   const [followAsks, setFollowAsks] = useState(true);
   const [followAccepted, setFollowAccepted] = useState(true);
+  const [newPosts, setNewPosts] = useState(true);
 
   useEffect(() => {
     const s = (profile?.settings as any) || {};
@@ -102,6 +103,7 @@ const NotificationSettings = () => {
     setFollows(s.notif_follows !== false);
     setFollowAsks(s.notif_follow_asks !== false);
     setFollowAccepted(s.notif_follow_accepted !== false);
+    setNewPosts(s.notif_new_posts !== false);
   }, [profile]);
 
   const save = (updates: Record<string, any>) => {
@@ -181,6 +183,12 @@ const NotificationSettings = () => {
             label="Agreed Follow Asks"
             value={followAccepted}
             onChange={(v) => { setFollowAccepted(v); save({ notif_follow_accepted: v }); }}
+          />
+          <FlagGroup
+            icon={Bell}
+            label="New posts from people you follow"
+            value={newPosts}
+            onChange={(v) => { setNewPosts(v); save({ notif_new_posts: v }); }}
           />
         </div>
       </main>
