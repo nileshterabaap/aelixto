@@ -29,6 +29,13 @@
       "when": 1792011513841,
       "tag": "0003_aelix_score_default_on",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792867317623,
+      "tag": "0004_migration",
+      "breakpoints": true
     }
   ]
 }
