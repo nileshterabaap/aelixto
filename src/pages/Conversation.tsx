@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
 
 const IS_IOS_NATIVE = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
@@ -96,6 +96,7 @@ const Conversation = () => {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const distanceFromBottom = useRef(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [menuTop, setMenuTop] = useState<number | null>(null);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [highlightId, setHighlightId] = useState<string | null>(null);
   // Swipe-to-reply state
