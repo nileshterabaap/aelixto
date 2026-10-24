@@ -289,7 +289,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { userId, title, body, url, icon } = await req.json();
+    const reqBody = await req.json();
+    const { userId, body, icon } = reqBody;
+    let { title, url } = reqBody as { title?: string; url?: string };
 
     if (!userId || !title) {
       return new Response(
@@ -302,6 +304,31 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+
+    // The DB trigger has no dedicated wording for "new post from someone you
+    // follow" yet, so it sends a generic title. Fill in the real wording here.
+    if (title === "New notification") {
+      try {
+        const since = new Date(Date.now() - 60_000).toISOString();
+        const { data: n } = await supabase
+          .from("notifications")
+          .select("type, post_id, actor_id")
+          .eq("recipient_id", userId)
+          .gte("created_at", since)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (n?.type === "new_post") {
+          const { data: p } = await supabase
+            .from("profiles").select("username").eq("user_id", n.actor_id).maybeSingle();
+          const name = (p?.username || "").replace(/^@/, "") || "Someone";
+          title = `${name} shared a new post`;
+          if (n.post_id) url = `/post/${n.post_id}`;
+        }
+      } catch (e) {
+        console.error("new_post title lookup failed", e);
+      }
+    }
 
     // ---------- Native push (FCM + APNs) ----------
     let nativeSent = 0;
