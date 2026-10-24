@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { ArrowLeft, Loader2, Heart, MessageCircle, Repeat2, UserPlus, UserCheck, Users, MessageSquare } from "lucide-react";
+import { ArrowLeft, Loader2, Heart, MessageCircle, Repeat2, UserPlus, UserCheck, Users, MessageSquare, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
