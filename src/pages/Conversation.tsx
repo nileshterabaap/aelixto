@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { Capacitor } from "@capacitor/core";
 
 const IS_IOS_NATIVE = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
@@ -96,6 +96,21 @@ const Conversation = () => {
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const distanceFromBottom = useRef(0);
   const menuRef = useRef<HTMLDivElement>(null);
+  const [menuTop, setMenuTop] = useState<number | null>(null);
+  // Keep the hold menu fully inside the visible area — above the keyboard
+  // (iPhone reports its height via --kb) — flipping above the finger if needed.
+  useLayoutEffect(() => {
+    const el = menuRef.current;
+    if (!menu.message || !el) { setMenuTop(null); return; }
+    const kb = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--kb')) || 0;
+    const visible = Math.min(window.visualViewport?.height ?? window.innerHeight, window.innerHeight - kb);
+    const h = el.offsetHeight;
+    const margin = 8;
+    let top = menu.y - 10;
+    if (top + h > visible - margin) top = menu.y - h - 10; // flip above
+    top = Math.max(margin, Math.min(top, visible - h - margin));
+    setMenuTop(top);
+  }, [menu.message, menu.y]);
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [highlightId, setHighlightId] = useState<string | null>(null);
   // Swipe-to-reply state
@@ -705,7 +720,7 @@ const Conversation = () => {
                           className="rounded-md max-h-[320px] w-auto max-w-full"
                         />
                       )}
-                      <p className={`text-sm whitespace-pre-wrap break-words ${media ? 'px-2 pb-0.5' : ''}`}>
+                      <p className={`text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere] ${media ? 'px-2 pb-0.5' : ''}`}>
                         {media ? '' : body}
                         <span
                           className={`float-right ml-2 text-[10px] leading-none select-none relative top-[6px] ${
@@ -762,7 +777,7 @@ const Conversation = () => {
           className="fixed z-50 bg-popover border border-border rounded-xl shadow-lg py-1.5 min-w-[160px] animate-in fade-in zoom-in-95 select-none [-webkit-touch-callout:none] [-webkit-tap-highlight-color:transparent]"
           style={{
             left: Math.min(menu.x, window.innerWidth - 180),
-            top: Math.min(menu.y - 10, window.innerHeight - 200),
+            top: menuTop ?? Math.min(menu.y - 10, window.innerHeight - 200),
           }}
         >
           <button
