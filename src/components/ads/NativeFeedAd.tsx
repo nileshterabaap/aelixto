@@ -77,6 +77,7 @@ export function NativeFeedAd({ openingSlot = false, revealAllowed = true }: {
   const slotRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const presentedRef = useRef(false);
+  const adIdRef = useRef<string | null>(null);
   const tagRef = useRef(`[slot#${++slotSeq}]`);
   const [aspect, setAspect] = useState<number>(16 / 9);
   const [presented, setPresented] = useState(false);
@@ -109,14 +110,18 @@ export function NativeFeedAd({ openingSlot = false, revealAllowed = true }: {
       if (!mountedRef.current) return;
       if (ratio > 0) setAspect(ratio);
       console.log(`[ads]${tag} media aspect =`, ratio || 'unknown (16:9 fallback)');
+      adIdRef.current = creative?.adId ?? null;
       setAd(creative);
       setReady(true);
     })();
     return () => {
       mountedRef.current = false;
-      if (ad?.adId) {
-        void GamNative.destroyAd({ adId: ad.adId }).catch(() => {});
-      }
+      // Read the id from a ref: this cleanup was created on first render,
+      // when `ad` was still null, so it used to never remove the native
+      // overlay — leaving old ads floating over the feed and other tabs.
+      const id = adIdRef.current;
+      adIdRef.current = null;
+      if (id) void GamNative.destroyAd({ adId: id }).catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
