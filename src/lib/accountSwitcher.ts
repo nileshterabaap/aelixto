@@ -147,9 +147,13 @@ export function installAccountSync() {
   });
 }
 
-type RefreshOutcome =
-  | { ok: true; access_token: string; refresh_token: string; expires_at: number }
-  | { ok: false; expired: boolean };
+interface RefreshOutcome {
+  ok: boolean;
+  expired?: boolean;
+  access_token?: string;
+  refresh_token?: string;
+  expires_at?: number;
+}
 
 async function refreshTokens(refreshToken: string): Promise<RefreshOutcome> {
   const url = import.meta.env.VITE_SUPABASE_URL as string;
@@ -179,9 +183,11 @@ async function refreshTokens(refreshToken: string): Promise<RefreshOutcome> {
   }
 }
 
-export type SwitchResult =
-  | { ok: true }
-  | { ok: false; reason: "expired" | "network" | "missing"; username?: string | null };
+export interface SwitchResult {
+  ok: boolean;
+  reason?: "expired" | "network" | "missing";
+  username?: string | null;
+}
 
 /** Hand a saved account's session to the auth client (no restart). */
 async function activateSaved(userId: string): Promise<SwitchResult> {
