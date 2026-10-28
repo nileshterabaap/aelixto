@@ -273,7 +273,7 @@ export const useConversations = () => {
       setConversations(ordered);
       if (cacheKey) {
         try {
-          window.localStorage.setItem(cacheKey, JSON.stringify(conversationsWithDetails));
+          window.localStorage.setItem(cacheKey, JSON.stringify(ordered));
         } catch {
           /* quota exceeded - ignore */
         }
@@ -325,5 +325,52 @@ export const useConversations = () => {
     }
   };
 
-  return { conversations, loading, refetch: fetchConversations, deleteConversation };
+  /** Optimistically patch my own settings for one chat, reverting on failure. */
+  const updateMyChatSettings = async (
+    conversationId: string,
+    patch: { pinned_at?: string | null; muted?: boolean },
+  ) => {
+    if (!user) throw new Error('Not signed in');
+    let previous: ConversationWithDetails | undefined;
+    const apply = (fn: (c: ConversationWithDetails) => ConversationWithDetails) => {
+      setConversations(prev => {
+        const next = sortChats(prev.map(c => (c.id === conversationId ? fn(c) : c)));
+        if (cacheKey) {
+          try {
+            window.localStorage.setItem(cacheKey, JSON.stringify(next));
+          } catch {
+            /* quota exceeded - ignore */
+          }
+        }
+        return next;
+      });
+    };
+    apply(c => {
+      previous = c;
+      return { ...c, ...patch };
+    });
+
+    const { error } = await supabase
+      .from('conversation_participants')
+      .update(patch)
+      .eq('conversation_id', conversationId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error updating chat settings:', error);
+      if (previous) {
+        const restore = previous;
+        apply(() => restore);
+      }
+      throw error;
+    }
+  };
+
+  const setPinned = (conversationId: string, pinned: boolean) =>
+    updateMyChatSettings(conversationId, { pinned_at: pinned ? new Date().toISOString() : null });
+
+  const setMuted = (conversationId: string, muted: boolean) =>
+    updateMyChatSettings(conversationId, { muted });
+
+  return { conversations, loading, refetch: fetchConversations, deleteConversation, setPinned, setMuted };
 };
