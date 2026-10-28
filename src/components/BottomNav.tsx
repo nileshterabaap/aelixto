@@ -1,7 +1,8 @@
 import { Home, Search, Plus, Bell, User, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useState, useCallback, MouseEvent } from "react";
+import { useState, useCallback, useRef, MouseEvent } from "react";
+import { openAccountSwitcher } from "@/lib/accountSwitcher";
 import { useQueryClient } from "@tanstack/react-query";
 import { prefetchRoute } from "@/lib/prefetch";
 import { setScrollPosition } from "@/hooks/useScrollRestoration";
@@ -114,7 +115,28 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
     navigate(path);
   };
 
+  // Long-press the Profile tab to switch accounts (like Instagram).
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
+  const startProfileLongPress = () => {
+    longPressFired.current = false;
+    if (!currentProfile) return;
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      openAccountSwitcher();
+    }, 500);
+  };
+  const cancelProfileLongPress = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+  };
+
   const handleProfileClick = (e: MouseEvent<HTMLButtonElement>) => {
+    if (longPressFired.current) {
+      longPressFired.current = false;
+      return;
+    }
     createRipple(e, "profile");
     // If already on the profile tab (own /profile or own /u/username), a
     // second tap should scroll back to the top instead of re-navigating.
@@ -226,6 +248,11 @@ export const BottomNav = ({ onCreatePost }: BottomNavProps) => {
             onClick={handleProfileClick}
             onMouseEnter={() => handlePrefetch("/profile")}
             onTouchStart={() => handleTouchStart("/profile")}
+            onPointerDown={startProfileLongPress}
+            onPointerUp={cancelProfileLongPress}
+            onPointerLeave={cancelProfileLongPress}
+            onPointerCancel={cancelProfileLongPress}
+            onContextMenu={(e) => e.preventDefault()}
           >
             {ripples.profile?.map(ripple => (
               <span

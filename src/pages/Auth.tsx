@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { User } from "@supabase/supabase-js";
+import { ArrowLeft } from "lucide-react";
+import { getActiveUserId } from "@/lib/accountSwitcher";
 
 const nativeLovableAuth = createLovableAuth({
   oauthBrokerUrl: "https://aelixto.com/~oauth/initiate",
@@ -39,6 +41,7 @@ const Auth = () => {
   //   • Android / web → Apple's web OAuth flow in a Chrome Custom Tab / popup
   //     (there is no Apple SDK on Android, so the web flow is the supported path)
   const showApple = true;
+  const addMode = new URLSearchParams(window.location.search).get("add") === "1";
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
@@ -56,16 +59,30 @@ const Auth = () => {
   }, [resendCooldown]);
 
   useEffect(() => {
+    // In "Add account" mode the account already in use stays signed in;
+    // when a different account signs in, the account switcher restarts the
+    // app as that account.
+    let startUserId: string | null = null;
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
+        if (addMode) {
+          startUserId = session.user.id;
+          return;
+        }
         setUser(session.user);
         navigate("/");
       }
     };
     checkUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (addMode) {
+        if (!session?.user || event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") return;
+        if (session.user.id === (startUserId ?? getActiveUserId())) return;
+        setUser(session.user);
+        return;
+      }
       setUser(session?.user ?? null);
       if (session?.user) {
         navigate("/");
@@ -73,7 +90,7 @@ const Auth = () => {
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, addMode]);
 
   // Debounced username availability check
   useEffect(() => {
@@ -128,7 +145,7 @@ const Auth = () => {
       email = resolved as string;
     }
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
 
     setLoading(false);
 
@@ -158,6 +175,9 @@ const Auth = () => {
           : error.message,
         variant: "destructive",
       });
+    } else if (addMode && signInData.user?.id === getActiveUserId()) {
+      toast({ title: "Already signed in", description: "You're already using this account." });
+      navigate("/");
     } else {
       toast({ title: "Welcome back!", description: "You've successfully signed in." });
     }
@@ -440,10 +460,23 @@ const Auth = () => {
       }}
     >
       <div className="relative w-full max-w-md">
+        {addMode && (
+          <button
+            type="button"
+            aria-label="Cancel adding account"
+            onClick={() => navigate("/")}
+            className="absolute left-0 top-1 h-10 w-10 rounded-full flex items-center justify-center text-foreground active:bg-muted/60"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+        )}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
             Aelixto
           </h1>
+          {addMode && (
+            <p className="mt-2 text-sm text-muted-foreground">Add another account</p>
+          )}
         </div>
 
         <div className="rounded-3xl border border-border/10 bg-card/80 backdrop-blur-xl shadow-[0_20px_60px_-20px_hsl(var(--brand-blue)/0.25)] p-6">

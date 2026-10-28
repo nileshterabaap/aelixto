@@ -2,6 +2,19 @@ import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persist
 
 const CACHE_KEY = 'aelixto-query-cache';
 const MAX_AGE = 14 * 24 * 60 * 60 * 1000; // 14 days
+// Set by the account switcher before it restarts the app: the previous
+// account's saved screens must never be shown to the next account.
+const RESET_CACHE_KEY = 'aelixto-reset-query-cache';
+if (typeof window !== 'undefined') {
+  try {
+    if (window.localStorage.getItem(RESET_CACHE_KEY)) {
+      window.localStorage.removeItem(CACHE_KEY);
+      window.localStorage.removeItem(RESET_CACHE_KEY);
+    }
+  } catch {
+    /* storage unavailable */
+  }
+}
 
 // Create a localStorage persister for React Query
 export const localStoragePersister = createSyncStoragePersister({

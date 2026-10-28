@@ -8,7 +8,8 @@ import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Menu, MessageCircle } from "lucide-react";
+import { ArrowLeft, ChevronDown, Menu, MessageCircle } from "lucide-react";
+import { openAccountSwitcher } from "@/lib/accountSwitcher";
 import { Profile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { useFollow } from "@/hooks/useFollow";
@@ -253,10 +254,25 @@ const UserProfile = ({ usernameOverride }: UserProfileProps) => {
                 >
                   <ArrowLeft className="h-5 w-5" />
                 </Button>
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-xl font-bold leading-tight truncate text-white drop-shadow-lg">{profile.display_name || profile.username}</h1>
-                  <p className="text-white/95 text-sm truncate drop-shadow-lg">@{profile.username}</p>
-                </div>
+                {isMe ? (
+                  <button
+                    type="button"
+                    aria-label="Switch account"
+                    onClick={openAccountSwitcher}
+                    className="flex-1 min-w-0 text-left active:opacity-80"
+                  >
+                    <h1 className="text-xl font-bold leading-tight truncate text-white drop-shadow-lg">{profile.display_name || profile.username}</h1>
+                    <p className="text-white/95 text-sm truncate drop-shadow-lg flex items-center gap-1">
+                      <span className="truncate">@{profile.username}</span>
+                      <ChevronDown className="h-4 w-4 flex-shrink-0 stroke-[2.5]" />
+                    </p>
+                  </button>
+                ) : (
+                  <div className="flex-1 min-w-0">
+                    <h1 className="text-xl font-bold leading-tight truncate text-white drop-shadow-lg">{profile.display_name || profile.username}</h1>
+                    <p className="text-white/95 text-sm truncate drop-shadow-lg">@{profile.username}</p>
+                  </div>
+                )}
               </div>
               {isMe ? (
                 <Button
