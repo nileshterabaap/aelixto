@@ -36,6 +36,13 @@
       "when": 1792867317623,
       "tag": "0004_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793195051884,
+      "tag": "0005_mute_users_and_chat_pin_mute",
+      "breakpoints": true
     }
   ]
 }
