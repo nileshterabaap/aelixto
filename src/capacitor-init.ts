@@ -226,6 +226,9 @@ export async function initCapacitorPlugins() {
         const { PushNotifications } = await import("@capacitor/push-notifications");
 
         const saveToken = async (token: string) => {
+          // Remembered so logging out can stop this phone getting that
+          // account's notifications (see accountSwitcher).
+          try { localStorage.setItem("aelixto-push-token", token); } catch { /* ignore */ }
           try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;

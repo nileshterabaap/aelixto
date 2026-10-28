@@ -8,10 +8,12 @@ import { Capacitor } from "@capacitor/core";
 import { installXEmbedSandbox } from "./lib/sandboxXEmbeds";
 import { installIosEmbedRelay } from "./lib/iosEmbedRelay";
 import { installAuthResilience } from "./lib/authResilience";
+import { installAccountSync } from "./lib/accountSwitcher";
 
 installXEmbedSandbox();
 installIosEmbedRelay();
 installAuthResilience();
+installAccountSync();
 
 const unregisterAppServiceWorkers = async () => {
   if (!("serviceWorker" in navigator)) return;
