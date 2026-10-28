@@ -16,6 +16,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { showPrivacyOptionsForm } from "@/lib/adConsent";
 import { Capacitor } from "@capacitor/core";
+import { useSavedAccounts } from "@/hooks/useSavedAccounts";
+import { useStartAddAccount } from "@/components/AccountSwitcherSheet";
+import { logOutAllAccounts, logOutCurrentAccount, openAccountSwitcher } from "@/lib/accountSwitcher";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -66,9 +69,22 @@ const Settings = () => {
   };
 
 
+  const savedAccounts = useSavedAccounts();
+  const startAddAccount = useStartAddAccount();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  // With other accounts saved, logging out opens the next one; otherwise
+  // the sign-in page opens. The app restarts either way.
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/auth');
+    if (loggingOut) return;
+    setLoggingOut(true);
+    await logOutCurrentAccount();
+  };
+
+  const handleLogoutAll = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    await logOutAllAccounts();
   };
 
 
@@ -220,7 +236,22 @@ const Settings = () => {
         {/* Log out at bottom */}
         <SectionHeader title="" />
         <div className="divide-y divide-border">
-          <Row label="Log out" onClick={handleLogout} hasChevron={false} />
+          {savedAccounts.length > 1 && (
+            <Row label="Switch account" onClick={openAccountSwitcher} />
+          )}
+          <Row label="Add account" onClick={startAddAccount} hasChevron={false} />
+          {savedAccounts.length > 1 ? (
+            <>
+              <Row
+                label={loggingOut ? "Logging out…" : `Log out${profile?.username ? ` @${profile.username}` : ""}`}
+                onClick={handleLogout}
+                hasChevron={false}
+              />
+              <Row label="Log out of all accounts" onClick={handleLogoutAll} hasChevron={false} />
+            </>
+          ) : (
+            <Row label={loggingOut ? "Logging out…" : "Log out"} onClick={handleLogout} hasChevron={false} />
+          )}
         </div>
       </main>
 
