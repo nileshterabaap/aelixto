@@ -8,8 +8,10 @@ import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Search, Trash2 } from "lucide-react";
-import { useConversations } from "@/hooks/useConversations";
+import { Search, Trash2, Pin, PinOff, Bell, BellOff } from "lucide-react";
+import { useConversations, type ConversationWithDetails } from "@/hooks/useConversations";
+import { canPinAnotherChat, MAX_PINNED_CHATS } from "@/lib/chatListOrder";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { formatDistanceToNow } from "date-fns";
 import { useSession } from "@/hooks/useSession";
 import { MessagesSkeleton } from "@/components/messages/MessagesSkeleton";
@@ -29,10 +31,12 @@ const Messages = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   useCreatePostTrigger(useCallback(() => setIsCreateDialogOpen(true), []));
   const navigate = useNavigate();
-  const { conversations, loading, refetch, deleteConversation } = useConversations();
+  const { conversations, loading, refetch, deleteConversation, setPinned, setMuted } = useConversations();
   const { user } = useSession();
   const { toast } = useToast();
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [actionTarget, setActionTarget] = useState<string | null>(null);
+  const actionChat = actionTarget ? conversations.find((c) => c.id === actionTarget) ?? null : null;
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const longPressFired = useRef(false);
 
@@ -42,7 +46,7 @@ const Messages = () => {
     longPressTimer.current = setTimeout(() => {
       longPressFired.current = true;
       if (navigator.vibrate) navigator.vibrate(15);
-      setPendingDelete(conversationId);
+      setActionTarget(conversationId);
     }, 450);
   };
 
@@ -50,6 +54,38 @@ const Messages = () => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
+    }
+  };
+
+  const handleTogglePin = async (chat: ConversationWithDetails) => {
+    setActionTarget(null);
+    const pin = !chat.pinned_at;
+    if (pin && !canPinAnotherChat(conversations)) {
+      toast({
+        title: `You can pin up to ${MAX_PINNED_CHATS} chats`,
+        description: "Unpin a chat to pin this one.",
+      });
+      return;
+    }
+    try {
+      await setPinned(chat.id, pin);
+      toast({ title: pin ? "Chat pinned" : "Chat unpinned" });
+    } catch {
+      toast({ title: "Couldn't update chat", description: "Please try again.", variant: "destructive" });
+    }
+  };
+
+  const handleToggleMute = async (chat: ConversationWithDetails) => {
+    setActionTarget(null);
+    const mute = !chat.muted;
+    try {
+      await setMuted(chat.id, mute);
+      toast({
+        title: mute ? "Chat muted" : "Chat unmuted",
+        description: mute ? "You won't get notified about new messages in this chat." : undefined,
+      });
+    } catch {
+      toast({ title: "Couldn't update chat", description: "Please try again.", variant: "destructive" });
     }
   };
 
@@ -157,7 +193,7 @@ const Messages = () => {
                     onPointerLeave={cancelLongPress}
                     onContextMenu={(e) => {
                       e.preventDefault();
-                      setPendingDelete(conversation.id);
+                      setActionTarget(conversation.id);
                     }}
                     style={{ WebkitTouchCallout: "none" }}
                   >
@@ -178,13 +214,15 @@ const Messages = () => {
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center justify-between gap-2 mb-1">
                         <h3 className={`font-semibold truncate ${
                           hasUnread ? "text-foreground" : "text-foreground/80"
                         }`}>
                           {conversation.other_user.display_name || conversation.other_user.username}
                         </h3>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1.5 flex-shrink-0 text-xs text-muted-foreground">
+                          {conversation.muted && <BellOff className="h-3.5 w-3.5" aria-label="Muted" />}
+                          {conversation.pinned_at && <Pin className="h-3.5 w-3.5" aria-label="Pinned" />}
                           {conversation.last_message
                             ? formatTimestamp(conversation.last_message.created_at)
                             : formatTimestamp(conversation.updated_at)}
@@ -208,6 +246,47 @@ const Messages = () => {
         open={isCreateDialogOpen} 
         onOpenChange={setIsCreateDialogOpen}
       />
+
+      <Sheet open={!!actionChat} onOpenChange={(open) => !open && setActionTarget(null)}>
+        <SheetContent side="bottom" className="z-[100] p-0 rounded-t-2xl flex flex-col gap-0 border-t pb-[var(--safe-bottom)]">
+          <SheetHeader className="px-4 py-3 border-b">
+            <SheetTitle className="text-center truncate">
+              {actionChat ? actionChat.other_user.display_name || actionChat.other_user.username : ""}
+            </SheetTitle>
+          </SheetHeader>
+          {actionChat && (
+            <div className="flex flex-col py-1">
+              <button
+                type="button"
+                className="press-in flex items-center gap-3 px-5 py-3.5 text-left text-base hover:bg-accent"
+                onClick={() => handleTogglePin(actionChat)}
+              >
+                {actionChat.pinned_at ? <PinOff className="h-5 w-5" /> : <Pin className="h-5 w-5" />}
+                {actionChat.pinned_at ? "Unpin chat" : "Pin chat"}
+              </button>
+              <button
+                type="button"
+                className="press-in flex items-center gap-3 px-5 py-3.5 text-left text-base hover:bg-accent"
+                onClick={() => handleToggleMute(actionChat)}
+              >
+                {actionChat.muted ? <Bell className="h-5 w-5" /> : <BellOff className="h-5 w-5" />}
+                {actionChat.muted ? "Unmute chat" : "Mute chat"}
+              </button>
+              <button
+                type="button"
+                className="press-in flex items-center gap-3 px-5 py-3.5 text-left text-base text-destructive hover:bg-accent"
+                onClick={() => {
+                  setActionTarget(null);
+                  setPendingDelete(actionChat.id);
+                }}
+              >
+                <Trash2 className="h-5 w-5" />
+                Delete chat
+              </button>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       <AlertDialog
         open={!!pendingDelete}
