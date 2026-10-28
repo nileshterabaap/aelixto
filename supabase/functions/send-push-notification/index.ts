@@ -339,11 +339,31 @@ Deno.serve(async (req) => {
         .eq("user_id", userId);
 
       if (deviceTokens && deviceTokens.length) {
+        // A phone signed in to several Aelixto accounts gets every account's
+        // notifications; name the account so people know which one it's for.
+        let sharedTokens = new Set<string>();
+        let recipientName = "";
+        try {
+          const { data: shared } = await supabase
+            .from("device_tokens")
+            .select("token")
+            .in("token", deviceTokens.map((d) => d.token))
+            .neq("user_id", userId);
+          sharedTokens = new Set((shared ?? []).map((s) => s.token));
+          if (sharedTokens.size) {
+            const { data: me } = await supabase
+              .from("profiles").select("username").eq("user_id", userId).maybeSingle();
+            recipientName = (me?.username || "").replace(/^@/, "");
+          }
+        } catch (e) {
+          console.error("shared device lookup failed", e);
+        }
         for (const dt of deviceTokens) {
+          const t = sharedTokens.has(dt.token) && recipientName ? `@${recipientName} · ${title}` : title;
           const res =
             dt.platform === "android"
-              ? await sendFcm(dt.token, title, body || "", url || "/")
-              : await sendApns(dt.token, title, body || "", url || "/");
+              ? await sendFcm(dt.token, t, body || "", url || "/")
+              : await sendApns(dt.token, t, body || "", url || "/");
           if (res.ok) nativeSent++;
           else if (res.invalid) {
             await supabase.from("device_tokens").delete().eq("id", dt.id);
