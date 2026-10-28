@@ -207,6 +207,8 @@ export type Database = {
           joined_at: string
           last_delivered_at: string | null
           last_read_at: string | null
+          muted: boolean
+          pinned_at: string | null
           user_id: string
         }
         Insert: {
@@ -215,6 +217,8 @@ export type Database = {
           joined_at?: string
           last_delivered_at?: string | null
           last_read_at?: string | null
+          muted?: boolean
+          pinned_at?: string | null
           user_id: string
         }
         Update: {
@@ -223,6 +227,8 @@ export type Database = {
           joined_at?: string
           last_delivered_at?: string | null
           last_read_at?: string | null
+          muted?: boolean
+          pinned_at?: string | null
           user_id?: string
         }
         Relationships: [
@@ -609,6 +615,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      muted_users: {
+        Row: {
+          created_at: string
+          id: string
+          muted_user_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          muted_user_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          muted_user_id?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       notifications: {
         Row: {

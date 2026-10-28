@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useSession } from './useSession';
 import { onMessageThreadRead } from '@/lib/messageReadEvents';
 import { preloadImageWithPromise } from '@/lib/preloadImages';
+import { sortChats } from '@/lib/chatListOrder';
 
 export interface ConversationWithDetails {
   id: string;
@@ -19,6 +20,10 @@ export interface ConversationWithDetails {
     sender_id: string;
   } | null;
   unread_count: number;
+  /** When I pinned this chat (null = not pinned). */
+  pinned_at: string | null;
+  /** I turned off notifications for this chat. */
+  muted: boolean;
 }
 
 export const useConversations = () => {
@@ -149,7 +154,7 @@ export const useConversations = () => {
       // Get all conversations for current user
       const { data: participantRows, error: participantError } = await supabase
         .from('conversation_participants')
-        .select('conversation_id, last_read_at, last_delivered_at')
+        .select('conversation_id, last_read_at, last_delivered_at, pinned_at, muted')
         .eq('user_id', user.id);
 
       if (participantError) throw participantError;
@@ -157,6 +162,8 @@ export const useConversations = () => {
         conversation_id: string;
         last_read_at: string | null;
         last_delivered_at: string | null;
+        pinned_at: string | null;
+        muted: boolean;
       }>;
       participantData.forEach(p => knownReadAt.current.set(p.conversation_id, p.last_read_at ?? null));
 
@@ -254,22 +261,19 @@ export const useConversations = () => {
             sender_id: lastMessage.sender_id,
           } : null,
           unread_count: unreadCount,
+          pinned_at: participant?.pinned_at ?? null,
+          muted: !!participant?.muted,
         };
       }) || [];
 
-      // Sort by last message time (most recent first). Fall back to
-      // conversation.updated_at if there are no messages yet.
-      conversationsWithDetails.sort((a, b) => {
-        const aTime = new Date(a.last_message?.created_at || a.updated_at).getTime();
-        const bTime = new Date(b.last_message?.created_at || b.updated_at).getTime();
-        return bTime - aTime;
-      });
+      // Pinned chats first, then by latest message time.
+      const ordered = sortChats(conversationsWithDetails);
 
       // Render immediately — avatars warm up in the background (no blocking wait)
-      setConversations(conversationsWithDetails);
+      setConversations(ordered);
       if (cacheKey) {
         try {
-          window.localStorage.setItem(cacheKey, JSON.stringify(conversationsWithDetails));
+          window.localStorage.setItem(cacheKey, JSON.stringify(ordered));
         } catch {
           /* quota exceeded - ignore */
         }
@@ -321,5 +325,52 @@ export const useConversations = () => {
     }
   };
 
-  return { conversations, loading, refetch: fetchConversations, deleteConversation };
+  /** Optimistically patch my own settings for one chat, reverting on failure. */
+  const updateMyChatSettings = async (
+    conversationId: string,
+    patch: { pinned_at?: string | null; muted?: boolean },
+  ) => {
+    if (!user) throw new Error('Not signed in');
+    let previous: ConversationWithDetails | undefined;
+    const apply = (fn: (c: ConversationWithDetails) => ConversationWithDetails) => {
+      setConversations(prev => {
+        const next = sortChats(prev.map(c => (c.id === conversationId ? fn(c) : c)));
+        if (cacheKey) {
+          try {
+            window.localStorage.setItem(cacheKey, JSON.stringify(next));
+          } catch {
+            /* quota exceeded - ignore */
+          }
+        }
+        return next;
+      });
+    };
+    apply(c => {
+      previous = c;
+      return { ...c, ...patch };
+    });
+
+    const { error } = await supabase
+      .from('conversation_participants')
+      .update(patch)
+      .eq('conversation_id', conversationId)
+      .eq('user_id', user.id);
+
+    if (error) {
+      console.error('Error updating chat settings:', error);
+      if (previous) {
+        const restore = previous;
+        apply(() => restore);
+      }
+      throw error;
+    }
+  };
+
+  const setPinned = (conversationId: string, pinned: boolean) =>
+    updateMyChatSettings(conversationId, { pinned_at: pinned ? new Date().toISOString() : null });
+
+  const setMuted = (conversationId: string, muted: boolean) =>
+    updateMyChatSettings(conversationId, { muted });
+
+  return { conversations, loading, refetch: fetchConversations, deleteConversation, setPinned, setMuted };
 };

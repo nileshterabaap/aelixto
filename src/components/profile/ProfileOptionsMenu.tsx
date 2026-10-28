@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { MoreVertical, Ban, UserMinus, Copy, Share2, Flag, ShieldOff } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { MoreVertical, Ban, UserMinus, Copy, Share2, Flag, ShieldOff, Bell, BellOff } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "@/hooks/useSession";
 import { ReportDialog } from "@/components/ReportDialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,12 +47,55 @@ export const ProfileOptionsMenu = ({
   onRemovedFollower,
 }: ProfileOptionsMenuProps) => {
   const queryClient = useQueryClient();
+  const { user } = useSession();
   const [blockDialogOpen, setBlockDialogOpen] = useState(false);
   const [removeFollowerDialogOpen, setRemoveFollowerDialogOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [muteLoading, setMuteLoading] = useState(false);
 
   const name = displayName || username;
+
+  const muteKey = ["muted-user", user?.id, targetUserId];
+  const { data: isMuted = false } = useQuery({
+    queryKey: muteKey,
+    enabled: !!user?.id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("muted_users")
+        .select("id")
+        .eq("user_id", user!.id)
+        .eq("muted_user_id", targetUserId)
+        .maybeSingle();
+      if (error) throw error;
+      return !!data;
+    },
+  });
+
+  const handleToggleMute = async () => {
+    if (!user?.id) return;
+    const mute = !isMuted;
+    setMuteLoading(true);
+    queryClient.setQueryData(muteKey, mute);
+    try {
+      const { error } = mute
+        ? await supabase.from("muted_users").insert({ user_id: user.id, muted_user_id: targetUserId })
+        : await supabase.from("muted_users").delete().eq("user_id", user.id).eq("muted_user_id", targetUserId);
+      // A duplicate row means it was already muted, which is the goal.
+      if (error && !(mute && error.code === "23505")) throw error;
+      toast.success(
+        mute
+          ? `Muted @${username}. You won't be notified when they post.`
+          : `Unmuted @${username}`,
+      );
+    } catch (error) {
+      console.error("Error toggling mute:", error);
+      queryClient.setQueryData(muteKey, !mute);
+      toast.error(mute ? "Couldn't mute. Please try again." : "Couldn't unmute. Please try again.");
+    } finally {
+      setMuteLoading(false);
+    }
+  };
 
   const handleCopyUrl = async () => {
     const url = await buildShortUrl(buildProfilePath(username));
@@ -199,6 +243,15 @@ export const ProfileOptionsMenu = ({
               <DropdownMenuItem onClick={() => setRemoveFollowerDialogOpen(true)}>
                 <UserMinus className="h-4 w-4 mr-2" />
                 Remove follower
+              </DropdownMenuItem>
+            </>
+          )}
+          {!isBlocked && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleToggleMute} disabled={muteLoading}>
+                {isMuted ? <Bell className="h-4 w-4 mr-2" /> : <BellOff className="h-4 w-4 mr-2" />}
+                {isMuted ? `Unmute @${username}` : `Mute @${username}`}
               </DropdownMenuItem>
             </>
           )}
