@@ -33,3 +33,9 @@ To change the logo, replace the files in `resources/` (same sizes) and re-run
 
 Android launchers cache app icons. After installing a build with a new icon,
 uninstall the old app first (or restart the phone), then install the new one.
+
+## Check before building
+
+`npm run assets:generate` now ends with an icon check (also `npm run icon:check`).
+It compares the icons inside `android/` with `resources/icon-foreground.png` and
+prints FAIL if the old logo is still there, so a wrong APK is never built.
