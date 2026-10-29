@@ -1,5 +1,7 @@
 # Project architecture
 
+- Some subdirectories have their own `AGENTS.md`; read it before changing files there.
+
 - The shared loading mark animates separate HTML compositor layers around static SVG artwork rather than SVG groups, avoiding per-frame SVG painting during native embed loading.
 
 - Home opening slots use a presentation-only whole-card gate, load mounted children concurrently, and reveal in feed order; native ads reserve their opening slot and fade their complete SDK overlay after presentation, without altering protected playback/scoring or feed refresh rules.
@@ -31,4 +33,3 @@
 - Multiple accounts go through `src/lib/accountSwitcher.ts` (list rules in `accountStore.ts`): every signed-in session is saved locally, a different active account always restarts the app with the persisted query cache discarded, saved tokens are refreshed before `setSession` so a dead account can't sign out the current one, and logout deletes only this device's push registration for that account, because caches and push tokens are otherwise shared across accounts on one phone.
 
 - Mutes are enforced where notifications are created (database triggers skip muted accounts/chats), so phone and in-app alerts stay consistent on every app version without client checks.
-- Android adaptive icon foreground (`resources/icon-foreground.png`) is the full opaque icon, because `capacitor-assets` insets both adaptive layers 16.7% and any padded/tiled foreground renders as a tiny logo on the phone.
