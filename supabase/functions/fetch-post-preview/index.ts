@@ -338,10 +338,30 @@ serve(async (req) => {
         updatePayload.title = previewTitle;
         updatePayload.preview_title = previewTitle;
       }
-      const { error: updateError } = await supabase
-        .from('posts')
-        .update(updatePayload)
-        .eq('id', postId);
+
+      // Reddit: a failed lookup must never wipe what we already stored.
+      // Only replace a field when the new value is real, not empty/generic.
+      if (platform === 'reddit') {
+        const { data: existing } = await supabase
+          .from('posts')
+          .select('thumbnail_url, preview_text, media_kind')
+          .eq('id', postId)
+          .maybeSingle();
+        if (!thumbnailUrl) {
+          delete updatePayload.thumbnail_url;
+          delete updatePayload.preview_image_url;
+        }
+        if (isGenericRedditText(previewText)) delete updatePayload.preview_text;
+        if (!sizing.media_kind || (existing?.media_kind && existing.media_kind !== 'text' && sizing.media_kind === 'text' && !thumbnailUrl)) {
+          delete updatePayload.media_kind;
+          delete updatePayload.aspect_ratio;
+          delete updatePayload.suggested_height;
+        }
+      }
+
+      const { error: updateError } = Object.keys(updatePayload).length
+        ? await supabase.from('posts').update(updatePayload).eq('id', postId)
+        : { error: null };
 
       if (updateError) {
         console.error('[fetch-post-preview] DB update error:', updateError);
