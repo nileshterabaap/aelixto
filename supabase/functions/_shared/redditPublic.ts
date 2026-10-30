@@ -93,7 +93,8 @@ export function parseRedditEmbedHtml(html: string, canonicalUrl: string): Reddit
 
   const deleted = /This post has been deleted|This post was removed|removed by the moderators/i.test(clean);
 
-  const titleMatch = clean.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+  const titleMatch = clean.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i)
+    || clean.match(/<shreddit-embed-title[^>]*>([\s\S]*?)<\/shreddit-embed-title>/i);
   const title = titleMatch ? decodeEntities(titleMatch[1].replace(/<[^>]+>/g, '')).trim() || null : null;
 
   // Post type + direct media URL from Reddit's tracking context.
