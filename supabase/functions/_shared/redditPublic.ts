@@ -121,7 +121,8 @@ export function parseRedditEmbedHtml(html: string, canonicalUrl: string): Reddit
   let author: string | null = null;
   const postedIdx = lines.indexOf('Posted by');
   if (postedIdx >= 0 && lines[postedIdx + 1]) author = lines[postedIdx + 1];
-  const subreddit = postedIdx > 0 ? lines[postedIdx - 2] === 'Join' ? lines[postedIdx - 3] ?? null : lines[postedIdx - 2] ?? null : null;
+  let subreddit: string | null = null;
+  if (postedIdx > 0) subreddit = (lines[postedIdx - 1] === 'Join' ? lines[postedIdx - 2] : lines[postedIdx - 1]) ?? null;
 
   let body: string | null = null;
   if (title && !deleted) {
@@ -182,8 +183,18 @@ export function isGenericRedditText(text: string | null | undefined): boolean {
     /^reddit$/i.test(t) ||
     /^reddit\s*·\s*r\//i.test(t) ||
     /^reddit post$/i.test(t) ||
-    /^from the .+ community on reddit$/i.test(t) ||
+    /^from the .+ community on reddit:?$/i.test(t) ||
     /^explore this post and more from the .+ community/i.test(t) ||
     /^\d[\d,.k]* votes?, \d[\d,.k]* comments?\. .* subscribers in the .+ community/i.test(t)
   );
+}
+
+/** Removes Reddit's crawler prefix ("From the X community on Reddit: ") and " : r/sub" suffix. */
+export function cleanRedditTitle(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const t = text
+    .replace(/^from the .+? community on reddit:\s*/i, '')
+    .replace(/\s+:\s+r\/[A-Za-z0-9_]+\s*$/, '')
+    .trim();
+  return isGenericRedditText(t) ? null : t;
 }
