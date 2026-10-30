@@ -17,6 +17,7 @@ import { useResumeRecovery } from "@/hooks/useResumeRecovery";
 import { KeepAliveRoutes } from "@/components/KeepAliveRoutes";
 import { PersistentBottomNav } from "@/components/PersistentBottomNav";
 import { AccountSwitcherHost } from "@/components/AccountSwitcherSheet";
+import { ForceUpdateGate } from "@/components/ForceUpdateGate";
 import { persistOptions } from "@/lib/queryPersister";
 import Index from "./pages/Index";
 import Discover from "./pages/Discover";
@@ -134,6 +135,7 @@ const AnimatedRoutes = () => {
           stays mounted across route changes and never flickers. */}
       <PersistentBottomNav />
       <AccountSwitcherHost />
+      <ForceUpdateGate />
     </>
   );
 };
