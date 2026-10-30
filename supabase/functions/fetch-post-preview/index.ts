@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import {
+  cleanRedditTitle,
+  fetchRedditEmbedDetails,
+  isGenericRedditText,
+  resolveRedditShareLink,
+} from "../_shared/redditPublic.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -196,9 +202,10 @@ serve(async (req) => {
       const redditData = await fetchRedditPreview(url);
       redditPostData = redditData.post_data ?? null;
       thumbnailUrl = redditData.thumbnail_url;
-      previewTitle = redditData.title;
-      previewText = redditData.description || redditData.title;
-      sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
+      previewTitle = cleanRedditTitle(redditData.title);
+      const desc = isGenericRedditText(redditData.description) ? null : redditData.description;
+      previewText = desc || previewTitle;
+      sizing = redditData.embed_sizing ?? classifyReddit(redditPostData, previewText || '');
     }
     // LinkedIn — OG description is short. The public embed page exposes the
     // full post commentary (with paragraph breaks) for any URN ID we can
