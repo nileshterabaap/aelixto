@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { resolveRedditShareLink } from "../_shared/redditPublic.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -200,7 +201,10 @@ serve(async (req) => {
     }
 
     if (isRedditShortShare) {
-      const redditFinalUrl = await resolveRedditAppShareUrl(parsedTarget);
+      // Reddit now rejects the old app token (401); link-preview crawlers
+      // still get the redirect, so fall back to that.
+      const redditFinalUrl = (await resolveRedditAppShareUrl(parsedTarget).catch(() => null))
+        || (await resolveRedditShareLink(targetUrl));
       if (redditFinalUrl) {
         console.log('[expand-url] Final URL:', redditFinalUrl);
         return new Response(

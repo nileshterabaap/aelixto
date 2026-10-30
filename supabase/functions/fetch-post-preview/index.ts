@@ -352,7 +352,8 @@ serve(async (req) => {
           delete updatePayload.preview_image_url;
         }
         if (isGenericRedditText(previewText)) delete updatePayload.preview_text;
-        if (!sizing.media_kind || (existing?.media_kind && existing.media_kind !== 'text' && sizing.media_kind === 'text' && !thumbnailUrl)) {
+        const nothingNew = !thumbnailUrl && !previewTitle && isGenericRedditText(previewText);
+        if (nothingNew || !sizing.media_kind || (existing?.media_kind && existing.media_kind !== 'text' && sizing.media_kind === 'text' && !thumbnailUrl)) {
           delete updatePayload.media_kind;
           delete updatePayload.aspect_ratio;
           delete updatePayload.suggested_height;
