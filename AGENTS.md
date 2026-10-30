@@ -33,3 +33,5 @@
 - Multiple accounts go through `src/lib/accountSwitcher.ts` (list rules in `accountStore.ts`): every signed-in session is saved locally, a different active account always restarts the app with the persisted query cache discarded, saved tokens are refreshed before `setSession` so a dead account can't sign out the current one, and logout deletes only this device's push registration for that account, because caches and push tokens are otherwise shared across accounts on one phone.
 
 - Mutes are enforced where notifications are created (database triggers skip muted accounts/chats), so phone and in-app alerts stay consistent on every app version without client checks.
+
+- Forced updates use `remote_flags` rows `force_update_android`/`force_update_ios` (enabled + min_build) checked by `ForceUpdateGate` against the native build number on launch/resume; errors or unknown builds never block, so a backend outage cannot lock users out.

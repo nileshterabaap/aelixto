@@ -41,9 +41,14 @@ export function ForceUpdateGate() {
 
   if (!blocked) return null;
 
-  const openStore = () => {
+  const openStore = async () => {
     const url = platform === 'ios' ? IOS_STORE_URL : ANDROID_STORE_URL;
-    window.open(url, '_system');
+    try {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url });
+    } catch {
+      window.open(url, '_system');
+    }
   };
 
   return (
