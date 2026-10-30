@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import {
+  cleanRedditTitle,
+  fetchRedditEmbedDetails,
+  isGenericRedditText,
+  resolveRedditShareLink,
+} from "../_shared/redditPublic.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -196,9 +202,10 @@ serve(async (req) => {
       const redditData = await fetchRedditPreview(url);
       redditPostData = redditData.post_data ?? null;
       thumbnailUrl = redditData.thumbnail_url;
-      previewTitle = redditData.title;
-      previewText = redditData.description || redditData.title;
-      sizing = classifyReddit(redditPostData, redditData.description || redditData.title || '');
+      previewTitle = cleanRedditTitle(redditData.title);
+      const desc = isGenericRedditText(redditData.description) ? null : redditData.description;
+      previewText = desc || previewTitle;
+      sizing = redditData.embed_sizing ?? classifyReddit(redditPostData, previewText || '');
     }
     // LinkedIn — OG description is short. The public embed page exposes the
     // full post commentary (with paragraph breaks) for any URN ID we can
@@ -331,10 +338,31 @@ serve(async (req) => {
         updatePayload.title = previewTitle;
         updatePayload.preview_title = previewTitle;
       }
-      const { error: updateError } = await supabase
-        .from('posts')
-        .update(updatePayload)
-        .eq('id', postId);
+
+      // Reddit: a failed lookup must never wipe what we already stored.
+      // Only replace a field when the new value is real, not empty/generic.
+      if (platform === 'reddit') {
+        const { data: existing } = await supabase
+          .from('posts')
+          .select('thumbnail_url, preview_text, media_kind')
+          .eq('id', postId)
+          .maybeSingle();
+        if (!thumbnailUrl) {
+          delete updatePayload.thumbnail_url;
+          delete updatePayload.preview_image_url;
+        }
+        if (isGenericRedditText(previewText)) delete updatePayload.preview_text;
+        const nothingNew = !thumbnailUrl && !previewTitle && isGenericRedditText(previewText);
+        if (nothingNew || !sizing.media_kind || (existing?.media_kind && existing.media_kind !== 'text' && sizing.media_kind === 'text' && !thumbnailUrl)) {
+          delete updatePayload.media_kind;
+          delete updatePayload.aspect_ratio;
+          delete updatePayload.suggested_height;
+        }
+      }
+
+      const { error: updateError } = Object.keys(updatePayload).length
+        ? await supabase.from('posts').update(updatePayload).eq('id', postId)
+        : { error: null };
 
       if (updateError) {
         console.error('[fetch-post-preview] DB update error:', updateError);
@@ -768,8 +796,9 @@ async function storeThumbnailPermanently(postId: string, imageUrl: string): Prom
   }
 }
 
-async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string | null; title: string | null; description: string | null; post_data?: Record<string, unknown> | null }> {
-  const canonicalUrl = await resolveRedditCanonicalUrl(url);
+async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string | null; title: string | null; description: string | null; post_data?: Record<string, unknown> | null; embed_sizing?: Sizing | null }> {
+  // Reddit now rejects the old app token, so fall back to the crawler redirect.
+  const canonicalUrl = (await resolveRedditCanonicalUrl(url)) || (await resolveRedditShareLink(url));
   const oembedData = await fetchRedditOembed(canonicalUrl || url);
 
   try {
@@ -789,11 +818,37 @@ async function fetchRedditPreview(url: string): Promise<{ thumbnail_url: string 
           post_data: post ?? null,
         };
       }
+    } else {
+      await res.body?.cancel().catch(() => {});
     }
   } catch (e) {
     console.log('[fetch-post-preview] Reddit JSON fetch failed');
   }
-  
+
+  // Reddit blocks its JSON API from servers; its official embed page still
+  // returns the title, body text, poster image and post type.
+  const embed = await fetchRedditEmbedDetails(canonicalUrl || url);
+  if (embed && !embed.deleted && (embed.title || embed.thumbnail)) {
+    const ar = clampAR(embed.aspectRatio);
+    let embedSizing: Sizing | null = null;
+    if (embed.type === 'video') embedSizing = { media_kind: 'video', aspect_ratio: ar ?? 9 / 16, suggested_height: null };
+    else if (embed.type === 'gallery') embedSizing = { media_kind: 'gallery', aspect_ratio: ar ?? 1, suggested_height: null };
+    else if (embed.type === 'image') embedSizing = { media_kind: 'image', aspect_ratio: ar ?? 4 / 5, suggested_height: null };
+    else if (embed.type === 'text') embedSizing = { media_kind: 'text', aspect_ratio: null, suggested_height: suggestedHeightForText(embed.body || embed.title, 280) };
+    else if (embed.type === 'link') embedSizing = { media_kind: 'article', aspect_ratio: ar ?? 16 / 9, suggested_height: 360 };
+    return {
+      thumbnail_url: embed.thumbnail,
+      title: embed.title || oembedData.title,
+      description: embed.body || embed.title,
+      post_data: null,
+      embed_sizing: embedSizing,
+    };
+  }
+  if (embed?.deleted) {
+    // Deleted on Reddit: return nothing so stored details are left untouched.
+    return { thumbnail_url: null, title: null, description: null, post_data: null, embed_sizing: null };
+  }
+
   const ogData = await scrapeOgData(canonicalUrl || url);
   return {
     thumbnail_url: ogData.image && !isMisleadingRedditThumbnail(ogData.image) ? ogData.image : null,
