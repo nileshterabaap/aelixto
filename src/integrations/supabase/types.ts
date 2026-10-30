@@ -1029,16 +1029,19 @@ export type Database = {
         Row: {
           enabled: boolean
           key: string
+          min_build: number | null
           updated_at: string
         }
         Insert: {
           enabled?: boolean
           key: string
+          min_build?: number | null
           updated_at?: string
         }
         Update: {
           enabled?: boolean
           key?: string
+          min_build?: number | null
           updated_at?: string
         }
         Relationships: []
