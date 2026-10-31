@@ -87,6 +87,38 @@ const Settings = () => {
     await logOutAllAccounts();
   };
 
+  // Deactivate: hidden from everyone until the owner logs in again.
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+  const handleDeactivate = async () => {
+    if (deactivating) return;
+    setDeactivating(true);
+    const { error } = await supabase.rpc("deactivate_my_account");
+    if (error) {
+      setDeactivating(false);
+      toast({ title: "Couldn't deactivate", description: "Please check your connection and try again.", variant: "destructive" });
+      return;
+    }
+    await logOutCurrentAccount({ everywhere: true });
+  };
+
+  // Delete: permanent, after typing DELETE.
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteText, setDeleteText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const handleDelete = async () => {
+    if (deleting || deleteText.trim().toUpperCase() !== "DELETE") return;
+    setDeleting(true);
+    const { data, error } = await supabase.functions.invoke("delete-account", { body: { confirm: "DELETE" } });
+    if (error || !(data as { ok?: boolean } | null)?.ok) {
+      setDeleting(false);
+      toast({ title: "Couldn't delete account", description: "Nothing was lost. Please try again.", variant: "destructive" });
+      return;
+    }
+    toast({ title: "Account deleted", description: "Your account and everything in it are gone." });
+    await logOutCurrentAccount({ accountDeleted: true });
+  };
+
 
   const handleChangeEmail = async () => {
     if (!newEmail) return;
