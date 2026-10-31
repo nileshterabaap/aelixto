@@ -270,16 +270,28 @@ async function removeThisDevicePush(userId: string) {
 /**
  * Log out the active account. If other accounts are saved, the most recently
  * used one opens next; otherwise the sign-in page opens.
+ *
+ * `everywhere` also signs the account out on every other device
+ * (deactivation); `accountDeleted` skips server calls for an account that
+ * no longer exists.
  */
-export async function logOutCurrentAccount(): Promise<void> {
+export async function logOutCurrentAccount(
+  opts: { everywhere?: boolean; accountDeleted?: boolean } = {},
+): Promise<void> {
   switching = true;
   const { data } = await supabase.auth.getSession();
   const uid = data.session?.user.id ?? null;
-  if (uid) await removeThisDevicePush(uid);
+  if (uid && !opts.accountDeleted) await removeThisDevicePush(uid);
   try {
-    await supabase.auth.signOut();
+    const scope = opts.accountDeleted ? "local" : opts.everywhere ? "global" : undefined;
+    const { error } = await supabase.auth.signOut(scope ? { scope } : undefined);
+    if (error && scope === "global") await supabase.auth.signOut({ scope: "local" });
   } catch {
-    /* local session is cleared regardless */
+    try {
+      await supabase.auth.signOut({ scope: "local" });
+    } catch {
+      /* local session is cleared regardless */
+    }
   }
   if (uid) writeAccounts(removeAccount(readAccounts(), uid));
 
