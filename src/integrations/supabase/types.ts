@@ -954,6 +954,7 @@ export type Database = {
           bio: string | null
           cover_url: string | null
           created_at: string
+          deactivated_at: string | null
           display_name: string | null
           email_verified: boolean
           id: string
@@ -969,6 +970,7 @@ export type Database = {
           bio?: string | null
           cover_url?: string | null
           created_at?: string
+          deactivated_at?: string | null
           display_name?: string | null
           email_verified?: boolean
           id?: string
@@ -984,6 +986,7 @@ export type Database = {
           bio?: string | null
           cover_url?: string | null
           created_at?: string
+          deactivated_at?: string | null
           display_name?: string | null
           email_verified?: boolean
           id?: string
@@ -1264,6 +1267,7 @@ export type Database = {
         Returns: undefined
       }
       create_short_link: { Args: { p_target_path: string }; Returns: string }
+      deactivate_my_account: { Args: never; Returns: undefined }
       delete_conversation: {
         Args: { _conversation_id: string }
         Returns: boolean
@@ -1437,6 +1441,7 @@ export type Database = {
           username: string
         }[]
       }
+      get_sign_in_method: { Args: { _email: string }; Returns: string }
       get_user_platform_counts: {
         Args: { target_user: string }
         Returns: {
@@ -1502,6 +1507,7 @@ export type Database = {
         Returns: boolean
       }
       post_delete_score_preview: { Args: { p_post_id: string }; Returns: Json }
+      reactivate_my_account: { Args: never; Returns: boolean }
       read_email_batch: {
         Args: { batch_size: number; queue_name: string; vt: number }
         Returns: {

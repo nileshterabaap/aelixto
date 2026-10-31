@@ -50,6 +50,13 @@
       "when": 1793369503878,
       "tag": "0006_force_update_switch",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793448359583,
+      "tag": "0007_account_deactivation_and_sign_in_method",
+      "breakpoints": true
     }
   ]
 }

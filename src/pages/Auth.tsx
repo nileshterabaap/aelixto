@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { User } from "@supabase/supabase-js";
 import { ArrowLeft } from "lucide-react";
 import { getActiveUserId } from "@/lib/accountSwitcher";
+import { signInFailureMessage, usernameNotFoundMessage, type SignInMethod } from "@/lib/signInError";
 
 const nativeLovableAuth = createLovableAuth({
   oauthBrokerUrl: "https://aelixto.com/~oauth/initiate",
@@ -128,24 +129,35 @@ const Auth = () => {
 
     // Resolve username -> email if the identifier is not an email
     let email = identifier;
-    if (!identifier.includes("@")) {
+    const viaUsername = !identifier.includes("@");
+    if (viaUsername) {
       const handle = identifier.startsWith("@") ? identifier.slice(1) : identifier;
       const { data: resolved, error: rpcError } = await supabase.rpc("get_email_for_username", {
         _username: handle,
       });
       if (rpcError || !resolved) {
         setLoading(false);
-        toast({
-          title: "Sign in failed",
-          description: "No account found with this username.",
-          variant: "destructive",
-        });
+        toast({ ...usernameNotFoundMessage(handle), variant: "destructive" });
         return;
       }
       email = resolved as string;
     }
 
     const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    // Only after a failure: find out which part was wrong.
+    let method: SignInMethod = null;
+    if (error) {
+      const m = error.message.toLowerCase();
+      if (m.includes("invalid login credentials") || m.includes("invalid_credentials")) {
+        try {
+          const { data: found } = await supabase.rpc("get_sign_in_method", { _email: email });
+          if (found === "none" || found === "password" || found === "social") method = found;
+        } catch {
+          /* message falls back below */
+        }
+      }
+    }
 
     setLoading(false);
 
@@ -169,10 +181,9 @@ const Auth = () => {
         return;
       }
       toast({
-        title: "Sign in failed",
-        description: isNoUser
-          ? "Incorrect password, or no account found for this email/username."
-          : error.message,
+        ...(isNoUser
+          ? signInFailureMessage({ viaUsername, method })
+          : { title: "Sign in failed", description: error.message }),
         variant: "destructive",
       });
     } else if (addMode && signInData.user?.id === getActiveUserId()) {
