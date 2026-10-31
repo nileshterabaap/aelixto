@@ -17,8 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { showPrivacyOptionsForm } from "@/lib/adConsent";
 import { Capacitor } from "@capacitor/core";
 import { useSavedAccounts } from "@/hooks/useSavedAccounts";
-import { useStartAddAccount } from "@/components/AccountSwitcherSheet";
-import { logOutAllAccounts, logOutCurrentAccount, openAccountSwitcher } from "@/lib/accountSwitcher";
+import { logOutAllAccounts, logOutCurrentAccount } from "@/lib/accountSwitcher";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -70,7 +69,6 @@ const Settings = () => {
 
 
   const savedAccounts = useSavedAccounts();
-  const startAddAccount = useStartAddAccount();
   const [loggingOut, setLoggingOut] = useState(false);
 
   // With other accounts saved, logging out opens the next one; otherwise
@@ -87,37 +85,6 @@ const Settings = () => {
     await logOutAllAccounts();
   };
 
-  // Deactivate: hidden from everyone until the owner logs in again.
-  const [deactivateOpen, setDeactivateOpen] = useState(false);
-  const [deactivating, setDeactivating] = useState(false);
-  const handleDeactivate = async () => {
-    if (deactivating) return;
-    setDeactivating(true);
-    const { error } = await supabase.rpc("deactivate_my_account");
-    if (error) {
-      setDeactivating(false);
-      toast({ title: "Couldn't deactivate", description: "Please check your connection and try again.", variant: "destructive" });
-      return;
-    }
-    await logOutCurrentAccount({ everywhere: true });
-  };
-
-  // Delete: permanent, after typing DELETE.
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleteText, setDeleteText] = useState("");
-  const [deleting, setDeleting] = useState(false);
-  const handleDelete = async () => {
-    if (deleting || deleteText.trim().toUpperCase() !== "DELETE") return;
-    setDeleting(true);
-    const { data, error } = await supabase.functions.invoke("delete-account", { body: { confirm: "DELETE" } });
-    if (error || !(data as { ok?: boolean } | null)?.ok) {
-      setDeleting(false);
-      toast({ title: "Couldn't delete account", description: "Please check your connection and try again.", variant: "destructive" });
-      return;
-    }
-    toast({ title: "Account deleted", description: "Your account and everything in it are gone." });
-    await logOutCurrentAccount({ accountDeleted: true });
-  };
 
 
   const handleChangeEmail = async () => {
@@ -265,13 +232,11 @@ const Settings = () => {
           <Row label="Child Safety Standards" onClick={() => navigate('/child-safety')} />
         </div>
 
-        {/* Log out at bottom */}
+        {/* Account + log out at bottom. Switch/Add account live on the
+            profile name and the long-pressed Profile tab, not here. */}
         <SectionHeader title="" />
         <div className="divide-y divide-border">
-          {savedAccounts.length > 1 && (
-            <Row label="Switch account" onClick={openAccountSwitcher} />
-          )}
-          <Row label="Add account" onClick={startAddAccount} hasChevron={false} />
+          <Row label="Account" onClick={() => navigate('/settings/account')} />
           {savedAccounts.length > 1 ? (
             <>
               <Row
@@ -284,13 +249,6 @@ const Settings = () => {
           ) : (
             <Row label={loggingOut ? "Logging out…" : "Log out"} onClick={handleLogout} hasChevron={false} />
           )}
-        </div>
-
-        {/* Leave Aelixto */}
-        <SectionHeader title="" />
-        <div className="divide-y divide-border">
-          <Row label="Deactivate account" onClick={() => setDeactivateOpen(true)} hasChevron={false} />
-          <Row label="Delete account" onClick={() => { setDeleteText(""); setDeleteOpen(true); }} hasChevron={false} danger />
         </div>
       </main>
 
@@ -318,56 +276,6 @@ const Settings = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Deactivate Account Dialog */}
-      <Dialog open={deactivateOpen} onOpenChange={(o) => { if (!deactivating) setDeactivateOpen(o); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Deactivate account?</DialogTitle>
-            <DialogDescription>
-              Your profile, posts, likes and comments will be hidden from everyone, and you'll be logged out on all your devices. Nothing is deleted. To come back, just log in again.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeactivateOpen(false)} disabled={deactivating}>Cancel</Button>
-            <Button onClick={handleDeactivate} disabled={deactivating}>
-              {deactivating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Deactivate'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Account Dialog */}
-      <Dialog open={deleteOpen} onOpenChange={(o) => { if (!deleting) setDeleteOpen(o); }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete account permanently?</DialogTitle>
-            <DialogDescription>
-              This deletes your profile, posts, likes, comments, followers, chats and photos forever. It can't be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label htmlFor="delete-confirm">Type DELETE to confirm</Label>
-            <Input
-              id="delete-confirm"
-              value={deleteText}
-              onChange={(e) => setDeleteText(e.target.value)}
-              placeholder="DELETE"
-              autoComplete="off"
-              autoCapitalize="characters"
-            />
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting || deleteText.trim().toUpperCase() !== "DELETE"}
-            >
-              {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Delete account'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Change Password Dialog */}
       <Dialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen}>
