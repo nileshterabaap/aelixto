@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { User } from "@supabase/supabase-js";
 import { ArrowLeft } from "lucide-react";
 import { getActiveUserId } from "@/lib/accountSwitcher";
+import { signInFailureMessage, usernameNotFoundMessage, type SignInMethod } from "@/lib/signInError";
 
 const nativeLovableAuth = createLovableAuth({
   oauthBrokerUrl: "https://aelixto.com/~oauth/initiate",
@@ -180,10 +181,9 @@ const Auth = () => {
         return;
       }
       toast({
-        title: "Sign in failed",
-        description: isNoUser
-          ? "Incorrect password, or no account found for this email/username."
-          : error.message,
+        ...(isNoUser
+          ? signInFailureMessage({ viaUsername, method })
+          : { title: "Sign in failed", description: error.message }),
         variant: "destructive",
       });
     } else if (addMode && signInData.user?.id === getActiveUserId()) {
