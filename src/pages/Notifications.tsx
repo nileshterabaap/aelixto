@@ -96,7 +96,7 @@ const NotificationItem = ({
     | undefined;
   
   const handleClick = () => {
-    if (busy) return;
+    if (busy || resolved === "deleted") return;
     onClick();
   };
 
@@ -396,7 +396,18 @@ const Notifications = () => {
   }, [isLoading]);
 
   const handleNotificationClick = (notification: Notification) => {
-    if (notification.type === 'report_outcome') return; // no navigation for moderation outcomes
+    if (notification.type === 'report_outcome') {
+      // "Your post was removed" notices open that post so the owner can check it.
+      const kind = notification.metadata?.kind;
+      if ((kind === 'source_removed' || kind === 'post_removed') && notification.post_id) {
+        if (!notification.post) {
+          toast("This post is no longer on Aelixto");
+          return;
+        }
+        navigate(`/post/${notification.post_id}`);
+      }
+      return; // other moderation outcomes have nothing to open
+    }
     if (notification.post_id) {
       const commentParam =
         notification.type === 'comment' && notification.comment_id
