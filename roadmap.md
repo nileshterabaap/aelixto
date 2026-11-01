@@ -24,3 +24,7 @@
 - [x] "Unknown" author on posts opened from grid, chats and notifications (both apps)
 - [x] iPhone slowness on profiles/platform switching: lockless auth library + no network round trip for signed-in checks
 - [ ] Confirm iPhone profile speed on device after rebuild (user)
+## Nov 1 requests
+- [x] Let drafts be added to collections (button on draft card, shown inside collection)
+- [x] Tapping "Your post was removed" notifications opens that post
+- [x] Inbox pull-to-refresh visibly spins and actually reloads

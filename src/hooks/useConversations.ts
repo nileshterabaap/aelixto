@@ -26,6 +26,8 @@ export interface ConversationWithDetails {
   muted: boolean;
 }
 
+const STALE_FETCH_MS = 8000;
+
 export const useConversations = () => {
   const { user } = useSession();
   const cacheKey = user ? `aelixto-conversations-${user.id}` : null;
@@ -47,7 +49,11 @@ export const useConversations = () => {
   // My last_read_at per conversation, so a realtime UPDATE that only touched
   // last_delivered_at (written by this very hook) doesn't trigger a refetch.
   const knownReadAt = useRef(new Map<string, string | null>());
-  const inFlight = useRef(false);
+  // The fetch currently running. A pull-to-refresh awaits it instead of
+  // returning instantly, and one stuck longer than STALE_FETCH_MS (a dead
+  // connection after the app resumes) no longer blocks a fresh fetch.
+  const inFlight = useRef<{ gen: number; since: number; promise: Promise<void> } | null>(null);
+  const fetchGen = useRef(0);
   const rerunQueued = useRef(false);
 
   useEffect(() => {
@@ -140,15 +146,25 @@ export const useConversations = () => {
     };
   }, [user]);
 
-  const fetchConversations = async (): Promise<void> => {
-    if (!user) return;
+  const fetchConversations = (): Promise<void> => {
+    if (!user) return Promise.resolve();
     // Coalesce bursts (several realtime events at once) into one fetch plus
     // at most one follow-up, instead of parallel duplicate request chains.
-    if (inFlight.current) {
+    const current = inFlight.current;
+    if (current && Date.now() - current.since < STALE_FETCH_MS) {
       rerunQueued.current = true;
-      return;
+      return current.promise;
     }
-    inFlight.current = true;
+    const gen = ++fetchGen.current;
+    const promise = runFetch(gen);
+    inFlight.current = { gen, since: Date.now(), promise };
+    return promise;
+  };
+
+  const runFetch = async (gen: number): Promise<void> => {
+    if (!user) return;
+    // A newer fetch replaced this one (this one was stuck): drop its result.
+    const superseded = () => gen !== fetchGen.current;
 
     try {
       // Get all conversations for current user
@@ -167,6 +183,7 @@ export const useConversations = () => {
       }>;
       participantData.forEach(p => knownReadAt.current.set(p.conversation_id, p.last_read_at ?? null));
 
+      if (superseded()) return;
       if (participantData.length === 0) {
         setConversations([]);
         setLoading(false);
@@ -268,6 +285,7 @@ export const useConversations = () => {
 
       // Pinned chats first, then by latest message time.
       const ordered = sortChats(conversationsWithDetails);
+      if (superseded()) return;
 
       // Render immediately — avatars warm up in the background (no blocking wait)
       setConversations(ordered);
@@ -286,11 +304,13 @@ export const useConversations = () => {
     } catch (error) {
       console.error('Error fetching conversations:', error);
     } finally {
-      setLoading(false);
-      inFlight.current = false;
-      if (rerunQueued.current) {
-        rerunQueued.current = false;
-        void fetchConversations();
+      if (!superseded()) {
+        setLoading(false);
+        inFlight.current = null;
+        if (rerunQueued.current) {
+          rerunQueued.current = false;
+          void fetchConversations();
+        }
       }
     }
   };

@@ -110,7 +110,12 @@ const Messages = () => {
   };
 
   const handleRefresh = useCallback(async () => {
-    await refetch?.();
+    // Keep the spinner visible briefly even when the reload is instant, so a
+    // pull always reads as a refresh instead of a quick spring-back.
+    await Promise.all([
+      refetch?.(),
+      new Promise((resolve) => setTimeout(resolve, 700)),
+    ]);
   }, [refetch]);
 
   return (

@@ -8,7 +8,10 @@ import { useCollections } from "@/hooks/useCollections";
 interface SaveToCollectionSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  postId: string;
+  /** Saved post to add. Pass either this or `draftId`. */
+  postId?: string;
+  /** Draft to add. */
+  draftId?: string;
   userId: string;
 }
 
@@ -16,15 +19,18 @@ export const SaveToCollectionSheet = ({
   open,
   onOpenChange,
   postId,
+  draftId,
   userId,
 }: SaveToCollectionSheetProps) => {
-  const { collections, createCollection, addToCollection, isCreating } = useCollections(userId);
+  const { collections, createCollection, addToCollection, addDraftToCollection, isCreating } = useCollections(userId);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [addedTo, setAddedTo] = useState<Set<string>>(new Set());
 
   const handleAdd = (collectionId: string) => {
-    addToCollection({ collectionId, postId });
+    if (draftId) addDraftToCollection({ collectionId, draftId });
+    else if (postId) addToCollection({ collectionId, postId });
+    else return;
     setAddedTo((prev) => new Set(prev).add(collectionId));
   };
 
@@ -45,7 +51,7 @@ export const SaveToCollectionSheet = ({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="rounded-t-2xl max-h-[70vh]">
         <SheetHeader>
-          <SheetTitle>Save to Collection</SheetTitle>
+          <SheetTitle>{draftId ? "Add draft to Collection" : "Save to Collection"}</SheetTitle>
         </SheetHeader>
         <div className="mt-4 space-y-2 overflow-y-auto max-h-[50vh]">
           {collections.map((col) => (

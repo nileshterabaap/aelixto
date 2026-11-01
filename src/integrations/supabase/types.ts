@@ -56,6 +56,42 @@ export type Database = {
         }
         Relationships: []
       }
+      collection_drafts: {
+        Row: {
+          collection_id: string
+          created_at: string
+          draft_id: string
+          id: string
+        }
+        Insert: {
+          collection_id: string
+          created_at?: string
+          draft_id: string
+          id?: string
+        }
+        Update: {
+          collection_id?: string
+          created_at?: string
+          draft_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collection_drafts_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collection_drafts_draft_id_fkey"
+            columns: ["draft_id"]
+            isOneToOne: false
+            referencedRelation: "post_drafts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collection_items: {
         Row: {
           collection_id: string

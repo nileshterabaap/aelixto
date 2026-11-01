@@ -79,6 +79,9 @@ export const useDeleteDraft = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["post-drafts"] });
+      // A deleted draft also leaves any collection it was in.
+      queryClient.invalidateQueries({ queryKey: ["collections"] });
+      queryClient.invalidateQueries({ queryKey: ["collection-drafts"] });
     },
   });
 };

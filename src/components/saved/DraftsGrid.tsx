@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Trash2, FileText } from "lucide-react";
+import { Trash2, FileText, FolderPlus, FolderMinus } from "lucide-react";
 import { maybeProxy } from "@/lib/getPostThumb";
 import { CreatePostDialog } from "@/components/CreatePostDialog";
 import { useDeleteDraft, type PostDraft } from "@/hooks/useDrafts";
+import { useSession } from "@/hooks/useSession";
+import { useCollections } from "@/hooks/useCollections";
+import { SaveToCollectionSheet } from "./SaveToCollectionSheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,16 +39,22 @@ const PLATFORM_ICONS: Record<string, string> = {
 
 interface DraftsGridProps {
   drafts: PostDraft[];
+  /** When shown inside a collection, the folder button removes the draft from it. */
+  collectionId?: string;
 }
 
 function DraftCard({
   draft,
   onOpen,
   onDelete,
+  onCollection,
+  inCollection,
 }: {
   draft: PostDraft;
   onOpen: () => void;
   onDelete: () => void;
+  onCollection: () => void;
+  inCollection: boolean;
 }) {
   const [imgError, setImgError] = useState(false);
   const [imgLoaded, setImgLoaded] = useState(false);
@@ -94,14 +103,31 @@ function DraftCard({
       >
         <Trash2 className="w-3.5 h-3.5 text-white" />
       </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); onCollection(); }}
+        className="absolute bottom-2 left-2 w-7 h-7 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center"
+        aria-label={inCollection ? "Remove from collection" : "Add to collection"}
+      >
+        {inCollection
+          ? <FolderMinus className="w-3.5 h-3.5 text-white" />
+          : <FolderPlus className="w-3.5 h-3.5 text-white" />}
+      </button>
     </div>
   );
 }
 
-export const DraftsGrid = ({ drafts }: DraftsGridProps) => {
+export const DraftsGrid = ({ drafts, collectionId }: DraftsGridProps) => {
   const [editingDraft, setEditingDraft] = useState<PostDraft | null>(null);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [collectionDraft, setCollectionDraft] = useState<string | null>(null);
   const deleteDraft = useDeleteDraft();
+  const { user } = useSession();
+  const { removeDraftFromCollection } = useCollections(user?.id);
+
+  const handleCollection = (draftId: string) => {
+    if (collectionId) removeDraftFromCollection({ collectionId, draftId });
+    else setCollectionDraft(draftId);
+  };
 
   if (drafts.length === 0) {
     return (
@@ -128,6 +154,8 @@ export const DraftsGrid = ({ drafts }: DraftsGridProps) => {
               draft={draft}
               onOpen={() => setEditingDraft(draft)}
               onDelete={() => setPendingDelete(draft.id)}
+              onCollection={() => handleCollection(draft.id)}
+              inCollection={!!collectionId}
             />
           </motion.div>
         ))}
@@ -138,6 +166,15 @@ export const DraftsGrid = ({ drafts }: DraftsGridProps) => {
           open={!!editingDraft}
           onOpenChange={(open) => { if (!open) setEditingDraft(null); }}
           initialDraft={editingDraft}
+        />
+      )}
+
+      {collectionDraft && user?.id && (
+        <SaveToCollectionSheet
+          open={!!collectionDraft}
+          onOpenChange={(open) => { if (!open) setCollectionDraft(null); }}
+          draftId={collectionDraft}
+          userId={user.id}
         />
       )}
 

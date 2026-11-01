@@ -9,8 +9,9 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Collection } from "@/hooks/useCollections";
-import { useCollectionItems } from "@/hooks/useCollections";
+import { useCollectionItems, useCollectionDrafts } from "@/hooks/useCollections";
 import { SavedThumbnailGrid } from "./SavedThumbnailGrid";
+import { DraftsGrid } from "./DraftsGrid";
 import { maybeProxy } from "@/lib/getPostThumb";
 
 interface CollectionGridProps {
@@ -108,6 +109,7 @@ function CollectionDetail({
   onBack: () => void;
 }) {
   const { data: items = [], isLoading, isError, refetch } = useCollectionItems(collection.id);
+  const { data: drafts = [] } = useCollectionDrafts(collection.id);
 
   return (
     <div>
@@ -122,8 +124,14 @@ function CollectionDetail({
           <p className="text-muted-foreground text-sm mb-3">Couldn't load this collection.</p>
           <Button variant="outline" size="sm" onClick={() => refetch()}>Try again</Button>
         </div>
-      ) : (
+      ) : items.length === 0 && drafts.length > 0 ? null : (
         <SavedThumbnailGrid posts={items} userId={userId} />
+      )}
+      {drafts.length > 0 && (
+        <div className={items.length > 0 ? "mt-6" : ""}>
+          <h3 className="text-sm font-semibold text-muted-foreground mb-2">Drafts</h3>
+          <DraftsGrid drafts={drafts} collectionId={collection.id} />
+        </div>
       )}
     </div>
   );
@@ -195,7 +203,7 @@ export const CollectionGrid = ({
       {collections.length === 0 && (
         <div className="text-center py-8 mt-4">
           <FolderOpen className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
-          <p className="text-sm text-muted-foreground">Organize your saved posts into collections</p>
+          <p className="text-sm text-muted-foreground">Organize your saved posts and drafts into collections</p>
         </div>
       )}
 
