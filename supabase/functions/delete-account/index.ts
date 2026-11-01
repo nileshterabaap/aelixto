@@ -113,6 +113,8 @@ Deno.serve(async (req) => {
   if (colIds.length) {
     const { error } = await admin.from("collection_items").delete().in("collection_id", colIds);
     if (error) return fail("delete collection items", error);
+    const { error: draftsErr } = await admin.from("collection_drafts").delete().in("collection_id", colIds);
+    if (draftsErr) return fail("delete collection drafts", draftsErr);
   }
   {
     const { error } = await admin.from("collections").delete().eq("user_id", uid);
