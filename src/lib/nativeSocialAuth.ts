@@ -107,7 +107,10 @@ type NativeResult = { ok: boolean; cancelled?: boolean; message?: string };
  * user backed out, or when the native path is unavailable and the caller
  * should fall back to the browser flow.
  */
-export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<NativeResult> => {
+export const nativeSocialSignIn = async (
+  provider: "google" | "apple",
+  opts: { androidGoogleStyle?: "standard" | "bottom" } = {},
+): Promise<NativeResult> => {
   try {
     await ensureInitialized();
     const SocialLogin = await getPlugin();
@@ -124,16 +127,26 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     // `style: "standard"` opens the full "Sign in with Google" account picker
     // (all accounts on the device) instead of the One Tap "sign back in" sheet,
     // which only ever suggests a single, previously used account.
+    // `style: "bottom"` is the recovery path: the standard picker sometimes
+    // reports "cancelled" after an account was picked; the One Tap sheet with
+    // auto-select then finishes for the account Google just authorised.
     //
     // iOS Google: the SDK can add its own nonce, so give it the SHA-256 of ours
     // (exactly like Apple) and hand the raw value to the backend.
     const isIos = Capacitor.getPlatform() === "ios";
     const hashNonce = provider === "apple" || isIos;
+    const androidStyle = opts.androidGoogleStyle ?? "standard";
     const options =
       provider === "apple"
         ? { scopes: ["email", "name"], nonce: await sha256(rawNonce) }
         : isIos
         ? { nonce: await sha256(rawNonce) }
+        : androidStyle === "bottom"
+        ? {
+            style: "bottom" as const,
+            filterByAuthorizedAccounts: false,
+            autoSelectEnabled: true,
+          }
         : {
             style: "standard" as const,
             filterByAuthorizedAccounts: false,

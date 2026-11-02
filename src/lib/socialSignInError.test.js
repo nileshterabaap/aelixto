@@ -14,3 +14,17 @@ describe('social sign-in cancellation', () => {
     expect(isCancellation('Google Sign-In failed: [16] Account reauth failed.')).toBe(false);
   });
 });
+
+import { shouldRetryAndroidGoogle } from './socialSignInError';
+
+describe('Android Google retry after a false cancel', () => {
+  test('first cancel on Android Google retries once', () => {
+    expect(shouldRetryAndroidGoogle({ platform: 'android', provider: 'google', cancelled: true, alreadyRetried: false })).toBe(true);
+  });
+  test('never retries a second time', () => {
+    expect(shouldRetryAndroidGoogle({ platform: 'android', provider: 'google', cancelled: true, alreadyRetried: true })).toBe(false);
+  });
+  test('iPhone does not use this retry', () => {
+    expect(shouldRetryAndroidGoogle({ platform: 'ios', provider: 'google', cancelled: true, alreadyRetried: false })).toBe(false);
+  });
+});
