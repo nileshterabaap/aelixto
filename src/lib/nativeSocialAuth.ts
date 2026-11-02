@@ -16,6 +16,7 @@
 import { Capacitor } from "@capacitor/core";
 import { supabase } from "@/integrations/supabase/client";
 import { NATIVE_AUTH_CONFIG, isNativeAuthConfigured } from "@/config/nativeAuth";
+import { isCancellation } from "@/lib/socialSignInError";
 
 let initPromise: Promise<void> | null = null;
 
@@ -100,16 +101,6 @@ export const canUseNativeSocialAuth = (provider: "google" | "apple") => {
 
 type NativeResult = { ok: boolean; cancelled?: boolean; message?: string };
 
-const isCancellation = (message: string) => {
-  const m = message.toLowerCase();
-  return (
-    m.includes("cancel") ||
-    m.includes("dismiss") ||
-    m.includes("user closed") ||
-    m.includes("no credential") ||
-    m.includes("1001")
-  );
-};
 
 /**
  * Runs the fully native flow. Returns `ok: false` (with `cancelled`) when the
