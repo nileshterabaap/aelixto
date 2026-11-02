@@ -386,9 +386,44 @@ const Auth = () => {
         // The ID token is exchanged in-process, so the user is signed in
         // without ever leaving Aelixto.
         if (canUseNativeSocialAuth(provider)) {
+          const activeBefore = getActiveUserId();
           const res = await nativeSocialSignIn(provider);
-          if (res.ok) return;
-          if (res.cancelled) return;
+          if (res.ok) {
+            // Don't rely only on the sign-in listener to leave this page:
+            // move on explicitly once the session is in place.
+            const { data } = await supabase.auth.getSession();
+            const signedInId = data.session?.user.id;
+            if (!signedInId) return;
+            if (addMode) {
+              if (signedInId === activeBefore) {
+                toast({ title: "Already signed in", description: "You're already using this account." });
+                navigate("/", { replace: true });
+              }
+              // A different account restarts the app as that account.
+              return;
+            }
+            navigate("/", { replace: true });
+            return;
+          }
+          if (res.cancelled) {
+            // Android's Google sheet sometimes reports "cancelled" even after
+            // an account was picked. If a session exists anyway, go home;
+            // otherwise say so instead of silently showing this page again.
+            if (!addMode) {
+              const { data } = await supabase.auth.getSession();
+              if (data.session?.user) {
+                navigate("/", { replace: true });
+                return;
+              }
+            }
+            if (provider === "google" && Capacitor.getPlatform() === "android") {
+              toast({
+                title: "Google sign-in didn't finish",
+                description: "If you picked an account, tap Continue with Google again.",
+              });
+            }
+            return;
+          }
           console.warn(`Native ${label} sign-in failed:`, res.message);
           if (provider === "google" && Capacitor.getPlatform() === "ios") {
             // iPhone safety net: if the in-app Google sheet's token is ever
