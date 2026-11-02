@@ -432,7 +432,7 @@ const Auth = () => {
             return;
           }
           toast({
-            title: "Native sign-in failed",
+            title: `${label} sign-in failed`,
             description: (res.message || "Unknown reason").slice(0, 180),
             variant: "destructive",
           });
