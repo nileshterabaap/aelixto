@@ -90,17 +90,26 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     // when at the top of the page — this is what lets the finger start
     // a pull gesture over a YouTube/Instagram/Twitter embed. As soon as
     // the user scrolls down, iframes become interactive again.
+    // Only a visible page may report "at top": keep-alive tabs stay mounted
+    // with display:none, and a hidden feed must never keep this global lock
+    // applied on the post page (Instagram reels there have no pointer-events
+    // exception, so the lock made their play button untappable).
     const updateAtTop = () => {
+      const visible = Boolean(containerRef.current?.getClientRects().length);
       const pageScrollTop =
         window.scrollY ||
         document.scrollingElement?.scrollTop ||
         document.documentElement.scrollTop ||
         0;
-      const atTop = pageScrollTop <= 2;
-      document.body.classList.toggle("at-scroll-top", atTop);
+      topReporterRef.current = visible && pageScrollTop <= 2;
+      syncAtScrollTopClass();
     };
     updateAtTop();
     window.addEventListener("scroll", updateAtTop, { passive: true });
+    // Keep-alive tabs flip between display:none and display:block without any
+    // scroll event; the observer re-evaluates the report when that happens.
+    const ro = new ResizeObserver(updateAtTop);
+    if (containerRef.current) ro.observe(containerRef.current);
 
     const handleTouchMove = (event: TouchEvent) => {
       if (!pulling.current || refreshing) return;
