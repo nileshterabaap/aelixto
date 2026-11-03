@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { pushDismissKey } from "../_shared/pushDismissKey.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -110,12 +111,20 @@ async function sendFcm(
         Authorization: `Bearer ${auth.token}`,
         "Content-Type": "application/json",
       },
+      // The tag does two jobs: notifications with the same tag replace each
+      // other (a second message in the same chat refreshes the alert instead
+      // of stacking), and the app can cancel the notification by tag when the
+      // user opens the matching post/chat.
+      const dismissKey = pushDismissKey(url);
       body: JSON.stringify({
         message: {
           token: deviceToken,
           notification: { title, body },
-          data: { url },
-          android: { priority: "HIGH", notification: { sound: "default" } },
+          data: dismissKey ? { url, dismissKey } : { url },
+          android: {
+            priority: "HIGH",
+            notification: { sound: "default", ...(dismissKey ? { tag: dismissKey } : {}) },
+          },
         },
       }),
     },
