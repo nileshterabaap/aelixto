@@ -22,6 +22,20 @@ export const triggerFeedRefresh = () => {
   window.dispatchEvent(new CustomEvent(FEED_REFRESH_EVENT));
 };
 
+// `at-scroll-top` is a GLOBAL body class that blocks taps on embed iframes so
+// a pull gesture can start over them. Several PullToRefresh pages stay mounted
+// (display:none keep-alive tabs), so only a *visible* page may report "at top";
+// otherwise a hidden feed keeps the lock applied on the post page, where an
+// Instagram reel (no pointer-events exception) can never be tapped to play.
+interface PullToRefreshTopReporter {
+  current: boolean;
+}
+const ptrTopReporters = new Set<PullToRefreshTopReporter>();
+const syncAtScrollTopClass = () => {
+  const anyVisibleAtTop = Array.from(ptrTopReporters).some((r) => r.current);
+  document.body.classList.toggle("at-scroll-top", anyVisibleAtTop);
+};
+
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
     target instanceof HTMLElement &&
