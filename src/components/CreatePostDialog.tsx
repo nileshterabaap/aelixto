@@ -141,6 +141,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const processLinkSubmit = async (linkUrl: string) => {
     if (!linkUrl.trim()) return;
     fetchedPreviewTextRef.current = null;
+    setMusicPrompt(false);
     measuredHeightRef.current = null;
     measurePromiseRef.current = null;
     
@@ -231,6 +232,17 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
           }
         } catch (error) {
           console.error(`[CreatePostDialog] ${platform} thumbnail fetch failed:`, error);
+        }
+        // Instagram music-library audio check: reels using a licensed track
+        // won't play embedded, so the creator is asked before saving. Runs
+        // alongside the preview fetch and never blocks it.
+        if (platform === "instagram" && /\/reels?\//i.test(linkUrl)) {
+          void supabase.functions
+            .invoke("check-instagram-audio", { body: { url: linkUrl } })
+            .then(({ data }) => {
+              if (data && data.musicLibraryAudio === true) setMusicPrompt(true);
+            })
+            .catch(() => {});
         }
       } else if (linkUrl.includes("pinterest.com") || linkUrl.includes("pin.it")) {
         try {
@@ -902,6 +914,37 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                             );
                           })()}
 
+                          {musicPrompt && (
+                            <div className="rounded-2xl border border-border bg-muted/60 p-4 text-sm">
+                              <p className="leading-relaxed text-foreground">
+                                Instagram doesn't allow reels using its music library to play in other apps, so viewers has to visit the original source. Want to proceed?
+                              </p>
+                              <div className="mt-3 flex gap-2">
+                                <Button
+                                  type="button"
+                                  onClick={() => setMusicPrompt(false)}
+                                  className="h-9 flex-1 rounded-[16px] bg-foreground text-background"
+                                >
+                                  Proceed
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setMusicPrompt(false);
+                                    setLinkUrl("");
+                                    setThumbnailUrl("");
+                                    setTitle("");
+                                    setStep(1);
+                                  }}
+                                  className="h-9 flex-1 rounded-[16px]"
+                                >
+                                  Pick a different link
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
                           <div>
                             <Label htmlFor="caption" className="text-sm font-medium text-foreground/80">
                               Caption (optional)
@@ -946,7 +989,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
                           <motion.div whileTap={{ scale: 0.98 }}>
                             <Button
                               onClick={handlePost}
-                              disabled={submitState !== null || limitReached}
+                              disabled={submitState !== null || limitReached || musicPrompt}
                               className="h-12 w-full rounded-[22px] bg-foreground text-background shadow-[0_18px_38px_-26px_hsl(var(--foreground)/0.9)] hover:bg-foreground/90"
                             >
                               {submitState === "post" ? (
