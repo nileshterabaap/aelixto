@@ -55,8 +55,8 @@ Deno.serve(async (req) => {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    if (!username || username.length < 3) {
-      return new Response(JSON.stringify({ error: 'Username is required' }), {
+    if (!/^[a-zA-Z][a-zA-Z0-9._]*$/.test(username) || username.length < 3 || username.length > 30 || username.endsWith('.')) {
+      return new Response(JSON.stringify({ error: 'Username must be 3-30 characters, start with a letter, and use only letters, numbers, dots or underscores' }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -88,8 +88,9 @@ Deno.serve(async (req) => {
         }
       } else {
         console.error('createUser failed', createErr)
+        // Deliberately generic: never reveal whether a password was too common.
         const friendly = msg.includes('weak') || msg.includes('easy to guess')
-          ? 'This password is too common. Please choose a stronger one.'
+          ? 'This password can\'t be used. Please choose a different one.'
           : createErr.message
         return new Response(JSON.stringify({ error: friendly }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },

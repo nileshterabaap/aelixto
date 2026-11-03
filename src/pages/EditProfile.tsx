@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Loader2, Check, X, Share2, Info } from "lucide-react";
+import { isValidUsername, USERNAME_RULE_HINT } from "@/lib/usernameRules";
 import { useCurrentProfile } from "@/hooks/useCurrentProfile";
 import { useSession } from "@/hooks/useSession";
 import { ImageUploadButton } from "@/components/ImageUploadButton";
@@ -99,7 +100,7 @@ const EditProfile = () => {
       setUsernameStatus('self');
       return;
     }
-    if (!/^[a-zA-Z0-9_.]{3,30}$/.test(uname)) {
+    if (!isValidUsername(uname)) {
       setUsernameStatus('invalid');
       return;
     }
@@ -224,7 +225,7 @@ const EditProfile = () => {
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                 placeholder="your_username"
-                pattern="^[a-zA-Z0-9_.]{3,30}$"
+                pattern="^[a-zA-Z][a-zA-Z0-9_.]*$"
                 required
                 className="pr-10"
               />
@@ -247,12 +248,10 @@ const EditProfile = () => {
               <p className="text-sm text-destructive">Username is not available</p>
             )}
             {usernameStatus === 'invalid' && (
-              <p className="text-sm text-destructive">3-30 characters, letters, numbers, dots and underscores only</p>
+              <p className="text-sm text-destructive">{USERNAME_RULE_HINT}</p>
             )}
             {(usernameStatus === 'idle' || usernameStatus === 'self' || usernameStatus === 'checking') && (
-              <p className="text-sm text-muted-foreground">
-                3-30 characters, letters, numbers, dots and underscores only
-              </p>
+              <p className="text-sm text-muted-foreground">{USERNAME_RULE_HINT}</p>
             )}
           </div>
 

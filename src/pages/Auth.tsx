@@ -15,6 +15,7 @@ import { User } from "@supabase/supabase-js";
 import { ArrowLeft } from "lucide-react";
 import { getActiveUserId } from "@/lib/accountSwitcher";
 import { signInFailureMessage, usernameNotFoundMessage, type SignInMethod } from "@/lib/signInError";
+import { isValidUsername, USERNAME_RULE_HINT } from "@/lib/usernameRules";
 
 const nativeLovableAuth = createLovableAuth({
   oauthBrokerUrl: "https://aelixto.com/~oauth/initiate",
@@ -46,7 +47,7 @@ const Auth = () => {
   const addMode = new URLSearchParams(window.location.search).get("add") === "1";
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
-  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
   const [usernameValue, setUsernameValue] = useState("");
   const [signinIdentifier, setSigninIdentifier] = useState("");
   // OTP verification state
@@ -96,8 +97,12 @@ const Auth = () => {
 
   // Debounced username availability check
   useEffect(() => {
-    if (!usernameValue || usernameValue.length < 3) {
+    if (!usernameValue) {
       setUsernameStatus("idle");
+      return;
+    }
+    if (!isValidUsername(usernameValue)) {
+      setUsernameStatus("invalid");
       return;
     }
     setUsernameStatus("checking");
@@ -201,12 +206,21 @@ const Auth = () => {
       toast({ title: "Username taken", description: "Please choose a different username.", variant: "destructive" });
       return;
     }
+    if (usernameStatus === "invalid") {
+      toast({ title: "Invalid username", description: USERNAME_RULE_HINT, variant: "destructive" });
+      return;
+    }
     setLoading(true);
 
     const formData = new FormData(e.currentTarget);
     const email = formData.get("signup-email") as string;
     const password = formData.get("signup-password") as string;
     const username = usernameValue || email.split("@")[0];
+    if (!isValidUsername(username)) {
+      setLoading(false);
+      toast({ title: "Invalid username", description: "Please enter a username. " + USERNAME_RULE_HINT, variant: "destructive" });
+      return;
+    }
 
     const { data, error } = await supabase.functions.invoke("send-signup-otp", {
       body: { email: email.trim().toLowerCase(), password, username, mode: "signup" },
@@ -619,9 +633,13 @@ const Auth = () => {
                   name="username"
                   type="text"
                   placeholder="Username"
+                  maxLength={30}
                   value={usernameValue}
                   onChange={(e) => setUsernameValue(e.target.value.replace(/\s/g, ""))}
                 />
+                {usernameStatus === "invalid" && (
+                  <p className="text-xs text-destructive">{USERNAME_RULE_HINT}</p>
+                )}
                 {usernameStatus === "checking" && (
                   <p className="text-xs text-muted-foreground">Checking availability…</p>
                 )}
@@ -630,6 +648,9 @@ const Auth = () => {
                 )}
                 {usernameStatus === "available" && (
                   <p className="text-xs text-green-600">Username is available!</p>
+                )}
+                {(usernameStatus === "idle") && (
+                  <p className="text-xs text-muted-foreground">{USERNAME_RULE_HINT}</p>
                 )}
               </div>
               <div className="space-y-2">
