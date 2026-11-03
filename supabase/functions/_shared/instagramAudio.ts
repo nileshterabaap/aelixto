@@ -50,8 +50,8 @@ export function parseInstagramAudioAttribution(html: string): InstagramAudioResu
   const usesOriginalAudio = /uses_original_audio\\?"\s*:\s*true/.test(block);
   // Values end at a quote that is not escaped (`\"` closes the field in the
   // escaped embed JSON; `"` closes it in plain JSON).
-  const songMatch = block.match(/song_name\\?"\s*:\s*"((?:(?!\\").)*?)\\?"/);
-  const artistMatch = block.match(/artist_name\\?"\s*:\s*"((?:(?!\\").)*?)\\?"/);
+  const songMatch = block.match(/song_name\\?"\s*:\s*\\?"((?:(?!\\").)*?)\\?"/);
+  const artistMatch = block.match(/artist_name\\?"\s*:\s*\\?"((?:(?!\\").)*?)\\?"/);
   const songName = songMatch ? unescapeJsonString(songMatch[1]) : null;
   const artistName = artistMatch ? unescapeJsonString(artistMatch[1]) : null;
 
