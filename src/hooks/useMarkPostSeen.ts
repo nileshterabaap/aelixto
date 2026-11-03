@@ -95,6 +95,8 @@ export const useMarkPostSeen = (userId: string | undefined) => {
             if (entry.isIntersecting) {
               // Mark as seen the moment it appears, even on fast scroll
               pendingRef.current.add(postId);
+              // Its "shared a new post" alert can leave the phone's shade too.
+              void dismissPostNotification(postId);
             }
           },
           { threshold: VISIBILITY_THRESHOLD }
