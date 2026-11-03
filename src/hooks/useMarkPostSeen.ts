@@ -11,6 +11,9 @@ const MIN_VIEW_TIME = 0; // mark immediately on appearance, like Instagram
  * Use this when viewing a post on detail/profile/saved pages.
  */
 export const markPostSeenImmediate = async (userId: string, postId: string) => {
+  // The user is looking at this post — its "shared a new post" alert can
+  // leave the phone's notification shade (like Instagram/WhatsApp do).
+  void dismissPostNotification(postId);
   try {
     await supabase
       .from('post_seen')
@@ -25,6 +28,7 @@ export const markPostSeenImmediate = async (userId: string, postId: string) => {
  */
 export const markPostsSeenImmediate = async (userId: string, postIds: string[]) => {
   if (postIds.length === 0) return;
+  postIds.forEach((id) => void dismissPostNotification(id));
   try {
     const rows = postIds.map((post_id) => ({ user_id: userId, post_id }));
     await supabase
