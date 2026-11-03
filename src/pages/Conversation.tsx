@@ -12,6 +12,7 @@ import { useMessages, Message } from "@/hooks/useMessages";
 import { useSession } from "@/hooks/useSession";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { supabase } from "@/integrations/supabase/client";
+import { dismissChatNotifications } from "@/lib/dismissNativeNotification";
 import { useToast } from "@/hooks/use-toast";
 import { AelixtoLoader } from "@/components/AelixtoLoader";
 
