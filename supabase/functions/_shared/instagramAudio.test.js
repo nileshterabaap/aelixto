@@ -36,10 +36,12 @@ describe("Instagram music-library audio detection", () => {
   });
 
   test("unescaped JSON values are decoded", () => {
-    const html = 'song_name\\":\\"Caf\\u00e9 Rendez\\-vous\\",\\"uses_original_audio\\":false';
+    const html =
+      'clips_music_attribution_info\\":{\\"artist_name\\":\\"N\\u00f4 Name\\",\\"song_name\\":\\"Caf\\u00e9 R\\u00e9sum\\u00e9\\",\\"uses_original_audio\\":false}';
     const r = parseInstagramAudioAttribution(html);
     expect(r.musicLibraryAudio).toBe(true);
-    expect(r.songName).toBe("Caf\u00e9 Rendez-vous");
+    expect(r.songName).toBe("Caf\u00e9 R\u00e9sum\u00e9");
+    expect(r.artistName).toBe("N\u00f4 Name");
   });
 });
 
