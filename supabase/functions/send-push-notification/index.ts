@@ -206,6 +206,9 @@ async function sendApns(
         "mutable-content": 1,
       },
       url,
+      // The app matches delivered notifications on this field and removes
+      // them when the user opens the matching post/chat.
+      ...(pushDismissKey(url) ? { dismissKey: pushDismissKey(url) } : {}),
     }),
   });
   if (res.ok || res.status === 200) return { ok: true, invalid: false };
