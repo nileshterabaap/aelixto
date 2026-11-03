@@ -64,6 +64,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   // set when detection flags one, gating the Post button until the creator
   // chooses to proceed or pick another link.
   const [musicPrompt, setMusicPrompt] = useState(false);
+  const submittedLinkRef = useRef<string | null>(null);
   const createPost = useCreatePost();
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
