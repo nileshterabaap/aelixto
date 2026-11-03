@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { UniversalMetaEmbed } from '@/components/UniversalMetaEmbed';
 import { OgCardFallback } from '@/components/OgCardFallback';
+import { InstagramReelInfo } from '@/components/InstagramReelInfo';
 import { ThreadsEmbed, isThreadsUrl, buildThreadsEmbedSrc } from '@/components/embeds/ThreadsEmbed';
 import {
   isThreadsShareUrl,
@@ -75,10 +76,22 @@ export const ThreadsAwareMetaEmbed = (props: {
   suggestedHeight?: number | null;
 }) => {
   if (isThreadsShareUrl(props.url)) {
-    return <ThreadsShareResolver {...props} />;
+    return (
+      <InstagramReelInfo url={props.url}>
+        <ThreadsShareResolver {...props} />
+      </InstagramReelInfo>
+    );
   }
   if (isThreadsUrl(props.url) && buildThreadsEmbedSrc(props.url)) {
-    return <ThreadsEmbed {...props} />;
+    return (
+      <InstagramReelInfo url={props.url}>
+        <ThreadsEmbed {...props} />
+      </InstagramReelInfo>
+    );
   }
-  return <UniversalMetaEmbed {...(props as any)} />;
+  return (
+    <InstagramReelInfo url={props.url}>
+      <UniversalMetaEmbed {...(props as any)} />
+    </InstagramReelInfo>
+  );
 };
