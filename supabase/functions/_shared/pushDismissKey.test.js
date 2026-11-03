@@ -16,7 +16,7 @@ describe("pushDismissKey", () => {
 
   test("other notifications never get a key", () => {
     for (const url of ["/notifications", "/messages", "/", "", null, undefined]) {
-      expect(pushDismissKey(url as string)).toBeNull();
+      expect(pushDismissKey(url)).toBeNull();
     }
   });
 
