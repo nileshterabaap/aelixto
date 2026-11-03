@@ -103,6 +103,11 @@ async function sendFcm(
 ): Promise<{ ok: boolean; invalid: boolean }> {
   const auth = await getFcmAccessToken();
   if (!auth) return { ok: false, invalid: false };
+  // The tag does two jobs: notifications with the same tag replace each
+  // other (a second message in the same chat refreshes the alert instead
+  // of stacking), and the app can cancel the notification by tag when the
+  // user opens the matching post/chat.
+  const dismissKey = pushDismissKey(url);
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${auth.projectId}/messages:send`,
     {
@@ -111,11 +116,6 @@ async function sendFcm(
         Authorization: `Bearer ${auth.token}`,
         "Content-Type": "application/json",
       },
-      // The tag does two jobs: notifications with the same tag replace each
-      // other (a second message in the same chat refreshes the alert instead
-      // of stacking), and the app can cancel the notification by tag when the
-      // user opens the matching post/chat.
-      const dismissKey = pushDismissKey(url);
       body: JSON.stringify({
         message: {
           token: deviceToken,
