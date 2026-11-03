@@ -177,7 +177,10 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       window.removeEventListener("touchend", handleTouchEnd, opts);
       window.removeEventListener("touchcancel", handleTouchCancel, opts);
       window.removeEventListener("scroll", updateAtTop);
-      document.body.classList.remove("at-scroll-top");
+      ro.disconnect();
+      ptrTopReporters.delete(topReporterRef);
+      // Drop the global lock only if no other visible page reports top.
+      syncAtScrollTopClass();
     };
   }, [isAtTop, onRefresh, pullY, refreshing]);
 
