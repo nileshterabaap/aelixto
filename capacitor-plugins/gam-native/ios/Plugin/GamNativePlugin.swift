@@ -1,5 +1,6 @@
 import Foundation
 import Capacitor
+import UserNotifications
 import GoogleMobileAds
 import UserMessagingPlatform
 import AppTrackingTransparency
