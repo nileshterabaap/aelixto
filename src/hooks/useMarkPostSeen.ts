@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { dismissPostNotification } from '@/lib/dismissNativeNotification';
 
 const BATCH_INTERVAL = 3000; // flush every 3s
 const VISIBILITY_THRESHOLD = 0.01; // any sliver visible counts

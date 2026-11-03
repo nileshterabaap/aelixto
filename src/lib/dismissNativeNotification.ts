@@ -16,10 +16,7 @@ const dismissedThisSession = new Set<string>();
 export const postNotificationKey = (postId: string) => `post-${postId.toLowerCase()}`;
 export const chatNotificationKey = (conversationId: string) => `chat-${conversationId.toLowerCase()}`;
 
-export const dismissNativeNotification = async (key: string): Promise<void> => {
-  if (!key || dismissedThisSession.has(key)) return;
-  if (!Capacitor.isNativePlatform()) return;
-  dismissedThisSession.add(key);
+const removeDelivered = async (key: string): Promise<void> => {
   try {
     const { GamNative } = await import('aelixto-gam-native');
     await GamNative.dismissNotifications({ key });
@@ -28,8 +25,24 @@ export const dismissNativeNotification = async (key: string): Promise<void> => {
   }
 };
 
+/**
+ * `once: true` skips keys already cleared this session (feed seen-marking can
+ * re-fire for the same post). Chat dismissals must repeat so a message that
+ * arrives while the chat is open also clears its fresh notification.
+ */
+export const dismissNativeNotification = async (
+  key: string,
+  { once = false }: { once?: boolean } = {},
+): Promise<void> => {
+  if (!key) return;
+  if (!Capacitor.isNativePlatform()) return;
+  if (once && dismissedThisSession.has(key)) return;
+  if (once) dismissedThisSession.add(key);
+  await removeDelivered(key);
+};
+
 export const dismissPostNotification = (postId: string) =>
-  dismissNativeNotification(postNotificationKey(postId));
+  dismissNativeNotification(postNotificationKey(postId), { once: true });
 
 export const dismissChatNotifications = (conversationId: string) =>
   dismissNativeNotification(chatNotificationKey(conversationId));
