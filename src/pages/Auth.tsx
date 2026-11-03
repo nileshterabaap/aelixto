@@ -15,6 +15,7 @@ import { User } from "@supabase/supabase-js";
 import { ArrowLeft } from "lucide-react";
 import { getActiveUserId } from "@/lib/accountSwitcher";
 import { signInFailureMessage, usernameNotFoundMessage, type SignInMethod } from "@/lib/signInError";
+import { isValidUsername, USERNAME_RULE_HINT } from "@/lib/usernameRules";
 
 const nativeLovableAuth = createLovableAuth({
   oauthBrokerUrl: "https://aelixto.com/~oauth/initiate",

@@ -99,7 +99,7 @@ const EditProfile = () => {
       setUsernameStatus('self');
       return;
     }
-    if (!/^[a-zA-Z0-9_.]{3,30}$/.test(uname)) {
+    if (!isValidUsername(uname)) {
       setUsernameStatus('invalid');
       return;
     }
