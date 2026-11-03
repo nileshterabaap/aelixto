@@ -60,6 +60,10 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   const [ogType, setOgType] = useState<string | null>(null);
   const [draftId, setDraftId] = useState<string | null>(null);
   const [submitState, setSubmitState] = useState<null | "post" | "draft">(null);
+  // Instagram reels using the platform's music library can't play embedded —
+  // set when detection flags one, gating the Post button until the creator
+  // chooses to proceed or pick another link.
+  const [musicPrompt, setMusicPrompt] = useState(false);
   const createPost = useCreatePost();
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();

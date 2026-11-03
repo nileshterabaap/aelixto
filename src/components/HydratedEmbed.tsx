@@ -8,6 +8,7 @@ import { TwitterEmbed } from '@/components/embeds/TwitterEmbed';
 import { PinterestEmbed } from '@/components/embeds/PinterestEmbed';
 import { RawEmbedRenderer } from '@/components/RawEmbedRenderer';
 import { ThreadsAwareMetaEmbed as UniversalMetaEmbed } from '@/components/ThreadsAwareMetaEmbed';
+import { InstagramReelInfo } from '@/components/InstagramReelInfo';
 import { ArticleEmbed } from '@/features/article-embeds';
 import RedditEmbed from '@/components/embeds/RedditEmbed';
 import { ImageViewTracker } from '@/components/ImageViewTracker';
@@ -410,7 +411,9 @@ export const HydratedEmbed = memo(({
 
         {forceUniversalRenderer && mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={mediaUrl} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+            <InstagramReelInfo url={mediaUrl}>
+              <UniversalMetaEmbed url={mediaUrl} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+            </InstagramReelInfo>
           </ImageViewTracker>
         )}
         
@@ -424,7 +427,9 @@ export const HydratedEmbed = memo(({
         {/* Fallback when raw embed fails — show UniversalMetaEmbed to rebuild */}
         {r.kind === 'raw' && !forceTwitterRenderer && !forcePinterestRenderer && !forceUniversalRenderer && rawEmbedFailed && post.mediaUrl && (
           <ImageViewTracker postId={post.id}>
-            <UniversalMetaEmbed url={post.mediaUrl} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+            <InstagramReelInfo url={post.mediaUrl}>
+              <UniversalMetaEmbed url={post.mediaUrl} postId={post.id} suggestedHeight={(post as any).suggested_height ?? null} />
+            </InstagramReelInfo>
           </ImageViewTracker>
         )}
         
