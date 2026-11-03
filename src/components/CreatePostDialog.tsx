@@ -64,6 +64,7 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
   // set when detection flags one, gating the Post button until the creator
   // chooses to proceed or pick another link.
   const [musicPrompt, setMusicPrompt] = useState(false);
+  const submittedLinkRef = useRef<string | null>(null);
   const createPost = useCreatePost();
   const saveDraft = useSaveDraft();
   const deleteDraft = useDeleteDraft();
@@ -140,6 +141,9 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
 
   const processLinkSubmit = async (linkUrl: string) => {
     if (!linkUrl.trim()) return;
+    // Tracks the newest submitted link so a slow music-check response for an
+    // earlier link can never flag a different one.
+    submittedLinkRef.current = linkUrl;
     fetchedPreviewTextRef.current = null;
     setMusicPrompt(false);
     measuredHeightRef.current = null;
@@ -237,10 +241,13 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
         // won't play embedded, so the creator is asked before saving. Runs
         // alongside the preview fetch and never blocks it.
         if (platform === "instagram" && /\/reels?\//i.test(linkUrl)) {
+          const checkedUrl = linkUrl;
           void supabase.functions
-            .invoke("check-instagram-audio", { body: { url: linkUrl } })
+            .invoke("check-instagram-audio", { body: { url: checkedUrl } })
             .then(({ data }) => {
-              if (data && data.musicLibraryAudio === true) setMusicPrompt(true);
+              if (data && data.musicLibraryAudio === true && submittedLinkRef.current === checkedUrl) {
+                setMusicPrompt(true);
+              }
             })
             .catch(() => {});
         }
@@ -674,6 +681,8 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setOgType(null);
     setDraftId(null);
     setSubmitState(null);
+    setMusicPrompt(false);
+    submittedLinkRef.current = null;
     fetchedPreviewTextRef.current = null;
     measuredHeightRef.current = null;
     measurePromiseRef.current = null;
@@ -697,6 +706,8 @@ export const CreatePostDialog = ({ open, onOpenChange, initialDraft }: CreatePos
     setOgType(null);
     setDraftId(null);
     setSubmitState(null);
+    setMusicPrompt(false);
+    submittedLinkRef.current = null;
     fetchedPreviewTextRef.current = null;
     measuredHeightRef.current = null;
     measurePromiseRef.current = null;
