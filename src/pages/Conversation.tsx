@@ -156,6 +156,12 @@ const Conversation = () => {
     didInitialScroll.current = false;
   }, [conversationId]);
 
+  // Opening the chat clears that chat's phone notifications from the shade
+  // (and again when a new message lands while it's open). Fire-and-forget.
+  useEffect(() => {
+    if (conversationId) void dismissChatNotifications(conversationId);
+  }, [conversationId, messages.length]);
+
   // When the keyboard opens (or the reply bar appears) the message area gets
   // shorter. Keep the same distance from the bottom so the latest messages
   // move up above the text box instead of hiding behind it.
