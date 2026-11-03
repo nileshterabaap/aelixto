@@ -50,6 +50,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const touchStartX = useRef(0);
   const pulling = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const topReporterRef = useRef(false);
 
   // Spinner transforms — fade in quickly, scale smoothly
   const spinnerOpacity = useTransform(pullY, [0, 20, THRESHOLD], [0, 0.6, 1]);
