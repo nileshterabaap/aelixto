@@ -248,12 +248,10 @@ const EditProfile = () => {
               <p className="text-sm text-destructive">Username is not available</p>
             )}
             {usernameStatus === 'invalid' && (
-              <p className="text-sm text-destructive">3-30 characters, letters, numbers, dots and underscores only</p>
+              <p className="text-sm text-destructive">{USERNAME_RULE_HINT}</p>
             )}
             {(usernameStatus === 'idle' || usernameStatus === 'self' || usernameStatus === 'checking') && (
-              <p className="text-sm text-muted-foreground">
-                3-30 characters, letters, numbers, dots and underscores only
-              </p>
+              <p className="text-sm text-muted-foreground">{USERNAME_RULE_HINT}</p>
             )}
           </div>
 

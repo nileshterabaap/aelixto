@@ -55,8 +55,8 @@ Deno.serve(async (req) => {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
-    if (!username || username.length < 3) {
-      return new Response(JSON.stringify({ error: 'Username is required' }), {
+    if (!/^[a-zA-Z][a-zA-Z0-9._]*$/.test(username) || username.length < 3 || username.length > 30 || username.endsWith('.')) {
+      return new Response(JSON.stringify({ error: 'Username must be 3-30 characters, start with a letter, and use only letters, numbers, dots or underscores' }), {
         status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
