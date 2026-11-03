@@ -54,6 +54,14 @@ export interface GamNativePlugin {
   }): Promise<void>;
   /** Free the underlying native ad object when the card unmounts. */
   destroyAd(options: { adId: string }): Promise<void>;
+
+  /**
+   * Remove delivered push notifications stamped with the given dismiss key
+   * (Android: FCM notification tag; iOS: APNs payload `dismissKey`). Used so
+   * a post's or chat's alert leaves the phone's notification shade once the
+   * user opens the matching content. No-op on web.
+   */
+  dismissNotifications(options: { key: string }): Promise<{ dismissed: number }>;
 }
 
 export interface NativeAdCreative {

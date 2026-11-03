@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { pushDismissKey } from "../_shared/pushDismissKey.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -102,6 +103,11 @@ async function sendFcm(
 ): Promise<{ ok: boolean; invalid: boolean }> {
   const auth = await getFcmAccessToken();
   if (!auth) return { ok: false, invalid: false };
+  // The tag does two jobs: notifications with the same tag replace each
+  // other (a second message in the same chat refreshes the alert instead
+  // of stacking), and the app can cancel the notification by tag when the
+  // user opens the matching post/chat.
+  const dismissKey = pushDismissKey(url);
   const res = await fetch(
     `https://fcm.googleapis.com/v1/projects/${auth.projectId}/messages:send`,
     {
@@ -114,8 +120,11 @@ async function sendFcm(
         message: {
           token: deviceToken,
           notification: { title, body },
-          data: { url },
-          android: { priority: "HIGH", notification: { sound: "default" } },
+          data: dismissKey ? { url, dismissKey } : { url },
+          android: {
+            priority: "HIGH",
+            notification: { sound: "default", ...(dismissKey ? { tag: dismissKey } : {}) },
+          },
         },
       }),
     },
@@ -197,6 +206,9 @@ async function sendApns(
         "mutable-content": 1,
       },
       url,
+      // The app matches delivered notifications on this field and removes
+      // them when the user opens the matching post/chat.
+      ...(pushDismissKey(url) ? { dismissKey: pushDismissKey(url) } : {}),
     }),
   });
   if (res.ok || res.status === 200) return { ok: true, invalid: false };

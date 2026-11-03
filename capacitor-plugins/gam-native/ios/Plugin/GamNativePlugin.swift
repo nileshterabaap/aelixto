@@ -1,5 +1,6 @@
 import Foundation
 import Capacitor
+import UserNotifications
 import GoogleMobileAds
 import UserMessagingPlatform
 import AppTrackingTransparency
@@ -26,7 +27,8 @@ public class GamNativePlugin: CAPPlugin, CAPBridgedPlugin, GADNativeAdLoaderDele
         CAPPluginMethod(name: "loadNativeAd", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "presentNativeAd", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateNativeAdFrame", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "destroyAd", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "destroyAd", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "dismissNotifications", returnType: CAPPluginReturnPromise)
     ]
 
     private var pendingLoads: [String: CAPPluginCall] = [:]
@@ -240,6 +242,31 @@ public class GamNativePlugin: CAPPlugin, CAPBridgedPlugin, GADNativeAdLoaderDele
             loaders.removeValue(forKey: adId)
         }
         call.resolve()
+    }
+
+    /// Removes delivered push notifications whose APNs payload carried a
+    /// matching `dismissKey` (stamped by the send-push-notification function).
+    /// Called when the user opens the matching post/chat so the alert leaves
+    /// the Notification Center shade, like Instagram/WhatsApp do.
+    @objc func dismissNotifications(_ call: CAPPluginCall) {
+        let key = call.getString("key") ?? ""
+        guard !key.isEmpty else {
+            call.resolve(["dismissed": 0])
+            return
+        }
+        let center = UNUserNotificationCenter.current()
+        center.getDeliveredNotifications { notifications in
+            let matching = notifications.filter {
+                ($0.request.content.userInfo["dismissKey"] as? String) == key
+            }
+            guard !matching.isEmpty else {
+                call.resolve(["dismissed": 0])
+                return
+            }
+            center.removeDeliveredNotifications(withIdentifiers: matching.map { $0.request.identifier }) {
+                call.resolve(["dismissed": matching.count])
+            }
+        }
     }
 }
 

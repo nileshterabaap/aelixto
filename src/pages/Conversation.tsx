@@ -12,6 +12,7 @@ import { useMessages, Message } from "@/hooks/useMessages";
 import { useSession } from "@/hooks/useSession";
 import { useImageUpload } from "@/hooks/useImageUpload";
 import { supabase } from "@/integrations/supabase/client";
+import { dismissChatNotifications } from "@/lib/dismissNativeNotification";
 import { useToast } from "@/hooks/use-toast";
 import { AelixtoLoader } from "@/components/AelixtoLoader";
 
@@ -155,6 +156,12 @@ const Conversation = () => {
   useEffect(() => {
     didInitialScroll.current = false;
   }, [conversationId]);
+
+  // Opening the chat clears that chat's phone notifications from the shade
+  // (and again when a new message lands while it's open). Fire-and-forget.
+  useEffect(() => {
+    if (conversationId) void dismissChatNotifications(conversationId);
+  }, [conversationId, messages.length]);
 
   // When the keyboard opens (or the reply bar appears) the message area gets
   // shorter. Keep the same distance from the bottom so the latest messages

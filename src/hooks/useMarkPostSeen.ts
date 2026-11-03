@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { dismissPostNotification } from '@/lib/dismissNativeNotification';
 
 const BATCH_INTERVAL = 3000; // flush every 3s
 const VISIBILITY_THRESHOLD = 0.01; // any sliver visible counts
@@ -10,6 +11,9 @@ const MIN_VIEW_TIME = 0; // mark immediately on appearance, like Instagram
  * Use this when viewing a post on detail/profile/saved pages.
  */
 export const markPostSeenImmediate = async (userId: string, postId: string) => {
+  // The user is looking at this post — its "shared a new post" alert can
+  // leave the phone's notification shade (like Instagram/WhatsApp do).
+  void dismissPostNotification(postId);
   try {
     await supabase
       .from('post_seen')
@@ -24,6 +28,7 @@ export const markPostSeenImmediate = async (userId: string, postId: string) => {
  */
 export const markPostsSeenImmediate = async (userId: string, postIds: string[]) => {
   if (postIds.length === 0) return;
+  postIds.forEach((id) => void dismissPostNotification(id));
   try {
     const rows = postIds.map((post_id) => ({ user_id: userId, post_id }));
     await supabase
@@ -90,6 +95,8 @@ export const useMarkPostSeen = (userId: string | undefined) => {
             if (entry.isIntersecting) {
               // Mark as seen the moment it appears, even on fast scroll
               pendingRef.current.add(postId);
+              // Its "shared a new post" alert can leave the phone's shade too.
+              void dismissPostNotification(postId);
             }
           },
           { threshold: VISIBILITY_THRESHOLD }

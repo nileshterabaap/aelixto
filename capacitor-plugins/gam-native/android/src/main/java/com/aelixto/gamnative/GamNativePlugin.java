@@ -689,4 +689,33 @@ public class GamNativePlugin extends Plugin {
         }
         call.resolve();
     }
+
+    /**
+     * Removes delivered push notifications by their dismiss key. The push
+     * sender (send-push-notification function) stamps FCM notification
+     * messages with `tag = dismissKey`; matching on the active notification's
+     * tag avoids depending on which numeric id FCM assigned.
+     */
+    @PluginMethod
+    public void dismissNotifications(PluginCall call) {
+        String key = call.getString("key");
+        int removed = 0;
+        if (key != null && !key.isEmpty()) {
+            try {
+                android.app.NotificationManager nm = (android.app.NotificationManager)
+                        getActivity().getSystemService(android.app.Activity.NOTIFICATION_SERVICE);
+                if (nm != null) {
+                    for (android.service.notification.StatusBarNotification n : nm.getActiveNotifications()) {
+                        if (key.equals(n.getTag())) {
+                            nm.cancel(n.getTag(), n.getId());
+                            removed++;
+                        }
+                    }
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "dismissNotifications failed", t);
+            }
+        }
+        call.resolve(new JSObject("dismissed", removed));
+    }
 }
