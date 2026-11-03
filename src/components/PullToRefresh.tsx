@@ -95,6 +95,9 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     // with display:none, and a hidden feed must never keep this global lock
     // applied on the post page (Instagram reels there have no pointer-events
     // exception, so the lock made their play button untappable).
+    // Register this instance so the shared body class reflects any *visible*
+    // page that is at the top of its scroll.
+    ptrTopReporters.add(topReporterRef);
     const updateAtTop = () => {
       const visible = Boolean(containerRef.current?.getClientRects().length);
       const pageScrollTop =
