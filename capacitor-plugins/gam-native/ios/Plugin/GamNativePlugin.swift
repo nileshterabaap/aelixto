@@ -26,7 +26,8 @@ public class GamNativePlugin: CAPPlugin, CAPBridgedPlugin, GADNativeAdLoaderDele
         CAPPluginMethod(name: "loadNativeAd", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "presentNativeAd", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateNativeAdFrame", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "destroyAd", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "destroyAd", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "dismissNotifications", returnType: CAPPluginReturnPromise)
     ]
 
     private var pendingLoads: [String: CAPPluginCall] = [:]
