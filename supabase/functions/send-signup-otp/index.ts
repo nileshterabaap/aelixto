@@ -88,8 +88,9 @@ Deno.serve(async (req) => {
         }
       } else {
         console.error('createUser failed', createErr)
+        // Deliberately generic: never reveal whether a password was too common.
         const friendly = msg.includes('weak') || msg.includes('easy to guess')
-          ? 'This password is too common. Please choose a stronger one.'
+          ? 'This password can\'t be used. Please choose a different one.'
           : createErr.message
         return new Response(JSON.stringify({ error: friendly }), {
           status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
