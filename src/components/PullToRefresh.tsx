@@ -22,6 +22,20 @@ export const triggerFeedRefresh = () => {
   window.dispatchEvent(new CustomEvent(FEED_REFRESH_EVENT));
 };
 
+// `at-scroll-top` is a GLOBAL body class that blocks taps on embed iframes so
+// a pull gesture can start over them. Several PullToRefresh pages stay mounted
+// (display:none keep-alive tabs), so only a *visible* page may report "at top";
+// otherwise a hidden feed keeps the lock applied on the post page, where an
+// Instagram reel (no pointer-events exception) can never be tapped to play.
+interface PullToRefreshTopReporter {
+  current: boolean;
+}
+const ptrTopReporters = new Set<PullToRefreshTopReporter>();
+const syncAtScrollTopClass = () => {
+  const anyVisibleAtTop = Array.from(ptrTopReporters).some((r) => r.current);
+  document.body.classList.toggle("at-scroll-top", anyVisibleAtTop);
+};
+
 const shouldIgnorePullTarget = (target: EventTarget | null) => {
   return (
     target instanceof HTMLElement &&
@@ -36,6 +50,7 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
   const touchStartX = useRef(0);
   const pulling = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const topReporterRef = useRef(false);
 
   // Spinner transforms — fade in quickly, scale smoothly
   const spinnerOpacity = useTransform(pullY, [0, 20, THRESHOLD], [0, 0.6, 1]);
@@ -76,17 +91,29 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
     // when at the top of the page — this is what lets the finger start
     // a pull gesture over a YouTube/Instagram/Twitter embed. As soon as
     // the user scrolls down, iframes become interactive again.
+    // Only a visible page may report "at top": keep-alive tabs stay mounted
+    // with display:none, and a hidden feed must never keep this global lock
+    // applied on the post page (Instagram reels there have no pointer-events
+    // exception, so the lock made their play button untappable).
+    // Register this instance so the shared body class reflects any *visible*
+    // page that is at the top of its scroll.
+    ptrTopReporters.add(topReporterRef);
     const updateAtTop = () => {
+      const visible = Boolean(containerRef.current?.getClientRects().length);
       const pageScrollTop =
         window.scrollY ||
         document.scrollingElement?.scrollTop ||
         document.documentElement.scrollTop ||
         0;
-      const atTop = pageScrollTop <= 2;
-      document.body.classList.toggle("at-scroll-top", atTop);
+      topReporterRef.current = visible && pageScrollTop <= 2;
+      syncAtScrollTopClass();
     };
     updateAtTop();
     window.addEventListener("scroll", updateAtTop, { passive: true });
+    // Keep-alive tabs flip between display:none and display:block without any
+    // scroll event; the observer re-evaluates the report when that happens.
+    const ro = new ResizeObserver(updateAtTop);
+    if (containerRef.current) ro.observe(containerRef.current);
 
     const handleTouchMove = (event: TouchEvent) => {
       if (!pulling.current || refreshing) return;
@@ -150,7 +177,10 @@ export const PullToRefresh = ({ onRefresh, children }: PullToRefreshProps) => {
       window.removeEventListener("touchend", handleTouchEnd, opts);
       window.removeEventListener("touchcancel", handleTouchCancel, opts);
       window.removeEventListener("scroll", updateAtTop);
-      document.body.classList.remove("at-scroll-top");
+      ro.disconnect();
+      ptrTopReporters.delete(topReporterRef);
+      // Drop the global lock only if no other visible page reports top.
+      syncAtScrollTopClass();
     };
   }, [isAtTop, onRefresh, pullY, refreshing]);
 
