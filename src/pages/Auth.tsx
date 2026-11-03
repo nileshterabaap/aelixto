@@ -46,7 +46,7 @@ const Auth = () => {
   const addMode = new URLSearchParams(window.location.search).get("add") === "1";
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
-  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const [usernameStatus, setUsernameStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
   const [usernameValue, setUsernameValue] = useState("");
   const [signinIdentifier, setSigninIdentifier] = useState("");
   // OTP verification state
@@ -96,8 +96,12 @@ const Auth = () => {
 
   // Debounced username availability check
   useEffect(() => {
-    if (!usernameValue || usernameValue.length < 3) {
+    if (!usernameValue) {
       setUsernameStatus("idle");
+      return;
+    }
+    if (!isValidUsername(usernameValue)) {
+      setUsernameStatus("invalid");
       return;
     }
     setUsernameStatus("checking");
