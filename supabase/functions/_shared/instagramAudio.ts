@@ -59,6 +59,13 @@ export function parseInstagramAudioAttribution(html: string): InstagramAudioResu
     return { musicLibraryAudio: false, songName, artistName };
   }
 
+  // Muted audio means Instagram will not play this reel's sound anywhere
+  // outside its own app.
+  const shouldMute = /should_mute_audio\\?"\s*:\s*true/.test(block);
+  if (shouldMute) {
+    return { musicLibraryAudio: true, songName: songName || null, artistName: artistName || null };
+  }
+
   // Licensed track: Instagram names the song (and it is never literally
   // "Original audio" for library music).
   if (songName && !/^original audio$/i.test(songName)) {

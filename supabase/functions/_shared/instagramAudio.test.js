@@ -23,6 +23,13 @@ describe("Instagram music-library audio detection", () => {
     expect(r.musicLibraryAudio).toBe(false);
   });
 
+  test("muted library audio without song data is flagged", () => {
+    const html =
+      'clips_music_attribution_info\\":{\\"artist_name\\":\\"\\",\\"song_name\\":\\"\\",\\"uses_original_audio\\":false,\\"should_mute_audio\\":true}';
+    const r = parseInstagramAudioAttribution(html);
+    expect(r.musicLibraryAudio).toBe(true);
+  });
+
   test("attribution block with no song name is inconclusive", () => {
     const r = parseInstagramAudioAttribution(
       '<html>clips_music_attribution_info\\":{\\"uses_original_audio\\":false}</html>'
