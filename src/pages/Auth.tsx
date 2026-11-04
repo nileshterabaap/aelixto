@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
 import { canUseNativeSocialAuth, nativeSocialSignIn } from "@/lib/nativeSocialAuth";
-import { shouldRetryAndroidGoogle } from "@/lib/socialSignInError";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -403,25 +402,12 @@ const Auth = () => {
         if (canUseNativeSocialAuth(provider)) {
           const activeBefore = getActiveUserId();
           let res = await nativeSocialSignIn(provider);
-          if (
-            !res.ok &&
-            shouldRetryAndroidGoogle({
-              platform: Capacitor.getPlatform(),
-              provider,
-              cancelled: !!res.cancelled,
-              alreadyRetried: false,
-            })
-          ) {
-            // The standard picker can report "cancelled" after an account was
-            // picked. If a session exists already, use it; otherwise retry once
-            // through the One Tap sheet, which auto-selects the just-picked account.
-            const { data: pre } = await supabase.auth.getSession();
-            if (!pre.session?.user || addMode) {
-              console.warn("[auth] Google picker reported cancel; retrying once with One Tap sheet");
-              const retry = await nativeSocialSignIn(provider, { androidGoogleStyle: "bottom" });
-              if (retry.ok || !retry.cancelled) res = retry;
-            }
-          }
+          // No silent retry. The One Tap recovery sheet that used to follow a
+          // "cancelled" pick fails with "Developer console is not set"
+          // (error 10) on devices where this build isn't registered for One
+          // Tap, turning a working sign-in into an error. If the picker
+          // reports "cancelled" after an account was picked anyway, the
+          // session check below still completes the sign-in.
           if (res.ok) {
             // Don't rely only on the sign-in listener to leave this page:
             // move on explicitly once the session is in place.
