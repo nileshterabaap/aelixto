@@ -107,10 +107,7 @@ type NativeResult = { ok: boolean; cancelled?: boolean; message?: string };
  * user backed out, or when the native path is unavailable and the caller
  * should fall back to the browser flow.
  */
-export const nativeSocialSignIn = async (
-  provider: "google" | "apple",
-  opts: { androidGoogleStyle?: "standard" | "bottom" } = {},
-): Promise<NativeResult> => {
+export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<NativeResult> => {
   try {
     await ensureInitialized();
     const SocialLogin = await getPlugin();
