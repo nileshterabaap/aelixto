@@ -121,29 +121,20 @@ export const nativeSocialSignIn = async (provider: "google" | "apple"): Promise<
     // Google: no nonce at all. The plugin puts the raw nonce in the ID token and
     // the backend re-hashes it before comparing, which produces "Nonces
     // mismatch". Omitting it entirely keeps the exchange valid.
-    // `style: "standard"` opens the full "Sign in with Google" account picker
-    // (all accounts on the device) instead of the One Tap "sign back in" sheet,
-    // which only ever suggests a single, previously used account.
-    // `style: "bottom"` is the recovery path: the standard picker sometimes
-    // reports "cancelled" after an account was picked; the One Tap sheet with
-    // auto-select then finishes for the account Google just authorised.
+    // `style: "standard"` always opens the full "Sign in with Google" account
+    // picker (all accounts on the device). The One Tap "bottom" sheet is
+    // never used: it fails with "Developer console is not set" (error 10) on
+    // devices where this build isn't registered for One Tap.
     //
     // iOS Google: the SDK can add its own nonce, so give it the SHA-256 of ours
     // (exactly like Apple) and hand the raw value to the backend.
     const isIos = Capacitor.getPlatform() === "ios";
     const hashNonce = provider === "apple" || isIos;
-    const androidStyle = opts.androidGoogleStyle ?? "standard";
     const options =
       provider === "apple"
         ? { scopes: ["email", "name"], nonce: await sha256(rawNonce) }
         : isIos
         ? { nonce: await sha256(rawNonce) }
-        : androidStyle === "bottom"
-        ? {
-            style: "bottom" as const,
-            filterByAuthorizedAccounts: false,
-            autoSelectEnabled: true,
-          }
         : {
             style: "standard" as const,
             filterByAuthorizedAccounts: false,
