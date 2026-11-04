@@ -716,6 +716,8 @@ public class GamNativePlugin extends Plugin {
                 Log.w(TAG, "dismissNotifications failed", t);
             }
         }
-        call.resolve(new JSObject("dismissed", removed));
+        JSObject ret = new JSObject();
+        ret.put("dismissed", removed);
+        call.resolve(ret);
     }
 }
