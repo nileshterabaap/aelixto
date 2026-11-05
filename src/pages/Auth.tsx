@@ -428,7 +428,8 @@ const Auth = () => {
           if (res.cancelled) {
             // Android's Google sheet sometimes reports "cancelled" even after
             // an account was picked. If a session exists anyway, go home;
-            // otherwise say so instead of silently showing this page again.
+            // otherwise recover through the known-good system-browser flow
+            // instead of leaving the person stuck on the sign-in page.
             if (!addMode) {
               const { data } = await supabase.auth.getSession();
               if (data.session?.user) {
@@ -437,14 +438,18 @@ const Auth = () => {
               }
             }
             if (provider === "google" && Capacitor.getPlatform() === "android") {
-              toast({
-                title: "Google sign-in didn't finish",
-                description: "If you picked an account, tap Continue with Google again.",
-              });
+              await browserSocialSignIn(provider);
             }
             return;
           }
           console.warn(`Native ${label} sign-in failed:`, res.message);
+          if (provider === "google" && Capacitor.getPlatform() === "android") {
+            // Credential Manager can fail or misreport account selection on
+            // some installed builds. Keep native sign-in as the first choice,
+            // but recover through the previously working browser OAuth path.
+            await browserSocialSignIn(provider);
+            return;
+          }
           if (provider === "google" && Capacitor.getPlatform() === "ios") {
             // iPhone safety net: if the in-app Google sheet's token is ever
             // refused, finish sign-in through the browser sheet instead.
