@@ -21,6 +21,8 @@ import { SwipeableView } from "@/components/SwipeableView";
 import { useFeedWithAds } from "@/hooks/useFeedWithAds";
 import { NativeFeedAd } from "@/components/ads/NativeFeedAd";
 import { observeFeedPostForAds } from "@/lib/adCadence";
+import { InviteButton } from "@/components/InviteButton";
+import { Search } from "lucide-react";
 const Index = () => {
   const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -300,11 +302,12 @@ const Index = () => {
                 <p className="text-sm text-muted-foreground mt-1">
                   only your follows do.
                 </p>
+                <InviteButton className="mt-8" />
                 <Link
                   to="/discover"
-                  className="mt-4 px-4 py-2 rounded-full border border-foreground/30 hover:bg-foreground hover:text-background transition-all"
+                  className="mt-4 w-full max-w-xs flex items-center justify-center gap-3 rounded-full border border-foreground/40 py-3 text-lg font-semibold active:scale-[0.98] transition-transform"
                 >
-                  Discover people to follow
+                  <Search className="h-6 w-6" /> Find people
                 </Link>
               </div>
             ) : hasKnownSeenPosts ? (
@@ -314,6 +317,7 @@ const Index = () => {
                 <p className="text-sm text-muted-foreground mt-2">
                   You've seen all recent posts from people you follow.
                 </p>
+                <InviteButton className="mt-6" />
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -368,6 +372,7 @@ const Index = () => {
                   <p className="text-sm text-muted-foreground mt-1">
                     You've seen all recent posts from people you follow.
                   </p>
+                  <InviteButton className="mt-6" />
                 </div>
               )}
             </div>

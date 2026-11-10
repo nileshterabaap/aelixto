@@ -13,6 +13,7 @@ import { useRealtimeInvalidations } from "@/hooks/useRealtimeInvalidations";
 import { useAppReviewPrompt } from "@/hooks/useAppReviewPrompt";
 import { useShareTarget } from "@/hooks/useShareTarget";
 import { useReactivateOnSignIn } from "@/hooks/useReactivateOnSignIn";
+import { useInviteAutoFollow } from "@/hooks/useInviteAutoFollow";
 import { PageTransition } from "@/components/PageTransition";
 import { useResumeRecovery } from "@/hooks/useResumeRecovery";
 import { KeepAliveRoutes } from "@/components/KeepAliveRoutes";
@@ -72,6 +73,7 @@ const AnimatedRoutes = () => {
   useAppReviewPrompt();
   useShareTarget();
   useReactivateOnSignIn();
+  useInviteAutoFollow();
   useResumeRecovery(queryClient);
   
   // Disable browser's automatic scroll restoration
