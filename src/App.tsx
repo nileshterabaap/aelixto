@@ -45,6 +45,7 @@ import Support from "./pages/Support";
 import AuthBridge from "./pages/AuthBridge";
 import Unsubscribe from "./pages/Unsubscribe";
 import ShortLinkRedirect from "./pages/ShortLinkRedirect";
+import Launch from "./pages/Launch";
 
 // Configure QueryClient with aggressive caching for instant navigation
 const queryClient = new QueryClient({
@@ -126,6 +127,7 @@ const AnimatedRoutes = () => {
             <Route path="/child-safety" element={<PageTransition><ChildSafety /></PageTransition>} />
             <Route path="/support" element={<PageTransition><Support /></PageTransition>} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
+            <Route path="/get" element={<Launch />} />
             {/* Short-link redirect */}
             <Route path="/s/:code" element={<ShortLinkRedirect />} />
             {/* Native OAuth bridge — converts web redirect into a custom-scheme deep link */}
