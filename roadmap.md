@@ -28,8 +28,3 @@
 - [x] Let drafts be added to collections (button on draft card, shown inside collection)
 - [x] Tapping "Your post was removed" notifications opens that post
 - [x] Inbox pull-to-refresh visibly spins and actually reloads
-
-## Standalone Aelixto App Store landing page
-- [ ] Build an independently served landing page outside app navigation.
-- [ ] Add a secure Apple App Store waitlist email capture with Lovable Cloud storage.
-- [ ] Confirm page and submission flow; review this roadmap before completion.

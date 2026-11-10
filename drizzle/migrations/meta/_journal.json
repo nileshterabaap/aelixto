@@ -64,13 +64,6 @@
       "when": 1793526517089,
       "tag": "0008_collection_drafts",
       "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1794347710523,
-      "tag": "0009_ios_waitlist",
-      "breakpoints": true
     }
   ]
 }
