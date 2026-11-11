@@ -5,7 +5,7 @@ import { useCurrentProfile } from "./useCurrentProfile";
 const STORAGE_KEY_BASE = "aelixto_daily_post_limit";
 export const DAILY_POST_LIMIT = 5;
 // Usernames exempt from the daily slot limit (unlimited posting).
-const UNLIMITED_USERNAMES = new Set<string>(["bpp"]);
+const UNLIMITED_USERNAMES = new Set<string>(["bpp", "garvseindian"]);
 
 interface StoredState {
   date: string;
