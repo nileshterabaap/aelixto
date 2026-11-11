@@ -12,18 +12,8 @@ export default function Launch() {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "saving" | "done" | "error">("idle");
   const [msg, setMsg] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [copyError, setCopyError] = useState(false);
   const incomingRef = new URLSearchParams(window.location.search).get("ref");
   const ref = incomingRef && isValidUsername(incomingRef) ? incomingRef : null;
-  const copyInvite = async () => {
-    if (!ref) return;
-    try {
-      await navigator.clipboard.writeText(inviteUrl(ref));
-      setCopied(true); setCopyError(false);
-    } catch { setCopyError(true); }
-  };
-
   useEffect(() => {
     document.title = "Aelixto — Every feed, one place";
     const robots = document.createElement("meta");
@@ -75,12 +65,7 @@ export default function Launch() {
             {ref && <div className="mt-6 space-y-3">
               <p className="text-sm font-semibold">Invited by @{ref}</p>
               <Button asChild variant="outline"><a href={`com.aelixto.app10://invite?ref=${encodeURIComponent(ref)}`}>Open Aelixto</a></Button>
-              <div className="space-y-3 border-t border-border pt-4">
-                <p className="text-sm text-muted-foreground">On iPhone, copy your invite before installing. Open Aelixto, choose “Paste invite” and allow pasting to follow your friend after signup.</p>
-                <Button onClick={copyInvite}>{copied ? "Invite copied" : "Copy invite for iPhone"}</Button>
-                {copyError && <p className="break-all text-sm text-destructive">Copy this link: {inviteUrl(ref)}</p>}
-                {copied && <Button asChild variant="outline"><a href={IOS_STORE_URL} target="_blank" rel="noopener noreferrer">View on App Store</a></Button>}
-              </div>
+              <p className="text-sm text-muted-foreground">Already installed? Tap “Open Aelixto” to follow @{ref} automatically when you sign up.</p>
             </div>}
 
             <form onSubmit={submit} className="mt-8 max-w-md rounded-3xl border border-border bg-card p-5">
