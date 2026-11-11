@@ -133,7 +133,7 @@ const NotificationSettings = () => {
 
   return (
     <div className="screen-nav bg-background">
-      <main className="mx-auto max-w-2xl px-4 py-6">
+      <main className="mx-auto max-w-2xl px-4 py-6" style={{ paddingTop: "calc(var(--safe-top) + 1.5rem)" }}>
         <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="-ml-2">
             <ArrowLeft className="h-5 w-5" />
