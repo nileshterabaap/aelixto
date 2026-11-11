@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { IOS_STORE_URL } from "@/lib/forceUpdate";
-import { inviteStoreUrl, inviteUrl } from "@/lib/inviteReferral";
+import { inviteStoreUrl } from "@/lib/inviteReferral";
 import { isValidUsername } from "@/lib/usernameRules";
 import { Button } from "@/components/ui/button";
 import hero from "@/assets/aelixto-launch-hero.jpg";
