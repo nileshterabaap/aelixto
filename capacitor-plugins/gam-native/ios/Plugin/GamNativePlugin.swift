@@ -263,9 +263,8 @@ public class GamNativePlugin: CAPPlugin, CAPBridgedPlugin, GADNativeAdLoaderDele
                 call.resolve(["dismissed": 0])
                 return
             }
-            center.removeDeliveredNotifications(withIdentifiers: matching.map { $0.request.identifier }) {
-                call.resolve(["dismissed": matching.count])
-            }
+            center.removeDeliveredNotifications(withIdentifiers: matching.map { $0.request.identifier })
+            call.resolve(["dismissed": matching.count])
         }
     }
 }
