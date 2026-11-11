@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Capacitor
 import UserNotifications
 import GoogleMobileAds
@@ -28,13 +29,29 @@ public class GamNativePlugin: CAPPlugin, CAPBridgedPlugin, GADNativeAdLoaderDele
         CAPPluginMethod(name: "presentNativeAd", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateNativeAdFrame", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "destroyAd", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "dismissNotifications", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "dismissNotifications", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "readInviteClipboard", returnType: CAPPluginReturnPromise)
     ]
 
     private var pendingLoads: [String: CAPPluginCall] = [:]
     private var loaders: [String: GADAdLoader] = [:]
     private var ads: [String: GADNativeAd] = [:]
     private var adViews: [String: GADNativeAdView] = [:]
+
+    @objc func readInviteClipboard(_ call: CAPPluginCall) {
+        // Never inspect clipboard content automatically: JS calls only after
+        // the person explicitly chooses to paste their invitation.
+        DispatchQueue.main.async {
+            guard let text = UIPasteboard.general.string,
+                  let parts = URLComponents(string: text),
+                  parts.scheme == "https", parts.host == "aelixto.com",
+                  parts.queryItems?.contains(where: { $0.name == "ref" }) == true else {
+                call.resolve(["url": ""])
+                return
+            }
+            call.resolve(["url": text])
+        }
+    }
 
     // MARK: - Init
 

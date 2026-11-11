@@ -1,11 +1,12 @@
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
 import { toast } from "sonner";
+import { inviteUrl } from "./inviteReferral";
 
-export const INVITE_REF_KEY = "aelixto-invite-ref";
+export { INVITE_REF_KEY } from "./inviteReferral";
 
 export function buildInviteText(username?: string | null): string {
-  const link = username ? `https://aelixto.com/?ref=${encodeURIComponent(username)}` : "https://aelixto.com";
+  const link = username ? inviteUrl(username) : "https://aelixto.com";
   return `Found something interesting on Instagram, YouTube, TikTok or elsewhere? Share it on Aelixto and bring your favourite finds to a place made for them.
 
 No algorithms deciding your feed — just content from people you choose to follow.

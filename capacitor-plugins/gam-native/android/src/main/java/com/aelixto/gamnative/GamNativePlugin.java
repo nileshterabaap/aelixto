@@ -26,6 +26,8 @@ import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.android.installreferrer.api.InstallReferrerClient;
+import com.android.installreferrer.api.InstallReferrerStateListener;
 
 import com.google.android.gms.ads.AdError;
 import com.google.android.gms.ads.AdListener;
@@ -63,6 +65,54 @@ public class GamNativePlugin extends Plugin {
     private final Map<String, NativeAd> ads = new HashMap<>();
     private final Map<String, ScrollForwardingAdFrame> adViews = new HashMap<>();
     private ConsentInformation consentInformation;
+
+    @PluginMethod
+    public void getInstallReferrer(PluginCall call) {
+        InstallReferrerClient client = InstallReferrerClient.newBuilder(getContext()).build();
+        java.util.concurrent.atomic.AtomicBoolean finished = new java.util.concurrent.atomic.AtomicBoolean(false);
+        android.os.Handler handler = new android.os.Handler(android.os.Looper.getMainLooper());
+        Runnable timeout = () -> {
+            if (finished.compareAndSet(false, true)) {
+                client.endConnection();
+                call.reject("Install referrer timed out");
+            }
+        };
+        handler.postDelayed(timeout, 8000);
+        try {
+            client.startConnection(new InstallReferrerStateListener() {
+                @Override public void onInstallReferrerSetupFinished(int code) {
+                    if (!finished.compareAndSet(false, true)) return;
+                    handler.removeCallbacks(timeout);
+                    try {
+                        JSObject result = new JSObject();
+                        if (code == InstallReferrerClient.InstallReferrerResponse.OK) {
+                            result.put("referrer", client.getInstallReferrer().getInstallReferrer());
+                            call.resolve(result);
+                        } else if (code == InstallReferrerClient.InstallReferrerResponse.FEATURE_NOT_SUPPORTED) {
+                            result.put("referrer", "");
+                            call.resolve(result);
+                        } else {
+                            call.reject("Install referrer unavailable");
+                        }
+                    } catch (Exception error) {
+                        call.reject("Unable to read install referrer", error);
+                    } finally { client.endConnection(); }
+                }
+                @Override public void onInstallReferrerServiceDisconnected() {
+                    if (!finished.compareAndSet(false, true)) return;
+                    handler.removeCallbacks(timeout);
+                    client.endConnection();
+                    call.reject("Install referrer disconnected");
+                }
+            });
+        } catch (Exception error) {
+            if (finished.compareAndSet(false, true)) {
+                handler.removeCallbacks(timeout);
+                client.endConnection();
+                call.reject("Unable to connect to install referrer", error);
+            }
+        }
+    }
 
     /**
      * All ad overlays live inside this clipping host instead of directly in the

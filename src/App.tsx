@@ -47,6 +47,9 @@ import AuthBridge from "./pages/AuthBridge";
 import Unsubscribe from "./pages/Unsubscribe";
 import ShortLinkRedirect from "./pages/ShortLinkRedirect";
 import Launch from "./pages/Launch";
+import { NativeInviteHandoff } from "@/components/NativeInviteHandoff";
+import { Capacitor } from "@capacitor/core";
+import { isValidUsername } from "@/lib/usernameRules";
 
 // Configure QueryClient with aggressive caching for instant navigation
 const queryClient = new QueryClient({
@@ -102,6 +105,12 @@ const AnimatedRoutes = () => {
     }
   ], []);
   
+  // Keep already-shared root invitation URLs usable for people without the app.
+  const rootInvite = new URLSearchParams(location.search).get("ref");
+  if (!Capacitor.isNativePlatform() && location.pathname === "/" && rootInvite && isValidUsername(rootInvite)) {
+    return <Launch />;
+  }
+
   return (
     <>
       {/* Keep-alive routes stay mounted, hidden with display:none */}
@@ -145,6 +154,7 @@ const AnimatedRoutes = () => {
           stays mounted across route changes and never flickers. */}
       <PersistentBottomNav />
       <AccountSwitcherHost />
+      <NativeInviteHandoff />
       <ForceUpdateGate />
     </>
   );
