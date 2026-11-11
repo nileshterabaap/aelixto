@@ -39,7 +39,7 @@ const AccountSettings = () => {
 
   return (
     <div className="screen-nav bg-background">
-      <main className="mx-auto max-w-2xl px-4 py-4">
+      <main className="mx-auto max-w-2xl px-4 py-4" style={{ paddingTop: "calc(var(--safe-top) + 1rem)" }}>
         <div className="flex items-center gap-3 mb-2">
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="-ml-2" aria-label="Back">
             <ArrowLeft className="h-5 w-5" />
