@@ -11,6 +11,7 @@ test("iPhone copied invitation preserves the same inviter", () => {
 });
 test("installed Android and iPhone accept the invitation scheme", () => {
   expect(referralFromUrl("aelixto://invite?ref=nilesh_maurya")).toBe("nilesh_maurya");
+  expect(referralFromUrl("com.aelixto.app10://invite?ref=nilesh_maurya")).toBe("nilesh_maurya");
 });
 test("clipboard handoff rejects other websites and invalid names", () => {
   expect(referralFromUrl("https://example.com/get?ref=nilesh_maurya")).toBeNull();

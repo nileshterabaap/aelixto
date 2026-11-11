@@ -72,7 +72,7 @@ export default function Launch() {
 
             {ref && <div className="mt-6 space-y-3">
               <p className="text-sm font-semibold">Invited by @{ref}</p>
-              <Button asChild variant="outline"><a href={`aelixto://invite?ref=${encodeURIComponent(ref)}`}>Open Aelixto</a></Button>
+              <Button asChild variant="outline"><a href={`com.aelixto.app10://invite?ref=${encodeURIComponent(ref)}`}>Open Aelixto</a></Button>
               <div className="space-y-3 border-t border-border pt-4">
                 <p className="text-sm text-muted-foreground">On iPhone, copy your invite before installing. Open Aelixto, choose “Paste invite” and allow pasting to follow your friend after signup.</p>
                 <Button onClick={copyInvite}>{copied ? "Invite copied" : "Copy invite for iPhone"}</Button>

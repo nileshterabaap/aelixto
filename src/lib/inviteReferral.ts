@@ -9,7 +9,7 @@ export function referralFromUrl(raw: string): string | null {
   try {
     const url = new URL(raw);
     const trusted = (url.protocol === "https:" && url.hostname === "aelixto.com") ||
-      (url.protocol === "aelixto:" && url.hostname === "invite");
+      (["aelixto:", "com.aelixto.app10:"].includes(url.protocol) && url.hostname === "invite");
     if (!trusted) return null;
     const ref = url.searchParams.get("ref");
     return ref && isValidUsername(ref) && ref === ref.trim() ? ref : null;

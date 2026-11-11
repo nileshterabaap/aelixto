@@ -30,11 +30,11 @@
 - [x] Inbox pull-to-refresh visibly spins and actually reloads
 
 ## Standalone Aelixto App Store landing page
-- [ ] Build an independently served landing page outside app navigation.
-- [ ] Add a secure Apple App Store waitlist email capture with Lovable Cloud storage.
+- [x] Build an independently served landing page outside app navigation.
+- [x] Add a secure Apple App Store waitlist email capture with Lovable Cloud storage.
 - [ ] Confirm page and submission flow; review this roadmap before completion.
 
 ## Invitations across installation
-- [ ] Carry Android invitations through Play Store installs and either launch method.
-- [ ] Add an explicit iPhone clipboard handoff and native invitation-link handling.
+- [x] Carry Android invitations through Play Store installs and either launch method.
+- [x] Add an explicit iPhone clipboard handoff and native invitation-link handling.
 - [ ] Verify referral rules and web handoff; native store-install checks require rebuilt phones.
