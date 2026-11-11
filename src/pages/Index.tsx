@@ -21,7 +21,7 @@ import { SwipeableView } from "@/components/SwipeableView";
 import { useFeedWithAds } from "@/hooks/useFeedWithAds";
 import { NativeFeedAd } from "@/components/ads/NativeFeedAd";
 import { observeFeedPostForAds } from "@/lib/adCadence";
-import { InviteButton } from "@/components/InviteButton";
+import { InviteButton, CaughtUpInvite } from "@/components/InviteButton";
 import { Search } from "lucide-react";
 const Index = () => {
   const navigate = useNavigate();
@@ -317,7 +317,7 @@ const Index = () => {
                 <p className="text-sm text-muted-foreground mt-2">
                   You've seen all recent posts from people you follow.
                 </p>
-                <InviteButton className="mt-6" />
+                <CaughtUpInvite className="mt-6" />
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -372,7 +372,7 @@ const Index = () => {
                   <p className="text-sm text-muted-foreground mt-1">
                     You've seen all recent posts from people you follow.
                   </p>
-                  <InviteButton className="mt-6" />
+                  <CaughtUpInvite className="mt-6" />
                 </div>
               )}
             </div>

@@ -4,7 +4,6 @@ export interface GamNativePlugin {
   /** Android Play Store attribution; empty for installs without a referrer. */
   getInstallReferrer(): Promise<{ referrer: string }>;
   /** iOS: reads only an Aelixto invitation, after explicit user permission. */
-  readInviteClipboard(): Promise<{ url: string }>;
   /** Initialize the Google Mobile Ads SDK. Safe to call multiple times. */
   initialize(options?: { testDeviceIds?: string[] }): Promise<{ status: string }>;
 
