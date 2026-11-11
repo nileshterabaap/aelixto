@@ -1,1 +1,1 @@
-- Invitations route to `/get?ref=…`; Android uses Play Install Referrer, iOS uses explicitly permitted clipboard handoff, and native links feed the same retryable follow hook. Never guess attribution or bypass privacy/block rules.
+- Invitations route to `/get?ref=…`; Android uses Play Install Referrer, iOS uses only invite deep links (no clipboard/paste step), and native links feed the same retryable follow hook. Never guess attribution or bypass privacy/block rules.
