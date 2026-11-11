@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { inviteStoreUrl } from "@/lib/inviteReferral";
+import { IOS_STORE_URL } from "@/lib/forceUpdate";
 import { isValidUsername } from "@/lib/usernameRules";
 import { Button } from "@/components/ui/button";
 import hero from "@/assets/aelixto-launch-hero.jpg";
@@ -13,6 +14,14 @@ export default function Launch() {
   const [msg, setMsg] = useState("");
   const incomingRef = new URLSearchParams(window.location.search).get("ref");
   const ref = incomingRef && isValidUsername(incomingRef) ? incomingRef : null;
+  useEffect(() => {
+    // Invite links on phones go straight to the store page.
+    if (!ref) return;
+    const ua = navigator.userAgent;
+    const ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+    if (/Android/i.test(ua)) window.location.replace(inviteStoreUrl(ref));
+    else if (ios) window.location.replace(IOS_STORE_URL);
+  }, [ref]);
   useEffect(() => {
     document.title = "Aelixto — Every feed, one place";
     const robots = document.createElement("meta");
