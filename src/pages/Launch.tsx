@@ -50,8 +50,8 @@ export default function Launch() {
           <span className="text-lg font-bold tracking-tight">Aelixto</span>
         </header>
 
-        <section className="mt-10 grid items-center gap-10 md:grid-cols-2">
-          <div>
+        <section className="mt-10 grid min-w-0 items-center gap-10 md:grid-cols-2">
+          <div className="min-w-0 break-words">
             <p className="text-sm font-semibold uppercase tracking-widest text-primary">One app. Every platform.</p>
             <h1 className="mt-4 text-4xl font-extrabold leading-tight tracking-tight md:text-6xl">
               All the posts you love, in a single feed.
@@ -89,7 +89,7 @@ export default function Launch() {
                 <p className="mt-3 text-sm text-primary">{msg}</p>
               ) : (
                 <>
-                  <div className="mt-3 flex gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     <input id="waitlist-email" type="email" required maxLength={255} value={email}
                       onChange={(e) => { setEmail(e.target.value); if (state === "error") setState("idle"); }}
                       placeholder="you@example.com"
@@ -114,7 +114,7 @@ export default function Launch() {
             ["Real people", "Follow friends, like, repost and chat."],
             ["Aelix Score", "See what's truly getting attention."],
           ].map(([t, d]) => (
-            <div key={t} className="rounded-3xl border border-border bg-card p-6">
+            <div key={t} className="min-w-0 rounded-3xl border border-border bg-card p-6">
               <h2 className="text-lg font-bold">{t}</h2>
               <p className="mt-2 text-muted-foreground">{d}</p>
             </div>

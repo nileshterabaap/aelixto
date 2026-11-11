@@ -37,4 +37,5 @@
 ## Invitations across installation
 - [x] Carry Android invitations through Play Store installs and either launch method.
 - [x] Add an explicit iPhone clipboard handoff and native invitation-link handling.
-- [ ] Verify referral rules and web handoff; native store-install checks require rebuilt phones.
+- [x] Verify referral rules and web handoff on desktop/mobile.
+- [ ] Verify actual Android/iPhone install-to-follow flows — requires published page and rebuilt phones; iPhone requires copying/allowing paste.
