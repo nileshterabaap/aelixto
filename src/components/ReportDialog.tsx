@@ -150,7 +150,7 @@ export const ReportDialog = ({
         onOpenChange(o);
       }}
     >
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md z-[120]" overlayClassName="z-[120]">
         <DialogHeader>
           <DialogTitle>
             Report {targetType === "post" ? "post" : `@${targetUsername ?? "user"}`}
