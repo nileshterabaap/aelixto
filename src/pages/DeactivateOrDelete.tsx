@@ -35,13 +35,24 @@ const DeactivateOrDelete = () => {
     await logOutCurrentAccount({ everywhere: true });
   };
 
-  // Delete: permanent, after typing DELETE.
+  // Delete: permanent, after confirming the account password.
+  // Google/Apple-only accounts have no password, so they confirm with the button alone.
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteText, setDeleteText] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const hasPassword = !!user?.email && (user?.identities ?? []).some((i) => i.provider === "email");
+  const canDelete = !hasPassword || deleteText.length > 0;
   const handleDelete = async () => {
-    if (deleting || deleteText.trim().toUpperCase() !== "DELETE") return;
+    if (deleting || !canDelete) return;
     setDeleting(true);
+    if (hasPassword) {
+      const { error: pwError } = await supabase.auth.signInWithPassword({ email: user!.email!, password: deleteText });
+      if (pwError) {
+        setDeleting(false);
+        toast({ title: "Wrong password", description: "Please check your password and try again.", variant: "destructive" });
+        return;
+      }
+    }
     const { data, error } = await supabase.functions.invoke("delete-account", { body: { confirm: "DELETE" } });
     if (error || !(data as { ok?: boolean } | null)?.ok) {
       setDeleting(false);
@@ -144,23 +155,25 @@ const DeactivateOrDelete = () => {
               This deletes your profile, posts, likes, comments, followers, chats and photos forever. It can't be undone.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 py-2">
-            <Label htmlFor="delete-confirm">Type DELETE to confirm</Label>
-            <Input
-              id="delete-confirm"
-              value={deleteText}
-              onChange={(e) => setDeleteText(e.target.value)}
-              placeholder="DELETE"
-              autoComplete="off"
-              autoCapitalize="characters"
-            />
-          </div>
+          {hasPassword && (
+            <div className="space-y-2 py-2">
+              <Label htmlFor="delete-confirm">Enter your password to confirm</Label>
+              <Input
+                id="delete-confirm"
+                type="password"
+                value={deleteText}
+                onChange={(e) => setDeleteText(e.target.value)}
+                placeholder="Password"
+                autoComplete="current-password"
+              />
+            </div>
+          )}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</Button>
             <Button
               variant="destructive"
               onClick={handleDelete}
-              disabled={deleting || deleteText.trim().toUpperCase() !== "DELETE"}
+              disabled={deleting || !canDelete}
             >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Delete account"}
             </Button>
