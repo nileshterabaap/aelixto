@@ -47,6 +47,7 @@ import AuthBridge from "./pages/AuthBridge";
 import Unsubscribe from "./pages/Unsubscribe";
 import ShortLinkRedirect from "./pages/ShortLinkRedirect";
 import Launch from "./pages/Launch";
+import { NativeInviteHandoff } from "@/components/NativeInviteHandoff";
 
 // Configure QueryClient with aggressive caching for instant navigation
 const queryClient = new QueryClient({
@@ -145,6 +146,7 @@ const AnimatedRoutes = () => {
           stays mounted across route changes and never flickers. */}
       <PersistentBottomNav />
       <AccountSwitcherHost />
+      <NativeInviteHandoff />
       <ForceUpdateGate />
     </>
   );

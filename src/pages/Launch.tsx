@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ANDROID_STORE_URL } from "@/lib/forceUpdate";
+import { IOS_STORE_URL } from "@/lib/forceUpdate";
+import { inviteStoreUrl, inviteUrl, referralFromUrl } from "@/lib/inviteReferral";
+import { Button } from "@/components/ui/button";
 import hero from "@/assets/aelixto-launch-hero.jpg";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
@@ -9,6 +11,16 @@ export default function Launch() {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<"idle" | "saving" | "done" | "error">("idle");
   const [msg, setMsg] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+  const ref = referralFromUrl(window.location.href);
+  const copyInvite = async () => {
+    if (!ref) return;
+    try {
+      await navigator.clipboard.writeText(inviteUrl(ref));
+      setCopied(true); setCopyError(false);
+    } catch { setCopyError(true); }
+  };
 
   useEffect(() => {
     document.title = "Aelixto — Every feed, one place";
@@ -47,7 +59,7 @@ export default function Launch() {
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <a href={ANDROID_STORE_URL} target="_blank" rel="noopener noreferrer"
+              <a href={inviteStoreUrl(ref)} target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-3 rounded-2xl bg-foreground px-5 py-3 text-background transition-transform active:scale-95">
                 <svg viewBox="0 0 24 24" className="h-7 w-7" fill="currentColor" aria-hidden="true"><path d="M3.6 1.8 13.8 12 3.6 22.2c-.4-.2-.6-.6-.6-1.1V2.9c0-.5.2-.9.6-1.1Zm11.3 11.3 2.4 2.4-11 6.3 8.6-8.7Zm3.6-3.6 2.8 1.6c.8.5.8 1.3 0 1.8l-2.8 1.6-2.6-2.5 2.6-2.5ZM6.3 2.2l11 6.3-2.4 2.4-8.6-8.7Z"/></svg>
                 <span className="text-left leading-tight"><span className="block text-xs opacity-80">Available on</span><span className="block text-lg font-semibold">Play Store</span></span>
@@ -57,6 +69,17 @@ export default function Launch() {
                 <span className="text-left leading-tight"><span className="block text-xs">Coming soon on</span><span className="block text-lg font-semibold">App Store</span></span>
               </div>
             </div>
+
+            {ref && <div className="mt-6 space-y-3">
+              <p className="text-sm font-semibold">Invited by @{ref}</p>
+              <Button asChild variant="outline"><a href={`aelixto://invite?ref=${encodeURIComponent(ref)}`}>Open Aelixto</a></Button>
+              <div className="space-y-3 border-t border-border pt-4">
+                <p className="text-sm text-muted-foreground">On iPhone, copy your invite before installing. Open Aelixto, choose “Paste invite” and allow pasting to follow your friend after signup.</p>
+                <Button onClick={copyInvite}>{copied ? "Invite copied" : "Copy invite for iPhone"}</Button>
+                {copyError && <p className="break-all text-sm text-destructive">Copy this link: {inviteUrl(ref)}</p>}
+                {copied && <Button asChild variant="outline"><a href={IOS_STORE_URL} target="_blank" rel="noopener noreferrer">View on App Store</a></Button>}
+              </div>
+            </div>}
 
             <form onSubmit={submit} className="mt-8 max-w-md rounded-3xl border border-border bg-card p-5">
               <label htmlFor="waitlist-email" className="text-sm font-semibold">On iPhone? Get notified when we launch.</label>
