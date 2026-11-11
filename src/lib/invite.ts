@@ -21,7 +21,14 @@ export async function shareInvite(username?: string | null) {
   const text = buildInviteText(username);
   try {
     if (Capacitor.isNativePlatform()) {
-      await Share.share({ text, dialogTitle: "Let's Invite" });
+      // iOS lists apps like Instagram/WhatsApp only when a real link is
+      // shared, so the link goes in `url` and the message stays in `text`.
+      if (Capacitor.getPlatform() === "ios" && username) {
+        const link = inviteUrl(username);
+        await Share.share({ text: text.replace(link, "").trimEnd(), url: link, dialogTitle: "Let's Invite" });
+      } else {
+        await Share.share({ text, dialogTitle: "Let's Invite" });
+      }
       return;
     }
     if (navigator.share) {
