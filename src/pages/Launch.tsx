@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { IOS_STORE_URL } from "@/lib/forceUpdate";
-import { inviteStoreUrl, inviteUrl, referralFromUrl } from "@/lib/inviteReferral";
+import { inviteStoreUrl, inviteUrl } from "@/lib/inviteReferral";
+import { isValidUsername } from "@/lib/usernameRules";
 import { Button } from "@/components/ui/button";
 import hero from "@/assets/aelixto-launch-hero.jpg";
 
@@ -13,7 +14,8 @@ export default function Launch() {
   const [msg, setMsg] = useState("");
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
-  const ref = referralFromUrl(window.location.href);
+  const incomingRef = new URLSearchParams(window.location.search).get("ref");
+  const ref = incomingRef && isValidUsername(incomingRef) ? incomingRef : null;
   const copyInvite = async () => {
     if (!ref) return;
     try {
